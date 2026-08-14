@@ -1,16 +1,46 @@
+/* Hide scrollbar for Chrome, Safari and Opera */
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
 }
 
+/* Hide scrollbar for IE, Edge and Firefox */
 .hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 
-.flex-grow-1 {
-  flex-grow: 1;
+/* Global Safe Area Utility Classes */
+.safe-padding-top {
+  padding-top: var(--safe-area-top) !important;
 }
 
-.w-100 {
-  width: 100%;
+.safe-padding-bottom {
+  padding-bottom: var(--safe-area-bottom) !important;
+}
+
+.safe-padding-left {
+  padding-left: var(--safe-area-left) !important;
+}
+
+.safe-padding-right {
+  padding-right: var(--safe-area-right) !important;
+}
+
+.safe-inset {
+  padding-top: var(--safe-area-top) !important;
+  padding-bottom: var(--safe-area-bottom) !important;
+  padding-left: var(--safe-area-left) !important;
+  padding-right: var(--safe-area-right) !important;
+}
+
+.safe-header-top {
+  padding-top: calc(var(--safe-area-top) + 16px) !important;
+}
+
+.safe-floating-top {
+  top: calc(var(--safe-area-top) + 16px) !important;
+}
+
+.safe-sheet-bottom {
+  padding-bottom: calc(var(--safe-area-bottom) + 24px) !important;
 }

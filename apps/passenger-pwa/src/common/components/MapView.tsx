@@ -1,8 +1,11 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import MapIcon from "@mui/icons-material/Map";
-import { APIProvider, Map, Marker, useMap } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, Marker, useMap, useMapsLibrary } from "@vis.gl/react-google-maps";
+import { DEFAULT_CALAPAN_CENTER } from "../../services/locationService";
+
+declare const google: any;
 
 export interface MapViewProps {
   center?: { lat: number; lng: number };
@@ -16,37 +19,104 @@ export interface MapViewProps {
   interactive?: boolean;
 }
 
-const DEFAULT_CALAPAN_CENTER = { lat: 13.4115, lng: 121.1803 };
-
-// Simulated tricycle drivers around Calapan City
+// Simulated active TODA drivers around Calapan City
 const NEARBY_DRIVERS = [
-  { id: "driver_1", lat: 13.4140, lng: 121.1820, name: "Tricycle Driver #104" },
-  { id: "driver_2", lat: 13.4080, lng: 121.1760, name: "Tricycle Driver #215" },
-  { id: "driver_3", lat: 13.4200, lng: 121.1850, name: "Tricycle Driver #088" },
+  { id: "driver_1", lat: 13.4140, lng: 121.1820, name: "TODA #104" },
+  { id: "driver_2", lat: 13.4080, lng: 121.1760, name: "TODA #215" },
+  { id: "driver_3", lat: 13.4200, lng: 121.1850, name: "TODA #088" },
 ];
 
-// Helper sub-component to dynamically control map centering
-const MapPanController: React.FC<{
+/**
+ * Subcomponent to smoothly pan and adjust Google Maps camera
+ */
+const MapCameraController: React.FC<{
   center: { lat: number; lng: number };
   zoom: number;
+  pickupLocation?: { lat: number; lng: number } | null;
+  dropoffLocation?: { lat: number; lng: number } | null;
   recenterTrigger?: number;
-}> = ({ center, zoom, recenterTrigger }) => {
+}> = ({ center, zoom, pickupLocation, dropoffLocation, recenterTrigger }) => {
   const map = useMap();
+  const coreLib = useMapsLibrary("core");
 
   useEffect(() => {
-    if (map && center) {
+    if (!map) return;
+
+    if (pickupLocation && dropoffLocation && coreLib) {
+      const bounds = new coreLib.LatLngBounds();
+      bounds.extend({ lat: pickupLocation.lat, lng: pickupLocation.lng });
+      bounds.extend({ lat: dropoffLocation.lat, lng: dropoffLocation.lng });
+      map.fitBounds(bounds, { top: 80, bottom: 80, left: 40, right: 40 });
+    } else if (center) {
       map.panTo(center);
       if (zoom) map.setZoom(zoom);
     }
-  }, [map, center, zoom, recenterTrigger]);
+  }, [map, coreLib, center, zoom, pickupLocation, dropoffLocation, recenterTrigger]);
 
   return null;
 };
 
-const MapView: React.FC<MapViewProps> = ({
-  center = DEFAULT_CALAPAN_CENTER,
+/**
+ * Subcomponent to render route directions polyline between pickup and dropoff
+ */
+const DirectionsPolylineRenderer: React.FC<{
+  pickup: { lat: number; lng: number };
+  dropoff: { lat: number; lng: number };
+}> = ({ pickup, dropoff }) => {
+  const map = useMap();
+  const routesLib = useMapsLibrary("routes");
+  const mapsLib = useMapsLibrary("maps");
+  const polylineRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!map || !routesLib || !mapsLib || !pickup || !dropoff) return;
+
+    const directionsService = new routesLib.DirectionsService();
+
+    directionsService.route(
+      {
+        origin: { lat: pickup.lat, lng: pickup.lng },
+        destination: { lat: dropoff.lat, lng: dropoff.lng },
+        travelMode: google.maps.TravelMode.DRIVING,
+      },
+      (result: any, status: any) => {
+        if (status === "OK" && result) {
+          if (polylineRef.current) {
+            polylineRef.current.setMap(null);
+          }
+
+          const path = result.routes[0].overview_path;
+          const polyline = new mapsLib.Polyline({
+            path: path,
+            strokeColor: "#FF6B00",
+            strokeOpacity: 0.9,
+            strokeWeight: 5,
+            map: map,
+          });
+
+          polylineRef.current = polyline;
+        }
+      }
+    );
+
+    return () => {
+      if (polylineRef.current) {
+        polylineRef.current.setMap(null);
+        polylineRef.current = null;
+      }
+    };
+  }, [map, routesLib, mapsLib, pickup.lat, pickup.lng, dropoff.lat, dropoff.lng]);
+
+  return null;
+};
+
+/**
+ * MapView - Real Google Maps Component powered by @vis.gl/react-google-maps
+ */
+export const MapView: React.FC<MapViewProps> = ({
+  center = { lat: DEFAULT_CALAPAN_CENTER.latitude, lng: DEFAULT_CALAPAN_CENTER.longitude },
   zoom = 15,
-  userLocation = DEFAULT_CALAPAN_CENTER,
+  userLocation,
   pickupLocation,
   dropoffLocation,
   recenterTrigger = 0,
@@ -57,7 +127,7 @@ const MapView: React.FC<MapViewProps> = ({
   const apiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || "";
   const effectiveCenter = userLocation || center;
 
-  // Custom SVG Marker icon URLs / Data URIs
+  // Custom marker icon definitions
   const userPinIcon = "https://maps.google.com/mapfiles/ms/icons/orange-dot.png";
   const pickupPinIcon = "https://maps.google.com/mapfiles/ms/icons/green-dot.png";
   const dropoffPinIcon = "https://maps.google.com/mapfiles/ms/icons/red-dot.png";
@@ -78,7 +148,6 @@ const MapView: React.FC<MapViewProps> = ({
       }}
     >
       {apiKey ? (
-        /* Real Google Maps API Component when key is configured */
         <APIProvider apiKey={apiKey}>
           <Map
             defaultCenter={effectiveCenter}
@@ -87,14 +156,16 @@ const MapView: React.FC<MapViewProps> = ({
             gestureHandling={interactive ? "greedy" : "none"}
             style={{ width: "100%", height: "100%" }}
           >
-            {/* Map centering controller */}
-            <MapPanController
+            {/* Camera pan/fit controller */}
+            <MapCameraController
               center={effectiveCenter}
               zoom={zoom}
+              pickupLocation={pickupLocation}
+              dropoffLocation={dropoffLocation}
               recenterTrigger={recenterTrigger}
             />
 
-            {/* User Current Location Marker */}
+            {/* Real User GPS Location Marker */}
             {userLocation && (
               <Marker
                 position={userLocation}
@@ -116,7 +187,7 @@ const MapView: React.FC<MapViewProps> = ({
               />
             )}
 
-            {/* Dropoff Marker */}
+            {/* Destination Dropoff Marker */}
             {dropoffLocation && (
               <Marker
                 position={dropoffLocation}
@@ -127,7 +198,7 @@ const MapView: React.FC<MapViewProps> = ({
               />
             )}
 
-            {/* Nearby Tricycle Drivers Markers */}
+            {/* Nearby TODA Tricycle Driver Markers */}
             {NEARBY_DRIVERS.map((driver) => (
               <Marker
                 key={driver.id}
@@ -138,6 +209,14 @@ const MapView: React.FC<MapViewProps> = ({
                 }}
               />
             ))}
+
+            {/* Route Polyline when both pickup and dropoff exist */}
+            {pickupLocation && dropoffLocation && (
+              <DirectionsPolylineRenderer
+                pickup={pickupLocation}
+                dropoff={dropoffLocation}
+              />
+            )}
           </Map>
         </APIProvider>
       ) : (
@@ -189,8 +268,8 @@ const MapView: React.FC<MapViewProps> = ({
               fontFamily: "Poppins, sans-serif",
             }}
           >
-            Please set <code>VITE_GOOGLE_MAPS_API_KEY</code> in{" "}
-            <code>apps/passenger-pwa/.env</code> to load live Google Maps tiles.
+            Please configure <code>VITE_GOOGLE_MAPS_API_KEY</code> in{" "}
+            <code>apps/passenger-pwa/.env</code> to load live Google Maps.
           </Typography>
         </Box>
       )}

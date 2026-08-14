@@ -226,244 +226,264 @@ const BookSummary: React.FC = () => {
   };
 
   return (
-    <Box className="app-container">
+    <Box
+      sx={{
+        width: "100%",
+        height: "100%",
+        backgroundColor: "#F8FAFC",
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+      }}
+    >
+      {/* Header respecting safe-area-inset-top */}
       <Box
-        component="main"
-        className="phone-simulator hide-scrollbar"
         sx={{
-          backgroundColor: "#F8FAFC",
           display: "flex",
-          flexDirection: "column",
-          position: "relative",
-          padding: "24px 20px",
+          alignItems: "center",
+          paddingTop: "calc(var(--safe-area-top) + 16px)",
+          paddingBottom: "16px",
+          paddingLeft: "20px",
+          paddingRight: "20px",
         }}
       >
-        {/* Header */}
-        <Box sx={{ display: "flex", alignItems: "center", marginTop: "20px", marginBottom: "20px" }}>
-          <IconButton onClick={() => navigate("/new-trip")} sx={{ color: "#0F172A", padding: 0 }}>
-            <ArrowBackIcon />
-          </IconButton>
-          <Typography sx={{ fontSize: "18px", fontWeight: 800, marginLeft: "12px", color: "#0F172A" }}>
-            {language === "tl" ? "Kumpirmahin ang Biyahe" : "Booking Details"}
-          </Typography>
-        </Box>
+        <IconButton onClick={() => navigate("/new-trip")} sx={{ color: "#0F172A", padding: 0 }}>
+          <ArrowBackIcon />
+        </IconButton>
+        <Typography sx={{ fontSize: "18px", fontWeight: 800, marginLeft: "12px", color: "#0F172A" }}>
+          {language === "tl" ? "Kumpirmahin ang Biyahe" : "Booking Details"}
+        </Typography>
+      </Box>
 
-        {errorMessage && (
+      {errorMessage && (
+        <Box sx={{ paddingX: "20px" }}>
           <Alert severity="error" sx={{ borderRadius: "12px", marginBottom: "16px" }}>
             {errorMessage}
           </Alert>
-        )}
+        </Box>
+      )}
 
-        {loading ? (
-          <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: "16px" }}>
-            <CircularProgress sx={{ color: "#FF6B00" }} />
-            <Typography sx={{ fontSize: "14px", fontWeight: 600, color: "#64748B" }}>
-              {language === "tl" ? "Kinakalkula ang distansya at pamasahe..." : "Calculating distance & fare..."}
-            </Typography>
-          </Box>
-        ) : (
-          <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", gap: "20px", paddingBottom: "32px" }}>
-            {/* Route Summary Card */}
-            <Paper
-              elevation={0}
-              sx={{
-                padding: "18px",
-                borderRadius: "20px",
-                border: "1px solid #E2E8F0",
-                backgroundColor: "#FFFFFF",
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px",
-              }}
-            >
-              {/* Pickup Address */}
-              <Box sx={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                <LocationOnIcon sx={{ color: "#34A853", marginTop: "2px" }} />
-                <Box>
-                  <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8" }}>
-                    {language === "tl" ? "MULA SA (PICKUP)" : "PICKUP POINT"}
-                  </Typography>
-                  <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#334155" }}>
-                    {pickup?.address}
-                  </Typography>
-                </Box>
-              </Box>
-
-              <Box sx={{ borderLeft: "2px dashed #CBD5E1", height: "16px", marginLeft: "11px", marginTop: "-12px", marginBottom: "-12px" }} />
-
-              {/* Dropoff Address */}
-              <Box sx={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                <LocationOnIcon sx={{ color: "#EF4444", marginTop: "2px" }} />
-                <Box>
-                  <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8" }}>
-                    {language === "tl" ? "PUPUNTA SA (DESTINASYON)" : "DESTINATION"}
-                  </Typography>
-                  <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#334155" }}>
-                    {dropoff?.address}
-                  </Typography>
-                </Box>
-              </Box>
-            </Paper>
-
-            {/* Trip Parameters Info */}
-            <Paper
-              elevation={0}
-              sx={{
-                padding: "16px 20px",
-                borderRadius: "20px",
-                border: "1px solid #E2E8F0",
-                backgroundColor: "#FFFFFF",
-                display: "flex",
-                flexDirection: "column",
-                gap: "12px",
-              }}
-            >
-              {/* Distance Detail */}
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Box sx={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <RouteIcon sx={{ color: "#FF6B00", fontSize: "20px" }} />
-                  <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#475569" }}>
-                    {language === "tl" ? "Distansya" : "Distance"}
-                  </Typography>
-                </Box>
-                <Box sx={{ textAlign: "right" }}>
-                  <Typography sx={{ fontSize: "14px", fontWeight: 800, color: "#0F172A" }}>
-                    {distance} km
-                  </Typography>
-                  <Typography sx={{ fontSize: "9px", color: "#94A3B8", fontWeight: 600 }}>
-                    {distanceSource === "osrm" ? "via OSRM road-network" : "estimated road distance"}
-                  </Typography>
-                </Box>
-              </Box>
-
-              <Box sx={{ borderBottom: "1px solid #F1F5F9" }} />
-
-              {/* Service Type Detail */}
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Box sx={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <LocalTaxiIcon sx={{ color: "#FF6B00", fontSize: "20px" }} />
-                  <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#475569" }}>
-                    {language === "tl" ? "Uri ng Biyahe" : "Trip Type"}
-                  </Typography>
-                </Box>
-                <Typography sx={{ fontSize: "14px", fontWeight: 800, color: tripType === "Solo" ? "#FF6B00" : "#34A853" }}>
-                  {tripType === "Solo" ? "Solo Trip" : "Shared Trip"}
+      {loading ? (
+        <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: "16px" }}>
+          <CircularProgress sx={{ color: "#FF6B00" }} />
+          <Typography sx={{ fontSize: "14px", fontWeight: 600, color: "#64748B" }}>
+            {language === "tl" ? "Kinakalkula ang distansya at pamasahe..." : "Calculating distance & fare..."}
+          </Typography>
+        </Box>
+      ) : (
+        <Box
+          className="hide-scrollbar"
+          sx={{
+            flexGrow: 1,
+            overflowY: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: "20px",
+            padding: "0 20px 16px 20px",
+          }}
+        >
+          {/* Route Summary Card */}
+          <Paper
+            elevation={0}
+            sx={{
+              padding: "18px",
+              borderRadius: "20px",
+              border: "1px solid #E2E8F0",
+              backgroundColor: "#FFFFFF",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+            }}
+          >
+            {/* Pickup Address */}
+            <Box sx={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+              <LocationOnIcon sx={{ color: "#34A853", marginTop: "2px" }} />
+              <Box>
+                <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8" }}>
+                  {language === "tl" ? "MULA SA (PICKUP)" : "PICKUP POINT"}
+                </Typography>
+                <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#334155" }}>
+                  {pickup?.address}
                 </Typography>
               </Box>
+            </Box>
 
-              <Box sx={{ borderBottom: "1px solid #F1F5F9" }} />
+            <Box sx={{ borderLeft: "2px dashed #CBD5E1", height: "16px", marginLeft: "11px", marginTop: "-12px", marginBottom: "-12px" }} />
 
-              {/* Passenger Detail */}
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <Box sx={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <PersonIcon sx={{ color: "#FF6B00", fontSize: "20px" }} />
-                  <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#475569" }}>
-                    {language === "tl" ? "Bilang ng Pasahero" : "Passenger Count"}
-                  </Typography>
-                </Box>
+            {/* Dropoff Address */}
+            <Box sx={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+              <LocationOnIcon sx={{ color: "#EF4444", marginTop: "2px" }} />
+              <Box>
+                <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#94A3B8" }}>
+                  {language === "tl" ? "PUPUNTA SA (DESTINASYON)" : "DESTINATION"}
+                </Typography>
+                <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#334155" }}>
+                  {dropoff?.address}
+                </Typography>
+              </Box>
+            </Box>
+          </Paper>
+
+          {/* Trip Parameters Info */}
+          <Paper
+            elevation={0}
+            sx={{
+              padding: "16px 20px",
+              borderRadius: "20px",
+              border: "1px solid #E2E8F0",
+              backgroundColor: "#FFFFFF",
+              display: "flex",
+              flexDirection: "column",
+              gap: "12px",
+            }}
+          >
+            {/* Distance Detail */}
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <Box sx={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <RouteIcon sx={{ color: "#FF6B00", fontSize: "20px" }} />
+                <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#475569" }}>
+                  {language === "tl" ? "Distansya" : "Distance"}
+                </Typography>
+              </Box>
+              <Box sx={{ textAlign: "right" }}>
                 <Typography sx={{ fontSize: "14px", fontWeight: 800, color: "#0F172A" }}>
-                  {passengers} {passengers > 1 ? "seats" : "seat"}
+                  {distance} km
+                </Typography>
+                <Typography sx={{ fontSize: "9px", color: "#94A3B8", fontWeight: 600 }}>
+                  {distanceSource === "osrm" ? "via OSRM road-network" : "estimated road distance"}
                 </Typography>
               </Box>
-            </Paper>
+            </Box>
 
-            {/* Fare Presentation Box */}
-            <Paper
-              elevation={0}
+            <Box sx={{ borderBottom: "1px solid #F1F5F9" }} />
+
+            {/* Service Type Detail */}
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <Box sx={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <LocalTaxiIcon sx={{ color: "#FF6B00", fontSize: "20px" }} />
+                <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#475569" }}>
+                  {language === "tl" ? "Uri ng Biyahe" : "Trip Type"}
+                </Typography>
+              </Box>
+              <Typography sx={{ fontSize: "14px", fontWeight: 800, color: tripType === "Solo" ? "#FF6B00" : "#34A853" }}>
+                {tripType === "Solo" ? "Solo Trip" : "Shared Trip"}
+              </Typography>
+            </Box>
+
+            <Box sx={{ borderBottom: "1px solid #F1F5F9" }} />
+
+            {/* Passenger Detail */}
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <Box sx={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <PersonIcon sx={{ color: "#FF6B00", fontSize: "20px" }} />
+                <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#475569" }}>
+                  {language === "tl" ? "Bilang ng Pasahero" : "Passenger Count"}
+                </Typography>
+              </Box>
+              <Typography sx={{ fontSize: "14px", fontWeight: 800, color: "#0F172A" }}>
+                {passengers} {passengers > 1 ? "seats" : "seat"}
+              </Typography>
+            </Box>
+          </Paper>
+
+          {/* Fare Presentation Box */}
+          <Paper
+            elevation={0}
+            sx={{
+              padding: "20px",
+              borderRadius: "24px",
+              background: "linear-gradient(135deg, #1F1F1F 0%, #0A0A0A 100%)",
+              color: "#FFFFFF",
+              boxShadow: "0 12px 24px rgba(0,0,0,0.15)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+              position: "relative",
+              overflow: "hidden",
+            }}
+          >
+            {/* Graphic background highlights */}
+            <Box
               sx={{
-                padding: "20px",
-                borderRadius: "24px",
-                background: "linear-gradient(135deg, #1F1F1F 0%, #0A0A0A 100%)",
-                color: "#FFFFFF",
-                boxShadow: "0 12px 24px rgba(0,0,0,0.15)",
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px",
-                position: "relative",
-                overflow: "hidden",
+                position: "absolute",
+                right: "-20px",
+                top: "-20px",
+                width: "120px",
+                height: "120px",
+                borderRadius: "50%",
+                backgroundColor: "rgba(255, 107, 0, 0.1)",
+                filter: "blur(10px)",
               }}
-            >
-              {/* Graphic background highlights */}
-              <Box
-                sx={{
-                  position: "absolute",
-                  right: "-20px",
-                  top: "-20px",
-                  width: "120px",
-                  height: "120px",
-                  borderRadius: "50%",
-                  backgroundColor: "rgba(255, 107, 0, 0.1)",
-                  filter: "blur(10px)",
-                }}
-              />
+            />
 
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <Box sx={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <AccountBalanceWalletIcon sx={{ color: "#FF6B00" }} />
-                  <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#94A3B8" }}>
-                    {language === "tl" ? "ESTIMASYON NG PAMASAHE" : "ESTIMATED FARE"}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
-                  <Typography sx={{ fontSize: "16px", fontWeight: 800, color: "#FF6B00" }}>
-                    ₱
-                  </Typography>
-                  <Typography sx={{ fontSize: "32px", fontWeight: 800, color: "#FFFFFF", lineHeight: 1 }}>
-                    {fare.toFixed(2)}
-                  </Typography>
-                </Box>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <Box sx={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <AccountBalanceWalletIcon sx={{ color: "#FF6B00" }} />
+                <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#94A3B8" }}>
+                  {language === "tl" ? "ESTIMASYON NG PAMASAHE" : "ESTIMATED FARE"}
+                </Typography>
               </Box>
-
-              <Box sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }} />
-
-              {/* Fare calculation rules explained */}
-              <Box sx={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {tripType === "Solo" ? (
-                  <>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#94A3B8" }}>
-                      <Typography>{language === "tl" ? "Bawat Upuan (Seat Fare):" : "Fare per seat:"}</Typography>
-                      <Typography>₱{seatFare.toFixed(2)}</Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#94A3B8" }}>
-                      <Typography>{language === "tl" ? "Solo Trip multiplier:" : "Full capacity multiplier:"}</Typography>
-                      <Typography>× 4</Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", gap: "6px", alignItems: "flex-start", marginTop: "4px", backgroundColor: "rgba(255, 107, 0, 0.08)", padding: "10px", borderRadius: "12px" }}>
-                      <InfoIcon sx={{ color: "#FF6B00", fontSize: "16px", marginTop: "2px" }} />
-                      <Typography sx={{ fontSize: "10px", color: "#FF8533", lineHeight: 1.4 }}>
-                        {language === "tl"
-                          ? "Dahil ito ay Solo Trip, sisingilin ang kabuuang pamasahe para sa buong kapasidad ng tricycle (4 na upuan), kahit ilan pa ang sumakay."
-                          : "As a Solo Trip, the total fare represents the exclusive capacity of the tricycle (4 seats multiplied), regardless of passenger headcount entered."}
-                      </Typography>
-                    </Box>
-                  </>
-                ) : (
-                  <>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#94A3B8" }}>
-                      <Typography>{language === "tl" ? "Bawat Upuan (Seat Fare):" : "Fare per seat:"}</Typography>
-                      <Typography>₱{seatFare.toFixed(2)}</Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#94A3B8" }}>
-                      <Typography>{language === "tl" ? "Bilang ng Upuan (Carpool):" : "Seats booked (Carpool):"}</Typography>
-                      <Typography>1 seat</Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", gap: "6px", alignItems: "flex-start", marginTop: "4px", backgroundColor: "rgba(52, 168, 83, 0.08)", padding: "10px", borderRadius: "12px" }}>
-                      <InfoIcon sx={{ color: "#34A853", fontSize: "16px", marginTop: "2px" }} />
-                      <Typography sx={{ fontSize: "10px", color: "#81C784", lineHeight: 1.4 }}>
-                        {language === "tl"
-                          ? "Makatipid sa Shared Trip! Magbabayad ka lamang para sa isang upuan habang nakikibahagi sa ibang pasahero."
-                          : "Save with Shared Trip! You only pay for your individual seat portion while sharing the vehicle with other bookers."}
-                      </Typography>
-                    </Box>
-                  </>
-                )}
+              <Box sx={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
+                <Typography sx={{ fontSize: "16px", fontWeight: 800, color: "#FF6B00" }}>
+                  ₱
+                </Typography>
+                <Typography sx={{ fontSize: "32px", fontWeight: 800, color: "#FFFFFF", lineHeight: 1 }}>
+                  {fare.toFixed(2)}
+                </Typography>
               </Box>
-            </Paper>
-          </Box>
-        )}
+            </Box>
 
-        {/* Action Button */}
-        {!loading && (
+            <Box sx={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }} />
+
+            {/* Fare calculation rules explained */}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {tripType === "Solo" ? (
+                <>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#94A3B8" }}>
+                    <Typography>{language === "tl" ? "Bawat Upuan (Seat Fare):" : "Fare per seat:"}</Typography>
+                    <Typography>₱{seatFare.toFixed(2)}</Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#94A3B8" }}>
+                    <Typography>{language === "tl" ? "Solo Trip multiplier:" : "Full capacity multiplier:"}</Typography>
+                    <Typography>× 4</Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", gap: "6px", alignItems: "flex-start", marginTop: "4px", backgroundColor: "rgba(255, 107, 0, 0.08)", padding: "10px", borderRadius: "12px" }}>
+                    <InfoIcon sx={{ color: "#FF6B00", fontSize: "16px", marginTop: "2px" }} />
+                    <Typography sx={{ fontSize: "10px", color: "#FF8533", lineHeight: 1.4 }}>
+                      {language === "tl"
+                        ? "Dahil ito ay Solo Trip, sisingilin ang kabuuang pamasahe para sa buong kapasidad ng tricycle (4 na upuan), kahit ilan pa ang sumakay."
+                        : "As a Solo Trip, the total fare represents the exclusive capacity of the tricycle (4 seats multiplied), regardless of passenger headcount entered."}
+                    </Typography>
+                  </Box>
+                </>
+              ) : (
+                <>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#94A3B8" }}>
+                    <Typography>{language === "tl" ? "Bawat Upuan (Seat Fare):" : "Fare per seat:"}</Typography>
+                    <Typography>₱{seatFare.toFixed(2)}</Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#94A3B8" }}>
+                    <Typography>{language === "tl" ? "Bilang ng Upuan (Carpool):" : "Seats booked (Carpool):"}</Typography>
+                    <Typography>1 seat</Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", gap: "6px", alignItems: "flex-start", marginTop: "4px", backgroundColor: "rgba(52, 168, 83, 0.08)", padding: "10px", borderRadius: "12px" }}>
+                    <InfoIcon sx={{ color: "#34A853", fontSize: "16px", marginTop: "2px" }} />
+                    <Typography sx={{ fontSize: "10px", color: "#81C784", lineHeight: 1.4 }}>
+                      {language === "tl"
+                        ? "Makatipid sa Shared Trip! Magbabayad ka lamang para sa isang upuan habang nakikibahagi sa ibang pasahero."
+                        : "Save with Shared Trip! You only pay for your individual seat portion while sharing the vehicle with other bookers."}
+                    </Typography>
+                  </Box>
+                </>
+              )}
+            </Box>
+          </Paper>
+        </Box>
+      )}
+
+      {/* Action Button respecting safe-area-inset-bottom */}
+      {!loading && (
+        <Box sx={{ padding: "0 20px calc(var(--safe-area-bottom) + 16px) 20px" }}>
           <Button
             variant="contained"
             onClick={handleConfirmBooking}
@@ -481,7 +501,6 @@ const BookSummary: React.FC = () => {
               boxShadow: "0 8px 20px rgba(255, 107, 0, 0.25)",
               textTransform: "none",
               width: "100%",
-              marginBottom: "16px",
             }}
           >
             {bookingLoading ? (
@@ -492,43 +511,43 @@ const BookSummary: React.FC = () => {
               "Confirm & Book Tricycle"
             )}
           </Button>
-        )}
+        </Box>
+      )}
 
-        {/* Success Modal Popup */}
-        <SuccessModal
-          open={successOpen}
-          title={language === "tl" ? "Nahanap na ang Drayber!" : "Booking Request Sent!"}
-          message={
-            language === "tl"
-              ? "Matagumpay na naipadala ang iyong booking. Naghahanap na kami ng tricycle drayber na malapit sa iyo."
-              : "Your tricycle booking has been registered. We are locating the nearest TODA driver to assign to your ride."
-          }
-        />
+      {/* Success Modal Popup */}
+      <SuccessModal
+        open={successOpen}
+        title={language === "tl" ? "Nahanap na ang Drayber!" : "Booking Request Sent!"}
+        message={
+          language === "tl"
+            ? "Matagumpay na naipadala ang iyong booking. Naghahanap na kami ng tricycle drayber na malapit sa iyo."
+            : "Your tricycle booking has been registered. We are locating the nearest TODA driver to assign to your ride."
+        }
+      />
 
-        {/* Action helper button inside success screen overlay to redirect back */}
-        {successOpen && (
-          <Button
-            onClick={handleSuccessClose}
-            sx={{
-              position: "absolute",
-              bottom: "40px",
-              left: "50%",
-              transform: "translateX(-50%)",
-              zIndex: 99999,
-              color: "#FFFFFF",
-              fontWeight: 700,
-              backgroundColor: "#FF6B00",
-              padding: "10px 24px",
-              borderRadius: "10px",
-              boxShadow: "0 4px 12px rgba(255, 107, 0, 0.3)",
-              "&:hover": { backgroundColor: "#D65A00" },
-              textTransform: "none",
-            }}
-          >
-            {language === "tl" ? "Pumunta sa Dashboard" : "Go to Dashboard"}
-          </Button>
-        )}
-      </Box>
+      {/* Action helper button inside success screen overlay to redirect back */}
+      {successOpen && (
+        <Button
+          onClick={handleSuccessClose}
+          sx={{
+            position: "absolute",
+            bottom: "calc(var(--safe-area-bottom) + 40px)",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 99999,
+            color: "#FFFFFF",
+            fontWeight: 700,
+            backgroundColor: "#FF6B00",
+            padding: "10px 24px",
+            borderRadius: "10px",
+            boxShadow: "0 4px 12px rgba(255, 107, 0, 0.3)",
+            "&:hover": { backgroundColor: "#D65A00" },
+            textTransform: "none",
+          }}
+        >
+          {language === "tl" ? "Pumunta sa Dashboard" : "Go to Dashboard"}
+        </Button>
+      )}
     </Box>
   );
 };

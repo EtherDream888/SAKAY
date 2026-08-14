@@ -196,173 +196,174 @@ const VerifyOtp: React.FC = () => {
   };
 
   return (
-    <Box className="app-container">
+    <Box
+      sx={{
+        width: "100%",
+        height: "100%",
+        padding: "24px",
+        paddingTop: "calc(var(--safe-area-top) + 16px)",
+        paddingBottom: "calc(var(--safe-area-bottom) + 24px)",
+        backgroundColor: "#FFFFFF",
+        display: "flex",
+        flexDirection: "column",
+        overflowY: "auto",
+      }}
+      className="hide-scrollbar"
+    >
+      {/* Header */}
       <Box
-        component="main"
-        className="phone-simulator hide-scrollbar"
         sx={{
-          padding: "24px",
-          backgroundColor: "#FFFFFF",
           display: "flex",
-          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "space-between",
+          width: "100%",
         }}
       >
-        {/* Header */}
-        <Box
+        <IconButton
+          onClick={() => navigate("/register", { state: { role: state?.role } })}
           sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginTop: "24px",
-            width: "100%",
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E2E8F0",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+            color: "#1A1A1A",
+            borderRadius: "14px",
+            width: "44px",
+            height: "44px",
+            "&:hover": {
+              backgroundColor: "#F8FAFC",
+            },
           }}
         >
-          <IconButton
-            onClick={() => navigate("/register", { state: { role: state?.role } })}
+          <ArrowBackIcon sx={{ fontSize: 20 }} />
+        </IconButton>
+
+        <Logo color="orange" />
+      </Box>
+
+      {/* Title */}
+      <Box sx={{ marginTop: "44px", textAlign: "left", width: "100%" }}>
+        <Typography
+          component="h2"
+          sx={{
+            fontSize: "26px",
+            fontWeight: 800,
+            color: "#0F172A",
+            lineHeight: 1.3,
+          }}
+        >
+          {language === "tl" ? "I-verify ang Number" : "Verify your Number"}
+        </Typography>
+        <Typography
+          sx={{
+            fontSize: "15px",
+            color: "#64748B",
+            marginTop: "8px",
+            lineHeight: 1.5,
+          }}
+        >
+          {language === "tl"
+            ? `I-enter ang 6-digit OTP code na ipinadala namin sa ${identifier}`
+            : `Enter the 6-digit OTP code sent to ${identifier}`}
+        </Typography>
+      </Box>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ width: "100%", marginTop: "24px", borderRadius: "12px" }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* OTP Input Grid */}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          gap: "8px",
+          marginTop: "36px",
+          width: "100%",
+        }}
+      >
+        {otp.map((digit, idx) => (
+          <Box
+            key={idx}
+            component="input"
+            type="text"
+            inputMode="numeric"
+            maxLength={1}
+            value={digit}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e.target.value, idx)}
+            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => handleKeyDown(e, idx)}
+            ref={(el: HTMLInputElement | null) => {
+              inputRefs.current[idx] = el;
+            }}
             sx={{
-              backgroundColor: "#FFFFFF",
+              width: "48px",
+              height: "56px",
+              borderRadius: "12px",
               border: "1px solid #E2E8F0",
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
-              color: "#1A1A1A",
-              borderRadius: "14px",
-              width: "44px",
-              height: "44px",
+              backgroundColor: "#F8FAFC",
+              textAlign: "center",
+              fontSize: "22px",
+              fontWeight: 700,
+              color: "#0F172A",
+              outline: "none",
+              transition: "all 0.2s",
+              "&:focus": {
+                borderColor: "#FF6B00",
+                backgroundColor: "#FFFFFF",
+                boxShadow: "0 0 0 2px rgba(255, 107, 0, 0.1)",
+              },
+            }}
+          />
+        ))}
+      </Box>
+
+      {/* Timer / Resend Button */}
+      <Box sx={{ marginTop: "24px", textAlign: "center", width: "100%" }}>
+        {timer === 0 ? (
+          <Typography
+            onClick={handleResend}
+            sx={{
+              fontSize: "14px",
+              fontWeight: 700,
+              color: "#FF6B00",
+              cursor: "pointer",
+              textDecoration: "underline",
               "&:hover": {
-                backgroundColor: "#F8FAFC",
+                color: "#E66000",
               },
             }}
           >
-            <ArrowBackIcon sx={{ fontSize: 20 }} />
-          </IconButton>
-
-          <Logo color="orange" />
-        </Box>
-
-        {/* Title */}
-        <Box sx={{ marginTop: "44px", textAlign: "left", width: "100%" }}>
-          <Typography
-            component="h2"
-            sx={{
-              fontSize: "26px",
-              fontWeight: 800,
-              color: "#0F172A",
-              lineHeight: 1.3,
-            }}
-          >
-            {language === "tl" ? "I-verify ang Number" : "Verify your Number"}
+            {language === "tl" ? "Muling ipadala ang OTP" : "Resend OTP Code"}
           </Typography>
-          <Typography
-            sx={{
-              fontSize: "15px",
-              color: "#64748B",
-              marginTop: "8px",
-              lineHeight: 1.5,
-            }}
-          >
+        ) : (
+          <Typography sx={{ fontSize: "14px", color: "#64748B", fontWeight: 500 }}>
             {language === "tl"
-              ? `I-enter ang 6-digit OTP code na ipinadala namin sa ${identifier}`
-              : `Enter the 6-digit OTP code sent to ${identifier}`}
+              ? `Muling ipadala sa loob ng 0:${timer < 10 ? `0${timer}` : timer}`
+              : `Resend code in 0:${timer < 10 ? `0${timer}` : timer}`}
           </Typography>
-        </Box>
-
-        {/* Error Alert */}
-        {error && (
-          <Alert severity="error" sx={{ width: "100%", marginTop: "24px", borderRadius: "12px" }}>
-            {error}
-          </Alert>
         )}
-
-        {/* OTP Input Grid */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            gap: "8px",
-            marginTop: "36px",
-            width: "100%",
-          }}
-        >
-          {otp.map((digit, idx) => (
-            <Box
-              key={idx}
-              component="input"
-              type="text"
-              inputMode="numeric"
-              maxLength={1}
-              value={digit}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange(e.target.value, idx)}
-              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => handleKeyDown(e, idx)}
-              ref={(el: HTMLInputElement | null) => {
-                inputRefs.current[idx] = el;
-              }}
-              sx={{
-                width: "48px",
-                height: "56px",
-                borderRadius: "12px",
-                border: "1px solid #E2E8F0",
-                backgroundColor: "#F8FAFC",
-                textAlign: "center",
-                fontSize: "22px",
-                fontWeight: 700,
-                color: "#0F172A",
-                outline: "none",
-                transition: "all 0.2s",
-                "&:focus": {
-                  borderColor: "#FF6B00",
-                  backgroundColor: "#FFFFFF",
-                  boxShadow: "0 0 0 2px rgba(255, 107, 0, 0.1)",
-                },
-              }}
-            />
-          ))}
-        </Box>
-
-        {/* Timer / Resend Button */}
-        <Box sx={{ marginTop: "24px", textAlign: "center", width: "100%" }}>
-          {timer === 0 ? (
-            <Typography
-              onClick={handleResend}
-              sx={{
-                fontSize: "14px",
-                fontWeight: 700,
-                color: "#FF6B00",
-                cursor: "pointer",
-                textDecoration: "underline",
-                "&:hover": {
-                  color: "#E66000",
-                },
-              }}
-            >
-              {language === "tl" ? "Muling ipadala ang OTP" : "Resend OTP Code"}
-            </Typography>
-          ) : (
-            <Typography sx={{ fontSize: "14px", color: "#64748B", fontWeight: 500 }}>
-              {language === "tl"
-                ? `Muling ipadala sa loob ng 0:${timer < 10 ? `0${timer}` : timer}`
-                : `Resend code in 0:${timer < 10 ? `0${timer}` : timer}`}
-            </Typography>
-          )}
-        </Box>
-
-        {/* Action button */}
-        <Box sx={{ marginTop: "auto", paddingBottom: "24px", width: "100%" }}>
-          <PrimaryButton
-            fullWidth
-            onClick={handleVerify}
-            loading={loading}
-            disabled={otp.join("").length < 6}
-          >
-            {language === "tl" ? "I-verify" : "Verify"}
-          </PrimaryButton>
-        </Box>
-
-        {/* Success Modal */}
-        <SuccessModal
-          open={success}
-          title={language === "tl" ? "Matagumpay na na-verify!" : "Verification Successful!"}
-          message={language === "tl" ? "Matagumpay ang iyong OTP verification." : "Your OTP verification was successful."}
-        />
       </Box>
+
+      {/* Action button */}
+      <Box sx={{ marginTop: "auto", paddingTop: "24px", width: "100%" }}>
+        <PrimaryButton
+          fullWidth
+          onClick={handleVerify}
+          loading={loading}
+          disabled={otp.join("").length < 6}
+        >
+          {language === "tl" ? "I-verify" : "Verify"}
+        </PrimaryButton>
+      </Box>
+
+      {/* Success Modal */}
+      <SuccessModal
+        open={success}
+        title={language === "tl" ? "Matagumpay na na-verify!" : "Verification Successful!"}
+        message={language === "tl" ? "Matagumpay ang iyong OTP verification." : "Your OTP verification was successful."}
+      />
     </Box>
   );
 };

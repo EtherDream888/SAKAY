@@ -11,11 +11,10 @@ import HomeBottomSheet from "./HomeBottomSheet";
 import PassengerNavigationDrawer from "./PassengerNavigationDrawer";
 import TulongDialog from "./TulongDialog";
 import NotificationsDialog from "./NotificationsDialog";
-
-const CALAPAN_CITY_CENTER = {
-  lat: 13.4115,
-  lng: 121.1803,
-};
+import {
+  DEFAULT_CALAPAN_CENTER,
+  getCurrentDevicePosition,
+} from "../../../../services/locationService";
 
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -33,7 +32,15 @@ const Dashboard: React.FC = () => {
   const [notificationsOpen, setNotificationsOpen] = useState<boolean>(false);
 
   // Map coordinates and recenter trigger state
-  const [mapCoords, setMapCoords] = useState<{ lat: number; lng: number }>(CALAPAN_CITY_CENTER);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(() => {
+    const savedLat = localStorage.getItem("user_lat");
+    const savedLng = localStorage.getItem("user_lng");
+    if (savedLat && savedLng) {
+      return { lat: parseFloat(savedLat), lng: parseFloat(savedLng) };
+    }
+    return null;
+  });
+
   const [recenterTrigger, setRecenterTrigger] = useState<number>(0);
 
   // Fetch Supabase Passenger profile info
@@ -65,12 +72,17 @@ const Dashboard: React.FC = () => {
     fetchProfile();
   }, []);
 
-  // Sync GPS location from localStorage if saved
+  // Try reading real device position quietly if previously granted
   useEffect(() => {
-    const gpsLat = localStorage.getItem("user_lat");
-    const gpsLng = localStorage.getItem("user_lng");
-    if (gpsLat && gpsLng) {
-      setMapCoords({ lat: parseFloat(gpsLat), lng: parseFloat(gpsLng) });
+    const gpsPermission = localStorage.getItem("gps_permission");
+    if (gpsPermission === "true") {
+      getCurrentDevicePosition()
+        .then((coords) => {
+          setUserLocation({ lat: coords.latitude, lng: coords.longitude });
+        })
+        .catch(() => {
+          // Keep previous or default
+        });
     }
   }, []);
 
@@ -106,101 +118,106 @@ const Dashboard: React.FC = () => {
 
   const handleAddPlace = () => {
     navigate("/set-place", {
-      state: { target: "dropoff", address: "Calapan City", lat: 13.4100, lng: 121.1800 },
+      state: { target: "dropoff", address: "", lat: 0, lng: 0 },
     });
   };
 
-  const handleRecenterGps = () => {
-    const gpsLat = localStorage.getItem("user_lat");
-    const gpsLng = localStorage.getItem("user_lng");
-    if (gpsLat && gpsLng) {
-      setMapCoords({ lat: parseFloat(gpsLat), lng: parseFloat(gpsLng) });
-    } else {
-      setMapCoords(CALAPAN_CITY_CENTER);
+  // Real recenter button handler: queries latest real GPS position and pans Google Map
+  const handleRecenterGps = async () => {
+    try {
+      const coords = await getCurrentDevicePosition();
+      setUserLocation({ lat: coords.latitude, lng: coords.longitude });
+      setRecenterTrigger((prev) => prev + 1);
+    } catch {
+      // If geolocation not allowed or unavailable, fallback to default center
+      setUserLocation({
+        lat: DEFAULT_CALAPAN_CENTER.latitude,
+        lng: DEFAULT_CALAPAN_CENTER.longitude,
+      });
+      setRecenterTrigger((prev) => prev + 1);
     }
-    setRecenterTrigger((prev) => prev + 1);
   };
 
   return (
-    <Box className="app-container">
-      <Box
-        component="main"
-        className="phone-simulator hide-scrollbar"
+    <Box
+      sx={{
+        width: "100%",
+        height: "100%",
+        backgroundColor: "#E3ECEF",
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* 1. Real Google Maps View */}
+      <MapView
+        userLocation={userLocation}
+        recenterTrigger={recenterTrigger}
+      />
+
+      {/* 2. Floating Header Controls respecting safe-area-inset-top */}
+      <HomeHeader
+        onOpenDrawer={() => setDrawerOpen(true)}
+        onOpenNotifications={() => setNotificationsOpen(true)}
+        onOpenTulong={() => setTulongOpen(true)}
+      />
+
+      {/* 3. Floating Recenter GPS Location Button */}
+      <IconButton
+        onClick={handleRecenterGps}
+        aria-label="Recenter map location"
         sx={{
-          backgroundColor: "#E3ECEF",
-          display: "flex",
-          flexDirection: "column",
-          position: "relative",
-          userSelect: "none",
-          overflow: "hidden",
+          position: "absolute",
+          bottom: "calc(var(--safe-area-bottom) + 235px)",
+          right: "16px",
+          backgroundColor: "#FFFFFF",
+          width: "44px",
+          height: "44px",
+          borderRadius: "50%",
+          boxShadow: "0 4px 14px rgba(15, 23, 42, 0.15)",
+          color: "#0F172A",
+          zIndex: 10,
+          transition: "all 0.2s ease",
+          "&:hover": {
+            backgroundColor: "#F8FAFC",
+            transform: "scale(1.05)",
+          },
+          "&:active": {
+            transform: "scale(0.95)",
+          },
         }}
       >
-        {/* 1. Real Interactive Map View (OpenStreetMap / Leaflet) */}
-        <MapView userLocation={mapCoords} recenterTrigger={recenterTrigger} />
+        <NavigationIcon sx={{ fontSize: 20, transform: "rotate(45deg)" }} />
+      </IconButton>
 
-        {/* 2. Floating Header Controls */}
-        <HomeHeader
-          onOpenDrawer={() => setDrawerOpen(true)}
-          onOpenNotifications={() => setNotificationsOpen(true)}
-          onOpenTulong={() => setTulongOpen(true)}
-        />
+      {/* 4. Bottom Sheet Card Container respecting safe-area-inset-bottom */}
+      <HomeBottomSheet
+        firstName={firstName}
+        onStartNewTrip={handleStartNewTrip}
+        onHomeTrip={handleHomeTrip}
+        onAddPlace={handleAddPlace}
+      />
 
-        {/* 3. Floating Recenter GPS Location Button */}
-        <IconButton
-          onClick={handleRecenterGps}
-          aria-label="Recenter map location"
-          sx={{
-            position: "absolute",
-            bottom: "235px",
-            right: "16px",
-            backgroundColor: "#FFFFFF",
-            width: "44px",
-            height: "44px",
-            borderRadius: "50%",
-            boxShadow: "0 4px 14px rgba(15, 23, 42, 0.15)",
-            color: "#0F172A",
-            zIndex: 10,
-            transition: "all 0.2s ease",
-            "&:hover": {
-              backgroundColor: "#F8FAFC",
-              transform: "scale(1.05)",
-            },
-            "&:active": {
-              transform: "scale(0.95)",
-            },
-          }}
-        >
-          <NavigationIcon sx={{ fontSize: 20, transform: "rotate(45deg)" }} />
-        </IconButton>
+      {/* 5. Mobile Navigation Drawer (Constrained to mobile viewport & safe areas) */}
+      <PassengerNavigationDrawer
+        isOpen={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        profileName={profileName}
+        profilePhoto={profilePhoto}
+        contactNumber={contactNumber}
+        onNavigateNewTrip={handleStartNewTrip}
+        onNavigateProfile={() => navigate("/profile")}
+        onOpenTulong={() => setTulongOpen(true)}
+        onLogout={handleLogout}
+      />
 
-        {/* 4. Bottom Sheet Card Container */}
-        <HomeBottomSheet
-          firstName={firstName}
-          onStartNewTrip={handleStartNewTrip}
-          onHomeTrip={handleHomeTrip}
-          onAddPlace={handleAddPlace}
-        />
-
-        {/* 5. Mobile Navigation Drawer (Constrained to viewport) */}
-        <PassengerNavigationDrawer
-          isOpen={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
-          profileName={profileName}
-          profilePhoto={profilePhoto}
-          contactNumber={contactNumber}
-          onNavigateNewTrip={handleStartNewTrip}
-          onNavigateProfile={() => navigate("/profile")}
-          onOpenTulong={() => setTulongOpen(true)}
-          onLogout={handleLogout}
-        />
-
-        {/* 6. Support & Notification Dialog Modals */}
-        <TulongDialog open={tulongOpen} onClose={() => setTulongOpen(false)} />
-        <NotificationsDialog
-          open={notificationsOpen}
-          onClose={() => setNotificationsOpen(false)}
-        />
-      </Box>
+      {/* 6. Support & Notification Dialog Modals */}
+      <TulongDialog open={tulongOpen} onClose={() => setTulongOpen(false)} />
+      <NotificationsDialog
+        open={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+      />
     </Box>
   );
 };

@@ -83,188 +83,188 @@ const ResetPassword: React.FC = () => {
   };
 
   return (
-    <Box className="app-container">
+    <Box
+      sx={{
+        width: "100%",
+        height: "100%",
+        padding: "24px",
+        paddingTop: "calc(var(--safe-area-top) + 16px)",
+        paddingBottom: "calc(var(--safe-area-bottom) + 24px)",
+        backgroundColor: "#FFFFFF",
+        display: "flex",
+        flexDirection: "column",
+        overflowY: "auto",
+      }}
+      className="hide-scrollbar"
+    >
+      {/* Header */}
       <Box
-        component="main"
-        className="phone-simulator hide-scrollbar"
         sx={{
-          padding: "24px",
-          backgroundColor: "#FFFFFF",
           display: "flex",
-          flexDirection: "column",
-          overflowY: "auto",
+          alignItems: "center",
+          justifyContent: "space-between",
+          width: "100%",
         }}
       >
-        {/* Header */}
-        <Box
+        <IconButton
+          onClick={() => navigate("/forgot-password")}
           sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginTop: "24px",
-            width: "100%",
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E2E8F0",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+            color: "#1A1A1A",
+            borderRadius: "14px",
+            width: "44px",
+            height: "44px",
+            "&:hover": {
+              backgroundColor: "#F8FAFC",
+            },
           }}
         >
-          <IconButton
-            onClick={() => navigate("/forgot-password")}
-            sx={{
-              backgroundColor: "#FFFFFF",
-              border: "1px solid #E2E8F0",
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
-              color: "#1A1A1A",
-              borderRadius: "14px",
-              width: "44px",
-              height: "44px",
-              "&:hover": {
-                backgroundColor: "#F8FAFC",
+          <ArrowBackIcon sx={{ fontSize: 20 }} />
+        </IconButton>
+
+        <Logo color="orange" />
+      </Box>
+
+      {/* Title */}
+      <Box sx={{ marginTop: "44px", textAlign: "left", width: "100%" }}>
+        <Typography
+          component="h2"
+          sx={{
+            fontSize: "26px",
+            fontWeight: 800,
+            color: "#0F172A",
+            lineHeight: 1.3,
+          }}
+        >
+          {language === "tl" ? "I-reset ang Password" : "Reset Password"}
+        </Typography>
+        <Typography
+          sx={{
+            fontSize: "15px",
+            color: "#64748B",
+            marginTop: "8px",
+            lineHeight: 1.5,
+          }}
+        >
+          {language === "tl"
+            ? `Gumawa ng bagong password para sa iyong account (${identifier})`
+            : `Create a new password for your account (${identifier})`}
+        </Typography>
+      </Box>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ width: "100%", marginTop: "24px", borderRadius: "12px" }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* Form */}
+      <Box
+        component="form"
+        onSubmit={handleSubmit}
+        className="anim-fade-in"
+        sx={{
+          marginTop: "32px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "16px",
+          width: "100%",
+        }}
+      >
+        {/* New Password */}
+        <Box sx={{ width: "100%" }}>
+          <TextField
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={loading}
+            placeholder={language === "tl" ? "Bagong Password" : "New Password"}
+            type={showPassword ? "text" : "password"}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <LockOutlinedIcon sx={{ color: "#94A3B8" }} />
+                  </InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                      disabled={loading}
+                    >
+                      {showPassword ? <VisibilityOff sx={{ color: "#94A3B8" }} /> : <Visibility sx={{ color: "#94A3B8" }} />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+                sx: {
+                  height: "56px",
+                  backgroundColor: "#F8FAFC",
+                  borderRadius: "14px",
+                  "& fieldset": { borderColor: "#F1F5F9" },
+                  "&:hover fieldset": { borderColor: "#CBD5E1" },
+                  "&.Mui-focused fieldset": { borderColor: "#FF6B00" },
+                },
               },
             }}
-          >
-            <ArrowBackIcon sx={{ fontSize: 20 }} />
-          </IconButton>
-
-          <Logo color="orange" />
+          />
         </Box>
 
-        {/* Title */}
-        <Box sx={{ marginTop: "44px", textAlign: "left", width: "100%" }}>
-          <Typography
-            component="h2"
-            sx={{
-              fontSize: "26px",
-              fontWeight: 800,
-              color: "#0F172A",
-              lineHeight: 1.3,
-            }}
-          >
-            {language === "tl" ? "I-reset ang Password" : "Reset Password"}
-          </Typography>
-          <Typography
-            sx={{
-              fontSize: "15px",
-              color: "#64748B",
-              marginTop: "8px",
-              lineHeight: 1.5,
-            }}
-          >
-            {language === "tl"
-              ? `Gumawa ng bagong password para sa iyong account (${identifier})`
-              : `Create a new password for your account (${identifier})`}
-          </Typography>
-        </Box>
-
-        {/* Error Alert */}
-        {error && (
-          <Alert severity="error" sx={{ width: "100%", marginTop: "24px", borderRadius: "12px" }}>
-            {error}
-          </Alert>
-        )}
-
-        {/* Form */}
-        <Box
-          component="form"
-          onSubmit={handleSubmit}
-          className="anim-fade-in"
-          sx={{
-            marginTop: "32px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "16px",
-            width: "100%",
-          }}
-        >
-          {/* New Password */}
-          <Box sx={{ width: "100%" }}>
-            <TextField
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-              placeholder={language === "tl" ? "Bagong Password" : "New Password"}
-              type={showPassword ? "text" : "password"}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LockOutlinedIcon sx={{ color: "#94A3B8" }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
-                        disabled={loading}
-                      >
-                        {showPassword ? <VisibilityOff sx={{ color: "#94A3B8" }} /> : <Visibility sx={{ color: "#94A3B8" }} />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                  sx: {
-                    height: "56px",
-                    backgroundColor: "#F8FAFC",
-                    borderRadius: "14px",
-                    "& fieldset": { borderColor: "#F1F5F9" },
-                    "&:hover fieldset": { borderColor: "#CBD5E1" },
-                    "&.Mui-focused fieldset": { borderColor: "#FF6B00" },
-                  },
+        {/* Confirm New Password */}
+        <Box sx={{ width: "100%" }}>
+          <TextField
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            disabled={loading}
+            placeholder={language === "tl" ? "Kumpirmahin ang Bagong Password" : "Confirm New Password"}
+            type={showConfirmPassword ? "text" : "password"}
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <LockOutlinedIcon sx={{ color: "#94A3B8" }} />
+                  </InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      edge="end"
+                      disabled={loading}
+                    >
+                      {showConfirmPassword ? <VisibilityOff sx={{ color: "#94A3B8" }} /> : <Visibility sx={{ color: "#94A3B8" }} />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+                sx: {
+                  height: "56px",
+                  backgroundColor: "#F8FAFC",
+                  borderRadius: "14px",
+                  "& fieldset": { borderColor: "#F1F5F9" },
+                  "&:hover fieldset": { borderColor: "#CBD5E1" },
+                  "&.Mui-focused fieldset": { borderColor: "#FF6B00" },
                 },
-              }}
-            />
-          </Box>
-
-          {/* Confirm New Password */}
-          <Box sx={{ width: "100%" }}>
-            <TextField
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              disabled={loading}
-              placeholder={language === "tl" ? "Kumpirmahin ang Bagong Password" : "Confirm New Password"}
-              type={showConfirmPassword ? "text" : "password"}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LockOutlinedIcon sx={{ color: "#94A3B8" }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        edge="end"
-                        disabled={loading}
-                      >
-                        {showConfirmPassword ? <VisibilityOff sx={{ color: "#94A3B8" }} /> : <Visibility sx={{ color: "#94A3B8" }} />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                  sx: {
-                    height: "56px",
-                    backgroundColor: "#F8FAFC",
-                    borderRadius: "14px",
-                    "& fieldset": { borderColor: "#F1F5F9" },
-                    "&:hover fieldset": { borderColor: "#CBD5E1" },
-                    "&.Mui-focused fieldset": { borderColor: "#FF6B00" },
-                  },
-                },
-              }}
-            />
-          </Box>
-
-          <Box sx={{ marginTop: "24px", width: "100%" }}>
-            <PrimaryButton type="submit" fullWidth loading={loading}>
-              {language === "tl" ? "I-update ang Password" : "Update Password"}
-            </PrimaryButton>
-          </Box>
+              },
+            }}
+          />
         </Box>
 
-        {/* Success Modal */}
-        <SuccessModal
-          open={success}
-          title={language === "tl" ? "Matagumpay na Nireset!" : "Password Reset Successful!"}
-          message={language === "tl" ? "Matagumpay na na-reset ang password ng iyong account." : "Your account password was successfully reset."}
-        />
+        <Box sx={{ marginTop: "24px", width: "100%" }}>
+          <PrimaryButton type="submit" fullWidth loading={loading}>
+            {language === "tl" ? "I-update ang Password" : "Update Password"}
+          </PrimaryButton>
+        </Box>
       </Box>
+
+      {/* Success Modal */}
+      <SuccessModal
+        open={success}
+        title={language === "tl" ? "Matagumpay na Nireset!" : "Password Reset Successful!"}
+        message={language === "tl" ? "Matagumpay na na-reset ang password ng iyong account." : "Your account password was successfully reset."}
+      />
     </Box>
   );
 };

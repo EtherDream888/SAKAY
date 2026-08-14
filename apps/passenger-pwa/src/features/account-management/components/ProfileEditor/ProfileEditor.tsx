@@ -88,7 +88,6 @@ const ProfileEditor: React.FC = () => {
   }, [language, navigate]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUserProfile();
   }, [fetchUserProfile]);
 
@@ -215,258 +214,256 @@ const ProfileEditor: React.FC = () => {
 
   if (loadingProfile) {
     return (
-      <Box className="app-container">
-        <Box
-          component="main"
-          className="phone-simulator"
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "#FFFFFF",
-          }}
-        >
-          <CircularProgress sx={{ color: "#FF6B00" }} />
-          <Typography sx={{ marginTop: "16px", color: "#64748B", fontWeight: 500 }}>
-            {language === "tl" ? "Kinukuha ang profile..." : "Loading profile..."}
-          </Typography>
-        </Box>
+      <Box
+        sx={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "#FFFFFF",
+        }}
+      >
+        <CircularProgress sx={{ color: "#FF6B00" }} />
+        <Typography sx={{ marginTop: "16px", color: "#64748B", fontWeight: 500 }}>
+          {language === "tl" ? "Kinukuha ang profile..." : "Loading profile..."}
+        </Typography>
       </Box>
     );
   }
 
   return (
-    <Box className="app-container">
+    <Box
+      sx={{
+        width: "100%",
+        height: "100%",
+        padding: "24px",
+        paddingTop: "calc(var(--safe-area-top) + 16px)",
+        paddingBottom: "calc(var(--safe-area-bottom) + 24px)",
+        backgroundColor: "#FFFFFF",
+        display: "flex",
+        flexDirection: "column",
+        overflowY: "auto",
+      }}
+      className="hide-scrollbar"
+    >
+      {/* Header */}
       <Box
-        component="main"
-        className="phone-simulator hide-scrollbar"
         sx={{
-          padding: "24px",
-          backgroundColor: "#FFFFFF",
           display: "flex",
-          flexDirection: "column",
-          overflowY: "auto",
+          alignItems: "center",
+          justifyContent: "space-between",
+          width: "100%",
         }}
       >
-        {/* Header */}
-        <Box
+        <IconButton
+          onClick={() => navigate("/dashboard")}
           sx={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginTop: "24px",
-            width: "100%",
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E2E8F0",
+            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+            color: "#1A1A1A",
+            borderRadius: "14px",
+            width: "44px",
+            height: "44px",
+            "&:hover": { backgroundColor: "#F8FAFC" },
           }}
         >
-          <IconButton
-            onClick={() => navigate("/dashboard")}
+          <ArrowBackIcon sx={{ fontSize: 20 }} />
+        </IconButton>
+
+        <Typography sx={{ fontSize: "18px", fontWeight: 700, color: "#0F172A" }}>
+          {language === "tl" ? "I-edit ang Profile" : "Edit Profile"}
+        </Typography>
+
+        <Box sx={{ width: "44px" }} /> {/* spacer */}
+      </Box>
+
+      {/* Profile Photo Upload Section */}
+      <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "32px" }}>
+        <Box sx={{ position: "relative" }}>
+          <Avatar
+            src={profilePhotoUrl}
             sx={{
-              backgroundColor: "#FFFFFF",
-              border: "1px solid #E2E8F0",
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
-              color: "#1A1A1A",
-              borderRadius: "14px",
-              width: "44px",
-              height: "44px",
-              "&:hover": { backgroundColor: "#F8FAFC" },
+              width: "96px",
+              height: "96px",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+              border: "3px solid #FFF",
+              outline: "2px solid #E2E8F0"
             }}
           >
-            <ArrowBackIcon sx={{ fontSize: 20 }} />
+            {fullName.charAt(0).toUpperCase()}
+          </Avatar>
+          <IconButton
+            component="label"
+            disabled={uploadingPhoto}
+            sx={{
+              position: "absolute",
+              bottom: 0,
+              right: 0,
+              backgroundColor: "#FF6B00",
+              color: "#FFFFFF",
+              "&:hover": { backgroundColor: "#E05300" },
+              width: "32px",
+              height: "32px",
+              boxShadow: "0 4px 10px rgba(255,107,0,0.3)"
+            }}
+          >
+            {uploadingPhoto ? (
+              <CircularProgress size={16} sx={{ color: "#FFF" }} />
+            ) : (
+              <PhotoCameraIcon sx={{ fontSize: 16 }} />
+            )}
+            <input type="file" accept="image/*" hidden onChange={handlePhotoUpload} />
           </IconButton>
+        </Box>
+        <Typography sx={{ fontSize: "14px", fontWeight: 600, color: "#475569", marginTop: "12px" }}>
+          {contactNumber}
+        </Typography>
+      </Box>
 
-          <Typography sx={{ fontSize: "18px", fontWeight: 700, color: "#0F172A" }}>
-            {language === "tl" ? "I-edit ang Profile" : "Edit Profile"}
+      {/* Feedback Alert */}
+      {error && (
+        <Alert severity="error" sx={{ width: "100%", marginTop: "24px", borderRadius: "12px" }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* Profile Edit Form */}
+      <Box
+        component="form"
+        onSubmit={handleSave}
+        sx={{
+          marginTop: "32px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "20px",
+          flexGrow: 1,
+        }}
+      >
+        {/* Full Name */}
+        <Box sx={{ width: "100%" }}>
+          <Typography sx={{ fontSize: "13px", fontWeight: 600, color: "#64748B", marginBottom: "6px" }}>
+            {language === "tl" ? "Buong Pangalan" : "Full Name"}
           </Typography>
-
-          <Box sx={{ width: "44px" }} /> {/* spacer */}
+          <TextField
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            disabled={saving}
+            placeholder="E.g. Juan Dela Cruz"
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <PersonOutlinedIcon sx={{ color: "#94A3B8" }} />
+                  </InputAdornment>
+                ),
+                sx: {
+                  height: "56px",
+                  backgroundColor: "#F8FAFC",
+                  borderRadius: "14px",
+                  "& fieldset": { borderColor: "#F1F5F9" },
+                  "&:hover fieldset": { borderColor: "#CBD5E1" },
+                  "&.Mui-focused fieldset": { borderColor: "#FF6B00" },
+                },
+              },
+            }}
+            fullWidth
+          />
         </Box>
 
-        {/* Profile Photo Upload Section */}
-        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", marginTop: "32px" }}>
-          <Box sx={{ position: "relative" }}>
-            <Avatar
-              src={profilePhotoUrl}
-              sx={{
-                width: "96px",
-                height: "96px",
-                boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
-                border: "3px solid #FFF",
-                outline: "2px solid #E2E8F0"
-              }}
-            >
-              {fullName.charAt(0).toUpperCase()}
-            </Avatar>
-            <IconButton
-              component="label"
-              disabled={uploadingPhoto}
-              sx={{
-                position: "absolute",
-                bottom: 0,
-                right: 0,
-                backgroundColor: "#FF6B00",
-                color: "#FFFFFF",
-                "&:hover": { backgroundColor: "#E05300" },
-                width: "32px",
-                height: "32px",
-                boxShadow: "0 4px 10px rgba(255,107,0,0.3)"
-              }}
-            >
-              {uploadingPhoto ? (
-                <CircularProgress size={16} sx={{ color: "#FFF" }} />
-              ) : (
-                <PhotoCameraIcon sx={{ fontSize: 16 }} />
-              )}
-              <input type="file" accept="image/*" hidden onChange={handlePhotoUpload} />
-            </IconButton>
-          </Box>
-          <Typography sx={{ fontSize: "14px", fontWeight: 600, color: "#475569", marginTop: "12px" }}>
-            {contactNumber}
+        {/* Email (Read-Only) */}
+        <Box sx={{ width: "100%" }}>
+          <Typography sx={{ fontSize: "13px", fontWeight: 600, color: "#94A3B8", marginBottom: "6px" }}>
+            {language === "tl" ? "Email (Hindi pwedeng baguhin)" : "Email Address (Read-only)"}
           </Typography>
+          <TextField
+            value={email}
+            disabled
+            slotProps={{
+              input: {
+                sx: {
+                  height: "56px",
+                  backgroundColor: "#F1F5F9",
+                  borderRadius: "14px",
+                  color: "#64748B",
+                  "& fieldset": { borderColor: "#E2E8F0" },
+                },
+              },
+            }}
+            fullWidth
+          />
         </Box>
 
-        {/* Feedback Alert */}
-        {error && (
-          <Alert severity="error" sx={{ width: "100%", marginTop: "24px", borderRadius: "12px" }}>
-            {error}
-          </Alert>
-        )}
-
-        {/* Profile Edit Form */}
-        <Box
-          component="form"
-          onSubmit={handleSave}
-          sx={{
-            marginTop: "32px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "20px",
-            flexGrow: 1,
-          }}
-        >
-          {/* Full Name */}
-          <Box sx={{ width: "100%" }}>
-            <Typography sx={{ fontSize: "13px", fontWeight: 600, color: "#64748B", marginBottom: "6px" }}>
-              {language === "tl" ? "Buong Pangalan" : "Full Name"}
-            </Typography>
-            <TextField
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              disabled={saving}
-              placeholder="E.g. Juan Dela Cruz"
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <PersonOutlinedIcon sx={{ color: "#94A3B8" }} />
-                    </InputAdornment>
-                  ),
-                  sx: {
-                    height: "56px",
-                    backgroundColor: "#F8FAFC",
-                    borderRadius: "14px",
-                    "& fieldset": { borderColor: "#F1F5F9" },
-                    "&:hover fieldset": { borderColor: "#CBD5E1" },
-                    "&.Mui-focused fieldset": { borderColor: "#FF6B00" },
-                  },
+        {/* Address */}
+        <Box sx={{ width: "100%" }}>
+          <Typography sx={{ fontSize: "13px", fontWeight: 600, color: "#64748B", marginBottom: "6px" }}>
+            {language === "tl" ? "Residential Address" : "Residential Address"}
+          </Typography>
+          <TextField
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            disabled={saving}
+            placeholder="Barangay, Calapan City, Oriental Mindoro"
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <HomeOutlinedIcon sx={{ color: "#94A3B8" }} />
+                  </InputAdornment>
+                ),
+                sx: {
+                  height: "56px",
+                  backgroundColor: "#F8FAFC",
+                  borderRadius: "14px",
+                  "& fieldset": { borderColor: "#F1F5F9" },
+                  "&:hover fieldset": { borderColor: "#CBD5E1" },
+                  "&.Mui-focused fieldset": { borderColor: "#FF6B00" },
                 },
-              }}
-              fullWidth
-            />
-          </Box>
+              },
+            }}
+            fullWidth
+          />
+        </Box>
 
-          {/* Email (Read-Only) */}
-          <Box sx={{ width: "100%" }}>
-            <Typography sx={{ fontSize: "13px", fontWeight: 600, color: "#94A3B8", marginBottom: "6px" }}>
-              {language === "tl" ? "Email (Hindi pwedeng baguhin)" : "Email Address (Read-only)"}
-            </Typography>
-            <TextField
-              value={email}
-              disabled
-              slotProps={{
-                input: {
-                  sx: {
-                    height: "56px",
-                    backgroundColor: "#F1F5F9",
-                    borderRadius: "14px",
-                    color: "#64748B",
-                    "& fieldset": { borderColor: "#E2E8F0" },
-                  },
+        {/* Change Password */}
+        <Box sx={{ width: "100%" }}>
+          <Typography sx={{ fontSize: "13px", fontWeight: 600, color: "#64748B", marginBottom: "6px" }}>
+            {language === "tl" ? "Bagong Password (Iwanang bakante kung walang babaguhin)" : "New Password (Leave blank to keep current)"}
+          </Typography>
+          <TextField
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            disabled={saving}
+            placeholder="••••••"
+            type="password"
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <LockOutlinedIcon sx={{ color: "#94A3B8" }} />
+                  </InputAdornment>
+                ),
+                sx: {
+                  height: "56px",
+                  backgroundColor: "#F8FAFC",
+                  borderRadius: "14px",
+                  "& fieldset": { borderColor: "#F1F5F9" },
+                  "&:hover fieldset": { borderColor: "#CBD5E1" },
+                  "&.Mui-focused fieldset": { borderColor: "#FF6B00" },
                 },
-              }}
-              fullWidth
-            />
-          </Box>
+              },
+            }}
+            fullWidth
+          />
+        </Box>
 
-          {/* Address */}
-          <Box sx={{ width: "100%" }}>
-            <Typography sx={{ fontSize: "13px", fontWeight: 600, color: "#64748B", marginBottom: "6px" }}>
-              {language === "tl" ? "Residential Address" : "Residential Address"}
-            </Typography>
-            <TextField
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              disabled={saving}
-              placeholder="Barangay, Calapan City, Oriental Mindoro"
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <HomeOutlinedIcon sx={{ color: "#94A3B8" }} />
-                    </InputAdornment>
-                  ),
-                  sx: {
-                    height: "56px",
-                    backgroundColor: "#F8FAFC",
-                    borderRadius: "14px",
-                    "& fieldset": { borderColor: "#F1F5F9" },
-                    "&:hover fieldset": { borderColor: "#CBD5E1" },
-                    "&.Mui-focused fieldset": { borderColor: "#FF6B00" },
-                  },
-                },
-              }}
-              fullWidth
-            />
-          </Box>
-
-          {/* Change Password */}
-          <Box sx={{ width: "100%" }}>
-            <Typography sx={{ fontSize: "13px", fontWeight: 600, color: "#64748B", marginBottom: "6px" }}>
-              {language === "tl" ? "Bagong Password (Iwanang bakante kung walang babaguhin)" : "New Password (Leave blank to keep current)"}
-            </Typography>
-            <TextField
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              disabled={saving}
-              placeholder="••••••"
-              type="password"
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LockOutlinedIcon sx={{ color: "#94A3B8" }} />
-                    </InputAdornment>
-                  ),
-                  sx: {
-                    height: "56px",
-                    backgroundColor: "#F8FAFC",
-                    borderRadius: "14px",
-                    "& fieldset": { borderColor: "#F1F5F9" },
-                    "&:hover fieldset": { borderColor: "#CBD5E1" },
-                    "&.Mui-focused fieldset": { borderColor: "#FF6B00" },
-                  },
-                },
-              }}
-              fullWidth
-            />
-          </Box>
-
-          {/* Save Button */}
-          <Box sx={{ marginTop: "auto", paddingBottom: "24px" }}>
-            <PrimaryButton type="submit" loading={saving} fullWidth>
-              {language === "tl" ? "I-save ang mga Pagbabago" : "Save Changes"}
-            </PrimaryButton>
-          </Box>
+        {/* Save Button */}
+        <Box sx={{ marginTop: "auto", paddingTop: "24px" }}>
+          <PrimaryButton type="submit" loading={saving} fullWidth>
+            {language === "tl" ? "I-save ang mga Pagbabago" : "Save Changes"}
+          </PrimaryButton>
         </Box>
       </Box>
 

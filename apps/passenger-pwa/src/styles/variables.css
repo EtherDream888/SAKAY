@@ -1,14 +1,30 @@
 :root {
+  /* SAKAY Core Brand Color Palette */
   --primary-color: #FF6B00;
   --primary-hover: #E66000;
+  --primary-light: #FFF7ED;
   --secondary-color: #1F1F1F;
   --bg-color: #F8FAFC;
   --border-color: #E2E8F0;
   --text-primary: #0F172A;
   --text-secondary: #64748B;
+
+  /* Mobile Device Dimensions */
   --phone-width: 412px;
   --phone-height: 892px;
   --border-radius-lg: 24px;
   --border-radius-md: 16px;
   --border-radius-sm: 12px;
+
+  /* Global Mobile Safe Area System Variables */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+
+  /* Resolved Safe Area Dimensions (overridden for desktop simulator mode) */
+  --safe-area-top: var(--sat);
+  --safe-area-bottom: var(--sab);
+  --safe-area-left: var(--sal);
+  --safe-area-right: var(--sar);
 }

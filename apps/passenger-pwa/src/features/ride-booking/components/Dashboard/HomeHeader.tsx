@@ -26,7 +26,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
     <Box
       sx={{
         position: "absolute",
-        top: "24px",
+        top: "calc(var(--safe-area-top) + 16px)",
         left: "16px",
         right: "16px",
         zIndex: 10,

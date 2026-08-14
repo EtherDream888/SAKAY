@@ -74,7 +74,7 @@ const PassengerNavigationDrawer: React.FC<PassengerNavigationDrawerProps> = ({
         }}
       />
 
-      {/* Slide-out Mobile Navigation Drawer */}
+      {/* Slide-out Mobile Navigation Drawer constrained inside mobile viewport */}
       <Box
         className="hide-scrollbar"
         sx={{
@@ -94,12 +94,12 @@ const PassengerNavigationDrawer: React.FC<PassengerNavigationDrawerProps> = ({
           overflowY: "auto",
         }}
       >
-        {/* Top Header Card matching SIDEBAR MENU.png (Vibrant Orange Topo Header) */}
+        {/* Top Header Card matching SIDEBAR MENU.png (Vibrant Orange Header respecting safe area) */}
         <Box
           onClick={handleProfileClick}
           sx={{
             background: "linear-gradient(135deg, #FF6B00 0%, #FF8533 100%)",
-            padding: "48px 20px 24px 20px",
+            padding: "calc(var(--safe-area-top) + 24px) 20px 24px 20px",
             display: "flex",
             alignItems: "center",
             gap: "16px",
@@ -286,8 +286,8 @@ const PassengerNavigationDrawer: React.FC<PassengerNavigationDrawerProps> = ({
           <Divider sx={{ borderColor: "#F1F5F9", marginX: "24px" }} />
         </List>
 
-        {/* Bottom Item: Logout matching SIDEBAR MENU.png */}
-        <Box sx={{ paddingBottom: "24px" }}>
+        {/* Bottom Item: Logout respecting safe-area-inset-bottom */}
+        <Box sx={{ paddingBottom: "calc(var(--safe-area-bottom) + 20px)" }}>
           <ListItem disablePadding>
             <ListItemButton
               onClick={onLogout}

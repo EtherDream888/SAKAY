@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import theme from "./styles/theme";
 import { LanguageProvider } from "./utils/LanguageContext";
+import MobileAppShell from "./common/layouts/MobileAppShell";
 
 // Pages
 import Splash from "./features/account-management/components/Splash/Splash";
@@ -32,27 +33,29 @@ function App() {
       <LanguageProvider>
         <BrowserRouter>
           <Routes>
-            <Route
-              path="/"
-              element={
-                isDevAuthBypass ? <Navigate to="/dashboard" replace /> : <Splash />
-              }
-            />
-            <Route path="/splash" element={<Splash />} />
-            <Route path="/account-selection" element={<AccountSelection />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/verify-otp" element={<VerifyOtp />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/registration-success" element={<RegistrationSuccess />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/profile" element={<ProfileEditor />} />
-            <Route path="/location-permission" element={<LocationPermission />} />
-            <Route path="/new-trip" element={<NewTrip />} />
-            <Route path="/set-place" element={<SetPlace />} />
-            <Route path="/book-summary" element={<BookSummary />} />
-            <Route path="/history" element={<PassengerHistory />} />
+            <Route element={<MobileAppShell />}>
+              <Route
+                path="/"
+                element={
+                  isDevAuthBypass ? <Navigate to="/dashboard" replace /> : <Splash />
+                }
+              />
+              <Route path="/splash" element={<Splash />} />
+              <Route path="/account-selection" element={<AccountSelection />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/verify-otp" element={<VerifyOtp />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/registration-success" element={<RegistrationSuccess />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/profile" element={<ProfileEditor />} />
+              <Route path="/location-permission" element={<LocationPermission />} />
+              <Route path="/new-trip" element={<NewTrip />} />
+              <Route path="/set-place" element={<SetPlace />} />
+              <Route path="/book-summary" element={<BookSummary />} />
+              <Route path="/history" element={<PassengerHistory />} />
+            </Route>
           </Routes>
         </BrowserRouter>
       </LanguageProvider>

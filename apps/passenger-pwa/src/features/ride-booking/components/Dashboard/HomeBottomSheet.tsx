@@ -34,7 +34,7 @@ const HomeBottomSheet: React.FC<HomeBottomSheetProps> = ({
         backgroundColor: "#F4FBF7", // Soft mint background matching reference UI
         borderTopLeftRadius: "28px",
         borderTopRightRadius: "28px",
-        padding: "16px 20px 24px 20px",
+        padding: "16px 20px calc(var(--safe-area-bottom) + 24px) 20px",
         zIndex: 10,
         boxShadow: "0 -10px 30px rgba(15, 23, 42, 0.08)",
         display: "flex",

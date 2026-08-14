@@ -96,95 +96,95 @@ const Splash: React.FC = () => {
     }
 
     return (
-      <Box className="app-container">
+      <Box
+        sx={{
+          width: "100%",
+          height: "100%",
+          padding: "24px",
+          backgroundColor: "#FFFFFF",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          paddingTop: "calc(var(--safe-area-top) + 20px)",
+          paddingBottom: "calc(var(--safe-area-bottom) + 24px)",
+        }}
+      >
+        {/* Header Logo */}
+        <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
+          <Logo color="orange" />
+        </Box>
+
+        {/* Illustration Container */}
         <Box
-          component="main"
-          className="phone-simulator"
+          className="anim-fade-in"
+          key={step} // Force re-render animation on step change
           sx={{
-            padding: "24px",
-            backgroundColor: "#FFFFFF",
             display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
+            justifyContent: "center",
+            alignItems: "center",
+            flexGrow: 1,
+            height: "280px",
+            maxHeight: "360px",
+            marginTop: "20px",
           }}
         >
-          {/* Header Logo */}
-          <Box sx={{ marginTop: "24px", width: "100%", display: "flex", justifyContent: "center" }}>
-            <Logo color="orange" />
-          </Box>
+          {slideIllustration}
+        </Box>
 
-          {/* Illustration Container */}
-          <Box
-            className="anim-fade-in"
-            key={step} // Force re-render animation on step change
+        {/* Text Section */}
+        <Box sx={{ width: "100%", textAlign: "center", padding: "0 12px" }}>
+          <Typography
+            component="h2"
             sx={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              flexGrow: 1,
-              height: "280px",
-              maxHeight: "360px",
-              marginTop: "20px",
+              fontSize: "24px",
+              fontWeight: 800,
+              color: "#0F172A",
             }}
           >
-            {slideIllustration}
-          </Box>
+            {slideTitle}
+          </Typography>
+          <Typography
+            sx={{
+              fontSize: "14px",
+              color: "#64748B",
+              marginTop: "12px",
+              lineHeight: 1.6,
+              fontWeight: 500,
+            }}
+          >
+            {slideDesc}
+          </Typography>
+        </Box>
 
-          {/* Text Section */}
-          <Box sx={{ width: "100%", textAlign: "center", padding: "0 12px" }}>
-            <Typography
-              component="h2"
+        {/* Dots Indicator */}
+        {renderDots(activeDotIdx)}
+
+        {/* Action Buttons */}
+        <Box sx={{ width: "100%", display: "flex", flexDirection: "column" }}>
+          <PrimaryButton fullWidth onClick={handleNextOnboarding}>
+            Magpatuloy
+          </PrimaryButton>
+
+          {step !== 6 && (
+            <Button
+              variant="text"
+              onClick={handleSkip}
               sx={{
-                fontSize: "24px",
-                fontWeight: 800,
-                color: "#0F172A",
-              }}
-            >
-              {slideTitle}
-            </Typography>
-            <Typography
-              sx={{
-                fontSize: "14px",
-                color: "#64748B",
+                height: "56px",
+                backgroundColor: "#F1F5F9",
+                color: "#475569",
                 marginTop: "12px",
-                lineHeight: 1.6,
-                fontWeight: 500,
+                borderRadius: "16px",
+                fontWeight: 700,
+                fontSize: "1rem",
+                "&:hover": {
+                  backgroundColor: "#E2E8F0",
+                },
               }}
             >
-              {slideDesc}
-            </Typography>
-          </Box>
-
-          {/* Dots Indicator */}
-          {renderDots(activeDotIdx)}
-
-          {/* Action Buttons */}
-          <Box sx={{ width: "100%", paddingBottom: "24px", display: "flex", flexDirection: "column" }}>
-            <PrimaryButton fullWidth onClick={handleNextOnboarding}>
-              Magpatuloy
-            </PrimaryButton>
-
-            {step !== 6 && (
-              <Button
-                variant="text"
-                onClick={handleSkip}
-                sx={{
-                  height: "56px",
-                  backgroundColor: "#F1F5F9",
-                  color: "#475569",
-                  marginTop: "12px",
-                  borderRadius: "16px",
-                  fontWeight: 700,
-                  fontSize: "1rem",
-                  "&:hover": {
-                    backgroundColor: "#E2E8F0",
-                  },
-                }}
-              >
-                Laktawan
-              </Button>
-            )}
-          </Box>
+              Laktawan
+            </Button>
+          )}
         </Box>
       </Box>
     );
@@ -193,32 +193,30 @@ const Splash: React.FC = () => {
   // RENDER INITIAL SPLASH SCREENS (Step 1)
   if (step === 1) {
     return (
-      <Box className="app-container">
+      <Box
+        sx={{
+          width: "100%",
+          height: "100%",
+          backgroundImage: `url(${background})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          position: "relative",
+        }}
+      >
+        {/* Tricycle riding across the screen */}
         <Box
-          component="main"
-          className="phone-simulator"
-          sx={{
-            backgroundImage: `url(${background})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            position: "relative",
-          }}
-        >
-          {/* Tricycle riding across the screen */}
-          <Box
-            component="img"
-            src={tricycle}
-            alt="Tricycle"
-            className="anim-tricycle-splash"
-          />
+          component="img"
+          src={tricycle}
+          alt="Tricycle"
+          className="anim-tricycle-splash"
+        />
 
-          {/* Logo overlay fading in as the tricycle exits */}
-          <Box className="anim-logo-splash-overlay">
-            <Logo color="white" width={220} />
-          </Box>
+        {/* Logo overlay fading in as the tricycle exits */}
+        <Box className="anim-logo-splash-overlay">
+          <Logo color="white" width={220} />
         </Box>
       </Box>
     );
@@ -226,103 +224,110 @@ const Splash: React.FC = () => {
 
   // RENDER FINAL WELCOME / AUTH LANDING PAGE (Step 7)
   return (
-    <Box className="app-container">
+    <Box
+      sx={{
+        width: "100%",
+        height: "100%",
+        backgroundImage: `url(${background})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        position: "relative",
+      }}
+    >
+      {/* Language Selector centered horizontally respecting safe area */}
       <Box
-        component="main"
-        className="phone-simulator"
         sx={{
-          backgroundImage: `url(${background})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
+          position: "absolute",
+          top: "calc(var(--safe-area-top) + 24px)",
+          left: "50%",
+          transform: "translateX(-50%)",
+          zIndex: 10,
         }}
       >
-        {/* Language Selector centered horizontally */}
-        <Box sx={{ position: "absolute", top: 40, left: "50%", transform: "translateX(-50%)", zIndex: 10 }}>
-          <LanguageSelector />
-        </Box>
+        <LanguageSelector />
+      </Box>
 
-        {/* White Logo Text */}
-        <Box className="anim-fade-in-down" sx={{ mt: "140px", zIndex: 2 }}>
-          <Logo color="white" width={220} />
-        </Box>
+      {/* White Logo Text */}
+      <Box className="anim-fade-in-down" sx={{ mt: "calc(var(--safe-area-top) + 110px)", zIndex: 2, display: "flex", justifyContent: "center" }}>
+        <Logo color="white" width={220} />
+      </Box>
 
-        {/* Tricycle Illustration */}
+      {/* Tricycle Illustration */}
+      <Box
+        className="anim-float-tricycle"
+        sx={{
+          mt: "30px",
+          zIndex: 2,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
         <Box
-          className="anim-float-tricycle"
+          component="img"
+          src={tricycle}
+          alt="Tricycle"
           sx={{
-            mt: "40px",
-            zIndex: 2,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
+            width: "250px",
+            height: "auto",
+            objectFit: "contain",
+          }}
+        />
+      </Box>
+
+      {/* Bottom Actions Area respecting safe-area-inset-bottom */}
+      <Box
+        className="anim-fade-in-up"
+        sx={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: "320px",
+          background:
+            "linear-gradient(to top, #ffffff 20%, rgba(255, 255, 255, 0.98) 45%, rgba(255, 255, 255, 0.8) 65%, rgba(255, 255, 255, 0) 100%)",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "flex-end",
+          padding: "32px 28px calc(var(--safe-area-bottom) + 36px) 28px",
+          zIndex: 5,
+        }}
+      >
+        <PrimaryButton
+          fullWidth
+          onClick={() => navigate("/account-selection")}
+        >
+          {t.start}
+        </PrimaryButton>
+
+        <Typography
+          sx={{
+            mt: "20px",
+            textAlign: "center",
+            fontSize: "15px",
+            fontWeight: 500,
+            color: "#64748B",
           }}
         >
+          {t.hasAccount}
           <Box
-            component="img"
-            src={tricycle}
-            alt="Tricycle"
+            component="span"
+            onClick={() => navigate("/login")}
             sx={{
-              width: "250px",
-              height: "auto",
-              objectFit: "contain",
-            }}
-          />
-        </Box>
-
-        {/* Bottom Actions Area */}
-        <Box
-          className="anim-fade-in-up"
-          sx={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: "320px",
-            background:
-              "linear-gradient(to top, #ffffff 20%, rgba(255, 255, 255, 0.98) 45%, rgba(255, 255, 255, 0.8) 65%, rgba(255, 255, 255, 0) 100%)",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "flex-end",
-            padding: "32px 28px 48px 28px",
-            zIndex: 5,
-          }}
-        >
-          <PrimaryButton
-            fullWidth
-            onClick={() => navigate("/account-selection")}
-          >
-            {t.start}
-          </PrimaryButton>
-
-          <Typography
-            sx={{
-              mt: "20px",
-              textAlign: "center",
-              fontSize: "15px",
-              fontWeight: 500,
-              color: "#64748B",
+              color: "#FF6B00",
+              fontWeight: 600,
+              cursor: "pointer",
+              ml: "4px",
+              transition: "color 0.2s",
+              "&:hover": {
+                color: "#E66000",
+                textDecoration: "underline",
+              },
             }}
           >
-            {t.hasAccount}
-            <Box
-              component="span"
-              onClick={() => navigate("/login")}
-              sx={{
-                color: "#FF6B00",
-                fontWeight: 600,
-                cursor: "pointer",
-                ml: "4px",
-                transition: "color 0.2s",
-                "&:hover": {
-                  color: "#E66000",
-                  textDecoration: "underline",
-                },
-              }}
-            >
-              {t.loginLink}
-            </Box>
-          </Typography>
-        </Box>
+            {t.loginLink}
+          </Box>
+        </Typography>
       </Box>
     </Box>
   );

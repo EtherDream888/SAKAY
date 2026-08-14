@@ -1,82 +1,22 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import IconButton from "@mui/material/IconButton";
 import InputBase from "@mui/material/InputBase";
 import Divider from "@mui/material/Divider";
+import CircularProgress from "@mui/material/CircularProgress";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SwapVertIcon from "@mui/icons-material/SwapVert";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import NorthWestIcon from "@mui/icons-material/NorthWest";
 
-interface PlaceSuggestion {
-  id: string;
-  name: string;
-  matchBold: string;
-  distance: string;
-  address: string;
-  lat: number;
-  lng: number;
-}
-
-const MOCK_PLACES: PlaceSuggestion[] = [
-  {
-    id: "place_1",
-    name: "Lumangbayan Barangay Hall",
-    matchBold: "ay Hall",
-    distance: "9 m",
-    address: "Molave Street, Calapan City, Oriental Mindoro",
-    lat: 13.4115,
-    lng: 121.1803,
-  },
-  {
-    id: "place_2",
-    name: "Calapan Public Market",
-    matchBold: "ic Market",
-    distance: "1.7 km",
-    address: "San Vicente North, Calapan City, Oriental Mindoro",
-    lat: 13.4116,
-    lng: 121.1802,
-  },
-  {
-    id: "place_3",
-    name: "Calapan Public Terminal",
-    matchBold: "Terminal",
-    distance: "1.7 km",
-    address: "Calapan City Public Market, Aurora Boulevard, Calapan City",
-    lat: 13.4120,
-    lng: 121.1810,
-  },
-  {
-    id: "place_4",
-    name: "Calapan Port",
-    matchBold: "",
-    distance: "2.4 km",
-    address: "San Antonio, Calapan City, Oriental Mindoro",
-    lat: 13.4248,
-    lng: 121.1812,
-  },
-  {
-    id: "place_5",
-    name: "Calapan City Hall",
-    matchBold: "",
-    distance: "3.1 km",
-    address: "Guinobatan, Calapan City, Oriental Mindoro",
-    lat: 13.3980,
-    lng: 121.1824,
-  },
-  {
-    id: "place_6",
-    name: "Xentro Mall Calapan",
-    matchBold: "",
-    distance: "1.2 km",
-    address: "JP Rizal Street, Calapan City, Oriental Mindoro",
-    lat: 13.4130,
-    lng: 121.1790,
-  },
-];
+import type { PlaceSuggestion } from "../../../../services/locationService";
+import {
+  searchPlaces,
+  DEFAULT_CALAPAN_CENTER,
+} from "../../../../services/locationService";
 
 const SetPlace: React.FC = () => {
   const navigate = useNavigate();
@@ -107,6 +47,32 @@ const SetPlace: React.FC = () => {
     return "";
   });
 
+  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  // Retrieve user's current GPS coordinates if available
+  const userLat = parseFloat(localStorage.getItem("user_lat") || DEFAULT_CALAPAN_CENTER.latitude.toString());
+  const userLng = parseFloat(localStorage.getItem("user_lng") || DEFAULT_CALAPAN_CENTER.longitude.toString());
+
+  const currentSearchQuery = activeTarget === "pickup" ? pickupText : dropoffText;
+
+  // Live debounced place search
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const results = await searchPlaces(currentSearchQuery, userLat, userLng);
+        setSuggestions(results);
+      } catch (err) {
+        console.error("Search error:", err);
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [currentSearchQuery, userLat, userLng]);
+
   const handleSwap = () => {
     const temp = pickupText;
     setPickupText(dropoffText);
@@ -131,210 +97,209 @@ const SetPlace: React.FC = () => {
     navigate("/new-trip");
   };
 
-  // Filter suggestions based on currently focused input string
-  const currentSearchQuery = activeTarget === "pickup" ? pickupText : dropoffText;
-
-  const filteredPlaces = MOCK_PLACES.filter((p) => {
-    if (!currentSearchQuery) return true;
-    return p.name.toLowerCase().includes(currentSearchQuery.toLowerCase()) ||
-           p.address.toLowerCase().includes(currentSearchQuery.toLowerCase());
-  });
-
   return (
-    <Box className="app-container">
+    <Box
+      sx={{
+        width: "100%",
+        height: "100%",
+        backgroundColor: "#FFFFFF",
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+      }}
+    >
+      {/* Top Header Card: Background bleeds into safe area, interactive content clears safe area */}
       <Box
-        component="main"
-        className="phone-simulator hide-scrollbar"
         sx={{
-          backgroundColor: "#FFFFFF",
+          background: "linear-gradient(135deg, #FF5B00 0%, #FF6D00 100%)",
+          padding: "calc(var(--safe-area-top) + 16px) 16px 20px 16px",
           display: "flex",
           flexDirection: "column",
+          gap: "12px",
+          boxShadow: "0 4px 16px rgba(255, 91, 0, 0.25)",
           position: "relative",
-          userSelect: "none",
         }}
       >
-        {/* Top Header Card matching SET PLACE.png and SET PLACE (1).png */}
-        <Box
-          sx={{
-            background: "linear-gradient(135deg, #FF5B00 0%, #FF6D00 100%)",
-            padding: "24px 16px 20px 16px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "12px",
-            boxShadow: "0 4px 16px rgba(255, 91, 0, 0.25)",
-            position: "relative",
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            {/* Back Arrow Button */}
-            <IconButton
-              onClick={() => navigate("/new-trip")}
+        <Box sx={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {/* Back Arrow Button */}
+          <IconButton
+            onClick={() => navigate("/new-trip")}
+            sx={{
+              backgroundColor: "rgba(255, 255, 255, 0.2)",
+              color: "#FFFFFF",
+              width: "44px",
+              height: "44px",
+              borderRadius: "14px",
+              "&:hover": { backgroundColor: "rgba(255, 255, 255, 0.3)" },
+            }}
+          >
+            <ArrowBackIcon />
+          </IconButton>
+
+          {/* Input Stack: PICKUP & DESTINASYON */}
+          <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
+            {/* PICKUP Input Box */}
+            <Box
+              onClick={() => setActiveTarget("pickup")}
               sx={{
-                backgroundColor: "rgba(255, 255, 255, 0.2)",
-                color: "#FFFFFF",
-                width: "44px",
-                height: "44px",
+                backgroundColor: "rgba(255, 255, 255, 0.25)",
+                backdropFilter: "blur(4px)",
                 borderRadius: "14px",
-                "&:hover": { backgroundColor: "rgba(255, 255, 255, 0.3)" },
+                padding: "8px 14px",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                border: activeTarget === "pickup" ? "1.5px solid #FFFFFF" : "1px solid rgba(255, 255, 255, 0.3)",
+                cursor: "pointer",
               }}
             >
-              <ArrowBackIcon />
-            </IconButton>
-
-            {/* Input Stack: PICKUP & DESTINASYON */}
-            <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
-              {/* PICKUP Input Box */}
+              {/* Orange Radio Dot */}
               <Box
-                onClick={() => setActiveTarget("pickup")}
                 sx={{
-                  backgroundColor: "rgba(255, 255, 255, 0.25)",
-                  backdropFilter: "blur(4px)",
-                  borderRadius: "14px",
-                  padding: "8px 14px",
+                  width: "16px",
+                  height: "16px",
+                  borderRadius: "50%",
+                  border: "2px solid #FFFFFF",
                   display: "flex",
                   alignItems: "center",
-                  gap: "10px",
-                  border: activeTarget === "pickup" ? "1.5px solid #FFFFFF" : "1px solid rgba(255, 255, 255, 0.3)",
+                  justifyContent: "center",
+                  flexShrink: 0,
                 }}
               >
-                {/* Orange Radio Dot */}
                 <Box
                   sx={{
-                    width: "16px",
-                    height: "16px",
+                    width: "8px",
+                    height: "8px",
                     borderRadius: "50%",
-                    border: "2px solid #FFFFFF",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
+                    backgroundColor: "#FFFFFF",
                   }}
-                >
-                  <Box
-                    sx={{
-                      width: "8px",
-                      height: "8px",
-                      borderRadius: "50%",
-                      backgroundColor: "#FFFFFF",
-                    }}
-                  />
-                </Box>
-
-                <Box sx={{ flexGrow: 1 }}>
-                  <Typography
-                    sx={{
-                      fontSize: "10px",
-                      fontWeight: 700,
-                      color: "rgba(255, 255, 255, 0.8)",
-                      letterSpacing: "0.5px",
-                    }}
-                  >
-                    PICKUP
-                  </Typography>
-                  <InputBase
-                    value={pickupText}
-                    onChange={(e) => setPickupText(e.target.value)}
-                    onFocus={() => setActiveTarget("pickup")}
-                    placeholder="Saan ka susunduin?"
-                    sx={{
-                      color: "#FFFFFF",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      width: "100%",
-                      fontFamily: "Poppins, sans-serif",
-                      "& input": { padding: 0 },
-                    }}
-                  />
-                </Box>
+                />
               </Box>
 
-              {/* DESTINASYON Input Box */}
-              <Box
-                onClick={() => setActiveTarget("dropoff")}
-                sx={{
-                  backgroundColor: "rgba(255, 255, 255, 0.25)",
-                  backdropFilter: "blur(4px)",
-                  borderRadius: "14px",
-                  padding: "8px 14px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  border: activeTarget === "dropoff" ? "1.5px solid #FFFFFF" : "1px solid rgba(255, 255, 255, 0.3)",
-                }}
-              >
-                {/* Location Pin Icon */}
-                <Box
+              <Box sx={{ flexGrow: 1 }}>
+                <Typography
                   sx={{
-                    width: "18px",
-                    height: "18px",
-                    borderRadius: "50%",
-                    backgroundColor: "#000000",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    color: "rgba(255, 255, 255, 0.8)",
+                    letterSpacing: "0.5px",
+                    fontFamily: "Poppins, sans-serif",
                   }}
                 >
-                  <LocationOnIcon sx={{ color: "#FFFFFF", fontSize: "12px" }} />
-                </Box>
-
-                <Box sx={{ flexGrow: 1 }}>
-                  <Typography
-                    sx={{
-                      fontSize: "10px",
-                      fontWeight: 700,
-                      color: "rgba(255, 255, 255, 0.8)",
-                      letterSpacing: "0.5px",
-                    }}
-                  >
-                    DESTINASYON
-                  </Typography>
-                  <InputBase
-                    value={dropoffText}
-                    onChange={(e) => setDropoffText(e.target.value)}
-                    onFocus={() => setActiveTarget("dropoff")}
-                    placeholder="I-type ang lugar"
-                    autoFocus={initialTarget === "dropoff"}
-                    sx={{
-                      color: "#FFFFFF",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      width: "100%",
-                      fontFamily: "Poppins, sans-serif",
-                      "& input": { padding: 0 },
-                    }}
-                  />
-                </Box>
+                  PICKUP
+                </Typography>
+                <InputBase
+                  value={pickupText}
+                  onChange={(e) => setPickupText(e.target.value)}
+                  onFocus={() => setActiveTarget("pickup")}
+                  placeholder="Saan ka susunduin?"
+                  sx={{
+                    color: "#FFFFFF",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    width: "100%",
+                    fontFamily: "Poppins, sans-serif",
+                    "& input": { padding: 0 },
+                  }}
+                />
               </Box>
             </Box>
 
-            {/* Swap Places Button */}
-            <IconButton
-              onClick={handleSwap}
+            {/* DESTINASYON Input Box */}
+            <Box
+              onClick={() => setActiveTarget("dropoff")}
               sx={{
-                color: "#FFFFFF",
-                backgroundColor: "rgba(255, 255, 255, 0.2)",
-                width: "40px",
-                height: "40px",
-                borderRadius: "12px",
-                "&:hover": { backgroundColor: "rgba(255, 255, 255, 0.3)" },
+                backgroundColor: "rgba(255, 255, 255, 0.25)",
+                backdropFilter: "blur(4px)",
+                borderRadius: "14px",
+                padding: "8px 14px",
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                border: activeTarget === "dropoff" ? "1.5px solid #FFFFFF" : "1px solid rgba(255, 255, 255, 0.3)",
+                cursor: "pointer",
               }}
             >
-              <SwapVertIcon />
-            </IconButton>
-          </Box>
-        </Box>
+              {/* Location Pin Icon */}
+              <Box
+                sx={{
+                  width: "18px",
+                  height: "18px",
+                  borderRadius: "50%",
+                  backgroundColor: "#000000",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <LocationOnIcon sx={{ color: "#FFFFFF", fontSize: "12px" }} />
+              </Box>
 
-        {/* Autocomplete Suggestions List matching SET PLACE.png and SET PLACE (1).png */}
-        <Box
-          className="hide-scrollbar"
-          sx={{
-            flexGrow: 1,
-            overflowY: "auto",
-            backgroundColor: "#FFFFFF",
-          }}
-        >
-          {filteredPlaces.map((place, idx) => (
+              <Box sx={{ flexGrow: 1 }}>
+                <Typography
+                  sx={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    color: "rgba(255, 255, 255, 0.8)",
+                    letterSpacing: "0.5px",
+                    fontFamily: "Poppins, sans-serif",
+                  }}
+                >
+                  DESTINASYON
+                </Typography>
+                <InputBase
+                  value={dropoffText}
+                  onChange={(e) => setDropoffText(e.target.value)}
+                  onFocus={() => setActiveTarget("dropoff")}
+                  placeholder="I-type ang lugar"
+                  autoFocus={initialTarget === "dropoff"}
+                  sx={{
+                    color: "#FFFFFF",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    width: "100%",
+                    fontFamily: "Poppins, sans-serif",
+                    "& input": { padding: 0 },
+                  }}
+                />
+              </Box>
+            </Box>
+          </Box>
+
+          {/* Swap Places Button */}
+          <IconButton
+            onClick={handleSwap}
+            sx={{
+              color: "#FFFFFF",
+              backgroundColor: "rgba(255, 255, 255, 0.2)",
+              width: "40px",
+              height: "40px",
+              borderRadius: "12px",
+              "&:hover": { backgroundColor: "rgba(255, 255, 255, 0.3)" },
+            }}
+          >
+            <SwapVertIcon />
+          </IconButton>
+        </Box>
+      </Box>
+
+      {/* Autocomplete Suggestions List matching SET PLACE.png and SET PLACE (1).png */}
+      <Box
+        className="hide-scrollbar"
+        sx={{
+          flexGrow: 1,
+          overflowY: "auto",
+          backgroundColor: "#FFFFFF",
+          paddingBottom: "calc(var(--safe-area-bottom) + 20px)",
+        }}
+      >
+        {loading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", padding: "32px" }}>
+            <CircularProgress size={28} sx={{ color: "#FF6B00" }} />
+          </Box>
+        ) : (
+          suggestions.map((place, idx) => (
             <React.Fragment key={place.id}>
               <Box
                 onClick={() => handleSelectPlace(place)}
@@ -383,23 +348,20 @@ const SetPlace: React.FC = () => {
                   </Typography>
                 </Box>
 
-                {/* Center Title with bold matched text & Subtitle Address */}
+                {/* Center Title & Subtitle Address */}
                 <Box sx={{ flexGrow: 1, overflow: "hidden" }}>
                   <Typography
                     sx={{
                       fontSize: "15px",
                       color: "#0F172A",
-                      fontWeight: 400,
+                      fontWeight: 700,
                       whiteSpace: "nowrap",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       fontFamily: "Poppins, sans-serif",
                     }}
                   >
-                    {place.name.replace(place.matchBold, "")}
-                    <Box component="span" sx={{ fontWeight: 800 }}>
-                      {place.matchBold}
-                    </Box>
+                    {place.name}
                   </Typography>
                   <Typography
                     sx={{
@@ -421,12 +383,12 @@ const SetPlace: React.FC = () => {
                   <NorthWestIcon sx={{ fontSize: "18px" }} />
                 </IconButton>
               </Box>
-              {idx < filteredPlaces.length - 1 && (
+              {idx < suggestions.length - 1 && (
                 <Divider sx={{ borderColor: "#F1F5F9" }} />
               )}
             </React.Fragment>
-          ))}
-        </Box>
+          ))
+        )}
       </Box>
     </Box>
   );
