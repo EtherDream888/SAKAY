@@ -62,7 +62,7 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({ metric }) => {
 
   return (
     <Box
-      onClick={() => navigate(metric.route)}
+      onClick={() => metric.route && navigate(metric.route)}
       sx={{
         background: 'linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.78) 100%)',
         borderRadius: 'var(--mac-radius-xl)',

@@ -2,6 +2,10 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AdminLayout } from '../components/layout/AdminLayout';
 import { DashboardPage } from '../pages/DashboardPage';
+import { TodaApplicationsPage } from '../pages/TodaApplicationsPage';
+import { AccreditedTodasPage } from '../pages/AccreditedTodasPage';
+import { DriverManagementPage } from '../pages/DriverManagementPage';
+import { PassengerManagementPage } from '../pages/PassengerManagementPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
 
 export const AdminRoutes: React.FC = () => {
@@ -24,11 +28,8 @@ export const AdminRoutes: React.FC = () => {
       <Route
         path="/toda-applications"
         element={
-          <AdminLayout pageTitle="TODA Applications" pageSubtitle="Review and manage pending TODA accreditation requests">
-            <PlaceholderPage
-              title="TODA Applications Management"
-              subtitle="View, approve, or decline accreditation requests from local Tricycle Operators and Drivers Associations."
-            />
+          <AdminLayout pageTitle="TODA Applications" pageSubtitle="Review and manage TODA accreditation requests.">
+            <TodaApplicationsPage />
           </AdminLayout>
         }
       />
@@ -36,11 +37,8 @@ export const AdminRoutes: React.FC = () => {
       <Route
         path="/accredited-todas"
         element={
-          <AdminLayout pageTitle="Accredited TODAs" pageSubtitle="Directory of officially accredited TODAs in Calapan City">
-            <PlaceholderPage
-              title="Accredited TODAs Directory"
-              subtitle="Manage active TODA rosters, zone boundaries, and official registration documents."
-            />
+          <AdminLayout pageTitle="Accredited TODAs" pageSubtitle="Manage accredited TODAs, service zones, and registration records.">
+            <AccreditedTodasPage />
           </AdminLayout>
         }
       />
@@ -48,11 +46,8 @@ export const AdminRoutes: React.FC = () => {
       <Route
         path="/drivers"
         element={
-          <AdminLayout pageTitle="Drivers" pageSubtitle="Registered tricycle drivers and verification statuses">
-            <PlaceholderPage
-              title="Driver Verification & Management"
-              subtitle="Inspect driver licenses, Toda affiliations, vehicle franchise details, and background verification."
-            />
+          <AdminLayout pageTitle="Driver Verification & Management" pageSubtitle="Review driver credentials, affiliations, and verification status.">
+            <DriverManagementPage />
           </AdminLayout>
         }
       />
@@ -60,11 +55,8 @@ export const AdminRoutes: React.FC = () => {
       <Route
         path="/passengers"
         element={
-          <AdminLayout pageTitle="Passengers" pageSubtitle="Registered passenger accounts and platform usage">
-            <PlaceholderPage
-              title="Passenger Management Portal"
-              subtitle="Oversee registered passenger accounts, active sessions, and passenger feedback."
-            />
+          <AdminLayout pageTitle="Passenger Management" pageSubtitle="Manage passenger accounts, sessions, and feedback.">
+            <PassengerManagementPage />
           </AdminLayout>
         }
       />

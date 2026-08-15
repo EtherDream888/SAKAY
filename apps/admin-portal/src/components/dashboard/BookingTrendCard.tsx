@@ -1,287 +1,362 @@
 import React, { useState } from 'react';
-import { Box, Typography, Select, MenuItem, FormControl } from '@mui/material';
-import { TrendPeriod, BookingTrendPoint } from '../../types/admin';
-import {
-  BOOKING_TREND_DAILY,
-  BOOKING_TREND_WEEKLY,
-  BOOKING_TREND_MONTHLY,
-} from '../../mockData/dashboardData';
+import { Box, Typography, Card, CardContent, Button, Menu, MenuItem, Chip } from '@mui/material';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+
+import { TrendPeriod } from '../../types/admin';
+
+interface TrendDataPoint {
+  day: string;
+  label: string;
+  value: number;
+  revenue: number;
+  formattedVal: string;
+  x: number;
+  y: number;
+}
 
 export const BookingTrendCard: React.FC = () => {
   const [period, setPeriod] = useState<TrendPeriod>('Weekly');
-  const [hoveredPoint, setHoveredPoint] = useState<{
-    x: number;
-    y: number;
-    point: BookingTrendPoint;
-  } | null>(null);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [hoveredPoint, setHoveredPoint] = useState<TrendDataPoint | null>(null);
 
-  const getData = (): BookingTrendPoint[] => {
-    switch (period) {
-      case 'Daily':
-        return BOOKING_TREND_DAILY;
-      case 'Weekly':
-        return BOOKING_TREND_WEEKLY;
-      case 'Monthly':
-        return BOOKING_TREND_MONTHLY;
-      default:
-        return BOOKING_TREND_WEEKLY;
-    }
+  const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    setAnchorEl(event.currentTarget);
   };
 
-  const data = getData();
-  const maxValue = Math.max(...data.map((d) => d.value)) * 1.25;
+  const handleClose = (selectedPeriod?: TrendPeriod) => {
+    if (selectedPeriod) {
+      setPeriod(selectedPeriod);
+    }
+    setAnchorEl(null);
+  };
 
-  // SVG dimensions
-  const svgWidth = 600;
-  const svgHeight = 220;
-  const paddingX = 42;
-  const paddingY = 25;
-  const chartWidth = svgWidth - paddingX * 2;
-  const chartHeight = svgHeight - paddingY * 2;
+  // Weekly data points with coordinates mapped to 760x240 SVG canvas
+  const weeklyPoints: TrendDataPoint[] = [
+    { day: 'Mon', label: 'Monday', value: 680, revenue: 16320, formattedVal: '680', x: 60, y: 175 },
+    { day: 'Tue', label: 'Tuesday', value: 1120, revenue: 26880, formattedVal: '1.1k', x: 168, y: 130 },
+    { day: 'Wed', label: 'Wednesday', value: 1640, revenue: 39360, formattedVal: '1.6k', x: 276, y: 65 },
+    { day: 'Thu', label: 'Thursday', value: 1040, revenue: 24960, formattedVal: '1.0k', x: 384, y: 138 },
+    { day: 'Fri', label: 'Friday', value: 890, revenue: 21360, formattedVal: '890', x: 492, y: 154 },
+    { day: 'Sat', label: 'Saturday', value: 1020, revenue: 24480, formattedVal: '1.0k', x: 600, y: 140 },
+    { day: 'Sun', label: 'Sunday', value: 1420, revenue: 34080, formattedVal: '1.4k', x: 708, y: 92 },
+  ];
 
-  // Calculate coordinates
-  const points = data.map((d, i) => {
-    const x = paddingX + (i / (data.length - 1)) * chartWidth;
-    const y = svgHeight - paddingY - (d.value / maxValue) * chartHeight;
-    return { x, y, point: d };
-  });
+  // Generate smooth cubic Bezier curve path string
+  const createSmoothPath = (pts: TrendDataPoint[]) => {
+    if (pts.length < 2) return '';
+    let path = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const curr = pts[i];
+      const next = pts[i + 1];
+      const cp1x = curr.x + (next.x - curr.x) / 2;
+      const cp1y = curr.y;
+      const cp2x = curr.x + (next.x - curr.x) / 2;
+      const cp2y = next.y;
+      path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${next.x} ${next.y}`;
+    }
+    return path;
+  };
 
-  // Construct SVG path for line
-  const linePath = points.reduce((acc, curr, index) => {
-    return index === 0 ? `M ${curr.x} ${curr.y}` : `${acc} L ${curr.x} ${curr.y}`;
-  }, '');
-
-  // Closed path for area fill under line
-  const fillPath = `${linePath} L ${points[points.length - 1].x} ${svgHeight - paddingY} L ${points[0].x} ${svgHeight - paddingY} Z`;
+  const linePath = createSmoothPath(weeklyPoints);
+  const areaPath = `${linePath} L ${weeklyPoints[weeklyPoints.length - 1].x} 200 L ${weeklyPoints[0].x} 200 Z`;
 
   return (
-    <Box
+    <Card
       sx={{
-        backgroundColor: 'var(--mac-card-bg)',
         borderRadius: 'var(--mac-radius-lg)',
         border: '1px solid var(--mac-border-color)',
         boxShadow: 'var(--mac-shadow-card)',
-        padding: '26px 28px',
+        backgroundColor: '#FFFFFF',
+        overflow: 'hidden',
+        height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        height: '100%',
-        position: 'relative',
-        overflow: 'hidden',
       }}
     >
-      {/* Header & Subtitle Block */}
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2.5 }}>
-        <Box>
-          <Typography sx={{ fontSize: '17px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-            Booking Trend
-          </Typography>
-          <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', mt: '3px' }}>
-            Number of passenger bookings over time.
-          </Typography>
-        </Box>
+      <CardContent sx={{ padding: '24px 28px !important', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+        {/* Header & Controls */}
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 3 }}>
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+              <Typography sx={{ fontSize: '18px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+                Booking Trend
+              </Typography>
+              <Chip
+                icon={<TrendingUpIcon style={{ fontSize: 14, color: '#1E8E3E' }} />}
+                label="+14.2% vs last week"
+                size="small"
+                sx={{
+                  backgroundColor: 'rgba(52, 168, 83, 0.12)',
+                  color: '#1E8E3E',
+                  fontWeight: 600,
+                  fontSize: '12px',
+                  height: 24,
+                  border: '1px solid rgba(52, 168, 83, 0.25)',
+                }}
+              />
+            </Box>
+            <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', fontWeight: 400 }}>
+              Number of completed passenger ride bookings across Calapan City.
+            </Typography>
+          </Box>
 
-        {/* Polished macOS Dropdown with SAKAY Orange Hover & NO BLACK OUTLINE */}
-        <FormControl size="small">
-          <Select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value as TrendPeriod)}
+          <Button
+            onClick={handleClick}
+            endIcon={<KeyboardArrowDownIcon />}
             sx={{
               height: 38,
-              fontSize: '14px',
-              fontWeight: 500,
+              padding: '0 16px',
               borderRadius: '9px',
-              padding: '0 4px',
+              border: '1px solid var(--mac-border-color)',
               backgroundColor: '#FFFFFF',
               color: 'var(--mac-text-primary)',
-              transition: 'var(--mac-transition-fast)',
-              fieldset: { borderColor: 'var(--mac-border-color)' },
+              fontSize: '13.5px',
+              fontWeight: 500,
+              textTransform: 'none',
+              boxShadow: 'var(--mac-shadow-subtle)',
               '&:hover': {
                 backgroundColor: 'var(--sakay-orange-soft)',
-                color: 'var(--sakay-orange)',
-                '& fieldset': { borderColor: 'var(--sakay-orange-border)' },
-              },
-              '&.Mui-focused': {
-                backgroundColor: 'var(--sakay-orange-soft)',
-                color: 'var(--sakay-orange)',
-                '& fieldset': { borderColor: 'var(--sakay-orange)' },
-              },
-              '& .MuiSelect-icon': {
-                transition: 'color 0.15s ease',
-              },
-              '&:hover .MuiSelect-icon': {
+                borderColor: 'var(--sakay-orange-border)',
                 color: 'var(--sakay-orange)',
               },
             }}
-            MenuProps={{
-              slotProps: {
-                paper: {
-                  className: 'mac-glass-popover',
-                  sx: {
-                    borderRadius: '10px',
-                    mt: 0.5,
-                    '& .MuiMenuItem-root': {
-                      fontSize: '13.5px',
-                      fontWeight: 500,
-                      padding: '8px 16px',
-                      '&:hover': {
-                        backgroundColor: 'var(--sakay-orange-soft)',
-                        color: 'var(--sakay-orange)',
-                      },
-                      '&.Mui-selected': {
-                        backgroundColor: 'var(--sakay-orange-soft)',
-                        color: 'var(--sakay-orange)',
-                        fontWeight: 600,
-                      },
-                    },
-                  },
+          >
+            {period}
+          </Button>
+
+          <Menu
+            anchorEl={anchorEl}
+            open={Boolean(anchorEl)}
+            onClose={() => handleClose()}
+            slotProps={{
+              paper: {
+                sx: {
+                  borderRadius: '10px',
+                  boxShadow: 'var(--mac-shadow-popover)',
+                  mt: 0.5,
+                  minWidth: 130,
                 },
               },
             }}
           >
-            <MenuItem value="Daily">Daily</MenuItem>
-            <MenuItem value="Weekly">Weekly</MenuItem>
-            <MenuItem value="Monthly">Monthly</MenuItem>
-          </Select>
-        </FormControl>
-      </Box>
+            <MenuItem onClick={() => handleClose('Weekly')} selected={period === 'Weekly'}>
+              Weekly
+            </MenuItem>
+            <MenuItem onClick={() => handleClose('Monthly')} selected={period === 'Monthly'}>
+              Monthly
+            </MenuItem>
+            <MenuItem onClick={() => handleClose('Daily')} selected={period === 'Daily'}>
+              Daily
+            </MenuItem>
+          </Menu>
+        </Box>
 
-      {/* SVG Chart Surface */}
-      <Box
-        sx={{
-          flex: 1,
-          width: '100%',
-          position: 'relative',
-          minHeight: 200,
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        <svg
-          viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-          style={{ width: '100%', height: '100%', overflow: 'visible' }}
+        {/* Centered Metric Summary Cards Container */}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
+            gap: 2,
+            width: '100%',
+            maxWidth: 680,
+            margin: '0 auto 24px auto',
+          }}
         >
-          <defs>
-            <linearGradient id="orangeGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#FF5500" stopOpacity="0.25" />
-              <stop offset="100%" stopColor="#FF5500" stopOpacity="0.0" />
-            </linearGradient>
-          </defs>
-
-          {/* Horizontal Grid lines */}
-          {[0, 0.33, 0.66, 1].map((ratio, idx) => {
-            const y = paddingY + ratio * chartHeight;
-            const val = Math.round((1 - ratio) * maxValue);
-            return (
-              <g key={idx}>
-                <line
-                  x1={paddingX}
-                  y1={y}
-                  x2={svgWidth - paddingX}
-                  y2={y}
-                  stroke="#F0F0F2"
-                  strokeDasharray="4 4"
-                />
-                <text
-                  x={paddingX - 8}
-                  y={y + 4}
-                  fill="#8E8E93"
-                  fontSize="10.5"
-                  textAnchor="end"
-                  fontFamily="var(--mac-font-family)"
-                >
-                  {val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Gradient Fill */}
-          <path d={fillPath} fill="url(#orangeGradient)" />
-
-          {/* Main Orange Trend Line */}
-          <path
-            d={linePath}
-            fill="none"
-            stroke="#FF5500"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-
-          {/* Data Point Markers */}
-          {points.map((pt, i) => (
-            <g key={i}>
-              <circle
-                cx={pt.x}
-                cy={pt.y}
-                r={hoveredPoint?.point.label === pt.point.label ? 6 : 4}
-                fill="#FFFFFF"
-                stroke="#FF5500"
-                strokeWidth="2.5"
-                style={{ transition: 'all 0.15s ease', cursor: 'pointer' }}
-              />
-              {/* X Axis Labels */}
-              <text
-                x={pt.x}
-                y={svgHeight - 6}
-                fill="#8E8E93"
-                fontSize={period === 'Monthly' ? '10' : '11.5'}
-                fontWeight="500"
-                textAnchor="middle"
-                fontFamily="var(--mac-font-family)"
-              >
-                {pt.point.label}
-              </text>
-              {/* Hit target circle */}
-              <circle
-                cx={pt.x}
-                cy={pt.y}
-                r="14"
-                fill="transparent"
-                style={{ cursor: 'pointer' }}
-                onMouseEnter={() => setHoveredPoint(pt)}
-                onMouseLeave={() => setHoveredPoint(null)}
-              />
-            </g>
-          ))}
-        </svg>
-
-        {/* Boundary-aware Tooltip */}
-        {hoveredPoint && (
+          {/* Card 1: Total Weekly Bookings */}
           <Box
             sx={{
-              position: 'absolute',
-              left: `${(hoveredPoint.x / svgWidth) * 100}%`,
-              top: `${(hoveredPoint.y / svgHeight) * 100}%`,
-              transform:
-                hoveredPoint.x > svgWidth - 100
-                  ? 'translate(-95%, -120%)'
-                  : hoveredPoint.x < 100
-                  ? 'translate(-5%, -120%)'
-                  : 'translate(-50%, -120%)',
-              backgroundColor: '#FFFFFF',
+              backgroundColor: '#FAFAFC',
+              borderRadius: '12px',
               border: '1px solid var(--mac-border-color)',
-              boxShadow: 'var(--mac-shadow-popover)',
-              borderRadius: '8px',
-              padding: '8px 12px',
-              zIndex: 500,
-              pointerEvents: 'none',
-              minWidth: 110,
-              animation: 'fadeIn 0.1s ease',
+              padding: '14px 18px',
+              textAlign: 'center',
+              boxShadow: 'var(--mac-shadow-subtle)',
+              transition: 'var(--mac-transition-fast)',
+              '&:hover': {
+                backgroundColor: '#FFFFFF',
+                borderColor: 'rgba(255, 85, 0, 0.3)',
+                boxShadow: 'var(--mac-shadow-card)',
+              },
             }}
           >
-            <Typography sx={{ fontSize: '11.5px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: '2px' }}>
-              {hoveredPoint.point.label}
+            <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', mb: '4px' }}>
+              Total Weekly Bookings
             </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box sx={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: 'var(--sakay-orange)' }} />
-              <Typography sx={{ fontSize: '13px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
-                {hoveredPoint.point.value.toLocaleString()} bookings
+            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--mac-text-primary)', lineHeight: 1.1 }}>
+              7,810
+            </Typography>
+          </Box>
+
+          {/* Card 2: Peak Volume (Wed) */}
+          <Box
+            sx={{
+              backgroundColor: '#FFF7ED',
+              borderRadius: '12px',
+              border: '1px solid #FDBA74',
+              padding: '14px 18px',
+              textAlign: 'center',
+              boxShadow: 'var(--mac-shadow-subtle)',
+              transition: 'var(--mac-transition-fast)',
+              '&:hover': {
+                backgroundColor: '#FFEDD5',
+                boxShadow: 'var(--mac-shadow-card)',
+              },
+            }}
+          >
+            <Typography sx={{ fontSize: '11.5px', color: '#C2410C', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', mb: '4px' }}>
+              Peak Volume (Wed)
+            </Typography>
+            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: '#EA580C', lineHeight: 1.1 }}>
+              1,640
+            </Typography>
+          </Box>
+
+          {/* Card 3: Est. Fare Volume */}
+          <Box
+            sx={{
+              backgroundColor: '#FAFAFC',
+              borderRadius: '12px',
+              border: '1px solid var(--mac-border-color)',
+              padding: '14px 18px',
+              textAlign: 'center',
+              boxShadow: 'var(--mac-shadow-subtle)',
+              transition: 'var(--mac-transition-fast)',
+              '&:hover': {
+                backgroundColor: '#FFFFFF',
+                borderColor: 'rgba(255, 85, 0, 0.3)',
+                boxShadow: 'var(--mac-shadow-card)',
+              },
+            }}
+          >
+            <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', mb: '4px' }}>
+              Est. Fare Volume
+            </Typography>
+            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--mac-text-primary)', lineHeight: 1.1 }}>
+              ₱187.4k
+            </Typography>
+          </Box>
+        </Box>
+
+        {/* Spacious SVG Bezier Line Chart */}
+        <Box sx={{ width: '100%', height: 260, position: 'relative', mt: 'auto' }}>
+          <svg viewBox="0 0 760 240" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+            <defs>
+              {/* Orange Area Gradient */}
+              <linearGradient id="bookingAreaGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#FF5500" stopOpacity="0.28" />
+                <stop offset="60%" stopColor="#FF5500" stopOpacity="0.08" />
+                <stop offset="100%" stopColor="#FF5500" stopOpacity="0.0" />
+              </linearGradient>
+
+              {/* Orange Drop Glow Filter */}
+              <filter id="orangeGlow" x="-10%" y="-20%" width="125%" height="150%">
+                <feDropShadow dx="0" dy="4" stdDeviation="5" floodColor="#FF5500" floodOpacity="0.38" />
+              </filter>
+            </defs>
+
+            {/* Y-Axis Horizontal Grid Lines & Labels with Generous Left Margin (55px) */}
+            <g stroke="#E5E5EA" strokeDasharray="4 4" strokeWidth="1">
+              <line x1="55" y1="35" x2="720" y2="35" />
+              <line x1="55" y1="90" x2="720" y2="90" />
+              <line x1="55" y1="145" x2="720" y2="145" />
+              <line x1="55" y1="200" x2="720" y2="200" />
+            </g>
+
+            {/* Y-Axis Text Labels */}
+            <g fill="#8E8E93" fontSize="12.5" fontWeight="500" textAnchor="end">
+              <text x="42" y="39">2.0k</text>
+              <text x="42" y="94">1.4k</text>
+              <text x="42" y="149">800</text>
+              <text x="42" y="204">0</text>
+            </g>
+
+            {/* Area Gradient Fill */}
+            <path d={areaPath} fill="url(#bookingAreaGrad)" />
+
+            {/* Smooth Bezier Spline Line Path with Glow Filter */}
+            <path
+              d={linePath}
+              fill="none"
+              stroke="#FF5500"
+              strokeWidth="3.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              filter="url(#orangeGlow)"
+            />
+
+            {/* Data Node Circles & Interactive Hover Hits */}
+            {weeklyPoints.map((pt, idx) => (
+              <g
+                key={idx}
+                onMouseEnter={() => setHoveredPoint(pt)}
+                onMouseLeave={() => setHoveredPoint(null)}
+                style={{ cursor: 'pointer' }}
+              >
+                {/* Outer Glow Ring on Hover */}
+                {hoveredPoint?.day === pt.day && (
+                  <circle cx={pt.x} cy={pt.y} r="10" fill="rgba(255, 85, 0, 0.22)" />
+                )}
+
+                {/* Outer Node Border Circle */}
+                <circle
+                  cx={pt.x}
+                  cy={pt.y}
+                  r={hoveredPoint?.day === pt.day ? "6.5" : "5"}
+                  fill="#FFFFFF"
+                  stroke="#FF5500"
+                  strokeWidth="3.5"
+                  style={{ transition: 'all 0.15s ease' }}
+                />
+              </g>
+            ))}
+
+            {/* X-Axis Day Labels with Generous Bottom Margin */}
+            <g fill="#636366" fontSize="13" fontWeight="500" textAnchor="middle">
+              {weeklyPoints.map((pt, idx) => (
+                <text key={idx} x={pt.x} y="228">
+                  {pt.day}
+                </text>
+              ))}
+            </g>
+          </svg>
+
+          {/* Floating White macOS Interactive Tooltip */}
+          {hoveredPoint && (
+            <Box
+              sx={{
+                position: 'absolute',
+                left: `calc(${(hoveredPoint.x / 760) * 100}% - 75px)`,
+                top: `calc(${(hoveredPoint.y / 240) * 100}% - 85px)`,
+                backgroundColor: '#FFFFFF',
+                color: 'var(--mac-text-primary)',
+                padding: '10px 16px',
+                borderRadius: '10px',
+                border: '1px solid var(--mac-border-color)',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06)',
+                pointerEvents: 'none',
+                zIndex: 10,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                minWidth: 150,
+                transform: 'translateY(-10px)',
+                transition: 'all 0.15s ease-out',
+              }}
+            >
+              <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', mb: '2px' }}>
+                {hoveredPoint.label}
+              </Typography>
+              <Typography sx={{ fontSize: '16px', fontWeight: 700, color: 'var(--sakay-orange)', lineHeight: 1.2 }}>
+                {hoveredPoint.value.toLocaleString()} Bookings
+              </Typography>
+              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-secondary)', mt: '3px', fontWeight: 500 }}>
+                Est. Fare: ₱{hoveredPoint.revenue.toLocaleString()}
               </Typography>
             </Box>
-          </Box>
-        )}
-      </Box>
-    </Box>
+          )}
+        </Box>
+      </CardContent>
+    </Card>
   );
 };
