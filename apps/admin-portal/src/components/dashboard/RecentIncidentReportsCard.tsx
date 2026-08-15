@@ -5,6 +5,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import PersonOffIcon from '@mui/icons-material/PersonOff';
 import AltRouteIcon from '@mui/icons-material/AltRoute';
 import SecurityIcon from '@mui/icons-material/Security';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { StatusBadge } from '../common/StatusBadge';
 import { RECENT_INCIDENT_REPORTS } from '../../mockData/dashboardData';
 
@@ -35,6 +36,10 @@ export const RecentIncidentReportsCard: React.FC = () => {
       default:
         return 'var(--sakay-orange-soft)';
     }
+  };
+
+  const handleIncidentClick = (reportId: string) => {
+    navigate('/incident-reports', { state: { reportId } });
   };
 
   return (
@@ -77,11 +82,12 @@ export const RecentIncidentReportsCard: React.FC = () => {
         </Typography>
       </Box>
 
-      {/* Top-aligned List of Incident Reports */}
+      {/* Interactive, Clickable List of Incident Reports */}
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {RECENT_INCIDENT_REPORTS.map((report) => (
           <Box
             key={report.id}
+            onClick={() => handleIncidentClick(report.id)}
             sx={{
               display: 'flex',
               alignItems: 'center',
@@ -90,10 +96,17 @@ export const RecentIncidentReportsCard: React.FC = () => {
               borderRadius: 'var(--mac-radius-md)',
               backgroundColor: '#FAFAFC',
               border: '1px solid var(--mac-border-subtle)',
+              cursor: 'pointer',
               transition: 'var(--mac-transition-fast)',
               '&:hover': {
-                backgroundColor: 'var(--mac-canvas-bg)',
-                borderColor: 'var(--mac-border-color)',
+                backgroundColor: 'var(--sakay-orange-soft)',
+                borderColor: 'var(--sakay-orange-border)',
+                transform: 'translateX(3px)',
+                '& .incident-chevron': {
+                  opacity: 1,
+                  transform: 'translateX(2px)',
+                  color: 'var(--sakay-orange)',
+                },
               },
             }}
           >
@@ -107,6 +120,7 @@ export const RecentIncidentReportsCard: React.FC = () => {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  flexShrink: 0,
                 }}
               >
                 {getIncidentIcon(report.iconType)}
@@ -121,7 +135,18 @@ export const RecentIncidentReportsCard: React.FC = () => {
               </Box>
             </Box>
 
-            <StatusBadge status={report.status} />
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <StatusBadge status={report.status} />
+              <ChevronRightIcon
+                className="incident-chevron"
+                sx={{
+                  fontSize: 18,
+                  color: 'var(--mac-text-muted)',
+                  opacity: 0.5,
+                  transition: 'var(--mac-transition-fast)',
+                }}
+              />
+            </Box>
           </Box>
         ))}
       </Box>

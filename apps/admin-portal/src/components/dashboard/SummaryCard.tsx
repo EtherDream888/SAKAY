@@ -45,6 +45,21 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({ metric }) => {
     }
   };
 
+  const getAccent = (id: string) => {
+    switch (id) {
+      case 'accredited-todas':
+        return 'var(--sakay-orange)';
+      case 'active-drivers':
+        return '#34A853';
+      case 'active-trips':
+        return '#1A73E8';
+      case 'todays-bookings':
+        return '#9C27B0';
+      default:
+        return 'var(--sakay-orange)';
+    }
+  };
+
   return (
     <Box
       onClick={() => navigate(metric.route)}
@@ -67,7 +82,7 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({ metric }) => {
           inset: '0 auto auto 0',
           width: '100%',
           height: '4px',
-          background: 'linear-gradient(90deg, rgba(255,107,26,0.18), rgba(255,138,71,0.85), rgba(255,255,255,0))',
+          background: `linear-gradient(90deg, ${getAccent(metric.id)} 0%, ${getAccent(metric.id)} 38%, rgba(255,255,255,0) 100%)`,
         },
         '&:hover': {
           boxShadow: 'var(--mac-shadow-hover)',
@@ -75,7 +90,7 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({ metric }) => {
           transform: 'translateY(-3px)',
           '& .chevron-icon': {
             transform: 'translateX(4px)',
-            color: 'var(--sakay-orange)',
+            color: getAccent(metric.id),
           },
         },
       }}

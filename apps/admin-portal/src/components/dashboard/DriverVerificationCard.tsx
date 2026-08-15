@@ -71,7 +71,7 @@ export const DriverVerificationCard: React.FC = () => {
         </Typography>
       </Box>
 
-      {/* Horizontal Layout: Donut on Left, Legend Stack on Right */}
+      {/* Horizontal Layout: Donut on Left, Interactive Legend Stack on Right */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: 1, gap: 3, pt: 1 }}>
         {/* Left: Donut Chart Surface (165px box with zero hover clipping) */}
         <Box
@@ -101,13 +101,14 @@ export const DriverVerificationCard: React.FC = () => {
                   r={radius}
                   fill="transparent"
                   stroke={seg.color}
-                  strokeWidth={isHovered ? strokeWidth + 4 : strokeWidth}
+                  strokeWidth={isHovered ? strokeWidth + 5 : strokeWidth}
                   strokeDasharray={strokeDasharray}
                   strokeDashoffset={strokeDashoffset}
                   transform={`rotate(-90 ${size / 2} ${size / 2})`}
                   style={{
                     transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
                     cursor: 'pointer',
+                    opacity: hoveredSegment && !isHovered ? 0.45 : 1,
                   }}
                   onMouseEnter={() => setHoveredSegment(seg)}
                   onMouseLeave={() => setHoveredSegment(null)}
@@ -131,7 +132,15 @@ export const DriverVerificationCard: React.FC = () => {
               pointerEvents: 'none',
             }}
           >
-            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--mac-text-primary)', lineHeight: 1 }}>
+            <Typography
+              sx={{
+                fontSize: '26px',
+                fontWeight: 700,
+                color: hoveredSegment ? hoveredSegment.color : 'var(--mac-text-primary)',
+                lineHeight: 1,
+                transition: 'var(--mac-transition-fast)',
+              }}
+            >
               {hoveredSegment ? hoveredSegment.count : total}
             </Typography>
             <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', fontWeight: 500, mt: '3px' }}>
@@ -140,21 +149,63 @@ export const DriverVerificationCard: React.FC = () => {
           </Box>
         </Box>
 
-        {/* Right: Legend Vertical Stack */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.6 }}>
-          {segments.map((seg) => (
-            <Box key={seg.label} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-                <Box sx={{ width: 9, height: 9, borderRadius: '50%', backgroundColor: seg.color, flexShrink: 0 }} />
-                <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-secondary)', fontWeight: 500 }}>
-                  {seg.label}
+        {/* Right: Interactive Legend Vertical Stack */}
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          {segments.map((seg) => {
+            const isHovered = hoveredSegment?.label === seg.label;
+
+            return (
+              <Box
+                key={seg.label}
+                onMouseEnter={() => setHoveredSegment(seg)}
+                onMouseLeave={() => setHoveredSegment(null)}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '6px 10px',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  backgroundColor: isHovered ? 'var(--mac-canvas-bg)' : 'transparent',
+                  border: isHovered ? '1px solid var(--mac-border-color)' : '1px solid transparent',
+                  transition: 'var(--mac-transition-fast)',
+                  transform: isHovered ? 'translateX(3px)' : 'none',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                  <Box
+                    sx={{
+                      width: isHovered ? 11 : 9,
+                      height: isHovered ? 11 : 9,
+                      borderRadius: '50%',
+                      backgroundColor: seg.color,
+                      flexShrink: 0,
+                      transition: 'var(--mac-transition-fast)',
+                    }}
+                  />
+                  <Typography
+                    sx={{
+                      fontSize: '13.5px',
+                      color: isHovered ? 'var(--mac-text-primary)' : 'var(--mac-text-secondary)',
+                      fontWeight: isHovered ? 600 : 500,
+                    }}
+                  >
+                    {seg.label}
+                  </Typography>
+                </Box>
+                <Typography
+                  sx={{
+                    fontSize: '13.5px',
+                    fontWeight: isHovered ? 700 : 600,
+                    color: isHovered ? seg.color : 'var(--mac-text-primary)',
+                  }}
+                >
+                  {seg.count}{' '}
+                  <span style={{ color: 'var(--mac-text-muted)', fontWeight: 400 }}>({seg.percentage}%)</span>
                 </Typography>
               </Box>
-              <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                {seg.count} <span style={{ color: 'var(--mac-text-muted)', fontWeight: 400 }}>({seg.percentage}%)</span>
-              </Typography>
-            </Box>
-          ))}
+            );
+          })}
         </Box>
       </Box>
     </Box>

@@ -24,7 +24,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   const [notifications, setNotifications] = useState<NotificationItem[]>(MOCK_NOTIFICATIONS);
   const [notifOpen, setNotifOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date(2026, 4, 12));
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date(2026, 4, 12)); // May 12, 2026
 
   const unreadCount = notifications.filter((n) => n.unread).length;
 
@@ -48,25 +48,24 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         zIndex: 80,
         height: 'var(--mac-header-height)',
         flexShrink: 0,
-        background: 'rgba(255,255,255,0.72)',
-        backdropFilter: 'blur(18px)',
-        WebkitBackdropFilter: 'blur(18px)',
+        backgroundColor: '#FFFFFF',
         borderBottom: '1px solid var(--mac-border-color)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 28px 0 32px',
+        padding: '0 36px',
       }}
     >
+      {/* Left: Primary Page Title & Subtitle inside Sticky Header */}
       <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <Typography
           variant="h1"
           sx={{
-            fontSize: '30px',
-            fontWeight: 700,
+            fontSize: '28px',
+            fontWeight: 600,
             color: 'var(--mac-text-primary)',
-            letterSpacing: '-0.52px',
-            lineHeight: 1.15,
+            letterSpacing: '-0.4px',
+            lineHeight: 1.2,
           }}
         >
           {pageTitle}
@@ -74,11 +73,11 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         {pageSubtitle && (
           <Typography
             sx={{
-              fontSize: '14px',
+              fontSize: '14.5px',
               fontWeight: 400,
               color: 'var(--mac-text-muted)',
-              lineHeight: 1.4,
-              mt: '4px',
+              lineHeight: 1.3,
+              mt: '3px',
             }}
           >
             {pageSubtitle}
@@ -86,25 +85,25 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         )}
       </Box>
 
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, position: 'relative' }}>
+      {/* Right: macOS Toolbar Controls with Increased Up/Down Padding and Regular (Non-Bold) Font Weight */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, position: 'relative' }}>
+        {/* Notifications Icon Button */}
         <Box sx={{ position: 'relative' }}>
           <IconButton
             size="small"
             onClick={() => setNotifOpen(!notifOpen)}
             sx={{
-              width: 40,
-              height: 40,
-              borderRadius: '12px',
-              border: '1px solid rgba(17, 24, 39, 0.08)',
-              backgroundColor: 'rgba(255,255,255,0.8)',
+              width: 42,
+              height: 42,
+              borderRadius: '10px',
+              border: '1px solid var(--mac-border-color)',
+              backgroundColor: '#FFFFFF',
               color: 'var(--mac-text-secondary)',
-              boxShadow: 'var(--mac-shadow-subtle)',
               transition: 'var(--mac-transition-fast)',
               '&:hover': {
                 backgroundColor: 'var(--sakay-orange-soft)',
                 color: 'var(--sakay-orange)',
                 borderColor: 'var(--sakay-orange-border)',
-                transform: 'translateY(-1px)',
               },
             }}
           >
@@ -120,18 +119,19 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           />
         </Box>
 
+        {/* Tulong Action Button */}
         <Button
           onClick={() => navigate('/tulong')}
           startIcon={<HelpOutlineOutlinedIcon fontSize="small" sx={{ fontSize: 18 }} />}
           sx={{
-            height: 40,
-            padding: '0 18px',
-            borderRadius: '12px',
-            border: '1px solid rgba(17, 24, 39, 0.08)',
-            backgroundColor: 'rgba(255,255,255,0.8)',
+            height: 42,
+            padding: '0 20px',
+            borderRadius: '10px',
+            border: '1px solid var(--mac-border-color)',
+            backgroundColor: '#FFFFFF',
             color: 'var(--mac-text-primary)',
             fontSize: '14px',
-            fontWeight: 600,
+            fontWeight: 400,
             textTransform: 'none',
             boxShadow: 'var(--mac-shadow-subtle)',
             transition: 'var(--mac-transition-fast)',
@@ -139,27 +139,27 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
               backgroundColor: 'var(--sakay-orange-soft)',
               color: 'var(--sakay-orange)',
               borderColor: 'var(--sakay-orange-border)',
-              transform: 'translateY(-1px)',
             },
           }}
         >
           Tulong
         </Button>
 
+        {/* Date Selector Button */}
         <Box sx={{ position: 'relative' }}>
           <Button
             onClick={() => setDateOpen(!dateOpen)}
             startIcon={<CalendarTodayIcon fontSize="small" sx={{ fontSize: 16 }} />}
             endIcon={<KeyboardArrowDownIcon fontSize="small" sx={{ fontSize: 18 }} />}
             sx={{
-              height: 40,
-              padding: '0 18px',
-              borderRadius: '12px',
-              border: '1px solid rgba(17, 24, 39, 0.08)',
-              backgroundColor: 'rgba(255,255,255,0.8)',
+              height: 42,
+              padding: '0 20px',
+              borderRadius: '10px',
+              border: '1px solid var(--mac-border-color)',
+              backgroundColor: '#FFFFFF',
               color: 'var(--mac-text-primary)',
               fontSize: '14px',
-              fontWeight: 600,
+              fontWeight: 400,
               textTransform: 'none',
               boxShadow: 'var(--mac-shadow-subtle)',
               transition: 'var(--mac-transition-fast)',
@@ -167,7 +167,6 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
                 backgroundColor: 'var(--sakay-orange-soft)',
                 color: 'var(--sakay-orange)',
                 borderColor: 'var(--sakay-orange-border)',
-                transform: 'translateY(-1px)',
               },
             }}
           >
