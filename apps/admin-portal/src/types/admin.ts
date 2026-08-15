@@ -13,7 +13,10 @@ export type StatusType =
   | 'Valid'
   | 'Expiring Soon'
   | 'Expired'
-  | 'Resubmission Required';
+  | 'Resubmission Required'
+  | 'Pending Review'
+  | 'Under Investigation'
+  | 'Dismissed';
 
 export interface User {
   id: string;

@@ -6,6 +6,8 @@ import { TodaApplicationsPage } from '../pages/TodaApplicationsPage';
 import { AccreditedTodasPage } from '../pages/AccreditedTodasPage';
 import { DriverManagementPage } from '../pages/DriverManagementPage';
 import { PassengerManagementPage } from '../pages/PassengerManagementPage';
+import { LiveTripsPage } from '../pages/LiveTripsPage';
+import { IncidentReportsPage } from '../pages/IncidentReportsPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
 
 export const AdminRoutes: React.FC = () => {
@@ -65,11 +67,8 @@ export const AdminRoutes: React.FC = () => {
       <Route
         path="/live-trips"
         element={
-          <AdminLayout pageTitle="Live Trips Map" pageSubtitle="Real-time location and active dispatch tracking">
-            <PlaceholderPage
-              title="Live Trips & Dispatch Monitor"
-              subtitle="Interactive real-time map displaying all active tricycle trips, route telemetry, and driver statuses."
-            />
+          <AdminLayout pageTitle="Live Trips" pageSubtitle="Monitor active trips and online drivers across Calapan City.">
+            <LiveTripsPage />
           </AdminLayout>
         }
       />
@@ -77,11 +76,8 @@ export const AdminRoutes: React.FC = () => {
       <Route
         path="/incident-reports"
         element={
-          <AdminLayout pageTitle="Incident Reports" pageSubtitle="Safety complaints, overcharging, and misconduct reports">
-            <PlaceholderPage
-              title="Incident Reports & Resolution"
-              subtitle="Review safety incident reports submitted by passengers and drivers for LGU administrative action."
-            />
+          <AdminLayout pageTitle="Incident Reports" pageSubtitle="Review and manage passenger and driver incident reports.">
+            <IncidentReportsPage />
           </AdminLayout>
         }
       />

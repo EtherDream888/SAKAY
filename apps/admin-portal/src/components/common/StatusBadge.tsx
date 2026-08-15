@@ -20,11 +20,18 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, sx, ...props }
           borderColor: 'rgba(52, 168, 83, 0.3)',
         };
       case 'Pending':
+      case 'Pending Review':
       case 'Under Review':
         return {
           backgroundColor: 'rgba(251, 188, 4, 0.15)',
           color: '#B06000',
           borderColor: 'rgba(251, 188, 4, 0.4)',
+        };
+      case 'Under Investigation':
+        return {
+          backgroundColor: 'rgba(21, 101, 192, 0.12)',
+          color: '#1565C0',
+          borderColor: 'rgba(21, 101, 192, 0.3)',
         };
       case 'Expiring Soon':
       case 'Resubmission Required':
@@ -32,6 +39,12 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, sx, ...props }
           backgroundColor: 'rgba(255, 149, 0, 0.14)',
           color: '#C25E00',
           borderColor: 'rgba(255, 149, 0, 0.4)',
+        };
+      case 'Dismissed':
+        return {
+          backgroundColor: 'rgba(142, 142, 147, 0.12)',
+          color: '#5F6368',
+          borderColor: 'rgba(142, 142, 147, 0.3)',
         };
       case 'Rejected':
       case 'Declined':

@@ -123,6 +123,93 @@ export interface PassengerRecord {
   }[];
 }
 
+export interface ActiveTripRecord {
+  id: string;
+  bookingId: string;
+  driverName: string;
+  driverPhone: string;
+  todaName: string;
+  todaId: string;
+  vehiclePlate: string;
+  passengerName: string;
+  passengerPhone: string;
+  passengerCount: number;
+  tripType: 'Solo Trip' | 'Shared Trip';
+  status: 'Heading to Passenger' | 'Trip Ongoing';
+  eta: string;
+  currentArea: string;
+  pickupArea: string;
+  destinationArea: string;
+  startLat: number;
+  startLng: number;
+  driverLat: number;
+  driverLng: number;
+  destLat: number;
+  destLng: number;
+  startTime: string;
+  bookingTime: string;
+  estimatedFare: number;
+  sharedTripDetails?: {
+    matchedPassengers: number;
+    cutoffPassed: boolean;
+    sharedSavings: string;
+  };
+}
+
+export interface OnlineDriverRecord {
+  id: string;
+  name: string;
+  todaName: string;
+  todaId: string;
+  vehiclePlate: string;
+  verificationStatus: 'Verified' | 'Pending';
+  availabilityStatus: 'Available' | 'Assigned' | 'Suspended';
+  dpsScore: number;
+  idleDuration: string;
+  currentArea: string;
+  lat: number;
+  lng: number;
+}
+
+export interface IncidentReportRecord {
+  id: string;
+  bookingId: string;
+  tripId: string;
+  category:
+    | 'Overcharging Attempt'
+    | 'Unsafe Driving'
+    | 'Rude Behavior'
+    | 'Harassment'
+    | 'Vehicle Issue'
+    | 'Route Deviation'
+    | 'Reckless Driving'
+    | 'Passenger Misconduct'
+    | 'Lost Item'
+    | 'Others';
+  reportedBy: 'Passenger' | 'Driver';
+  reporterName: string;
+  driverName: string;
+  todaName: string;
+  vehiclePlate: string;
+  passengerName: string;
+  submittedDate: string;
+  submittedTime: string;
+  status: 'Pending Review' | 'Under Investigation' | 'Resolved' | 'Dismissed';
+  description: string;
+  evidenceFiles: {
+    name: string;
+    type: 'image' | 'video' | 'pdf';
+    url: string;
+  }[];
+  findings?: string;
+  relatedIncidentsCount: number;
+  statusHistory: {
+    step: string;
+    timestamp: string;
+    actor: string;
+  }[];
+}
+
 // System Dashboard Surface-Level KPIs
 export const SYSTEM_DASHBOARD_KPIS = {
   passengers: {
@@ -263,13 +350,6 @@ export const MOCK_ACCREDITED_TODAS: AccreditedTodaRecord[] = [
       { id: 'DRV-1004', name: 'Aurelio "Auring" Bautista', vehiclePlate: '773-MV', verificationStatus: 'Verified', accountStatus: 'Active', onlineStatus: 'Offline' },
       { id: 'DRV-1005', name: 'Catalino "Lino" Mendoza', vehiclePlate: '304-MV', verificationStatus: 'Verified', accountStatus: 'Active', onlineStatus: 'Online' },
       { id: 'DRV-1006', name: 'Severino "Seve" Aquino', vehiclePlate: '118-MV', verificationStatus: 'Verified', accountStatus: 'Active', onlineStatus: 'Offline' },
-      { id: 'DRV-1007', name: 'Gregorio "Goyong" del Pilar', vehiclePlate: '552-MV', verificationStatus: 'Verified', accountStatus: 'Active', onlineStatus: 'Online' },
-      { id: 'DRV-1008', name: 'Manuel "Manoling" Quezon', vehiclePlate: '809-MV', verificationStatus: 'Verified', accountStatus: 'Active', onlineStatus: 'Offline' },
-      { id: 'DRV-1009', name: 'Diosdado "Dado" Macapagal', vehiclePlate: '621-MV', verificationStatus: 'Verified', accountStatus: 'Active', onlineStatus: 'Online' },
-      { id: 'DRV-1010', name: 'Ramon "Monching" Magsaysay', vehiclePlate: '447-MV', verificationStatus: 'Verified', accountStatus: 'Active', onlineStatus: 'Online' },
-      { id: 'DRV-1011', name: 'Elpidio "Elpy" Quirino', vehiclePlate: '290-MV', verificationStatus: 'Verified', accountStatus: 'Active', onlineStatus: 'Offline' },
-      { id: 'DRV-1012', name: 'Sergio "Serge" Osmeña', vehiclePlate: '733-MV', verificationStatus: 'Verified', accountStatus: 'Active', onlineStatus: 'Online' },
-      { id: 'DRV-1013', name: 'Emilio "Miong" Aguinaldo', vehiclePlate: '105-MV', verificationStatus: 'Verified', accountStatus: 'Active', onlineStatus: 'Offline' },
     ],
   },
   {
@@ -324,7 +404,7 @@ export const MOCK_ACCREDITED_TODAS: AccreditedTodaRecord[] = [
   },
 ];
 
-// 3. Driver Management Mock Data with Strike History
+// 3. Driver Management Mock Data
 export const MOCK_DRIVERS: DriverRecord[] = [
   {
     id: 'DRV-1001',
@@ -364,8 +444,6 @@ export const MOCK_DRIVERS: DriverRecord[] = [
     documents: [
       { name: "LTO Driver's License", type: 'Image', status: 'Verified' },
       { name: 'MTOP Permit Certificate', type: 'PDF', status: 'Verified' },
-      { name: 'TODA Endorsement Form', type: 'PDF', status: 'Verified' },
-      { name: 'Barangay Clearance', type: 'Image', status: 'Verified' },
     ],
   },
   {
@@ -417,88 +495,9 @@ export const MOCK_DRIVERS: DriverRecord[] = [
       { name: 'MTOP Permit', type: 'PDF', status: 'Pending' },
     ],
   },
-  {
-    id: 'DRV-1003',
-    name: 'Eduardo "Ed" Ramos',
-    licenseNo: 'N02-12-004412',
-    licenseExpiry: 'Feb 10, 2026',
-    licenseStatus: 'Expired',
-    mtopNo: 'MTOP-2024-0012',
-    mtopExpiry: 'May 01, 2026',
-    mtopStatus: 'Expired',
-    mtopOperatorName: 'Bernardo Ramos (Registered Operator)',
-    todaName: 'Suqui Beach TODA',
-    todaId: 'TODA-ACC-03',
-    vehiclePlate: '109-MV',
-    franchiseNo: 'LGU-FR-2024-0012',
-    franchiseExpiry: 'Dec 31, 2025',
-    todaVerificationStatus: 'Verified',
-    lguVerificationStatus: 'Suspended',
-    verificationStatus: 'Suspended',
-    accountStatus: 'Inactive',
-    onlineStatus: 'Offline',
-    rating: 3.9,
-    ratingCount: 42,
-    phone: '+63 918 998 1122',
-    barangay: 'Suqui, Calapan City',
-    strikesCount: 5,
-    strikeHistory: [
-      {
-        id: 'STRK-D-301',
-        date: 'Mar 15, 2026',
-        reason: 'Unjustified Cancellation while En Route (>50m)',
-        strikesApplied: 2,
-        status: 'Active (Rolling 90d)',
-        issuedBy: 'System Auto-Detector',
-      },
-      {
-        id: 'STRK-D-302',
-        date: 'Apr 04, 2026',
-        reason: 'Confirmed Unsafe/Reckless Driving (Upheld incident report)',
-        strikesApplied: 3,
-        status: 'Active (Rolling 90d)',
-        issuedBy: 'LGU Administrative Review',
-      },
-    ],
-    documents: [
-      { name: "Expired Driver's License", type: 'Image', status: 'Pending' },
-      { name: 'Expired MTOP Permit', type: 'PDF', status: 'Pending' },
-    ],
-  },
-  {
-    id: 'DRV-1004',
-    name: 'Aurelio "Auring" Bautista',
-    licenseNo: 'N01-19-551120',
-    licenseExpiry: 'Nov 05, 2028',
-    licenseStatus: 'Valid',
-    mtopNo: 'MTOP-2025-0511',
-    mtopExpiry: 'Dec 31, 2026',
-    mtopStatus: 'Valid',
-    mtopOperatorName: 'Aurelio Bautista (Owner-Operator)',
-    todaName: 'Calapan Central TODA',
-    todaId: 'TODA-ACC-01',
-    vehiclePlate: '773-MV',
-    franchiseNo: 'LGU-FR-2025-0511',
-    franchiseExpiry: 'Dec 31, 2026',
-    todaVerificationStatus: 'Verified',
-    lguVerificationStatus: 'Verified',
-    verificationStatus: 'Verified',
-    accountStatus: 'Active',
-    onlineStatus: 'Offline',
-    rating: 4.9,
-    ratingCount: 210,
-    phone: '+63 927 445 6677',
-    barangay: 'Ibaba, Calapan City',
-    strikesCount: 0,
-    strikeHistory: [],
-    documents: [
-      { name: "LTO Driver's License", type: 'Image', status: 'Verified' },
-      { name: 'MTOP Permit', type: 'PDF', status: 'Verified' },
-    ],
-  },
 ];
 
-// 4. Passenger Management Mock Data with Strike History
+// 4. Passenger Management Mock Data
 export const MOCK_PASSENGERS: PassengerRecord[] = [
   {
     id: 'PSG-5001',
@@ -547,64 +546,316 @@ export const MOCK_PASSENGERS: PassengerRecord[] = [
         issuedBy: 'System Dispatch Engine',
       },
     ],
-    recentFeedback: [
-      {
-        rating: 4,
-        category: 'Fare Compliance',
-        comment: 'Good ride experience along Tawiran highway.',
-        date: 'May 09, 2026',
-        tripId: 'TRIP-7712',
-      },
+  },
+];
+
+// 5. Active Trips Mock Data (/live-trips)
+export const MOCK_ACTIVE_TRIPS: ActiveTripRecord[] = [
+  {
+    id: 'TRP-2026-00421',
+    bookingId: 'BKG-9901',
+    driverName: 'Vicente "Enteng" Sotto',
+    driverPhone: '+63 917 112 3344',
+    todaName: 'Calapan Central TODA',
+    todaId: 'TODA-ACC-01',
+    vehiclePlate: '482-MV',
+    passengerName: 'Maria Clara Alonso',
+    passengerPhone: '+63 917 889 0011',
+    passengerCount: 2,
+    tripType: 'Shared Trip',
+    status: 'Trip Ongoing',
+    eta: '6 mins',
+    currentArea: 'JP Rizal St., Poblacion 1',
+    pickupArea: 'Calapan Main Public Market',
+    destinationArea: 'Divine Word College Calapan',
+    startLat: 13.4117,
+    startLng: 121.1803,
+    driverLat: 13.4140,
+    driverLng: 121.1825,
+    destLat: 13.4190,
+    destLng: 121.1860,
+    startTime: 'May 16, 2026 • 10:42 AM',
+    bookingTime: 'May 16, 2026 • 10:38 AM',
+    estimatedFare: 24,
+    sharedTripDetails: {
+      matchedPassengers: 2,
+      cutoffPassed: true,
+      sharedSavings: '₱18 saved via 2-rider match',
+    },
+  },
+  {
+    id: 'TRP-2026-00422',
+    bookingId: 'BKG-9902',
+    driverName: 'Rodrigo "Digoy" Perez',
+    driverPhone: '+63 920 334 5566',
+    todaName: 'Calapan Central TODA',
+    todaId: 'TODA-ACC-01',
+    vehiclePlate: '915-MV',
+    passengerName: 'Joshua "Josh" Dizon',
+    passengerPhone: '+63 920 445 7788',
+    passengerCount: 1,
+    tripType: 'Solo Trip',
+    status: 'Heading to Passenger',
+    eta: '3 mins',
+    currentArea: 'Lumangbayan National Highway',
+    pickupArea: 'Lumangbayan Elementary School',
+    destinationArea: 'Calapan City Plaza',
+    startLat: 13.4080,
+    startLng: 121.1750,
+    driverLat: 13.4095,
+    driverLng: 121.1765,
+    destLat: 13.4125,
+    destLng: 121.1810,
+    startTime: 'May 16, 2026 • 10:45 AM',
+    bookingTime: 'May 16, 2026 • 10:44 AM',
+    estimatedFare: 60,
+  },
+  {
+    id: 'TRP-2026-00423',
+    bookingId: 'BKG-9903',
+    driverName: 'Danilo Reyes',
+    driverPhone: '+63 919 443 2291',
+    todaName: 'Ibaba TODA Express',
+    todaId: 'TODA-ACC-02',
+    vehiclePlate: '221-MV',
+    passengerName: 'Elena "Nena" Gonzaga',
+    passengerPhone: '+63 919 112 4455',
+    passengerCount: 1,
+    tripType: 'Solo Trip',
+    status: 'Trip Ongoing',
+    eta: '8 mins',
+    currentArea: 'Ibaba Coastal Road',
+    pickupArea: 'Ibaba TODA Terminal',
+    destinationArea: 'Suqui Beach Resort',
+    startLat: 13.4150,
+    startLng: 121.1850,
+    driverLat: 13.4180,
+    driverLng: 121.1890,
+    destLat: 13.4220,
+    destLng: 121.1920,
+    startTime: 'May 16, 2026 • 10:40 AM',
+    bookingTime: 'May 16, 2026 • 10:35 AM',
+    estimatedFare: 68,
+  },
+  {
+    id: 'TRP-2026-00424',
+    bookingId: 'BKG-9904',
+    driverName: 'Catalino "Lino" Mendoza',
+    driverPhone: '+63 917 882 3311',
+    todaName: 'Calapan Central TODA',
+    todaId: 'TODA-ACC-01',
+    vehiclePlate: '304-MV',
+    passengerName: 'Antonio "Tony" Luna',
+    passengerPhone: '+63 928 331 4422',
+    passengerCount: 3,
+    tripType: 'Shared Trip',
+    status: 'Heading to Passenger',
+    eta: '4 mins',
+    currentArea: 'San Vicente North',
+    pickupArea: 'San Vicente Church',
+    destinationArea: 'Oriental Mindoro Provincial Hospital',
+    startLat: 13.4130,
+    startLng: 121.1780,
+    driverLat: 13.4145,
+    driverLng: 121.1795,
+    destLat: 13.4170,
+    destLng: 121.1820,
+    startTime: 'May 16, 2026 • 10:46 AM',
+    bookingTime: 'May 16, 2026 • 10:45 AM',
+    estimatedFare: 30,
+    sharedTripDetails: {
+      matchedPassengers: 3,
+      cutoffPassed: false,
+      sharedSavings: '₱24 saved via 3-rider match',
+    },
+  },
+];
+
+// 6. Online Drivers Mock Data (/live-trips)
+export const MOCK_ONLINE_DRIVERS: OnlineDriverRecord[] = [
+  {
+    id: 'DRV-1001',
+    name: 'Vicente "Enteng" Sotto',
+    todaName: 'Calapan Central TODA',
+    todaId: 'TODA-ACC-01',
+    vehiclePlate: '482-MV',
+    verificationStatus: 'Verified',
+    availabilityStatus: 'Assigned',
+    dpsScore: 98,
+    idleDuration: '0 mins',
+    currentArea: 'JP Rizal St., Poblacion 1',
+    lat: 13.4140,
+    lng: 121.1825,
+  },
+  {
+    id: 'DRV-1002',
+    name: 'Rodrigo "Digoy" Perez',
+    todaName: 'Calapan Central TODA',
+    todaId: 'TODA-ACC-01',
+    vehiclePlate: '915-MV',
+    verificationStatus: 'Pending',
+    availabilityStatus: 'Assigned',
+    dpsScore: 89,
+    idleDuration: '2 mins',
+    currentArea: 'Lumangbayan National Highway',
+    lat: 13.4095,
+    lng: 121.1765,
+  },
+  {
+    id: 'DRV-1004',
+    name: 'Aurelio "Auring" Bautista',
+    todaName: 'Calapan Central TODA',
+    todaId: 'TODA-ACC-01',
+    vehiclePlate: '773-MV',
+    verificationStatus: 'Verified',
+    availabilityStatus: 'Available',
+    dpsScore: 100,
+    idleDuration: '14 mins',
+    currentArea: 'Calapan Main Public Market',
+    lat: 13.4117,
+    lng: 121.1803,
+  },
+  {
+    id: 'DRV-2001',
+    name: 'Danilo Reyes',
+    todaName: 'Ibaba TODA Express',
+    todaId: 'TODA-ACC-02',
+    vehiclePlate: '221-MV',
+    verificationStatus: 'Verified',
+    availabilityStatus: 'Assigned',
+    dpsScore: 94,
+    idleDuration: '0 mins',
+    currentArea: 'Ibaba Coastal Road',
+    lat: 13.4180,
+    lng: 121.1890,
+  },
+  {
+    id: 'DRV-1005',
+    name: 'Catalino "Lino" Mendoza',
+    todaName: 'Calapan Central TODA',
+    todaId: 'TODA-ACC-01',
+    vehiclePlate: '304-MV',
+    verificationStatus: 'Verified',
+    availabilityStatus: 'Assigned',
+    dpsScore: 96,
+    idleDuration: '4 mins',
+    currentArea: 'San Vicente North',
+    lat: 13.4145,
+    lng: 121.1795,
+  },
+  {
+    id: 'DRV-1007',
+    name: 'Gregorio "Goyong" del Pilar',
+    todaName: 'Calapan Central TODA',
+    todaId: 'TODA-ACC-01',
+    vehiclePlate: '552-MV',
+    verificationStatus: 'Verified',
+    availabilityStatus: 'Available',
+    dpsScore: 92,
+    idleDuration: '28 mins',
+    currentArea: 'Tawiran Terminal Area',
+    lat: 13.4050,
+    lng: 121.1720,
+  },
+];
+
+// 7. Incident Reports Mock Data (/incident-reports)
+export const MOCK_INCIDENT_REPORTS_DETAILED: IncidentReportRecord[] = [
+  {
+    id: 'INC-2026-0042',
+    bookingId: 'BKG-8812',
+    tripId: 'TRP-2026-00388',
+    category: 'Overcharging Attempt',
+    reportedBy: 'Passenger',
+    reporterName: 'Maria Clara Alonso',
+    driverName: 'Rodrigo "Digoy" Perez',
+    todaName: 'Calapan Central TODA',
+    vehiclePlate: '915-MV',
+    passengerName: 'Maria Clara Alonso',
+    submittedDate: 'May 12, 2026',
+    submittedTime: '10:24 AM',
+    status: 'Pending Review',
+    description: 'The driver requested a cash fare of ₱150 for a trip from Poblacion to Pachoca, which exceeds the SAKAY system estimated fare of ₱42 computed under City Ordinance No. 110, Series of 2022.',
+    evidenceFiles: [
+      { name: 'Fare Discrepancy Screenshot.png', type: 'image', url: '#' },
+      { name: 'Cash Receipt Demand.pdf', type: 'pdf', url: '#' },
+    ],
+    relatedIncidentsCount: 3,
+    statusHistory: [
+      { step: 'Report Submitted by Passenger', timestamp: 'May 12, 2026 • 10:24 AM', actor: 'Maria Clara Alonso' },
+      { step: 'Routed to LGU Administrative Triage Queue', timestamp: 'May 12, 2026 • 10:25 AM', actor: 'System Automated Workflow' },
     ],
   },
   {
-    id: 'PSG-5003',
-    name: 'Elena "Nena" Gonzaga',
-    phone: '+63 919 112 4455',
-    email: 'elena.gonzaga@outlook.com',
-    verificationStatus: 'Unverified',
-    accountStatus: 'Suspended',
-    suspensionReason: 'Violation of Platform Policy: 5 Strikes accumulated within rolling 90 days.',
-    activeSession: false,
-    totalBookings: 3,
-    registeredDate: 'Apr 02, 2026',
-    rating: 3.2,
-    ratingCount: 3,
-    strikesCount: 5,
-    strikeHistory: [
-      {
-        id: 'STRK-P-201',
-        date: 'Apr 10, 2026',
-        reason: 'Passenger No-Show at pickup location (5 min wait expired)',
-        strikesApplied: 2,
-        status: 'Active (Rolling 90d)',
-        issuedBy: 'Driver Dispatch Report',
-      },
-      {
-        id: 'STRK-P-202',
-        date: 'Apr 28, 2026',
-        reason: 'Passenger Payment Refusal / Unfounded Fare Dispute',
-        strikesApplied: 2,
-        status: 'Active (Rolling 90d)',
-        issuedBy: 'LGU Administrative Review',
-      },
-      {
-        id: 'STRK-P-203',
-        date: 'May 04, 2026',
-        reason: 'Late Cancellation after driver arrival',
-        strikesApplied: 1,
-        status: 'Active (Rolling 90d)',
-        issuedBy: 'System Dispatch Engine',
-      },
+    id: 'INC-2026-0041',
+    bookingId: 'BKG-8790',
+    tripId: 'TRP-2026-00375',
+    category: 'Unsafe Driving',
+    reportedBy: 'Passenger',
+    reporterName: 'Joshua "Josh" Dizon',
+    driverName: 'Eduardo "Ed" Ramos',
+    todaName: 'Suqui Beach TODA',
+    vehiclePlate: '109-MV',
+    passengerName: 'Joshua "Josh" Dizon',
+    submittedDate: 'May 11, 2026',
+    submittedTime: '03:15 PM',
+    status: 'Under Investigation',
+    description: 'Driver was swerving recklessly across the Tawiran highway lanes and carrying excessive luggage on the sidecar roof.',
+    evidenceFiles: [
+      { name: 'Dashboard Camera Video Clip.mp4', type: 'video', url: '#' },
     ],
-    recentFeedback: [
-      {
-        rating: 1,
-        category: 'Overcharging Complaint',
-        comment: 'Driver charged 150 pesos from Poblacion to Pachoca.',
-        date: 'Apr 28, 2026',
-        tripId: 'TRIP-5510',
-      },
+    findings: 'Initial TODA review confirms vehicle was operating with overloaded roof rack. Pending final officer recommendation.',
+    relatedIncidentsCount: 4,
+    statusHistory: [
+      { step: 'Report Submitted by Passenger', timestamp: 'May 11, 2026 • 03:15 PM', actor: 'Joshua "Josh" Dizon' },
+      { step: 'Assigned Under Investigation', timestamp: 'May 11, 2026 • 04:00 PM', actor: 'LGU Officer Santos' },
+    ],
+  },
+  {
+    id: 'INC-2026-0040',
+    bookingId: 'BKG-8640',
+    tripId: 'TRP-2026-00340',
+    category: 'Route Deviation',
+    reportedBy: 'Passenger',
+    reporterName: 'Elena "Nena" Gonzaga',
+    driverName: 'Vicente "Enteng" Sotto',
+    todaName: 'Calapan Central TODA',
+    vehiclePlate: '482-MV',
+    passengerName: 'Elena "Nena" Gonzaga',
+    submittedDate: 'May 09, 2026',
+    submittedTime: '09:45 AM',
+    status: 'Resolved',
+    description: 'Driver detoured through San Vicente inner roads instead of taking the primary JP Rizal arterial route.',
+    evidenceFiles: [],
+    findings: 'GPS telemetry review indicates driver detoured due to an official DPWH road repair on JP Rizal St. Case resolved with zero penalty.',
+    relatedIncidentsCount: 1,
+    statusHistory: [
+      { step: 'Report Submitted by Passenger', timestamp: 'May 09, 2026 • 09:45 AM', actor: 'Elena "Nena" Gonzaga' },
+      { step: 'Under Investigation', timestamp: 'May 09, 2026 • 11:00 AM', actor: 'LGU Officer Santos' },
+      { step: 'Case Resolved — No Penalty (Road Repair Verified)', timestamp: 'May 09, 2026 • 02:30 PM', actor: 'LGU Admin Vance' },
+    ],
+  },
+  {
+    id: 'INC-2026-0039',
+    bookingId: 'BKG-8511',
+    tripId: 'TRP-2026-00310',
+    category: 'Passenger Misconduct',
+    reportedBy: 'Driver',
+    reporterName: 'Aurelio "Auring" Bautista',
+    driverName: 'Aurelio "Auring" Bautista',
+    todaName: 'Calapan Central TODA',
+    vehiclePlate: '773-MV',
+    passengerName: 'Unverified Passenger',
+    submittedDate: 'May 08, 2026',
+    submittedTime: '08:10 PM',
+    status: 'Dismissed',
+    description: 'Passenger refused to board after driver arrived within 2 minutes of booking acceptance.',
+    evidenceFiles: [],
+    findings: 'Unfounded claim; passenger cancelled within the 1-minute grace period (Rule 12.1). Report dismissed.',
+    relatedIncidentsCount: 0,
+    statusHistory: [
+      { step: 'Report Submitted by Driver', timestamp: 'May 08, 2026 • 08:10 PM', actor: 'Aurelio Bautista' },
+      { step: 'Dismissed (Grace Period Compliant)', timestamp: 'May 08, 2026 • 08:30 PM', actor: 'LGU Admin Vance' },
     ],
   },
 ];
