@@ -15,10 +15,14 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import SettingsIcon from '@mui/icons-material/Settings';
 import SecurityIcon from '@mui/icons-material/Security';
 import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
+import CampaignIcon from '@mui/icons-material/Campaign';
+import PaidIcon from '@mui/icons-material/Paid';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 
 import appIcon from '@sakay/shared/assets/icons/app-icon.png';
 import logoTextOrange from '@sakay/shared/assets/images/logo-text-orange.png';
 import { MacTooltip } from '../common/MacTooltip';
+import { CURRENT_ADMIN } from '../../mockData/adminData';
 
 interface AdminSidebarProps {
   collapsed: boolean;
@@ -64,6 +68,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
       items: [
         { id: 'live-trips', label: 'Live Trips', path: '/live-trips', icon: <NavigationIcon fontSize="small" />, badge: '●', badgeType: 'green' },
         { id: 'incident-reports', label: 'Incident Reports', path: '/incident-reports', icon: <ReportProblemIcon fontSize="small" />, badge: 3, badgeType: 'orange' },
+        { id: 'announcements', label: 'Announcements', path: '/announcements', icon: <CampaignIcon fontSize="small" /> },
+      ],
+    },
+    {
+      groupTitle: 'MUNICIPAL POLICY',
+      items: [
+        { id: 'fare-configuration', label: 'Fare Configuration', path: '/fare-configuration', icon: <PaidIcon fontSize="small" /> },
       ],
     },
     {
@@ -76,7 +87,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
     {
       groupTitle: 'SYSTEM',
       items: [
-        { id: 'settings', label: 'Settings', path: '/settings', icon: <SettingsIcon fontSize="small" /> },
+        { id: 'settings', label: 'Admin Accounts', path: '/settings', icon: <ManageAccountsIcon fontSize="small" /> },
         { id: 'audit-logs', label: 'Audit Logs', path: '/audit-logs', icon: <SecurityIcon fontSize="small" /> },
       ],
     },
@@ -330,15 +341,15 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
               boxShadow: '0 10px 18px rgba(255, 107, 26, 0.18)',
             }}
           >
-            LA
+            {CURRENT_ADMIN.name.charAt(0)}
           </Avatar>
           {!collapsed && (
-            <Box>
-              <Typography sx={{ fontWeight: 700, fontSize: '14px', color: 'var(--mac-text-primary)', lineHeight: 1.2 }}>
-                LGU Admin
+            <Box sx={{ maxWidth: 155, overflow: 'hidden' }}>
+              <Typography sx={{ fontWeight: 700, fontSize: '13px', color: 'var(--mac-text-primary)', lineHeight: 1.2, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                {CURRENT_ADMIN.name}
               </Typography>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', lineHeight: 1.2 }}>
-                Calapan City LGU
+              <Typography sx={{ fontSize: '11px', color: 'var(--sakay-orange)', fontWeight: 600, lineHeight: 1.2, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                {CURRENT_ADMIN.role}
               </Typography>
             </Box>
           )}

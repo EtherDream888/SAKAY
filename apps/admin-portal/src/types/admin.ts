@@ -16,7 +16,70 @@ export type StatusType =
   | 'Resubmission Required'
   | 'Pending Review'
   | 'Under Investigation'
-  | 'Dismissed';
+  | 'Dismissed'
+  | 'Pending Password Reset'
+  | 'Deactivated'
+  | 'Published'
+  | 'Unpublished'
+  | 'Draft'
+  | 'Superseded';
+
+export type LguAdminRole =
+  | 'Super Administrator'
+  | 'Verifier'
+  | 'Incident Officer'
+  | 'Analytics Viewer'
+  | 'Fare Administrator';
+
+export interface LguAdmin {
+  id: string;
+  name: string;
+  email: string;
+  contactNumber: string;
+  role: LguAdminRole;
+  accountStatus: 'Active' | 'Pending Password Reset' | 'Deactivated';
+  lastLogin?: string;
+  createdAt: string;
+}
+
+export interface FareMatrixItem {
+  id: string;
+  baseFare: number;
+  baseDistanceKm: number;
+  succeedingRate: number;
+  effectiveTimestamp: string;
+  isActive: boolean;
+  configuredBy: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface AnnouncementItem {
+  id: string;
+  title: string;
+  message: string;
+  targetRole: 'All' | 'Passenger' | 'Driver' | 'TODA Administrator';
+  todaId?: string | null;
+  todaName?: string | null;
+  isPublished: boolean;
+  publishTiming?: 'Immediate' | 'Scheduled';
+  scheduledDate?: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface AuditLogItem {
+  id: string;
+  actorId: string;
+  actorName: string;
+  actorRole?: string;
+  actionType: string;
+  targetId: string;
+  targetName: string;
+  details: string;
+  timestamp: string;
+  category?: 'Authentication' | 'Verification' | 'User Oversight' | 'Fare Matrix' | 'Announcement' | 'System';
+}
 
 export interface User {
   id: string;

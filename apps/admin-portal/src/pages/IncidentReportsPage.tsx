@@ -10,6 +10,7 @@ import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { IncidentDetailModal } from '../components/admin/IncidentDetailModal';
+import { logAdminAction } from '../lib/auditLog';
 
 export const IncidentReportsPage: React.FC = () => {
   const [incidents, setIncidents] = useState<IncidentReportRecord[]>(MOCK_INCIDENT_REPORTS_DETAILED);
@@ -59,6 +60,8 @@ export const IncidentReportsPage: React.FC = () => {
     newStatus: 'Under Investigation' | 'Resolved' | 'Dismissed',
     findings?: string
   ) => {
+    const targetInc = incidents.find((i) => i.id === incidentId);
+
     setIncidents((prev) =>
       prev.map((inc) =>
         inc.id === incidentId
@@ -96,6 +99,14 @@ export const IncidentReportsPage: React.FC = () => {
           }
         : null
     );
+
+    logAdminAction({
+      actionType: `INCIDENT_${newStatus.toUpperCase().replace(/\s+/g, '_')}`,
+      targetId: incidentId,
+      targetName: targetInc ? `Incident #${incidentId} (${targetInc.category})` : `Incident #${incidentId}`,
+      details: `Updated incident investigation status to "${newStatus}". Findings/Notes: ${findings || 'Status updated during administrative triage.'}`,
+      category: 'User Oversight',
+    });
   };
 
   return (

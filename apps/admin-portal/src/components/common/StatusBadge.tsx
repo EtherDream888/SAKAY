@@ -14,6 +14,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, sx, ...props }
       case 'Verified':
       case 'Resolved':
       case 'Valid':
+      case 'Published':
         return {
           backgroundColor: 'rgba(52, 168, 83, 0.12)',
           color: '#1E8E3E',
@@ -35,12 +36,16 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, sx, ...props }
         };
       case 'Expiring Soon':
       case 'Resubmission Required':
+      case 'Pending Password Reset':
         return {
           backgroundColor: 'rgba(255, 149, 0, 0.14)',
           color: '#C25E00',
           borderColor: 'rgba(255, 149, 0, 0.4)',
         };
       case 'Dismissed':
+      case 'Unpublished':
+      case 'Draft':
+      case 'Superseded':
         return {
           backgroundColor: 'rgba(142, 142, 147, 0.12)',
           color: '#5F6368',
@@ -52,6 +57,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, sx, ...props }
       case 'Inactive':
       case 'Unverified':
       case 'Expired':
+      case 'Deactivated':
         return {
           backgroundColor: 'rgba(234, 67, 53, 0.12)',
           color: '#D93025',

@@ -11,6 +11,14 @@
     "dev": "npm run dev:passenger",
     "dev:passenger": "npm run dev --workspace=apps/passenger-pwa",
     "build:passenger": "npm run build --workspace=apps/passenger-pwa",
+    "dev:admin": "npm run dev --workspace=apps/admin-portal",
+    "build:admin": "npm run build --workspace=apps/admin-portal",
+    "dev:toda": "npm run dev --workspace=apps/toda-portal",
+    "build:toda": "npm run build --workspace=apps/toda-portal",
+    "dev:driver": "npm run dev --workspace=apps/driver-pwa",
+    "build:driver": "npm run build --workspace=apps/driver-pwa",
+    "dev:server": "npm run dev --workspace=server",
+    "build:server": "npm run build --workspace=server",
     "lint": "npm run lint --workspaces"
   }
 }

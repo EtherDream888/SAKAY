@@ -1,0 +1,19 @@
+{
+  "name": "SAKAY Driver",
+  "short_name": "SAKAY Drayber",
+  "description": "SAKAY Driver Portal - Smart Tricycle Transportation Management System for Calapan City Drivers.",
+  "theme_color": "#FF6B00",
+  "background_color": "#0F172A",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/driver/home",
+  "scope": "/",
+  "lang": "tl",
+  "icons": [
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ]
+}

@@ -23,7 +23,12 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": ".",
+    "paths": {
+      "@sakay/shared": ["../../packages/shared/src/index.ts"],
+      "@sakay/shared/*": ["../../packages/shared/src/*"]
+    }
   },
   "include": ["src"]
 }

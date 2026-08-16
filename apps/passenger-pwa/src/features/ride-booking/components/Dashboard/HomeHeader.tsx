@@ -4,6 +4,7 @@ import IconButton from "@mui/material/IconButton";
 import Button from "@mui/material/Button";
 import Badge from "@mui/material/Badge";
 import MenuIcon from "@mui/icons-material/Menu";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import NotificationsOutlinedIcon from "@mui/icons-material/NotificationsOutlined";
 import HeadsetMicIcon from "@mui/icons-material/HeadsetMic";
 
@@ -13,12 +14,14 @@ interface HomeHeaderProps {
   onOpenDrawer: () => void;
   onOpenNotifications: () => void;
   onOpenTulong: () => void;
+  onBack?: () => void;
 }
 
 const HomeHeader: React.FC<HomeHeaderProps> = ({
   onOpenDrawer,
   onOpenNotifications,
   onOpenTulong,
+  onBack,
 }) => {
   const { language } = useLanguage();
 
@@ -35,24 +38,44 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
         alignItems: "center",
       }}
     >
-      {/* Top Left: Hamburger Menu Button */}
-      <IconButton
-        onClick={onOpenDrawer}
-        aria-label="Open navigation menu"
-        sx={{
-          backgroundColor: "#FFFFFF",
-          width: "48px",
-          height: "48px",
-          borderRadius: "16px",
-          boxShadow: "0 4px 16px rgba(15, 23, 42, 0.08)",
-          color: "#0F172A",
-          "&:hover": {
-            backgroundColor: "#F8FAFC",
-          },
-        }}
-      >
-        <MenuIcon sx={{ fontSize: 24 }} />
-      </IconButton>
+      {/* Top Left: Back button or Hamburger Menu Button */}
+      {onBack ? (
+        <IconButton
+          onClick={onBack}
+          aria-label="Go back"
+          sx={{
+            backgroundColor: "#FFFFFF",
+            width: "48px",
+            height: "48px",
+            borderRadius: "16px",
+            boxShadow: "0 4px 16px rgba(15, 23, 42, 0.08)",
+            color: "#0F172A",
+            "&:hover": {
+              backgroundColor: "#F8FAFC",
+            },
+          }}
+        >
+          <ArrowBackIcon sx={{ fontSize: 24 }} />
+        </IconButton>
+      ) : (
+        <IconButton
+          onClick={onOpenDrawer}
+          aria-label="Open navigation menu"
+          sx={{
+            backgroundColor: "#FFFFFF",
+            width: "48px",
+            height: "48px",
+            borderRadius: "16px",
+            boxShadow: "0 4px 16px rgba(15, 23, 42, 0.08)",
+            color: "#0F172A",
+            "&:hover": {
+              backgroundColor: "#F8FAFC",
+            },
+          }}
+        >
+          <MenuIcon sx={{ fontSize: 24 }} />
+        </IconButton>
+      )}
 
       {/* Top Right Actions Stack: Notification + Tulong */}
       <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>

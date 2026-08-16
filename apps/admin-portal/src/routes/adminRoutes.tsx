@@ -8,6 +8,10 @@ import { DriverManagementPage } from '../pages/DriverManagementPage';
 import { PassengerManagementPage } from '../pages/PassengerManagementPage';
 import { LiveTripsPage } from '../pages/LiveTripsPage';
 import { IncidentReportsPage } from '../pages/IncidentReportsPage';
+import { AnnouncementManagementPage } from '../pages/AnnouncementManagementPage';
+import { FareConfigurationPage } from '../pages/FareConfigurationPage';
+import { AccountManagementPage } from '../pages/AccountManagementPage';
+import { AuditLogPage } from '../pages/AuditLogPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
 
 export const AdminRoutes: React.FC = () => {
@@ -82,6 +86,25 @@ export const AdminRoutes: React.FC = () => {
         }
       />
 
+      <Route
+        path="/announcements"
+        element={
+          <AdminLayout pageTitle="Announcement Management" pageSubtitle="Broadcast official municipal notices, route advisories, and policy reminders.">
+            <AnnouncementManagementPage />
+          </AdminLayout>
+        }
+      />
+
+      {/* Municipal / Rate Configuration Route */}
+      <Route
+        path="/fare-configuration"
+        element={
+          <AdminLayout pageTitle="Fare Configuration" pageSubtitle="Enact and manage municipal tricycle fare matrix rates and derived formulas.">
+            <FareConfigurationPage />
+          </AdminLayout>
+        }
+      />
+
       {/* Analytics & Reports Routes */}
       <Route
         path="/reports"
@@ -111,11 +134,8 @@ export const AdminRoutes: React.FC = () => {
       <Route
         path="/settings"
         element={
-          <AdminLayout pageTitle="Settings" pageSubtitle="LGU portal configurations and parameters">
-            <PlaceholderPage
-              title="System Settings"
-              subtitle="Configure municipal fare caps, zone parameters, notification triggers, and admin permissions."
-            />
+          <AdminLayout pageTitle="Account Management" pageSubtitle="Manage LGU staff administrator profiles, permissions, and credential resets.">
+            <AccountManagementPage />
           </AdminLayout>
         }
       />
@@ -123,11 +143,8 @@ export const AdminRoutes: React.FC = () => {
       <Route
         path="/audit-logs"
         element={
-          <AdminLayout pageTitle="Audit Logs" pageSubtitle="Administrative activity and security trail">
-            <PlaceholderPage
-              title="System Audit Logs"
-              subtitle="Immutable log of administrative actions, credential verifications, and status modifications."
-            />
+          <AdminLayout pageTitle="Audit Logs" pageSubtitle="Cryptographic administrative activity ledger and compliance security trail.">
+            <AuditLogPage />
           </AdminLayout>
         }
       />

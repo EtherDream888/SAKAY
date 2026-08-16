@@ -88,7 +88,14 @@ const RegistrationSuccess: React.FC = () => {
       <Box sx={{ width: "100%", padding: "0 12px" }}>
         <PrimaryButton
           fullWidth
-          onClick={() => navigate("/dashboard", { state: { userName: state?.name } })}
+          onClick={() => {
+            localStorage.removeItem("gps_permission");
+            sessionStorage.removeItem("gps_permission_session");
+            navigate("/dashboard", {
+              replace: true,
+              state: { userName: state?.name, freshLogin: true },
+            });
+          }}
         >
           {language === "tl" ? "Pumunta sa Dashboard" : "Go to Dashboard"}
         </PrimaryButton>

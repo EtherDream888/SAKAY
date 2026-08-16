@@ -1,0 +1,122 @@
+:root {
+  --phone-width: 412px;
+  --phone-height: 892px;
+}
+
+/* Background container on desktop testing mode */
+.app-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  background-color: #0B0F19; /* Sleek dark environment */
+  padding: 16px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Standalone Phone Simulator on desktop (Strict Portrait Mobile Frame) */
+.phone-simulator {
+  position: relative;
+  width: var(--phone-width, 412px) !important;
+  min-width: var(--phone-width, 412px) !important;
+  max-width: var(--phone-width, 412px) !important;
+  height: var(--phone-height, 892px) !important;
+  max-height: calc(100vh - 32px) !important;
+  background-color: #FFFFFF;
+  border-radius: 46px !important;
+  border: 12px solid #1E293B !important;
+  box-shadow: 0 30px 80px -15px rgba(0, 0, 0, 0.7),
+              0 0 0 1px rgba(255, 255, 255, 0.1) inset !important;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  box-sizing: border-box;
+
+  /* Desktop simulator safe area simulation */
+  --safe-area-top: max(env(safe-area-inset-top, 0px), 34px);
+  --safe-area-bottom: max(env(safe-area-inset-bottom, 0px), 24px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+}
+
+/* Android Camera Punch Hole on Desktop Simulator */
+.phone-simulator::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  background-color: #0F172A;
+  border-radius: 50%;
+  z-index: 999;
+  box-shadow: inset 0 0 3px rgba(255, 255, 255, 0.25),
+              0 0 0 2px #0F172A;
+  pointer-events: none;
+}
+
+/* Android Bottom Gesture Navigation Handle on Desktop Simulator */
+.phone-simulator::after {
+  content: "";
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 108px;
+  height: 4px;
+  background-color: rgba(15, 23, 42, 0.25);
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 999;
+}
+
+/* Actual Mobile Screens / Real PWA Viewport Override */
+@media (max-width: 480px) {
+  html,
+  body {
+    background-color: #FFFFFF !important;
+  }
+
+  .app-container {
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+    height: 100% !important;
+    width: 100% !important;
+    background-color: #FFFFFF !important;
+  }
+
+  .phone-simulator {
+    width: 100vw !important;
+    min-width: 100vw !important;
+    max-width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    border-radius: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+
+    /* Hardware Safe Areas on Real Mobile */
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-left: env(safe-area-inset-left, 0px);
+    --safe-area-right: env(safe-area-inset-right, 0px);
+  }
+
+  .phone-simulator::before {
+    display: none !important;
+  }
+
+  .phone-simulator::after {
+    display: none !important;
+  }
+}

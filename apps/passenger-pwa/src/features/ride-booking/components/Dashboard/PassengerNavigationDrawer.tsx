@@ -16,6 +16,7 @@ import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import ExitToAppIcon from "@mui/icons-material/ExitToApp";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 
 export interface PassengerNavigationDrawerProps {
   isOpen: boolean;
@@ -235,10 +236,7 @@ const PassengerNavigationDrawer: React.FC<PassengerNavigationDrawerProps> = ({
           {/* Item 4: Feedback */}
           <ListItem disablePadding>
             <ListItemButton
-              onClick={() => {
-                onClose();
-                if (onOpenTulong) onOpenTulong();
-              }}
+              onClick={() => handleNavigate("/feedback")}
               sx={{
                 padding: "16px 24px",
                 "&:hover": { backgroundColor: "#FFF7ED" },
@@ -252,7 +250,7 @@ const PassengerNavigationDrawer: React.FC<PassengerNavigationDrawerProps> = ({
                   <Typography
                     sx={{ fontSize: "16px", fontWeight: 600, color: "#0F172A" }}
                   >
-                    Feedback
+                    Puna at Rating (Feedback)
                   </Typography>
                 }
               />
@@ -260,7 +258,32 @@ const PassengerNavigationDrawer: React.FC<PassengerNavigationDrawerProps> = ({
           </ListItem>
           <Divider sx={{ borderColor: "#F1F5F9", marginX: "24px" }} />
 
-          {/* Item 5: Settings */}
+          {/* Item 5: I-ulat ang Insidente */}
+          <ListItem disablePadding>
+            <ListItemButton
+              onClick={() => handleNavigate("/incident-report")}
+              sx={{
+                padding: "16px 24px",
+                "&:hover": { backgroundColor: "#FFF7ED" },
+              }}
+            >
+              <ListItemIcon sx={{ color: "#DC2626", minWidth: "44px" }}>
+                <ReportProblemOutlinedIcon sx={{ fontSize: "22px" }} />
+              </ListItemIcon>
+              <ListItemText
+                primary={
+                  <Typography
+                    sx={{ fontSize: "16px", fontWeight: 600, color: "#DC2626" }}
+                  >
+                    I-ulat ang Insidente
+                  </Typography>
+                }
+              />
+            </ListItemButton>
+          </ListItem>
+          <Divider sx={{ borderColor: "#F1F5F9", marginX: "24px" }} />
+
+          {/* Item 6: Settings */}
           <ListItem disablePadding>
             <ListItemButton
               onClick={() => handleNavigate("/profile")}

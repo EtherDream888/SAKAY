@@ -17,6 +17,7 @@ import Alert from "@mui/material/Alert";
 import { useLanguage } from "../../../../utils/LanguageContext";
 import { supabase } from "../../../../services/supabaseClient";
 import SuccessModal from "../../../../common/components/SuccessModal";
+import { createBooking } from "../../../../services/bookingService";
 
 interface LocationState {
   address: string;
@@ -150,43 +151,16 @@ const BookSummary: React.FC = () => {
     setLoading(false);
   };
 
+  const [createdBookingId, setCreatedBookingId] = useState<string>("");
+
   const handleConfirmBooking = async () => {
     if (!pickup || !dropoff) return;
     setBookingLoading(true);
     setErrorMessage("");
 
     try {
-      // Fetch current authenticated Supabase user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-
-      let passengerId = "";
-      if (user) {
-        // Query the profile in the passenger table
-        const { data: profile } = await supabase
-          .from("passenger")
-          .select("passenger_id")
-          .eq("auth_user_id", user.id)
-          .maybeSingle();
-        if (profile) {
-          passengerId = profile.passenger_id;
-        }
-      }
-
-      if (!passengerId) {
-        // Mock Sandbox mode fallback (if not logged in or running locally offline)
-        console.warn("No active passenger profile found in Supabase. Running in Sandbox Mode.");
-        setTimeout(() => {
-          setBookingLoading(false);
-          setSuccessOpen(true);
-        }, 1500);
-        return;
-      }
-
-      // Real booking insert to Supabase database
-      const { error: insertError } = await supabase.from("booking").insert({
-        passenger_id: passengerId,
-        booking_type: "Immediate",
+      // Create mock booking through our reactive mock service layer
+      const newBooking = await createBooking({
         is_shared_trip: tripType === "Shared",
         passenger_count: passengers,
         pickup_address: pickup.address,
@@ -197,32 +171,27 @@ const BookSummary: React.FC = () => {
         dropoff_longitude: dropoff.lng,
         estimated_distance_km: distance,
         estimated_fare: fare,
-        booking_status: "Searching Driver",
       });
 
-      if (insertError) throw insertError;
-
+      setCreatedBookingId(newBooking.booking_id);
       setBookingLoading(false);
       setSuccessOpen(true);
     } catch (err: any) {
       console.error("Booking error:", err);
-      // Fallback to Sandbox Mode if RLS or authentication blocks
-      console.warn("Database save failed. Mocking Sandbox success state.");
-      setTimeout(() => {
-        setBookingLoading(false);
-        setSuccessOpen(true);
-      }, 1500);
+      setErrorMessage("May aberya sa pag-book. Pakisubukang muli.");
+      setBookingLoading(false);
     }
   };
 
   const handleSuccessClose = () => {
     setSuccessOpen(false);
-    // Clear trip session data
+    // Clear trip input session data
     sessionStorage.removeItem("trip_pickup");
     sessionStorage.removeItem("trip_dropoff");
     sessionStorage.removeItem("trip_passengers");
     sessionStorage.removeItem("trip_type");
-    navigate("/dashboard");
+    // Transition directly into Trip Monitoring screen with history replacement
+    navigate("/trip-monitoring", { replace: true, state: { bookingId: createdBookingId } });
   };
 
   return (
@@ -464,14 +433,14 @@ const BookSummary: React.FC = () => {
                   </Box>
                   <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#94A3B8" }}>
                     <Typography>{language === "tl" ? "Bilang ng Upuan (Carpool):" : "Seats booked (Carpool):"}</Typography>
-                    <Typography>1 seat</Typography>
+                    <Typography>{passengers} {passengers > 1 ? "seats" : "seat"}</Typography>
                   </Box>
                   <Box sx={{ display: "flex", gap: "6px", alignItems: "flex-start", marginTop: "4px", backgroundColor: "rgba(52, 168, 83, 0.08)", padding: "10px", borderRadius: "12px" }}>
                     <InfoIcon sx={{ color: "#34A853", fontSize: "16px", marginTop: "2px" }} />
                     <Typography sx={{ fontSize: "10px", color: "#81C784", lineHeight: 1.4 }}>
                       {language === "tl"
-                        ? "Makatipid sa Shared Trip! Magbabayad ka lamang para sa isang upuan habang nakikibahagi sa ibang pasahero."
-                        : "Save with Shared Trip! You only pay for your individual seat portion while sharing the vehicle with other bookers."}
+                        ? `Makatipid sa Shared Trip! Magbabayad ka para sa ${passengers} upuan (max 2 bawat booking, hanggang 4 na pinagsamang pasahero sa biyahe). Agad itong ibabroadcast nang walang paghihintay.`
+                        : `Save with Shared Trip! You pay for ${passengers} seat(s) (max 2 per booking, up to 4 paired passengers total). Dispatched immediately without waiting room delays.`}
                     </Typography>
                   </Box>
                 </>

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
@@ -14,6 +14,9 @@ import { getCurrentDevicePosition } from "../../../../services/locationService";
 
 const LocationPermission: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const destination = (location.state as { from?: string })?.from || "/new-trip";
+
   const [requesting, setRequesting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
 
@@ -31,8 +34,9 @@ const LocationPermission: React.FC = () => {
         sessionStorage.setItem("gps_permission_session", "true");
       }
 
-      // Real coordinates acquired -> proceed to New Trip
-      navigate("/new-trip", {
+      // Real coordinates acquired -> proceed
+      navigate(destination, {
+        replace: true,
         state: {
           hasGps: true,
           coords: {
@@ -49,20 +53,21 @@ const LocationPermission: React.FC = () => {
       // Store explicit denial/failure
       localStorage.setItem("gps_permission", "false");
 
-      // Give user 1.5s to read the message before moving forward in manual fallback mode
+      // Give user 1.5s to read the message before moving forward
       setTimeout(() => {
-        navigate("/new-trip", {
+        navigate(destination, {
+          replace: true,
           state: {
             hasGps: false,
           },
         });
-      }, 1800);
+      }, 1500);
     }
   };
 
   const handleDeny = () => {
     localStorage.setItem("gps_permission", "false");
-    navigate("/new-trip", { state: { hasGps: false } });
+    navigate(destination, { replace: true, state: { hasGps: false } });
   };
 
   return (

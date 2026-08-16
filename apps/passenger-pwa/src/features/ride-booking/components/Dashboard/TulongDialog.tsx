@@ -1,4 +1,5 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import Dialog from "@mui/material/Dialog";
 import DialogTitle from "@mui/material/DialogTitle";
 import DialogContent from "@mui/material/DialogContent";
@@ -11,6 +12,7 @@ import Paper from "@mui/material/Paper";
 import CloseIcon from "@mui/icons-material/Close";
 import PhoneIcon from "@mui/icons-material/Phone";
 import SupportAgentIcon from "@mui/icons-material/SupportAgent";
+import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 
 import { useLanguage } from "../../../../utils/LanguageContext";
 
@@ -21,6 +23,12 @@ interface TulongDialogProps {
 
 const TulongDialog: React.FC<TulongDialogProps> = ({ open, onClose }) => {
   const { language } = useLanguage();
+  const navigate = useNavigate();
+
+  const handleOpenIncidentReport = () => {
+    onClose();
+    navigate('/incident-report', { state: { from: '/dashboard' } });
+  };
 
   return (
     <Dialog
@@ -122,7 +130,25 @@ const TulongDialog: React.FC<TulongDialogProps> = ({ open, onClose }) => {
         </Paper>
       </DialogContent>
 
-      <DialogActions sx={{ padding: "8px 16px 16px 16px" }}>
+      <DialogActions sx={{ padding: "8px 16px 16px 16px", display: "flex", flexDirection: "column", gap: "8px" }}>
+        <Button
+          fullWidth
+          variant="outlined"
+          startIcon={<ReportProblemIcon />}
+          onClick={handleOpenIncidentReport}
+          sx={{
+            borderColor: "#EF4444",
+            color: "#EF4444",
+            borderRadius: "14px",
+            fontWeight: 700,
+            textTransform: "none",
+            height: "44px",
+            fontFamily: "Poppins, sans-serif",
+            "&:hover": { borderColor: "#DC2626", backgroundColor: "#FEF2F2" },
+          }}
+        >
+          {language === "tl" ? "Mag-ulat ng Reklamo o Insidente" : "Report a Complaint or Incident"}
+        </Button>
         <Button
           fullWidth
           variant="contained"

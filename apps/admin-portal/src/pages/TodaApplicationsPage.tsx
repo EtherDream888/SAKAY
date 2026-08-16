@@ -9,6 +9,8 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
+import { DocumentPreviewModal } from '../components/admin/DocumentPreviewModal';
+import { logAdminAction } from '../lib/auditLog';
 
 export const TodaApplicationsPage: React.FC = () => {
   const [applications, setApplications] = useState<TodaApplicationRecord[]>(MOCK_TODA_APPLICATIONS);
@@ -16,6 +18,7 @@ export const TodaApplicationsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('All');
   const [reminderSent, setReminderSent] = useState<string | null>(null);
+  const [selectedDoc, setSelectedDoc] = useState<{ name: string; type: string } | null>(null);
   
   // Selected Application for Centered Review Modal
   const [selectedApp, setSelectedApp] = useState<TodaApplicationRecord | null>(null);
@@ -66,6 +69,15 @@ export const TodaApplicationsPage: React.FC = () => {
       prev.map((app) => (app.id === selectedApp.id ? { ...app, status: 'Approved' } : app))
     );
     setSelectedApp((prev) => (prev ? { ...prev, status: 'Approved' } : null));
+
+    logAdminAction({
+      actionType: 'TODA_ACCREDITATION_APPROVED',
+      targetId: selectedApp.id,
+      targetName: selectedApp.name,
+      details: `Approved official municipal accreditation for ${selectedApp.name} (${selectedApp.barangay}). Authorized driver roster: ${selectedApp.memberCount} drivers.`,
+      category: 'Verification',
+    });
+
     setApproveDialogOpen(false);
   };
 
@@ -77,6 +89,15 @@ export const TodaApplicationsPage: React.FC = () => {
       )
     );
     setSelectedApp((prev) => (prev ? { ...prev, status: 'Declined', declineReason: reason } : null));
+
+    logAdminAction({
+      actionType: 'TODA_ACCREDITATION_DECLINED',
+      targetId: selectedApp.id,
+      targetName: selectedApp.name,
+      details: `Declined accreditation application for ${selectedApp.name}. Reason: ${reason || 'Incomplete organization credentials.'}`,
+      category: 'Verification',
+    });
+
     setDeclineDialogOpen(false);
   };
 
@@ -88,11 +109,29 @@ export const TodaApplicationsPage: React.FC = () => {
       )
     );
     setSelectedApp((prev) => (prev ? { ...prev, status: 'Resubmission Required', resubmissionReason: reason } : null));
+
+    logAdminAction({
+      actionType: 'DOCUMENT_RESUBMISSION_REQUESTED',
+      targetId: selectedApp.id,
+      targetName: selectedApp.name,
+      details: `Returned application for ${selectedApp.name} under Resubmission Required. Reason: ${reason || 'Expired Barangay Clearance.'}`,
+      category: 'Verification',
+    });
+
     setResubmissionDialogOpen(false);
   };
 
   const handleSendReminder = (todaId: string) => {
     setReminderSent(todaId);
+
+    logAdminAction({
+      actionType: 'CLEARANCE_REMINDER_SENT',
+      targetId: todaId,
+      targetName: selectedApp ? selectedApp.name : todaId,
+      details: `Dispatched automated Barangay Clearance renewal reminder to TODA leadership.`,
+      category: 'Verification',
+    });
+
     setTimeout(() => setReminderSent(null), 3000);
   };
 
@@ -348,12 +387,27 @@ export const TodaApplicationsPage: React.FC = () => {
                     </Box>
                   </Box>
 
-                  <Chip label="View File" size="small" onClick={() => {}} sx={{ fontSize: '12.5px', cursor: 'pointer', backgroundColor: 'var(--mac-canvas-bg)', height: 28 }} />
+                  <Chip
+                    label="View File"
+                    size="small"
+                    onClick={() => setSelectedDoc({ name: doc.name, type: doc.type })}
+                    sx={{ fontSize: '12.5px', cursor: 'pointer', backgroundColor: 'var(--mac-canvas-bg)', height: 28 }}
+                  />
                 </Box>
               ))}
             </Box>
           </Box>
         </MacCenterModal>
+      )}
+
+      {/* Document Inspection Popover */}
+      {selectedDoc && (
+        <DocumentPreviewModal
+          open={Boolean(selectedDoc)}
+          onClose={() => setSelectedDoc(null)}
+          documentName={selectedDoc.name}
+          documentType={selectedDoc.type}
+        />
       )}
 
       {/* 5. Approve Confirmation Dialog */}

@@ -14,6 +14,7 @@ import { MacCenterModal } from './MacCenterModal';
 import { StatusBadge } from '../common/StatusBadge';
 import { ActionButton } from './ActionButton';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
+import { logAdminAction } from '../../lib/auditLog';
 
 interface DriverDetailModalProps {
   open: boolean;
@@ -37,18 +38,45 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
   const isAccountActive = driver.accountStatus === 'Active';
 
   const handleToggleStatus = () => {
+    const nextStatus = isAccountActive ? 'Inactive' : 'Active';
     if (onStatusChange) {
-      onStatusChange(driver.id, isAccountActive ? 'Inactive' : 'Active');
+      onStatusChange(driver.id, nextStatus);
     }
+
+    logAdminAction({
+      actionType: nextStatus === 'Inactive' ? 'DRIVER_ACCOUNT_SUSPENDED' : 'DRIVER_ACCOUNT_REACTIVATED',
+      targetId: driver.id,
+      targetName: driver.name,
+      details: `${nextStatus === 'Inactive' ? 'Suspended' : 'Reactivated'} driver access. License: ${driver.licenseNo}, TODA: ${driver.todaName}, Plate: ${driver.vehiclePlate}.`,
+      category: 'User Oversight',
+    });
   };
 
   const handleSendReminder = () => {
     setReminderSent(true);
+
+    logAdminAction({
+      actionType: 'DRIVER_PERMIT_REMINDER_SENT',
+      targetId: driver.id,
+      targetName: driver.name,
+      details: `Dispatched MTOP and License renewal alert to driver mobile (${driver.phone}).`,
+      category: 'Verification',
+    });
+
     setTimeout(() => setReminderSent(false), 3000);
   };
 
   const handleIssueStrike = () => {
     setStrikeIssued(true);
+
+    logAdminAction({
+      actionType: 'MANUAL_STRIKE_ISSUED',
+      targetId: driver.id,
+      targetName: driver.name,
+      details: `Issued +1 Administrative Policy Strike to driver for operational non-compliance. Current strikes: ${driver.strikesCount + 1}.`,
+      category: 'User Oversight',
+    });
+
     setTimeout(() => setStrikeIssued(false), 3000);
   };
 

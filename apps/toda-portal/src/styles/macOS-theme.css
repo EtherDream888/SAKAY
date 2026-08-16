@@ -1,0 +1,73 @@
+/* Apple-inspired visual system for SAKAY TODA Admin Portal */
+
+:root {
+  /* Layout Dimensions */
+  --mac-header-height: 88px;
+
+  /* Base surfaces */
+  --mac-canvas-bg: #f4f5f7;
+  --mac-shell-bg: rgba(255, 255, 255, 0.72);
+  --mac-card-bg: rgba(255, 255, 255, 0.82);
+  --mac-sidebar-bg: rgba(255, 255, 255, 0.74);
+  --mac-header-bg: rgba(255, 255, 255, 0.72);
+  --mac-glass-bg: rgba(255, 255, 255, 0.72);
+  --mac-popover-bg: rgba(255, 255, 255, 0.84);
+
+  /* Brand accents */
+  --sakay-orange: #ff6b1a;
+  --sakay-orange-hover: #ea5f12;
+  --sakay-orange-active: #d7520e;
+  --sakay-orange-soft: #fff2e9;
+  --sakay-orange-border: rgba(255, 107, 26, 0.32);
+  --sakay-orange-glow: rgba(255, 107, 26, 0.14);
+
+  /* Neutral palette */
+  --mac-text-primary: #1d1d1f;
+  --mac-text-secondary: #4d4d52;
+  --mac-text-muted: #7b7b80;
+  --mac-text-tertiary: #b4b4b8;
+
+  --mac-border-color: rgba(15, 23, 42, 0.08);
+  --mac-border-subtle: rgba(15, 23, 42, 0.05);
+  --mac-border-glass: rgba(255, 255, 255, 0.6);
+  --mac-divider: rgba(17, 24, 39, 0.05);
+
+  /* Status colors */
+  --mac-success-bg: #e7f9ee;
+  --mac-success-text: #198754;
+  --mac-success-dot: #28a745;
+
+  --mac-warning-bg: #fff5e6;
+  --mac-warning-text: #b76e00;
+  --mac-warning-dot: #f5ac28;
+
+  --mac-danger-bg: #fdf0ed;
+  --mac-danger-text: #d93025;
+  --mac-danger-dot: #ea4335;
+
+  --mac-neutral-bg: #f1f3f4;
+  --mac-neutral-text: #5f6368;
+  --mac-neutral-dot: #9aa0a6;
+
+  --mac-info-bg: #edf3ff;
+  --mac-info-text: #1a73e8;
+
+  /* Radius and shadows */
+  --mac-radius-sm: 8px;
+  --mac-radius-md: 12px;
+  --mac-radius-lg: 18px;
+  --mac-radius-xl: 22px;
+
+  --mac-shadow-subtle: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 20px rgba(15, 23, 42, 0.02);
+  --mac-shadow-card: 0 10px 30px rgba(15, 23, 42, 0.06), 0 2px 8px rgba(15, 23, 42, 0.04);
+  --mac-shadow-popover: 0 20px 50px rgba(15, 23, 42, 0.16), 0 8px 16px rgba(15, 23, 42, 0.08);
+  --mac-shadow-hover: 0 18px 36px rgba(15, 23, 42, 0.08), 0 8px 16px rgba(15, 23, 42, 0.05);
+
+  /* Transitions */
+  --mac-transition-fast: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  --mac-transition-normal: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  --mac-sidebar-transition: width 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Typography */
+  --mac-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", sans-serif;
+}

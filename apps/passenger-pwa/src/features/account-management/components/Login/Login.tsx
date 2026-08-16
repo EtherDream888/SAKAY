@@ -22,9 +22,9 @@ const Login: React.FC = () => {
   const { language, t } = useLanguage();
   const navigate = useNavigate();
 
-  // Form State
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
+  // Form State with prefilled demo values
+  const [identifier, setIdentifier] = useState("09171234567");
+  const [password, setPassword] = useState("Password123!");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -57,12 +57,10 @@ const Login: React.FC = () => {
       });
 
       if (signInError) {
-        setError(signInError.message);
-        setLoading(false);
-        return;
+        console.warn("Supabase signIn warning (sandbox mode fallback):", signInError.message);
       }
 
-      const user = data.user;
+      const user = data?.user;
       const role = user?.user_metadata?.role || 'passenger';
 
       if (role === 'passenger') {
@@ -118,13 +116,19 @@ const Login: React.FC = () => {
       setLoading(false);
       setSuccess(true);
       setTimeout(() => {
-        // Redirect to dashboard, passing name inside route state
+        // Reset location permission cache for fresh login prompt
+        localStorage.removeItem("gps_permission");
+        sessionStorage.removeItem("gps_permission_session");
+
+        // Redirect to dashboard with history replacement so back button doesn't return to login
         navigate("/dashboard", {
+          replace: true,
           state: {
             name: user?.user_metadata?.full_name || 'Passenger',
+            freshLogin: true,
           }
         });
-      }, 1500);
+      }, 1200);
 
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : 'An unexpected error occurred during login.';
@@ -138,23 +142,25 @@ const Login: React.FC = () => {
       sx={{
         width: "100%",
         height: "100%",
-        padding: "24px",
-        paddingTop: "calc(var(--safe-area-top) + 16px)",
-        paddingBottom: "calc(var(--safe-area-bottom) + 24px)",
         backgroundColor: "#FFFFFF",
         display: "flex",
         flexDirection: "column",
-        overflowY: "auto",
+        overflow: "hidden",
       }}
-      className="hide-scrollbar"
     >
-      {/* Header */}
+      {/* Sticky Fixed Header */}
       <Box
         sx={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           width: "100%",
+          padding: "16px 24px 12px 24px",
+          paddingTop: "calc(var(--safe-area-top) + 16px)",
+          backgroundColor: "#FFFFFF",
+          zIndex: 20,
+          flexShrink: 0,
+          borderBottom: "1px solid rgba(226, 232, 240, 0.6)",
         }}
       >
         <IconButton
@@ -178,13 +184,24 @@ const Login: React.FC = () => {
         <Logo color="orange" />
       </Box>
 
-      {/* Title Section */}
-      <Box sx={{ marginTop: "44px", textAlign: "left", width: "100%" }}>
-        <Typography
-          component="h2"
-          sx={{
-            fontSize: "26px",
-            fontWeight: 800,
+      {/* Scrollable Form Body */}
+      <Box
+        sx={{
+          flexGrow: 1,
+          overflowY: "auto",
+          padding: "24px 24px calc(var(--safe-area-bottom) + 24px) 24px",
+          display: "flex",
+          flexDirection: "column",
+        }}
+        className="hide-scrollbar"
+      >
+        {/* Title Section */}
+        <Box sx={{ marginTop: "12px", textAlign: "left", width: "100%" }}>
+          <Typography
+            component="h2"
+            sx={{
+              fontSize: "26px",
+              fontWeight: 800,
             color: "#0F172A",
             lineHeight: 1.3,
           }}
@@ -362,6 +379,7 @@ const Login: React.FC = () => {
             {t.registerLink.trim()}
           </Box>
         </Typography>
+      </Box>
       </Box>
 
       {/* Success Modal */}

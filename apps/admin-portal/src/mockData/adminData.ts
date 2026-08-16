@@ -210,6 +210,61 @@ export interface IncidentReportRecord {
   }[];
 }
 
+export interface LguAdminRecord {
+  id: string;
+  name: string;
+  email: string;
+  contactNumber: string;
+  role: 'Super Administrator' | 'Verifier' | 'Incident Officer' | 'Analytics Viewer' | 'Fare Administrator';
+  accountStatus: 'Active' | 'Pending Password Reset' | 'Deactivated';
+  lastLogin?: string;
+  createdAt: string;
+}
+
+export interface FareMatrixRecord {
+  id: string;
+  fare_matrix_id: string;
+  base_fare: number;
+  base_distance_km: number;
+  succeeding_rate: number;
+  effective_timestamp: string;
+  effective_date: string;
+  is_active: boolean;
+  configured_by_lgu_admin: string;
+  ordinance_reference: string;
+  notes?: string;
+  created_at: string;
+}
+
+export interface AnnouncementRecord {
+  id: string;
+  announcement_id: string;
+  toda_id?: string | null;
+  toda_name?: string | null;
+  title: string;
+  message: string;
+  target_role: 'All' | 'Passenger' | 'Driver' | 'TODA Administrator';
+  is_published: boolean;
+  publish_timing: 'Immediate' | 'Scheduled';
+  scheduled_date?: string;
+  created_by_lgu_admin: string;
+  created_at: string;
+}
+
+export interface AuditLogRecord {
+  id: string;
+  log_id: string;
+  lgu_admin_id: string;
+  actor_name: string;
+  actor_role: string;
+  action_type: string;
+  target_id: string;
+  target_name: string;
+  details: string;
+  performed_at: string;
+  category: 'Authentication' | 'Verification' | 'User Oversight' | 'Fare Matrix' | 'Announcement' | 'System';
+}
+
 // System Dashboard Surface-Level KPIs
 export const SYSTEM_DASHBOARD_KPIS = {
   passengers: {
@@ -857,5 +912,355 @@ export const MOCK_INCIDENT_REPORTS_DETAILED: IncidentReportRecord[] = [
       { step: 'Report Submitted by Driver', timestamp: 'May 08, 2026 • 08:10 PM', actor: 'Aurelio Bautista' },
       { step: 'Dismissed (Grace Period Compliant)', timestamp: 'May 08, 2026 • 08:30 PM', actor: 'LGU Admin Vance' },
     ],
+  },
+];
+
+// Current Logged-In Admin Mock Constant
+export const CURRENT_ADMIN: {
+  id: string;
+  name: string;
+  email: string;
+  role: 'Super Administrator' | 'Verifier' | 'Incident Officer' | 'Analytics Viewer' | 'Fare Administrator';
+} = {
+  id: 'LGU-ADM-001',
+  name: 'Hon. Juanito De Chavez',
+  email: 'j.dechavez@calapan.gov.ph',
+  role: 'Super Administrator',
+};
+
+// 7. LGU Administrator Accounts Mock Data
+export const MOCK_LGU_ADMINS: LguAdminRecord[] = [
+  {
+    id: 'LGU-ADM-001',
+    name: 'Hon. Juanito De Chavez',
+    email: 'j.dechavez@calapan.gov.ph',
+    contactNumber: '+63 917 555 0101',
+    role: 'Super Administrator',
+    accountStatus: 'Active',
+    lastLogin: 'May 12, 2026 • 09:15 AM',
+    createdAt: 'Jan 05, 2026',
+  },
+  {
+    id: 'LGU-ADM-002',
+    name: 'Maria Elena Santos',
+    email: 'm.santos@calapan.gov.ph',
+    contactNumber: '+63 918 555 0102',
+    role: 'Verifier',
+    accountStatus: 'Active',
+    lastLogin: 'May 12, 2026 • 08:40 AM',
+    createdAt: 'Jan 10, 2026',
+  },
+  {
+    id: 'LGU-ADM-003',
+    name: 'Capt. Rodrigo Alcantara',
+    email: 'r.alcantara@calapan.gov.ph',
+    contactNumber: '+63 919 555 0103',
+    role: 'Incident Officer',
+    accountStatus: 'Active',
+    lastLogin: 'May 11, 2026 • 04:30 PM',
+    createdAt: 'Jan 15, 2026',
+  },
+  {
+    id: 'LGU-ADM-004',
+    name: 'Engr. Liza Bautista',
+    email: 'l.bautista@calapan.gov.ph',
+    contactNumber: '+63 920 555 0104',
+    role: 'Fare Administrator',
+    accountStatus: 'Active',
+    lastLogin: 'May 10, 2026 • 11:20 AM',
+    createdAt: 'Feb 01, 2026',
+  },
+  {
+    id: 'LGU-ADM-005',
+    name: 'Dominic Castillo',
+    email: 'd.castillo@calapan.gov.ph',
+    contactNumber: '+63 921 555 0105',
+    role: 'Analytics Viewer',
+    accountStatus: 'Active',
+    lastLogin: 'May 09, 2026 • 02:15 PM',
+    createdAt: 'Feb 15, 2026',
+  },
+  {
+    id: 'LGU-ADM-006',
+    name: 'Grace Villanueva',
+    email: 'g.villanueva@calapan.gov.ph',
+    contactNumber: '+63 922 555 0106',
+    role: 'Verifier',
+    accountStatus: 'Pending Password Reset',
+    lastLogin: 'Never (First Login Required)',
+    createdAt: 'May 10, 2026',
+  },
+  {
+    id: 'LGU-ADM-007',
+    name: 'Arnold Hernandez',
+    email: 'a.hernandez@calapan.gov.ph',
+    contactNumber: '+63 923 555 0107',
+    role: 'Incident Officer',
+    accountStatus: 'Deactivated',
+    lastLogin: 'Apr 20, 2026 • 05:00 PM',
+    createdAt: 'Jan 20, 2026',
+  },
+];
+
+// 8. Fare Matrix Version History Mock Data (City Ordinance No. 118, Series of 2022)
+export const MOCK_FARE_MATRIX_HISTORY: FareMatrixRecord[] = [
+  {
+    id: 'FARE-2026-V3',
+    fare_matrix_id: 'FM-003',
+    base_fare: 15.0,
+    base_distance_km: 2.0,
+    succeeding_rate: 1.0,
+    effective_timestamp: '2026-01-01T00:00:00.000Z',
+    effective_date: 'Jan 01, 2026',
+    is_active: true,
+    configured_by_lgu_admin: 'Engr. Liza Bautista (Fare Administrator)',
+    ordinance_reference: 'City Ordinance No. 118, Series of 2022 (Amendment 2026)',
+    notes: 'Approved standard minimum base rate reflecting current fuel and inflation indices.',
+    created_at: 'Dec 20, 2025',
+  },
+  {
+    id: 'FARE-2025-V2',
+    fare_matrix_id: 'FM-002',
+    base_fare: 12.0,
+    base_distance_km: 2.0,
+    succeeding_rate: 1.0,
+    effective_timestamp: '2025-01-01T00:00:00.000Z',
+    effective_date: 'Jan 01, 2025 – Dec 31, 2025',
+    is_active: false,
+    configured_by_lgu_admin: 'Engr. Liza Bautista (Fare Administrator)',
+    ordinance_reference: 'City Ordinance No. 84, Series of 2024',
+    notes: 'Superseded by Ordinance 118-2026 rate revision.',
+    created_at: 'Dec 15, 2024',
+  },
+  {
+    id: 'FARE-2024-V1',
+    fare_matrix_id: 'FM-001',
+    base_fare: 10.0,
+    base_distance_km: 2.0,
+    succeeding_rate: 0.75,
+    effective_timestamp: '2024-01-01T00:00:00.000Z',
+    effective_date: 'Jan 01, 2024 – Dec 31, 2024',
+    is_active: false,
+    configured_by_lgu_admin: 'Hon. Juanito De Chavez (Super Administrator)',
+    ordinance_reference: 'City Ordinance No. 52, Series of 2023',
+    notes: 'Initial SAKAY digital metering pilot baseline.',
+    created_at: 'Dec 10, 2023',
+  },
+];
+
+// 9. Municipal Announcements Mock Data
+export const MOCK_ANNOUNCEMENTS: AnnouncementRecord[] = [
+  {
+    id: 'ANN-2026-001',
+    announcement_id: 'ANN-001',
+    toda_id: null,
+    toda_name: 'All City TODAs & Commuters',
+    title: 'New SAKAY Fare Cap Ordinance Enforcement Notice',
+    message: 'Pursuant to City Ordinance No. 118, all tricycle operators and drivers must adhere strictly to the ₱15 base fare for the first 2.0 km. Overcharging reports will trigger immediate 3-strike policy review.',
+    target_role: 'All',
+    is_published: true,
+    publish_timing: 'Immediate',
+    created_by_lgu_admin: 'Hon. Juanito De Chavez (Super Administrator)',
+    created_at: 'May 08, 2026 • 10:00 AM',
+  },
+  {
+    id: 'ANN-2026-002',
+    announcement_id: 'ANN-002',
+    toda_id: 'toda-1',
+    toda_name: 'Calapan Central TODA',
+    title: 'JP Rizal St. Drainage Construction Temporary Route Advisory',
+    message: 'Drivers affiliated with Calapan Central TODA are advised to utilize San Vicente diversion roads during DPWH culvert upgrades between 8:00 AM and 5:00 PM.',
+    target_role: 'Driver',
+    is_published: true,
+    publish_timing: 'Immediate',
+    created_by_lgu_admin: 'Maria Elena Santos (Verifier)',
+    created_at: 'May 10, 2026 • 08:30 AM',
+  },
+  {
+    id: 'ANN-2026-003',
+    announcement_id: 'ANN-003',
+    toda_id: null,
+    toda_name: 'All TODA Administrators',
+    title: 'Annual Barangay Clearance Renewal Deadline (Q2 2026)',
+    message: 'All accredited TODA presidents and secretaries are reminded to upload updated Barangay Clearances and driver rosters before June 30, 2026 to prevent account suspension.',
+    target_role: 'TODA Administrator',
+    is_published: true,
+    publish_timing: 'Immediate',
+    created_by_lgu_admin: 'Maria Elena Santos (Verifier)',
+    created_at: 'May 11, 2026 • 02:00 PM',
+  },
+  {
+    id: 'ANN-2026-004',
+    announcement_id: 'ANN-004',
+    toda_id: null,
+    toda_name: 'All City Commuters',
+    title: 'Enhanced Ride-Sharing Discount Availability for Poblacion Routes',
+    message: 'Commuters booking through the SAKAY Passenger PWA can now enjoy up to 35% fare discounts when matching co-passengers heading in the same service corridor.',
+    target_role: 'Passenger',
+    is_published: true,
+    publish_timing: 'Immediate',
+    created_by_lgu_admin: 'Engr. Liza Bautista (Fare Administrator)',
+    created_at: 'May 12, 2026 • 09:00 AM',
+  },
+  {
+    id: 'ANN-2026-005',
+    announcement_id: 'ANN-005',
+    toda_id: 'toda-2',
+    toda_name: 'Ibaba TODA Express',
+    title: 'Scheduled MTOP Inspection Day for Ibaba Units (Draft)',
+    message: 'Special on-site franchise renewal and tricycle roadworthiness inspection scheduled at Ibaba Barangay Plaza.',
+    target_role: 'Driver',
+    is_published: false,
+    publish_timing: 'Scheduled',
+    scheduled_date: 'May 20, 2026',
+    created_by_lgu_admin: 'Maria Elena Santos (Verifier)',
+    created_at: 'May 12, 2026 • 11:15 AM',
+  },
+];
+
+// 10. Audit Log Seed Records
+export const MOCK_AUDIT_LOGS: AuditLogRecord[] = [
+  {
+    id: 'LOG-2026-015',
+    log_id: 'AUD-015',
+    lgu_admin_id: 'LGU-ADM-001',
+    actor_name: 'Hon. Juanito De Chavez',
+    actor_role: 'Super Administrator',
+    action_type: 'TODA_ACCREDITATION_APPROVED',
+    target_id: 'APP-2026-003',
+    target_name: 'Lazareto TODA',
+    details: 'Approved municipal accreditation renewal and issued permit accreditation permit #CAL-TODA-2026-03.',
+    performed_at: 'May 12, 2026 • 09:30 AM',
+    category: 'Verification',
+  },
+  {
+    id: 'LOG-2026-014',
+    log_id: 'AUD-014',
+    lgu_admin_id: 'LGU-ADM-003',
+    actor_name: 'Capt. Rodrigo Alcantara',
+    actor_role: 'Incident Officer',
+    action_type: 'MANUAL_STRIKE_ISSUED',
+    target_id: 'DRV-002',
+    target_name: 'Vicente "Enteng" Sotto',
+    details: 'Issued +1 Administrative Policy Strike for confirmed overcharging attempt on Trip #TRP-2026-00412.',
+    performed_at: 'May 12, 2026 • 09:05 AM',
+    category: 'User Oversight',
+  },
+  {
+    id: 'LOG-2026-013',
+    log_id: 'AUD-013',
+    lgu_admin_id: 'LGU-ADM-004',
+    actor_name: 'Engr. Liza Bautista',
+    actor_role: 'Fare Administrator',
+    action_type: 'ANNOUNCEMENT_PUBLISHED',
+    target_id: 'ANN-2026-004',
+    target_name: 'Enhanced Ride-Sharing Discount Availability',
+    details: 'Published public passenger broadcast regarding 35% ride-sharing savings.',
+    performed_at: 'May 12, 2026 • 09:00 AM',
+    category: 'Announcement',
+  },
+  {
+    id: 'LOG-2026-012',
+    log_id: 'AUD-012',
+    lgu_admin_id: 'LGU-ADM-003',
+    actor_name: 'Capt. Rodrigo Alcantara',
+    actor_role: 'Incident Officer',
+    action_type: 'INCIDENT_TRIAGED',
+    target_id: 'INC-2026-0042',
+    target_name: 'Incident #INC-2026-0042 (Harassment)',
+    details: 'Updated investigation status to "Under Investigation" and requested police coordination log.',
+    performed_at: 'May 12, 2026 • 08:50 AM',
+    category: 'User Oversight',
+  },
+  {
+    id: 'LOG-2026-011',
+    log_id: 'AUD-011',
+    lgu_admin_id: 'LGU-ADM-002',
+    actor_name: 'Maria Elena Santos',
+    actor_role: 'Verifier',
+    action_type: 'DOCUMENT_RESUBMISSION_REQUESTED',
+    target_id: 'APP-2026-002',
+    target_name: 'Ibaba TODA Express',
+    details: 'Requested resubmission of updated 2026 Barangay Clearance before accreditation renewal.',
+    performed_at: 'May 12, 2026 • 08:20 AM',
+    category: 'Verification',
+  },
+  {
+    id: 'LOG-2026-010',
+    log_id: 'AUD-010',
+    lgu_admin_id: 'LGU-ADM-001',
+    actor_name: 'Hon. Juanito De Chavez',
+    actor_role: 'Super Administrator',
+    action_type: 'ADMIN_ACCOUNT_CREATED',
+    target_id: 'LGU-ADM-006',
+    target_name: 'Grace Villanueva',
+    details: 'Created new Verifier administrator account with status "Pending Password Reset".',
+    performed_at: 'May 10, 2026 • 03:45 PM',
+    category: 'Authentication',
+  },
+  {
+    id: 'LOG-2026-009',
+    log_id: 'AUD-009',
+    lgu_admin_id: 'LGU-ADM-003',
+    actor_name: 'Capt. Rodrigo Alcantara',
+    actor_role: 'Incident Officer',
+    action_type: 'PASSENGER_SUSPENDED',
+    target_id: 'PAS-004',
+    target_name: 'Carlos Mendoza',
+    details: 'Suspended passenger account for 7 days due to 3 accumulated booking abandonment strikes.',
+    performed_at: 'May 10, 2026 • 01:15 PM',
+    category: 'User Oversight',
+  },
+  {
+    id: 'LOG-2026-008',
+    log_id: 'AUD-008',
+    lgu_admin_id: 'LGU-ADM-004',
+    actor_name: 'Engr. Liza Bautista',
+    actor_role: 'Fare Administrator',
+    action_type: 'FARE_MATRIX_UPDATED',
+    target_id: 'FM-003',
+    target_name: 'Fare Matrix Version 3 (City Ord. No. 118)',
+    details: 'Activated Fare Matrix Version 3 (₱15 base fare / 2.0 km, ₱1.00/km succeeding rate).',
+    performed_at: 'May 09, 2026 • 10:30 AM',
+    category: 'Fare Matrix',
+  },
+  {
+    id: 'LOG-2026-007',
+    log_id: 'AUD-007',
+    lgu_admin_id: 'LGU-ADM-003',
+    actor_name: 'Capt. Rodrigo Alcantara',
+    actor_role: 'Incident Officer',
+    action_type: 'INCIDENT_RESOLVED',
+    target_id: 'INC-2026-0040',
+    target_name: 'Incident #INC-2026-0040 (Route Deviation)',
+    details: 'Resolved report without penalty after verifying DPWH road repair on JP Rizal St.',
+    performed_at: 'May 09, 2026 • 02:30 PM',
+    category: 'User Oversight',
+  },
+  {
+    id: 'LOG-2026-006',
+    log_id: 'AUD-006',
+    lgu_admin_id: 'LGU-ADM-002',
+    actor_name: 'Maria Elena Santos',
+    actor_role: 'Verifier',
+    action_type: 'CLEARANCE_REMINDER_SENT',
+    target_id: 'toda-1',
+    target_name: 'Calapan Central TODA',
+    details: 'Sent automated SMS and in-portal Barangay Clearance renewal notification to representative.',
+    performed_at: 'May 08, 2026 • 11:00 AM',
+    category: 'Verification',
+  },
+  {
+    id: 'LOG-2026-005',
+    log_id: 'AUD-005',
+    lgu_admin_id: 'LGU-ADM-001',
+    actor_name: 'Hon. Juanito De Chavez',
+    actor_role: 'Super Administrator',
+    action_type: 'ADMIN_ACCOUNT_DEACTIVATED',
+    target_id: 'LGU-ADM-007',
+    target_name: 'Arnold Hernandez',
+    details: 'Deactivated staff administrative account following department reassignment.',
+    performed_at: 'Apr 20, 2026 • 05:00 PM',
+    category: 'Authentication',
   },
 ];

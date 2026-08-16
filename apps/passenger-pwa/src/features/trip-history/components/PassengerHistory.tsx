@@ -569,11 +569,38 @@ const PassengerHistory: React.FC = () => {
                   Drayber: <strong>{selectedDetails.driverName} ({selectedDetails.bodyNumber})</strong>
                 </Typography>
               )}
+              {selectedDetails.type === "Share" && (
+                <Box sx={{ p: 1, borderRadius: "10px", backgroundColor: "#E6F4EA", border: "1px solid #A7F3D0" }}>
+                  <Typography sx={{ fontSize: "11px", color: "#1E8E3E", fontWeight: 700 }}>
+                    ✓ Final Proportionate Shared Tariff Applied
+                  </Typography>
+                  <Typography sx={{ fontSize: "10.5px", color: "#065F46" }}>
+                    Pinagsamang carpool fare base sa aktwal na sakay sa ruta.
+                  </Typography>
+                </Box>
+              )}
               <Typography sx={{ fontSize: "14px", fontWeight: 800, color: "#FF6B00", marginTop: "6px" }}>
-                Bayad: {selectedDetails.price} ({selectedDetails.type})
+                Bayad: {selectedDetails.price} ({selectedDetails.type === "Share" ? "Shared Ride" : "Solo Charter"})
               </Typography>
             </DialogContent>
-            <DialogActions>
+            <DialogActions sx={{ display: "flex", justifyContent: "space-between", px: 2, pb: 1.5 }}>
+              <Button
+                size="small"
+                onClick={() => {
+                  const targetTrip = selectedDetails;
+                  setSelectedDetails(null);
+                  navigate('/incident-report', {
+                    state: {
+                      from: '/history',
+                      franchiseNo: targetTrip.bodyNumber,
+                      bookingId: targetTrip.id,
+                    },
+                  });
+                }}
+                sx={{ color: "#EF4444", fontWeight: 600, fontSize: "11.5px", textTransform: "none" }}
+              >
+                I-ulat ang Biyahe
+              </Button>
               <Button
                 onClick={() => setSelectedDetails(null)}
                 sx={{ color: "#FF6B00", fontWeight: 700 }}

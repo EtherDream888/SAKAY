@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "@mui/material/styles";
 import theme from "./styles/theme";
 import { LanguageProvider } from "./utils/LanguageContext";
@@ -20,12 +20,9 @@ import NewTrip from "./features/ride-booking/components/NewTrip/NewTrip";
 import SetPlace from "./features/ride-booking/components/SetPlace/SetPlace";
 import BookSummary from "./features/ride-booking/components/BookSummary/BookSummary";
 import PassengerHistory from "./features/trip-history/components/PassengerHistory";
-
-// Isolate development-only authentication bypass check.
-// Strict security check: must be in local development mode (import.meta.env.DEV)
-// AND VITE_DEV_AUTH_BYPASS must be explicitly "true".
-const isDevAuthBypass =
-  import.meta.env.DEV && import.meta.env.VITE_DEV_AUTH_BYPASS === "true";
+import { TripMonitoring } from "./features/trip-monitoring/components/TripMonitoring";
+import { PassengerFeedback } from "./features/feedback/components/PassengerFeedback";
+import { IncidentReporting } from "./features/incident-reporting/components/IncidentReporting";
 
 function App() {
   return (
@@ -34,12 +31,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route element={<MobileAppShell />}>
-              <Route
-                path="/"
-                element={
-                  isDevAuthBypass ? <Navigate to="/dashboard" replace /> : <Splash />
-                }
-              />
+              <Route path="/" element={<Splash />} />
               <Route path="/splash" element={<Splash />} />
               <Route path="/account-selection" element={<AccountSelection />} />
               <Route path="/login" element={<Login />} />
@@ -54,6 +46,9 @@ function App() {
               <Route path="/new-trip" element={<NewTrip />} />
               <Route path="/set-place" element={<SetPlace />} />
               <Route path="/book-summary" element={<BookSummary />} />
+              <Route path="/trip-monitoring" element={<TripMonitoring />} />
+              <Route path="/feedback" element={<PassengerFeedback />} />
+              <Route path="/incident-report" element={<IncidentReporting />} />
               <Route path="/history" element={<PassengerHistory />} />
             </Route>
           </Routes>

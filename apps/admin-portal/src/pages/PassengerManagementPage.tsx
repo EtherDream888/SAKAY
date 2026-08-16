@@ -12,6 +12,7 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
+import { logAdminAction } from '../lib/auditLog';
 
 export const PassengerManagementPage: React.FC = () => {
   const [passengers, setPassengers] = useState<PassengerRecord[]>(MOCK_PASSENGERS);
@@ -51,16 +52,26 @@ export const PassengerManagementPage: React.FC = () => {
 
   const handleSuspendConfirm = (reason?: string) => {
     if (!selectedPassenger) return;
+    const finalReason = reason || 'Violation of Platform Policies';
     setPassengers((prev) =>
       prev.map((p) =>
         p.id === selectedPassenger.id
-          ? { ...p, accountStatus: 'Suspended', suspensionReason: reason || 'Violation of Platform Policies' }
+          ? { ...p, accountStatus: 'Suspended', suspensionReason: finalReason }
           : p
       )
     );
     setSelectedPassenger((prev) =>
-      prev ? { ...prev, accountStatus: 'Suspended', suspensionReason: reason || 'Violation of Platform Policies' } : null
+      prev ? { ...prev, accountStatus: 'Suspended', suspensionReason: finalReason } : null
     );
+
+    logAdminAction({
+      actionType: 'PASSENGER_ACCOUNT_SUSPENDED',
+      targetId: selectedPassenger.id,
+      targetName: selectedPassenger.name,
+      details: `Suspended passenger access. Reason: ${finalReason}. Registered phone: ${selectedPassenger.phone}.`,
+      category: 'User Oversight',
+    });
+
     setSuspendDialogOpen(false);
   };
 
@@ -70,11 +81,30 @@ export const PassengerManagementPage: React.FC = () => {
       prev.map((p) => (p.id === selectedPassenger.id ? { ...p, accountStatus: 'Active', suspensionReason: undefined } : p))
     );
     setSelectedPassenger((prev) => (prev ? { ...prev, accountStatus: 'Active', suspensionReason: undefined } : null));
+
+    logAdminAction({
+      actionType: 'PASSENGER_ACCOUNT_REACTIVATED',
+      targetId: selectedPassenger.id,
+      targetName: selectedPassenger.name,
+      details: `Reactivated passenger account access for mobile bookings.`,
+      category: 'User Oversight',
+    });
+
     setReactivateDialogOpen(false);
   };
 
   const handleIssueStrike = () => {
+    if (!selectedPassenger) return;
     setStrikeIssued(true);
+
+    logAdminAction({
+      actionType: 'MANUAL_STRIKE_ISSUED',
+      targetId: selectedPassenger.id,
+      targetName: selectedPassenger.name,
+      details: `Issued +1 Administrative Policy Strike to passenger for repeated booking misconduct. Current strikes: ${selectedPassenger.strikesCount + 1}.`,
+      category: 'User Oversight',
+    });
+
     setTimeout(() => setStrikeIssued(false), 3000);
   };
 

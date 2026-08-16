@@ -169,6 +169,7 @@ const NewTrip: React.FC = () => {
 
       {/* 2. Floating Top Header Controls */}
       <HomeHeader
+        onBack={() => navigate('/dashboard')}
         onOpenDrawer={() => setDrawerOpen(true)}
         onOpenNotifications={() => setNotificationsOpen(true)}
         onOpenTulong={() => setTulongOpen(true)}
