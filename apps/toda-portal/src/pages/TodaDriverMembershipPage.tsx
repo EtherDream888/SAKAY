@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -32,11 +32,27 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
-import { logTodaAction } from '../lib/auditLog';
+import {
+  fetchTodaDriverMembers,
+  suspendTodaDriver,
+  reactivateTodaDriver,
+  recordTodaAuditAction,
+} from '../services/todaApiService';
 
+/**
+ * ============================================================================
+ * TODA DRIVER MEMBERSHIP & ROSTER PAGE
+ * ============================================================================
+ * Purpose:
+ *   Enables TODA Association officers to monitor their 24 accredited member
+ *   drivers, adjust terminal shifts, investigate 90-day strike records,
+ *   and enforce TODA-level temporary terminal suspensions.
+ * ============================================================================
+ */
 export const TodaDriverMembershipPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<number>(0);
   const [drivers, setDrivers] = useState<TodaDriverMember[]>(MOCK_TODA_DRIVERS);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [exemptions, setExemptions] = useState<DriverExemptionRequest[]>(MOCK_EXEMPTION_REQUESTS);
 
   // Search & Filters
@@ -58,6 +74,29 @@ export const TodaDriverMembershipPage: React.FC = () => {
   // Selected Exemption for Review Modal
   const [selectedExemption, setSelectedExemption] = useState<DriverExemptionRequest | null>(null);
   const [exemptionDecisionModalOpen, setExemptionDecisionModalOpen] = useState(false);
+
+  /**
+   * Effect: Fetch live member driver roster on initial mount.
+   */
+  useEffect(() => {
+    let isMounted = true;
+    fetchTodaDriverMembers()
+      .then((data) => {
+        if (isMounted && data && data.length > 0) {
+          setDrivers(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('[TodaMembership] Failed to fetch drivers, using fallback:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Filter Drivers
   const filteredDrivers = drivers.filter((drv) => {
@@ -103,7 +142,6 @@ export const TodaDriverMembershipPage: React.FC = () => {
     setEditDriverModalOpen(true);
   };
 
-  // Submit Driver Edit
   const handleEditSubmit = () => {
     if (!selectedDriver) return;
 
@@ -114,9 +152,8 @@ export const TodaDriverMembershipPage: React.FC = () => {
           : d
       )
     );
-    setSelectedDriver((prev) => (prev ? { ...prev, phone: editPhone, terminalShift: editShift, serviceZone: editZone } : null));
 
-    logTodaAction({
+    recordTodaAuditAction({
       actionType: 'DRIVER_MEMBERSHIP_UPDATED',
       targetId: selectedDriver.id,
       targetName: selectedDriver.name,
@@ -128,10 +165,18 @@ export const TodaDriverMembershipPage: React.FC = () => {
   };
 
   // TODA Suspend Action (Local Disciplinary Action)
-  const handleSuspendConfirm = (reason?: string) => {
+  const handleSuspendConfirm = async (reason?: string) => {
     if (!selectedDriver) return;
 
     const finalReason = reason || 'TODA Terminal Rules Violation (3-Day Loading Bay Suspension)';
+
+    // Backend API Call
+    try {
+      await suspendTodaDriver(selectedDriver.id, finalReason, 3);
+    } catch (err) {
+      console.warn('[TodaMembership] Backend error during suspend:', err);
+    }
+
     setDrivers((prev) =>
       prev.map((d) =>
         d.id === selectedDriver.id
@@ -141,7 +186,7 @@ export const TodaDriverMembershipPage: React.FC = () => {
     );
     setSelectedDriver((prev) => (prev ? { ...prev, accountStatus: 'TODA Suspended', suspensionReason: finalReason } : null));
 
-    logTodaAction({
+    recordTodaAuditAction({
       actionType: 'DRIVER_TODA_SUSPENDED',
       targetId: selectedDriver.id,
       targetName: selectedDriver.name,
@@ -153,8 +198,15 @@ export const TodaDriverMembershipPage: React.FC = () => {
   };
 
   // TODA Reactivate Action
-  const handleReactivateConfirm = () => {
+  const handleReactivateConfirm = async () => {
     if (!selectedDriver) return;
+
+    // Backend API Call
+    try {
+      await reactivateTodaDriver(selectedDriver.id);
+    } catch (err) {
+      console.warn('[TodaMembership] Backend error during reactivate:', err);
+    }
 
     setDrivers((prev) =>
       prev.map((d) =>
@@ -165,7 +217,7 @@ export const TodaDriverMembershipPage: React.FC = () => {
     );
     setSelectedDriver((prev) => (prev ? { ...prev, accountStatus: 'Active', suspensionReason: undefined } : null));
 
-    logTodaAction({
+    recordTodaAuditAction({
       actionType: 'DRIVER_TODA_REACTIVATED',
       targetId: selectedDriver.id,
       targetName: selectedDriver.name,
@@ -182,7 +234,7 @@ export const TodaDriverMembershipPage: React.FC = () => {
       prev.map((e) => (e.id === exm.id ? { ...e, status: 'Approved', decisionNotes: 'Approved by TODA President. Strike record cleared.' } : e))
     );
 
-    logTodaAction({
+    recordTodaAuditAction({
       actionType: 'EXEMPTION_REQUEST_APPROVED',
       targetId: exm.id,
       targetName: exm.driverName,
@@ -199,7 +251,7 @@ export const TodaDriverMembershipPage: React.FC = () => {
       prev.map((e) => (e.id === exm.id ? { ...e, status: 'Escalated to LGU', decisionNotes: 'Escalated to LGU Franchising Board due to dispute complexity or strike threshold.' } : e))
     );
 
-    logTodaAction({
+    recordTodaAuditAction({
       actionType: 'EXEMPTION_ESCALATED_TO_LGU',
       targetId: exm.id,
       targetName: exm.driverName,

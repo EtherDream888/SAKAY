@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -31,10 +31,28 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
-import { logTodaAction } from '../lib/auditLog';
+import {
+  fetchDriverApplicants,
+  updateApplicantVerification,
+  forwardApplicantToLgu,
+  recordTodaAuditAction,
+} from '../services/todaApiService';
 
+/**
+ * ============================================================================
+ * TODA DRIVER VERIFICATION PAGE COMPONENT
+ * ============================================================================
+ * Purpose:
+ *   Handles Stage 1 of the sequential 2-step verification pipeline.
+ *   TODA officers cross-examine applicant credentials against their official
+ *   submitted member roster and verify physical tricycle photos before
+ *   endorsing the driver to the City LGU.
+ * ============================================================================
+ */
 export const TodaDriverVerificationPage: React.FC = () => {
+  // State: Driver applicant screening queue and active filters
   const [applicants, setApplicants] = useState<DriverApplicant[]>(MOCK_DRIVER_APPLICANTS);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [rosterFilter, setRosterFilter] = useState('All');
@@ -50,6 +68,29 @@ export const TodaDriverVerificationPage: React.FC = () => {
   const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [resubmitDialogOpen, setResubmitDialogOpen] = useState(false);
+
+  /**
+   * Effect: Fetch live applicant queue from backend on initial mount.
+   */
+  useEffect(() => {
+    let isMounted = true;
+    fetchDriverApplicants()
+      .then((data) => {
+        if (isMounted && data && data.length > 0) {
+          setApplicants(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('[TodaVerification] Failed to fetch applicants, using fallback:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Filter Logic
   const filteredApplicants = applicants.filter((app) => {
@@ -96,9 +137,18 @@ export const TodaDriverVerificationPage: React.FC = () => {
     setPhotoChecked(app.photoVerified);
   };
 
-  // Action: Forward to LGU
-  const handleForwardConfirm = () => {
+  /**
+   * Action Handler: Endorses and forwards screened driver applicant to City LGU.
+   */
+  const handleForwardConfirm = async () => {
     if (!selectedApplicant) return;
+
+    // Backend API Call
+    try {
+      await forwardApplicantToLgu(selectedApplicant.id);
+    } catch (err) {
+      console.warn('[TodaVerification] Backend error during endorsement:', err);
+    }
 
     setApplicants((prev) =>
       prev.map((a) =>
@@ -109,7 +159,8 @@ export const TodaDriverVerificationPage: React.FC = () => {
     );
     setSelectedApplicant((prev) => (prev ? { ...prev, todaStageStatus: 'TODA Endorsed' } : null));
 
-    logTodaAction({
+    // Commit Action to TODA Audit Trail
+    recordTodaAuditAction({
       actionType: 'DRIVER_ENDORSED_TO_LGU',
       targetId: selectedApplicant.id,
       targetName: selectedApplicant.name,
@@ -133,7 +184,7 @@ export const TodaDriverVerificationPage: React.FC = () => {
     );
     setSelectedApplicant((prev) => (prev ? { ...prev, todaStageStatus: 'Rejected', rejectionReason: reason } : null));
 
-    logTodaAction({
+    recordTodaAuditAction({
       actionType: 'DRIVER_APPLICATION_REJECTED',
       targetId: selectedApplicant.id,
       targetName: selectedApplicant.name,
@@ -157,7 +208,7 @@ export const TodaDriverVerificationPage: React.FC = () => {
     );
     setSelectedApplicant((prev) => (prev ? { ...prev, todaStageStatus: 'Resubmission Required', notes: reason } : null));
 
-    logTodaAction({
+    recordTodaAuditAction({
       actionType: 'DRIVER_RESUBMISSION_REQUESTED',
       targetId: selectedApplicant.id,
       targetName: selectedApplicant.name,

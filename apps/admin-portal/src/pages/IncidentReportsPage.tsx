@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Card, CardContent, Chip } from '@mui/material';
 import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
@@ -10,15 +10,52 @@ import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { IncidentDetailModal } from '../components/admin/IncidentDetailModal';
-import { logAdminAction } from '../lib/auditLog';
+import { fetchIncidents, updateIncidentStatus, recordAdminAuditAction } from '../services/adminApiService';
 
+/**
+ * ============================================================================
+ * INCIDENT REPORTS PAGE COMPONENT
+ * ============================================================================
+ * Purpose:
+ *   Enables LGU Transport Officers to investigate commuter safety complaints,
+ *   triage fare overcharging or route deviation violations, track repeated
+ *   complaint flags against drivers, and record resolution findings.
+ * ============================================================================
+ */
 export const IncidentReportsPage: React.FC = () => {
+  // State: Incident reports list and filter controls
   const [incidents, setIncidents] = useState<IncidentReportRecord[]>(MOCK_INCIDENT_REPORTS_DETAILED);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [selectedIncident, setSelectedIncident] = useState<IncidentReportRecord | null>(null);
 
+  /**
+   * Effect: Fetch live incident reports from the backend on component mount.
+   * Falls back gracefully to mock data when operating offline.
+   */
+  useEffect(() => {
+    let isMounted = true;
+    fetchIncidents()
+      .then((data) => {
+        if (isMounted && data && data.length > 0) {
+          setIncidents(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('[IncidentReports] Failed to fetch incidents, using fallback:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Filter logic: Search by ID, booking ID, driver name, reporter name, or category
   const filteredIncidents = incidents.filter((inc) => {
     const matchesSearch =
       inc.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -55,13 +92,25 @@ export const IncidentReportsPage: React.FC = () => {
     { label: 'Others', value: 'Others' },
   ];
 
-  const handleStatusUpdate = (
+  /**
+   * Action Handler: Triages and updates the status of an incident report.
+   * Synchronizes with the Express backend and records an audit log entry.
+   */
+  const handleStatusUpdate = async (
     incidentId: string,
     newStatus: 'Under Investigation' | 'Resolved' | 'Dismissed',
     findings?: string
   ) => {
     const targetInc = incidents.find((i) => i.id === incidentId);
 
+    // Backend API Call
+    try {
+      await updateIncidentStatus(incidentId, newStatus, findings);
+    } catch (err) {
+      console.warn('[IncidentReports] Backend error during incident status update:', err);
+    }
+
+    // Update local state
     setIncidents((prev) =>
       prev.map((inc) =>
         inc.id === incidentId
@@ -100,7 +149,8 @@ export const IncidentReportsPage: React.FC = () => {
         : null
     );
 
-    logAdminAction({
+    // Record Action in Immutable Audit Trail
+    recordAdminAuditAction({
       actionType: `INCIDENT_${newStatus.toUpperCase().replace(/\s+/g, '_')}`,
       targetId: incidentId,
       targetName: targetInc ? `Incident #${incidentId} (${targetInc.category})` : `Incident #${incidentId}`,

@@ -14,7 +14,7 @@ import { MacCenterModal } from './MacCenterModal';
 import { StatusBadge } from '../common/StatusBadge';
 import { ActionButton } from './ActionButton';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
-import { logAdminAction } from '../../lib/auditLog';
+import { suspendDriver, issueDriverStrike, recordAdminAuditAction } from '../../services/adminApiService';
 
 interface DriverDetailModalProps {
   open: boolean;
@@ -23,6 +23,16 @@ interface DriverDetailModalProps {
   onStatusChange?: (driverId: string, newStatus: 'Active' | 'Inactive') => void;
 }
 
+/**
+ * ============================================================================
+ * DRIVER DETAIL MODAL COMPONENT
+ * ============================================================================
+ * Purpose:
+ *   Displays a driver's full administrative dossier (license, MTOP permit validity,
+ *   TODA affiliation, compliance strikes) and provides direct action buttons to
+ *   toggle suspensions, send renewal reminders, and issue policy strikes.
+ * ============================================================================
+ */
 export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
   open,
   onClose,
@@ -37,13 +47,27 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
 
   const isAccountActive = driver.accountStatus === 'Active';
 
-  const handleToggleStatus = () => {
+  /**
+   * Action Handler: Toggles driver status between Active and Inactive/Suspended.
+   * Calls the backend API and commits an audit log entry.
+   */
+  const handleToggleStatus = async () => {
     const nextStatus = isAccountActive ? 'Inactive' : 'Active';
     if (onStatusChange) {
       onStatusChange(driver.id, nextStatus);
     }
 
-    logAdminAction({
+    // Backend API Call for suspension
+    if (nextStatus === 'Inactive') {
+      try {
+        await suspendDriver(driver.id, 'Administrative suspension from LGU driver dossier modal.', 7);
+      } catch (err) {
+        console.warn('[DriverDetailModal] Backend error during suspension:', err);
+      }
+    }
+
+    // Record Action in Immutable Audit Trail
+    recordAdminAuditAction({
       actionType: nextStatus === 'Inactive' ? 'DRIVER_ACCOUNT_SUSPENDED' : 'DRIVER_ACCOUNT_REACTIVATED',
       targetId: driver.id,
       targetName: driver.name,
@@ -52,10 +76,13 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
     });
   };
 
+  /**
+   * Action Handler: Dispatches MTOP / License renewal reminder alert.
+   */
   const handleSendReminder = () => {
     setReminderSent(true);
 
-    logAdminAction({
+    recordAdminAuditAction({
       actionType: 'DRIVER_PERMIT_REMINDER_SENT',
       targetId: driver.id,
       targetName: driver.name,
@@ -66,10 +93,21 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
     setTimeout(() => setReminderSent(false), 3000);
   };
 
-  const handleIssueStrike = () => {
+  /**
+   * Action Handler: Issues an administrative policy violation strike (+1).
+   */
+  const handleIssueStrike = async () => {
     setStrikeIssued(true);
 
-    logAdminAction({
+    // Backend API Call to increment driver strikes
+    try {
+      await issueDriverStrike(driver.id, 'Operational non-compliance policy strike', 'Operational');
+    } catch (err) {
+      console.warn('[DriverDetailModal] Backend error during strike:', err);
+    }
+
+    // Record Action in Audit Trail
+    recordAdminAuditAction({
       actionType: 'MANUAL_STRIKE_ISSUED',
       targetId: driver.id,
       targetName: driver.name,

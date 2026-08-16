@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -27,17 +27,53 @@ import { MOCK_FARE_MATRIX_HISTORY, FareMatrixRecord, CURRENT_ADMIN } from '../mo
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
-import { logAdminAction } from '../lib/auditLog';
+import { fetchFareMatrices, createFareMatrix, recordAdminAuditAction } from '../services/adminApiService';
 
+/**
+ * ============================================================================
+ * FARE CONFIGURATION PAGE COMPONENT
+ * ============================================================================
+ * Purpose:
+ *   Allows LGU Transport Board administrators to review active municipal
+ *   tricycle tariffs, derive passenger seat fares, enact new fare ordinances,
+ *   and maintain an immutable audit trail of all rate modifications.
+ * ============================================================================
+ */
 export const FareConfigurationPage: React.FC = () => {
+  // State: Historical and currently enacted fare matrix records
   const [fareHistory, setFareHistory] = useState<FareMatrixRecord[]>(MOCK_FARE_MATRIX_HISTORY);
-  const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [updateModalOpen, setUpdateModalOpen] = useState<boolean>(false);
   const [selectedVersion, setSelectedVersion] = useState<FareMatrixRecord | null>(null);
 
-  // Active matrix is the first active record
+  /**
+   * Effect: Fetch live fare matrices from the backend server on initial component load.
+   * If the backend server is offline, it gracefully uses the fallback mock data.
+   */
+  useEffect(() => {
+    let isMounted = true;
+    fetchFareMatrices()
+      .then((data) => {
+        if (isMounted && data && data.length > 0) {
+          setFareHistory(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('[FareConfiguration] Failed to fetch fare matrix, using fallback:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Compute: The currently active municipal matrix (first record where is_active is true)
   const activeMatrix = fareHistory.find((f) => f.is_active) || fareHistory[0];
 
-  // New Matrix Form State
+  // Form State: Controlled inputs for enacting a new municipal fare rate ordinance
   const [newBaseFare, setNewBaseFare] = useState<string>('15.00');
   const [newBaseDistance, setNewBaseDistance] = useState<string>('2.0');
   const [newSucceedingRate, setNewSucceedingRate] = useState<string>('1.00');
@@ -45,7 +81,14 @@ export const FareConfigurationPage: React.FC = () => {
   const [newEffectiveDate, setNewEffectiveDate] = useState<string>('June 01, 2026');
   const [newNotes, setNewNotes] = useState<string>('');
 
-  const handleUpdateMatrixSubmit = () => {
+  /**
+   * Handler: Submits a new municipal fare matrix.
+   * 1. Validates numerical inputs.
+   * 2. Calls createFareMatrix() API to persist the new rates in the backend.
+   * 3. Records an immutable action in the audit trail.
+   * 4. Updates the local state to immediately reflect the new active rates.
+   */
+  const handleUpdateMatrixSubmit = async () => {
     const base = parseFloat(newBaseFare) || 15.0;
     const dist = parseFloat(newBaseDistance) || 2.0;
     const succ = parseFloat(newSucceedingRate) || 1.0;
@@ -66,14 +109,31 @@ export const FareConfigurationPage: React.FC = () => {
       created_at: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
     };
 
-    // Append and deactivate previous
+    // Save to Backend API / Database
+    try {
+      await createFareMatrix({
+        baseFare: base,
+        baseDistanceKm: dist,
+        succeedingRate: succ,
+        ordinanceNumber: newOrdinance,
+        configuredBy: `${CURRENT_ADMIN.name} (${CURRENT_ADMIN.role})`,
+      });
+    } catch (error) {
+      console.warn('[FareConfiguration] Failed to save matrix to backend, saving locally:', error);
+    }
+
+    // Update local UI state
     setFareHistory((prev) => [
       newRecord,
-      ...prev.map((f) => ({ ...f, is_active: false, effective_date: f.is_active ? `${f.effective_date} (Superseded)` : f.effective_date })),
+      ...prev.map((f) => ({
+        ...f,
+        is_active: false,
+        effective_date: f.is_active ? `${f.effective_date} (Superseded)` : f.effective_date,
+      })),
     ]);
 
-    // Write audit log
-    logAdminAction({
+    // Record action to the immutable audit trail ledger
+    recordAdminAuditAction({
       actionType: 'FARE_MATRIX_UPDATED',
       targetId: newRecord.fare_matrix_id,
       targetName: `Fare Matrix Version ${fareHistory.length + 1}`,

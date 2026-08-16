@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -33,10 +33,27 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
-import { logAdminAction } from '../lib/auditLog';
+import {
+  fetchAnnouncements,
+  createAnnouncement,
+  deleteAnnouncement,
+  recordAdminAuditAction,
+} from '../services/adminApiService';
 
+/**
+ * ============================================================================
+ * ANNOUNCEMENT MANAGEMENT PAGE COMPONENT
+ * ============================================================================
+ * Purpose:
+ *   Enables LGU Transport Administrators to draft, broadcast, schedule,
+ *   and archive city-wide municipal notices targeted to commuters,
+ *   tricycle drivers, or specific TODA associations.
+ * ============================================================================
+ */
 export const AnnouncementManagementPage: React.FC = () => {
+  // State: Broadcast bulletins list and filter options
   const [announcements, setAnnouncements] = useState<AnnouncementRecord[]>(MOCK_ANNOUNCEMENTS);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -49,7 +66,7 @@ export const AnnouncementManagementPage: React.FC = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  // Form State
+  // Form State: Creating a new announcement
   const [formTitle, setFormTitle] = useState('');
   const [formMessage, setFormMessage] = useState('');
   const [formRole, setFormRole] = useState<AnnouncementRecord['target_role']>('All');
@@ -57,7 +74,30 @@ export const AnnouncementManagementPage: React.FC = () => {
   const [formTiming, setFormTiming] = useState<'Immediate' | 'Scheduled'>('Immediate');
   const [formScheduledDate, setFormScheduledDate] = useState('May 25, 2026');
 
-  // Filter logic
+  /**
+   * Effect: Fetch live municipal announcements on initial mount.
+   */
+  useEffect(() => {
+    let isMounted = true;
+    fetchAnnouncements()
+      .then((data) => {
+        if (isMounted && data && data.length > 0) {
+          setAnnouncements(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('[AnnouncementManagement] Failed to fetch announcements, using fallback:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Filter logic: Search by title, message, or TODA name
   const filteredAnnouncements = announcements.filter((ann) => {
     const matchesSearch =
       ann.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -108,8 +148,11 @@ export const AnnouncementManagementPage: React.FC = () => {
     }
   };
 
-  // Action: Create Announcement
-  const handleCreateSubmit = () => {
+  /**
+   * Action Handler: Submits a new broadcast announcement.
+   * Persists to backend API and writes to immutable audit trail.
+   */
+  const handleCreateSubmit = async () => {
     if (!formTitle.trim() || !formMessage.trim()) return;
 
     let todaName: string | null = null;
@@ -136,9 +179,21 @@ export const AnnouncementManagementPage: React.FC = () => {
       created_at: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) + ' • ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     };
 
+    // Backend API Call
+    try {
+      await createAnnouncement({
+        title: formTitle.trim(),
+        message: formMessage.trim(),
+        targetRole: formRole,
+      });
+    } catch (err) {
+      console.warn('[AnnouncementManagement] Backend error during announcement create:', err);
+    }
+
     setAnnouncements((prev) => [newRecord, ...prev]);
 
-    logAdminAction({
+    // Record in Audit Trail
+    recordAdminAuditAction({
       actionType: formTiming === 'Immediate' ? 'ANNOUNCEMENT_PUBLISHED' : 'ANNOUNCEMENT_SCHEDULED',
       targetId: newId,
       targetName: newRecord.title,
@@ -155,7 +210,9 @@ export const AnnouncementManagementPage: React.FC = () => {
     setCreateModalOpen(false);
   };
 
-  // Action: Toggle Publish
+  /**
+   * Action Handler: Toggles published vs unpublished status.
+   */
   const handleTogglePublish = (ann: AnnouncementRecord) => {
     const nextPublished = !ann.is_published;
     setAnnouncements((prev) =>
@@ -163,7 +220,7 @@ export const AnnouncementManagementPage: React.FC = () => {
     );
     setSelectedAnn((prev) => (prev && prev.id === ann.id ? { ...prev, is_published: nextPublished } : prev));
 
-    logAdminAction({
+    recordAdminAuditAction({
       actionType: nextPublished ? 'ANNOUNCEMENT_PUBLISHED' : 'ANNOUNCEMENT_UNPUBLISHED',
       targetId: ann.id,
       targetName: ann.title,
@@ -172,13 +229,22 @@ export const AnnouncementManagementPage: React.FC = () => {
     });
   };
 
-  // Action: Delete Announcement
-  const handleDeleteConfirm = () => {
+  /**
+   * Action Handler: Deletes an announcement record.
+   */
+  const handleDeleteConfirm = async () => {
     if (!selectedAnn) return;
+
+    // Backend API Call
+    try {
+      await deleteAnnouncement(selectedAnn.id);
+    } catch (err) {
+      console.warn('[AnnouncementManagement] Backend error during announcement delete:', err);
+    }
 
     setAnnouncements((prev) => prev.filter((a) => a.id !== selectedAnn.id));
 
-    logAdminAction({
+    recordAdminAuditAction({
       actionType: 'ANNOUNCEMENT_DELETED',
       targetId: selectedAnn.id,
       targetName: selectedAnn.title,

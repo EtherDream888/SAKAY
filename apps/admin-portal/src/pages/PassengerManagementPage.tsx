@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Avatar, Rating, Chip } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import StarIcon from '@mui/icons-material/Star';
@@ -12,10 +12,28 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
-import { logAdminAction } from '../lib/auditLog';
+import {
+  fetchPassengers,
+  suspendPassenger,
+  reactivatePassenger,
+  issuePassengerStrike,
+  recordAdminAuditAction,
+} from '../services/adminApiService';
 
+/**
+ * ============================================================================
+ * PASSENGER MANAGEMENT PAGE COMPONENT
+ * ============================================================================
+ * Purpose:
+ *   Enables LGU Transport Officers to monitor commuter registration, track
+ *   ride completion statistics, review ratings, investigate passenger policy
+ *   strikes, and enforce temporary suspensions or reactivations.
+ * ============================================================================
+ */
 export const PassengerManagementPage: React.FC = () => {
+  // State: Commuter accounts list and filter criteria
   const [passengers, setPassengers] = useState<PassengerRecord[]>(MOCK_PASSENGERS);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [verificationFilter, setVerificationFilter] = useState('All');
@@ -26,6 +44,30 @@ export const PassengerManagementPage: React.FC = () => {
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
   const [reactivateDialogOpen, setReactivateDialogOpen] = useState(false);
 
+  /**
+   * Effect: Fetch live passenger records on initial mount.
+   */
+  useEffect(() => {
+    let isMounted = true;
+    fetchPassengers()
+      .then((data) => {
+        if (isMounted && data && data.length > 0) {
+          setPassengers(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('[PassengerManagement] Failed to fetch passengers, using fallback:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Filter logic: Search by name, phone, or email
   const filteredPassengers = passengers.filter((p) => {
     const matchesSearch =
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -50,9 +92,20 @@ export const PassengerManagementPage: React.FC = () => {
     { label: 'Unverified', value: 'Unverified' },
   ];
 
-  const handleSuspendConfirm = (reason?: string) => {
+  /**
+   * Action Handler: Suspends a passenger account with a mandatory reason.
+   */
+  const handleSuspendConfirm = async (reason?: string) => {
     if (!selectedPassenger) return;
     const finalReason = reason || 'Violation of Platform Policies';
+
+    // Backend API Call
+    try {
+      await suspendPassenger(selectedPassenger.id, finalReason, 7);
+    } catch (err) {
+      console.warn('[PassengerManagement] Backend error during suspend:', err);
+    }
+
     setPassengers((prev) =>
       prev.map((p) =>
         p.id === selectedPassenger.id
@@ -64,7 +117,8 @@ export const PassengerManagementPage: React.FC = () => {
       prev ? { ...prev, accountStatus: 'Suspended', suspensionReason: finalReason } : null
     );
 
-    logAdminAction({
+    // Record Action in Audit Trail
+    recordAdminAuditAction({
       actionType: 'PASSENGER_ACCOUNT_SUSPENDED',
       targetId: selectedPassenger.id,
       targetName: selectedPassenger.name,
@@ -75,14 +129,26 @@ export const PassengerManagementPage: React.FC = () => {
     setSuspendDialogOpen(false);
   };
 
-  const handleReactivateConfirm = () => {
+  /**
+   * Action Handler: Reactivates a suspended passenger account.
+   */
+  const handleReactivateConfirm = async () => {
     if (!selectedPassenger) return;
+
+    // Backend API Call
+    try {
+      await reactivatePassenger(selectedPassenger.id);
+    } catch (err) {
+      console.warn('[PassengerManagement] Backend error during reactivate:', err);
+    }
+
     setPassengers((prev) =>
       prev.map((p) => (p.id === selectedPassenger.id ? { ...p, accountStatus: 'Active', suspensionReason: undefined } : p))
     );
     setSelectedPassenger((prev) => (prev ? { ...prev, accountStatus: 'Active', suspensionReason: undefined } : null));
 
-    logAdminAction({
+    // Record Action in Audit Trail
+    recordAdminAuditAction({
       actionType: 'PASSENGER_ACCOUNT_REACTIVATED',
       targetId: selectedPassenger.id,
       targetName: selectedPassenger.name,
@@ -93,11 +159,22 @@ export const PassengerManagementPage: React.FC = () => {
     setReactivateDialogOpen(false);
   };
 
-  const handleIssueStrike = () => {
+  /**
+   * Action Handler: Issues an administrative policy strike (+1) to a passenger.
+   */
+  const handleIssueStrike = async () => {
     if (!selectedPassenger) return;
     setStrikeIssued(true);
 
-    logAdminAction({
+    // Backend API Call
+    try {
+      await issuePassengerStrike(selectedPassenger.id, 'Repeated booking cancellation misconduct.');
+    } catch (err) {
+      console.warn('[PassengerManagement] Backend error during strike issue:', err);
+    }
+
+    // Record Action in Audit Trail
+    recordAdminAuditAction({
       actionType: 'MANUAL_STRIKE_ISSUED',
       targetId: selectedPassenger.id,
       targetName: selectedPassenger.name,

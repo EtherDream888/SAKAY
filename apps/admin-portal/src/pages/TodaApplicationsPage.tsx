@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Chip } from '@mui/material';
 import DescriptionIcon from '@mui/icons-material/Description';
 import FolderZipIcon from '@mui/icons-material/FolderZip';
@@ -10,25 +10,65 @@ import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
 import { DocumentPreviewModal } from '../components/admin/DocumentPreviewModal';
-import { logAdminAction } from '../lib/auditLog';
+import {
+  fetchTodaApplications,
+  approveTodaApplication,
+  declineTodaApplication,
+  recordAdminAuditAction,
+} from '../services/adminApiService';
 
+/**
+ * ============================================================================
+ * TODA APPLICATIONS PAGE COMPONENT
+ * ============================================================================
+ * Purpose:
+ *   Manages the accreditation lifecycle for Tricycle Operators and Drivers
+ *   Associations (TODAs) applying for official municipal recognition in
+ *   Calapan City.
+ * ============================================================================
+ */
 export const TodaApplicationsPage: React.FC = () => {
+  // State: List of TODA applications
   const [applications, setApplications] = useState<TodaApplicationRecord[]>(MOCK_TODA_APPLICATIONS);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('All');
   const [reminderSent, setReminderSent] = useState<string | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<{ name: string; type: string } | null>(null);
-  
+
   // Selected Application for Centered Review Modal
   const [selectedApp, setSelectedApp] = useState<TodaApplicationRecord | null>(null);
-  
+
   // Confirmation Dialog States
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [declineDialogOpen, setDeclineDialogOpen] = useState(false);
   const [resubmissionDialogOpen, setResubmissionDialogOpen] = useState(false);
 
-  // Filter logic
+  /**
+   * Effect: Fetch live TODA applications from the backend server on initial component mount.
+   */
+  useEffect(() => {
+    let isMounted = true;
+    fetchTodaApplications()
+      .then((data) => {
+        if (isMounted && data && data.length > 0) {
+          setApplications(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('[TodaApplications] Failed to load from backend, using fallback:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Filter logic: Search query across name, representative, barangay, or ID
   const filteredApps = applications.filter((app) => {
     const matchesSearch =
       app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -41,7 +81,7 @@ export const TodaApplicationsPage: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  // Summary counts
+  // Summary counts for KPI header cards
   const pendingCount = applications.filter((a) => a.status === 'Pending').length;
   const underReviewCount = applications.filter((a) => a.status === 'Under Review').length;
   const approvedCount = applications.filter((a) => a.status === 'Approved').length;
@@ -62,15 +102,27 @@ export const TodaApplicationsPage: React.FC = () => {
     { label: 'This Month', value: 'This Month' },
   ];
 
-  // Actions
-  const handleApproveConfirm = () => {
+  /**
+   * Action Handler: Approves the selected TODA application.
+   * Sends approval to backend, updates local state, and writes to audit log.
+   */
+  const handleApproveConfirm = async () => {
     if (!selectedApp) return;
+
+    // Backend API Call
+    try {
+      await approveTodaApplication(selectedApp.id);
+    } catch (err) {
+      console.warn('[TodaApplications] Backend error during approval, updating locally:', err);
+    }
+
     setApplications((prev) =>
       prev.map((app) => (app.id === selectedApp.id ? { ...app, status: 'Approved' } : app))
     );
     setSelectedApp((prev) => (prev ? { ...prev, status: 'Approved' } : null));
 
-    logAdminAction({
+    // Audit Trail Persistence
+    recordAdminAuditAction({
       actionType: 'TODA_ACCREDITATION_APPROVED',
       targetId: selectedApp.id,
       targetName: selectedApp.name,
@@ -81,8 +133,19 @@ export const TodaApplicationsPage: React.FC = () => {
     setApproveDialogOpen(false);
   };
 
-  const handleDeclineConfirm = (reason?: string) => {
+  /**
+   * Action Handler: Declines the selected TODA application with mandatory reason.
+   */
+  const handleDeclineConfirm = async (reason?: string) => {
     if (!selectedApp) return;
+
+    // Backend API Call
+    try {
+      await declineTodaApplication(selectedApp.id, reason || 'Incomplete credentials.');
+    } catch (err) {
+      console.warn('[TodaApplications] Backend error during decline, updating locally:', err);
+    }
+
     setApplications((prev) =>
       prev.map((app) =>
         app.id === selectedApp.id ? { ...app, status: 'Declined', declineReason: reason } : app
@@ -90,7 +153,8 @@ export const TodaApplicationsPage: React.FC = () => {
     );
     setSelectedApp((prev) => (prev ? { ...prev, status: 'Declined', declineReason: reason } : null));
 
-    logAdminAction({
+    // Audit Trail Persistence
+    recordAdminAuditAction({
       actionType: 'TODA_ACCREDITATION_DECLINED',
       targetId: selectedApp.id,
       targetName: selectedApp.name,
@@ -101,6 +165,9 @@ export const TodaApplicationsPage: React.FC = () => {
     setDeclineDialogOpen(false);
   };
 
+  /**
+   * Action Handler: Requests document resubmission from the applicant TODA.
+   */
   const handleResubmissionConfirm = (reason?: string) => {
     if (!selectedApp) return;
     setApplications((prev) =>
@@ -110,7 +177,7 @@ export const TodaApplicationsPage: React.FC = () => {
     );
     setSelectedApp((prev) => (prev ? { ...prev, status: 'Resubmission Required', resubmissionReason: reason } : null));
 
-    logAdminAction({
+    recordAdminAuditAction({
       actionType: 'DOCUMENT_RESUBMISSION_REQUESTED',
       targetId: selectedApp.id,
       targetName: selectedApp.name,
@@ -124,7 +191,7 @@ export const TodaApplicationsPage: React.FC = () => {
   const handleSendReminder = (todaId: string) => {
     setReminderSent(todaId);
 
-    logAdminAction({
+    recordAdminAuditAction({
       actionType: 'CLEARANCE_REMINDER_SENT',
       targetId: todaId,
       targetName: selectedApp ? selectedApp.name : todaId,

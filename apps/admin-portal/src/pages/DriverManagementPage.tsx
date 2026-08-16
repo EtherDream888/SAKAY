@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Avatar, Chip } from '@mui/material';
 
 import { MOCK_DRIVERS, DriverRecord } from '../mockData/adminData';
@@ -6,14 +6,52 @@ import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { DriverDetailModal } from '../components/admin/DriverDetailModal';
+import { fetchDrivers } from '../services/adminApiService';
 
+/**
+ * ============================================================================
+ * DRIVER MANAGEMENT PAGE COMPONENT
+ * ============================================================================
+ * Purpose:
+ *   Allows LGU Transport Officers to review driver credentials, monitor
+ *   accreditation statuses, track online sessions, investigate policy strikes,
+ *   and perform administrative suspensions.
+ * ============================================================================
+ */
 export const DriverManagementPage: React.FC = () => {
+  // State: Driver roster and active filters
   const [drivers, setDrivers] = useState<DriverRecord[]>(MOCK_DRIVERS);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [verificationFilter, setVerificationFilter] = useState('All');
   const [onlineFilter, setOnlineFilter] = useState('All');
   const [selectedDriver, setSelectedDriver] = useState<DriverRecord | null>(null);
 
+  /**
+   * Effect: Fetch live driver records from the backend server on initial mount.
+   * Gracefully falls back to mock data if the backend is not running.
+   */
+  useEffect(() => {
+    let isMounted = true;
+    fetchDrivers()
+      .then((data) => {
+        if (isMounted && data && data.length > 0) {
+          setDrivers(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('[DriverManagement] Failed to fetch drivers, using fallback:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Filter logic: Search by name, license number, MTOP operator, plate number, or TODA
   const filteredDrivers = drivers.filter((d) => {
     const matchesSearch =
       d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -42,6 +80,9 @@ export const DriverManagementPage: React.FC = () => {
     { label: 'Offline', value: 'Offline' },
   ];
 
+  /**
+   * Handler: Updates a driver's account status (Active / Inactive) in local state.
+   */
   const handleStatusChange = (driverId: string, newStatus: 'Active' | 'Inactive') => {
     setDrivers((prev) =>
       prev.map((d) => (d.id === driverId ? { ...d, accountStatus: newStatus } : d))
