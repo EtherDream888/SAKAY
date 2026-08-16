@@ -16,12 +16,13 @@ export interface FilterSelectProps {
   onChange: (value: string) => void;
 }
 
-interface FilterToolbarProps {
+export interface FilterToolbarProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   searchPlaceholder?: string;
   selectFilters?: FilterSelectProps[];
   onResetFilters?: () => void;
+  disableMarginBottom?: boolean;
 }
 
 export const FilterToolbar: React.FC<FilterToolbarProps> = ({
@@ -30,6 +31,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
   searchPlaceholder = 'Search records...',
   selectFilters = [],
   onResetFilters,
+  disableMarginBottom = false,
 }) => {
   return (
     <Box
@@ -44,7 +46,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
         border: '1px solid var(--mac-border-color)',
         padding: '14px 18px',
         boxShadow: 'var(--mac-shadow-subtle)',
-        mb: 3,
+        mb: disableMarginBottom ? 0 : 3,
       }}
     >
       {/* Apple-style Search Field */}

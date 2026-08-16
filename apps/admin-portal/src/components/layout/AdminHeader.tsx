@@ -1,14 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, IconButton, Badge, Menu, MenuItem, Chip } from '@mui/material';
+import { Box, Typography, Button, IconButton, Badge, Menu, MenuItem } from '@mui/material';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 
 import { NotificationPopover } from '../popovers/NotificationPopover';
-import { DateCalendarPopover } from '../popovers/DateCalendarPopover';
 import { MOCK_NOTIFICATIONS } from '../../mockData/dashboardData';
 import { CURRENT_ADMIN, MOCK_LGU_ADMINS } from '../../mockData/adminData';
 import { NotificationItem, LguAdminRole } from '../../types/admin';
@@ -25,8 +23,6 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationItem[]>(MOCK_NOTIFICATIONS);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [dateOpen, setDateOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date(2026, 4, 12)); // May 12, 2026
 
   // Dev-only Role Switcher State
   const [currentRole, setCurrentRole] = useState<LguAdminRole>(CURRENT_ADMIN.role);
@@ -48,13 +44,6 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
 
   const handleMarkAllAsRead = () => {
     setNotifications(notifications.map((n) => ({ ...n, unread: false })));
-  };
-
-  const formatDateLabel = (date: Date) => {
-    const month = date.toLocaleString('en-US', { month: 'short' });
-    const day = date.getDate();
-    const year = date.getFullYear();
-    return `${month} ${day}, ${year}`;
   };
 
   return (
@@ -103,7 +92,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         )}
       </Box>
 
-      {/* Right: macOS Toolbar Controls with Increased Up/Down Padding and Regular (Non-Bold) Font Weight */}
+      {/* Right: Global Sticky Header Controls */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, position: 'relative' }}>
         {/* Notifications Icon Button */}
         <Box sx={{ position: 'relative' }}>
@@ -238,42 +227,6 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         >
           Tulong
         </Button>
-
-        {/* Date Selector Button */}
-        <Box sx={{ position: 'relative' }}>
-          <Button
-            onClick={() => setDateOpen(!dateOpen)}
-            startIcon={<CalendarTodayIcon fontSize="small" sx={{ fontSize: 16 }} />}
-            endIcon={<KeyboardArrowDownIcon fontSize="small" sx={{ fontSize: 18 }} />}
-            sx={{
-              height: 42,
-              padding: '0 20px',
-              borderRadius: '10px',
-              border: '1px solid var(--mac-border-color)',
-              backgroundColor: '#FFFFFF',
-              color: 'var(--mac-text-primary)',
-              fontSize: '14px',
-              fontWeight: 400,
-              textTransform: 'none',
-              boxShadow: 'var(--mac-shadow-subtle)',
-              transition: 'var(--mac-transition-fast)',
-              '&:hover': {
-                backgroundColor: 'var(--sakay-orange-soft)',
-                color: 'var(--sakay-orange)',
-                borderColor: 'var(--sakay-orange-border)',
-              },
-            }}
-          >
-            {formatDateLabel(selectedDate)}
-          </Button>
-
-          <DateCalendarPopover
-            open={dateOpen}
-            onClose={() => setDateOpen(false)}
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-          />
-        </Box>
       </Box>
     </Box>
   );

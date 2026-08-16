@@ -257,8 +257,8 @@ export const AccountManagementPage: React.FC = () => {
       </Box>
 
       {/* 2. Filter Toolbar with "+ Add Admin" Action */}
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'center' }, justifyContent: 'space-between', gap: 2, mb: 3 }}>
-        <Box sx={{ flex: 1 }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'stretch' }, justifyContent: 'space-between', gap: 2, mb: 3 }}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <FilterToolbar
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
@@ -284,6 +284,7 @@ export const AccountManagementPage: React.FC = () => {
               setRoleFilter('All');
               setStatusFilter('All');
             }}
+            disableMarginBottom
           />
         </Box>
 
@@ -292,9 +293,10 @@ export const AccountManagementPage: React.FC = () => {
           startIcon={<PersonAddIcon fontSize="small" />}
           variant="contained"
           sx={{
-            height: 44,
-            padding: '0 22px',
-            borderRadius: '10px',
+            height: 'auto',
+            alignSelf: 'stretch',
+            padding: '0 24px',
+            borderRadius: 'var(--mac-radius-lg)',
             textTransform: 'none',
             fontSize: '14px',
             fontWeight: 600,
@@ -303,6 +305,10 @@ export const AccountManagementPage: React.FC = () => {
             whiteSpace: 'nowrap',
             boxShadow: 'var(--mac-shadow-subtle)',
             flexShrink: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'var(--mac-transition-fast)',
             '&:hover': {
               backgroundColor: 'var(--sakay-orange-hover)',
             },

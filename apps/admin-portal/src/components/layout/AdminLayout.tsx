@@ -19,7 +19,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, pageTitle, p
         width: '100vw',
         height: '100vh',
         overflow: 'hidden',
-        background: 'linear-gradient(180deg, rgba(245,247,250,0.94) 0%, rgba(236,240,245,0.9) 100%)',
+        backgroundColor: '#FFF8F2',
       }}
     >
       <AdminSidebar
@@ -35,7 +35,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, pageTitle, p
           height: '100vh',
           minWidth: 0,
           overflow: 'hidden',
-          background: 'linear-gradient(180deg, rgba(255,255,255,0.38) 0%, rgba(245,247,250,0.2) 100%)',
+          backgroundColor: '#FFF8F2',
         }}
       >
         <AdminHeader pageTitle={pageTitle} pageSubtitle={pageSubtitle} />
@@ -47,7 +47,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, pageTitle, p
             overflowY: 'auto',
             overflowX: 'hidden',
             padding: { xs: '20px', md: '28px', lg: '32px' },
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.04))',
+            backgroundColor: '#FFF8F2',
           }}
         >
           {children}
