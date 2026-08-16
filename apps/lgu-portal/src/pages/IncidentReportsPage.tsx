@@ -295,9 +295,7 @@ export const IncidentReportsPage: React.FC = () => {
               filteredIncidents.map((incident) => (
                 <TableRow
                   key={incident.id}
-                  onClick={() => setSelectedIncident(incident)}
                   sx={{
-                    cursor: 'pointer',
                     transition: 'var(--mac-transition-fast)',
                     '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' },
                   }}

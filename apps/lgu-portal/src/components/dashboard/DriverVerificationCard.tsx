@@ -46,34 +46,47 @@ export const DriverVerificationCard: React.FC = () => {
     >
       {/* Header & Subtitle Block */}
       <Box sx={{ mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography sx={{ fontSize: '17px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-            Driver Verification Status
-          </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <Box>
+            <Typography sx={{ fontSize: '17px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+              Driver Verification Status
+            </Typography>
+            <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', mt: '3px' }}>
+              Current verification status of registered drivers.
+            </Typography>
+          </Box>
+
           <Button
             onClick={() => navigate('/drivers')}
             size="small"
             sx={{
-              fontSize: '13px',
-              textTransform: 'none',
-              color: 'var(--mac-text-muted)',
+              height: 38,
+              padding: '0 18px',
+              borderRadius: '9px',
+              backgroundColor: '#FFFFFF',
+              color: 'var(--mac-text-primary)',
+              fontSize: '14px',
               fontWeight: 500,
-              padding: 0,
-              minWidth: 'auto',
-              '&:hover': { color: 'var(--sakay-orange)', backgroundColor: 'transparent' },
+              textTransform: 'none',
+              border: '1px solid var(--mac-border-color)',
+              boxShadow: 'var(--mac-shadow-subtle)',
+              transition: 'var(--mac-transition-fast)',
+              flexShrink: 0,
+              '&:hover': {
+                backgroundColor: 'var(--sakay-orange-soft)',
+                color: 'var(--sakay-orange)',
+                borderColor: 'var(--sakay-orange-border)',
+              },
             }}
           >
             View all
           </Button>
         </Box>
-        <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', mt: '3px' }}>
-          Current verification status of registered drivers.
-        </Typography>
       </Box>
 
       {/* Horizontal Layout: Donut on Left, Interactive Legend Stack on Right */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: 1, gap: 3, pt: 1 }}>
-        {/* Left: Donut Chart Surface (165px box with zero hover clipping) */}
+        {/* Left: Donut Chart Surface */}
         <Box
           sx={{
             position: 'relative',

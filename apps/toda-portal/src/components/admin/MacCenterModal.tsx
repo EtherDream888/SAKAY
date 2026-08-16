@@ -68,7 +68,7 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
       {/* Modal Header */}
       <DialogTitle
         sx={{
-          padding: '24px 28px 18px',
+          padding: '24px 28px 20px',
           borderBottom: '1px solid var(--mac-border-color)',
           display: 'flex',
           alignItems: 'flex-start',
@@ -77,13 +77,13 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
       >
         <Box sx={{ pr: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: subtitle ? '4px' : 0 }}>
-            <Typography sx={{ fontSize: '18px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+            <Typography sx={{ fontSize: '20px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
               {title}
             </Typography>
             {badge}
           </Box>
           {subtitle && (
-            <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', fontWeight: 400 }}>
+            <Typography sx={{ fontSize: '14.5px', color: 'var(--mac-text-muted)', fontWeight: 400 }}>
               {subtitle}
             </Typography>
           )}
@@ -105,8 +105,8 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
         </IconButton>
       </DialogTitle>
 
-      {/* Modal Content */}
-      <DialogContent sx={{ padding: '24px 28px' }}>
+      {/* Modal Content with Explicit Top Padding */}
+      <DialogContent sx={{ padding: '24px 28px 28px', pt: '24px !important' }}>
         {children}
       </DialogContent>
 
@@ -114,7 +114,7 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
       {(primaryActionLabel || secondaryActionLabel) && (
         <DialogActions
           sx={{
-            padding: '16px 28px 24px',
+            padding: '18px 28px 24px',
             borderTop: '1px solid var(--mac-border-color)',
             backgroundColor: '#FAFAFC',
             gap: 1.5,
@@ -125,12 +125,12 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
               variant="outlined"
               onClick={onSecondaryAction || onClose}
               sx={{
-                height: 38,
-                padding: '0 18px',
+                height: 40,
+                padding: '0 20px',
                 borderRadius: '8px',
                 borderColor: 'var(--mac-border-color)',
                 color: 'var(--mac-text-secondary)',
-                fontSize: '13.5px',
+                fontSize: '14.5px',
                 fontWeight: 500,
                 textTransform: 'none',
                 backgroundColor: '#FFFFFF',
@@ -151,10 +151,10 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
               onClick={onPrimaryAction}
               color={primaryActionColor}
               sx={{
-                height: 38,
-                padding: '0 20px',
+                height: 40,
+                padding: '0 22px',
                 borderRadius: '8px',
-                fontSize: '13.5px',
+                fontSize: '14.5px',
                 fontWeight: 600,
                 textTransform: 'none',
                 backgroundColor:

@@ -662,9 +662,7 @@ export const LiveTripsPage: React.FC = () => {
                 filteredTrips.map((trip) => (
                   <TableRow
                     key={trip.id}
-                    onClick={() => setSelectedTrip(trip)}
                     sx={{
-                      cursor: 'pointer',
                       transition: 'var(--mac-transition-fast)',
                       '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' },
                     }}

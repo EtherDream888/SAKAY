@@ -11,13 +11,13 @@ import {
   Paper,
   Avatar,
   Chip,
+  Button,
 } from '@mui/material';
-import SecurityIcon from '@mui/icons-material/Security';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 
 import { TodaAuditLog } from '../types/toda';
 import { CURRENT_TODA_PROFILE } from '../mockData/todaData';
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
-import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { getAuditLogs, subscribeAuditLogs } from '../lib/auditLog';
 
@@ -25,6 +25,7 @@ export const TodaAuditLogsPage: React.FC = () => {
   const [logs, setLogs] = useState<TodaAuditLog[]>(getAuditLogs());
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [dateFilter, setDateFilter] = useState('All');
   const [selectedLog, setSelectedLog] = useState<TodaAuditLog | null>(null);
 
   useEffect(() => {
@@ -36,6 +37,7 @@ export const TodaAuditLogsPage: React.FC = () => {
     };
   }, []);
 
+  // Filter Logic with Date Filter
   const filteredLogs = logs.filter((log) => {
     const matchesSearch =
       log.action_type.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -45,7 +47,18 @@ export const TodaAuditLogsPage: React.FC = () => {
       log.log_id.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesCategory = categoryFilter === 'All' || log.category === categoryFilter;
-    return matchesSearch && matchesCategory;
+
+    let matchesDate = true;
+    if (dateFilter === 'Today') {
+      const todayStr = new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+      matchesDate = log.performed_at.includes(todayStr) || log.performed_at.includes('May 12, 2026');
+    } else if (dateFilter === 'Yesterday') {
+      matchesDate = log.performed_at.includes('May 11, 2026') || log.performed_at.includes('Yesterday');
+    } else if (dateFilter === 'Last 7 Days') {
+      matchesDate = true; // Mock dataset falls within range
+    }
+
+    return matchesSearch && matchesCategory && matchesDate;
   });
 
   const categoryOptions: FilterOption[] = [
@@ -56,6 +69,14 @@ export const TodaAuditLogsPage: React.FC = () => {
     { label: 'Announcements', value: 'Announcement' },
     { label: 'Account & Terminal', value: 'Account' },
     { label: 'Operations', value: 'Operations' },
+  ];
+
+  const dateOptions: FilterOption[] = [
+    { label: 'All Dates (Full Log)', value: 'All' },
+    { label: 'Today (May 12)', value: 'Today' },
+    { label: 'Yesterday (May 11)', value: 'Yesterday' },
+    { label: 'Last 7 Days', value: 'Last 7 Days' },
+    { label: 'Last 30 Days', value: 'Last 30 Days' },
   ];
 
   const getCategoryBadgeStyle = (category: TodaAuditLog['category']) => {
@@ -77,45 +98,19 @@ export const TodaAuditLogsPage: React.FC = () => {
 
   return (
     <Box sx={{ maxWidth: 1600, margin: '0 auto', pb: 6 }}>
-      {/* 1. Summary Cards */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
-          gap: 2.5,
-          mb: 3.5,
-        }}
-      >
-        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Total TODA Actions Logged</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>{logs.length}</Typography>
-        </Box>
-        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Driver Endorsement Actions</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: '#1565C0' }}>
-            {logs.filter((l) => l.category === 'Driver Verification').length}
-          </Typography>
-        </Box>
-        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>TODA Disciplinary Strikes</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: '#DC2626' }}>
-            {logs.filter((l) => l.category === 'Membership').length}
-          </Typography>
-        </Box>
-        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Incident Triage & Escalations</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: 'var(--sakay-orange)' }}>
-            {logs.filter((l) => l.category === 'Incident').length}
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* 2. Filter Toolbar */}
+      {/* 1. Floating Card Filter Toolbar with Date Filtering */}
       <FilterToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         searchPlaceholder="Search TODA audit action, actor, target entity, or log ID..."
         selectFilters={[
+          {
+            id: 'date',
+            label: 'Filter by Date',
+            value: dateFilter,
+            options: dateOptions,
+            onChange: setDateFilter,
+          },
           {
             id: 'category',
             label: 'Category',
@@ -127,10 +122,11 @@ export const TodaAuditLogsPage: React.FC = () => {
         onResetFilters={() => {
           setSearchQuery('');
           setCategoryFilter('All');
+          setDateFilter('All');
         }}
       />
 
-      {/* 3. Table */}
+      {/* 2. Audit Trail Log Table */}
       <TableContainer
         component={Paper}
         elevation={0}
@@ -144,12 +140,12 @@ export const TodaAuditLogsPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TIMESTAMP & LOG ID</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TODA OFFICER</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>CATEGORY</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TARGET ENTITY</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>DETAILS OF MODIFICATION</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACTIONS</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TIMESTAMP & LOG ID</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TODA OFFICER</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>CATEGORY</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TARGET ENTITY</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>DETAILS OF MODIFICATION</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACTIONS</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -158,31 +154,29 @@ export const TodaAuditLogsPage: React.FC = () => {
               return (
                 <TableRow
                   key={log.id}
-                  onClick={() => setSelectedLog(log)}
                   sx={{
-                    cursor: 'pointer',
                     transition: 'var(--mac-transition-fast)',
                     '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' },
                   }}
                 >
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: '15px', color: 'var(--mac-text-primary)' }}>
                       {log.performed_at}
                     </Typography>
-                    <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)', fontFamily: 'monospace' }}>
+                    <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)', fontFamily: 'monospace' }}>
                       {log.log_id}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Avatar sx={{ width: 32, height: 32, backgroundColor: 'var(--sakay-orange-soft)', color: 'var(--sakay-orange)', fontSize: '12px', fontWeight: 700 }}>
+                      <Avatar sx={{ width: 36, height: 36, backgroundColor: 'var(--sakay-orange-soft)', color: 'var(--sakay-orange)', fontSize: '14px', fontWeight: 700 }}>
                         {log.actor_name.charAt(0)}
                       </Avatar>
                       <Box>
-                        <Typography sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-primary)' }}>
+                        <Typography sx={{ fontWeight: 600, fontSize: '15px', color: 'var(--mac-text-primary)' }}>
                           {log.actor_name}
                         </Typography>
-                        <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)' }}>
+                        <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>
                           {CURRENT_TODA_PROFILE.acronym}
                         </Typography>
                       </Box>
@@ -193,36 +187,51 @@ export const TodaAuditLogsPage: React.FC = () => {
                       label={log.category}
                       size="small"
                       sx={{
-                        fontSize: '11.5px',
+                        fontSize: '13px',
                         fontWeight: 600,
                         backgroundColor: catBadge.bg,
                         color: catBadge.color,
                         border: `1px solid ${catBadge.border}`,
-                        height: 24,
+                        height: 26,
                       }}
                     />
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: '14.5px', color: 'var(--mac-text-primary)' }}>
                       {log.target_name}
                     </Typography>
-                    <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)', fontFamily: 'monospace' }}>
+                    <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)', fontFamily: 'monospace' }}>
                       {log.target_id}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3, maxWidth: 380 }}>
-                    <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-secondary)', lineHeight: 1.4 }}>
+                    <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-secondary)', lineHeight: 1.4 }}>
                       {log.details}
                     </Typography>
                   </TableCell>
                   <TableCell align="right" sx={{ py: 2.2, px: 3 }}>
-                    <ActionButton
-                      label="Inspect"
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<VisibilityIcon fontSize="small" />}
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedLog(log);
                       }}
-                    />
+                      sx={{
+                        height: 34,
+                        px: 2,
+                        borderRadius: '8px',
+                        fontSize: '13.5px',
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        color: 'var(--sakay-orange)',
+                        borderColor: 'var(--sakay-orange-border)',
+                        backgroundColor: 'var(--sakay-orange-soft)',
+                      }}
+                    >
+                      Inspect
+                    </Button>
                   </TableCell>
                 </TableRow>
               );
@@ -231,7 +240,7 @@ export const TodaAuditLogsPage: React.FC = () => {
         </Table>
       </TableContainer>
 
-      {/* 4. Event Inspection Modal */}
+      {/* 3. Event Inspection Modal */}
       {selectedLog && (
         <MacCenterModal
           open={Boolean(selectedLog)}
@@ -239,33 +248,33 @@ export const TodaAuditLogsPage: React.FC = () => {
           title={`TODA Audit Trail Event — ${selectedLog.log_id}`}
           subtitle={`Action Type: ${selectedLog.action_type}`}
           badge={<Chip label={selectedLog.category} size="small" sx={{ ...getCategoryBadgeStyle(selectedLog.category), fontWeight: 700 }} />}
-          maxWidth={620}
+          maxWidth={660}
         >
           <Box sx={{ mb: 3 }}>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, backgroundColor: '#F8F9FA', p: 2, borderRadius: '12px', mb: 3 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, backgroundColor: '#F8F9FA', p: 2.5, borderRadius: '12px', mb: 3 }}>
               <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Timestamp</Typography>
-                <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedLog.performed_at}</Typography>
+                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Timestamp</Typography>
+                <Typography sx={{ fontSize: '15.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedLog.performed_at}</Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Acting Officer</Typography>
-                <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedLog.actor_name}</Typography>
+                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Acting Officer</Typography>
+                <Typography sx={{ fontSize: '15.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedLog.actor_name}</Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Target Entity ID</Typography>
-                <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--sakay-orange)', fontFamily: 'monospace' }}>{selectedLog.target_id}</Typography>
+                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Target Entity ID</Typography>
+                <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'var(--sakay-orange)', fontFamily: 'monospace' }}>{selectedLog.target_id}</Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Target Entity Name</Typography>
-                <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedLog.target_name}</Typography>
+                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Target Entity Name</Typography>
+                <Typography sx={{ fontSize: '15.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedLog.target_name}</Typography>
               </Box>
             </Box>
 
-            <Typography sx={{ fontSize: '13px', fontWeight: 700, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1 }}>
+            <Typography sx={{ fontSize: '14px', fontWeight: 700, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1 }}>
               Full Log Payload Details
             </Typography>
             <Box sx={{ p: 2, borderRadius: '10px', backgroundColor: '#FAFAFC', border: '1px solid var(--mac-border-color)' }}>
-              <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-primary)', lineHeight: 1.6 }}>
+              <Typography sx={{ fontSize: '15px', color: 'var(--mac-text-primary)', lineHeight: 1.6 }}>
                 {selectedLog.details}
               </Typography>
             </Box>

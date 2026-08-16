@@ -3,658 +3,743 @@ import {
   Box,
   Typography,
   Card,
-  CardContent,
-  Grid,
   Button,
   TextField,
   Chip,
   Divider,
   Avatar,
-  IconButton,
-  InputAdornment,
+  Select,
   MenuItem,
+  FormControl,
+  InputLabel,
+  IconButton,
 } from '@mui/material';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import BusinessIcon from '@mui/icons-material/Business';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
 import GroupsIcon from '@mui/icons-material/Groups';
-import PhoneIphoneIcon from '@mui/icons-material/PhoneIphone';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import EditIcon from '@mui/icons-material/Edit';
-import LockResetIcon from '@mui/icons-material/LockReset';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import PendingIcon from '@mui/icons-material/Pending';
 import DescriptionIcon from '@mui/icons-material/Description';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import ShieldIcon from '@mui/icons-material/Shield';
+import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 
-import { CURRENT_TODA_PROFILE, CURRENT_TODA_ADMIN } from '../mockData/todaData';
-import { StatusBadge } from '../components/common/StatusBadge';
-import { ActionButton } from '../components/admin/ActionButton';
+import { CURRENT_TODA_PROFILE } from '../mockData/todaData';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
-import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
 import { DocumentPreviewModal } from '../components/admin/DocumentPreviewModal';
-import { logTodaAction } from '../lib/auditLog';
+import { recordTodaAuditAction } from '../services/todaApiService';
 
 export const TodaAccountManagementPage: React.FC = () => {
   const [profile, setProfile] = useState(CURRENT_TODA_PROFILE);
+  const [logoImage, setLogoImage] = useState<string | null>(null);
 
   // Modals & Dialogs
   const [editProfileModalOpen, setEditProfileModalOpen] = useState(false);
-  const [relocateTerminalModalOpen, setRelocateTerminalModalOpen] = useState(false);
-  const [otpModalOpen, setOtpModalOpen] = useState(false);
   const [uploadDocModalOpen, setUploadDocModalOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<{ name: string; type: string } | null>(null);
 
-  // Edit Profile Form State
-  const [editContact, setEditContact] = useState(profile.contactNumber);
-  const [editEmail, setEditEmail] = useState(profile.email);
+  // Organizational Profile Form State
+  const [editTodaName, setEditTodaName] = useState(profile.name);
+  const [editTodaAcronym, setEditTodaAcronym] = useState(profile.acronym);
+  const [editRegNum, setEditRegNum] = useState(profile.registrationNumber);
+  const [editDateEst, setEditDateEst] = useState(profile.dateEstablished);
+  const [editTerminalLoc, setEditTerminalLoc] = useState(profile.terminalLocation);
+  const [editBarangay, setEditBarangay] = useState(profile.barangay);
+  const [editCoverage, setEditCoverage] = useState(profile.serviceCoverageArea);
+
+  // Officers Form State
   const [editPresident, setEditPresident] = useState(profile.officers.president);
-  const [newPassword, setNewPassword] = useState('');
+  const [editVicePresident, setEditVicePresident] = useState(profile.officers.vicePresident);
+  const [editSecretary, setEditSecretary] = useState(profile.officers.secretary);
+  const [editTreasurer, setEditTreasurer] = useState(profile.officers.treasurer);
 
-  // Terminal Relocation State
-  const [newTerminalAddress, setNewTerminalAddress] = useState('');
-  const [relocationReason, setRelocationReason] = useState('');
-
-  // OTP Verification State
-  const [otpCode, setOtpCode] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpError, setOtpError] = useState(false);
-
-  // Document Upload State
+  // Document Upload Form State (Real File Picker)
   const [docCategory, setDocCategory] = useState<'Barangay Clearance' | 'Driver Master List'>('Barangay Clearance');
-  const [uploadedFileName, setUploadedFileName] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  // Handle Edit Profile
+  // Logo Change Handler
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      const imageUrl = URL.createObjectURL(file);
+      setLogoImage(imageUrl);
+
+      recordTodaAuditAction({
+        actionType: 'TODA_PROFILE_UPDATED',
+        targetId: profile.id,
+        targetName: profile.name,
+        details: `Updated TODA Organization logo icon (${file.name}).`,
+        category: 'Account',
+      });
+    }
+  };
+
+  // File Picker Handler for Document Renewal
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
+  // Submit Organizational Profile Edit
   const handleEditProfileSubmit = () => {
     setProfile((prev) => ({
       ...prev,
-      contactNumber: editContact,
-      email: editEmail,
-      officers: { ...prev.officers, president: editPresident },
+      name: editTodaName,
+      acronym: editTodaAcronym,
+      registrationNumber: editRegNum,
+      dateEstablished: editDateEst,
+      terminalLocation: editTerminalLoc,
+      barangay: editBarangay,
+      serviceCoverageArea: editCoverage,
+      officers: {
+        president: editPresident,
+        vicePresident: editVicePresident,
+        secretary: editSecretary,
+        treasurer: editTreasurer,
+      },
     }));
 
-    logTodaAction({
+    recordTodaAuditAction({
       actionType: 'TODA_PROFILE_UPDATED',
       targetId: profile.id,
-      targetName: profile.name,
-      details: `Updated TODA contact details (${editContact}) and administrative officer information.`,
+      targetName: editTodaName,
+      details: `Updated TODA organizational details, office location (${editTerminalLoc}), and authorized officer roster.`,
       category: 'Account',
     });
 
     setEditProfileModalOpen(false);
   };
 
-  // Handle Terminal Relocation Request (Rule: Enters Pending LGU Re-approval, does NOT overwrite immediately)
-  const handleRelocateSubmit = () => {
-    if (!newTerminalAddress.trim()) return;
-
-    setProfile((prev) => ({
-      ...prev,
-      pendingTerminalLocation: newTerminalAddress.trim(),
-    }));
-
-    logTodaAction({
-      actionType: 'TERMINAL_RELOCATION_REQUESTED',
-      targetId: profile.id,
-      targetName: profile.name,
-      details: `Submitted terminal relocation request for "${newTerminalAddress}". Status set to Pending LGU Re-approval. Reason: ${relocationReason || 'Terminal modernization / capacity expansion.'}`,
-      category: 'Account',
-    });
-
-    setNewTerminalAddress('');
-    setRelocationReason('');
-    setRelocateTerminalModalOpen(false);
-  };
-
-  // Handle OTP Verification
-  const handleSendOtp = () => {
-    setOtpSent(true);
-    setOtpError(false);
-  };
-
-  const handleVerifyOtp = () => {
-    if (otpCode.length === 6) {
-      setProfile((prev) => ({ ...prev, isOtpVerified: true }));
-      logTodaAction({
-        actionType: 'MOBILE_OTP_VERIFIED',
-        targetId: profile.id,
-        targetName: profile.contactNumber,
-        details: `Completed mobile OTP verification for official TODA administrator contact line (${profile.contactNumber}).`,
-        category: 'Account',
-      });
-      setOtpModalOpen(false);
-      setOtpCode('');
-      setOtpSent(false);
-    } else {
-      setOtpError(true);
-    }
-  };
-
-  // Handle Document Upload
+  // Submit Annual Compliance Document Renewal Upload
   const handleDocumentUploadSubmit = () => {
-    const filename = uploadedFileName.trim() || `${profile.acronym}_${docCategory.replace(/\s+/g, '_')}_2026.pdf`;
-    const today = new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
+    if (!selectedFile) return;
 
+    const fileName = selectedFile.name;
     if (docCategory === 'Barangay Clearance') {
       setProfile((prev) => ({
         ...prev,
-        barangayClearanceFile: { name: filename, date: today },
+        barangayClearanceFile: {
+          name: fileName,
+          date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+        },
       }));
     } else {
       setProfile((prev) => ({
         ...prev,
-        rosterFile: { name: filename, date: today, count: prev.rosterFile.count },
+        rosterFile: {
+          name: fileName,
+          date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+          count: prev.rosterFile.count,
+        },
       }));
     }
 
-    logTodaAction({
+    recordTodaAuditAction({
       actionType: 'COMPLIANCE_DOCUMENT_UPLOADED',
       targetId: profile.id,
-      targetName: filename,
-      details: `Uploaded new ${docCategory} compliance archive to LGU verification registry.`,
+      targetName: fileName,
+      details: `Uploaded annual accreditation renewal document (${docCategory}: ${fileName}) for LGU review.`,
       category: 'Account',
     });
 
+    setSelectedFile(null);
     setUploadDocModalOpen(false);
-    setUploadedFileName('');
   };
 
   return (
     <Box sx={{ maxWidth: 1600, margin: '0 auto', pb: 6 }}>
-      {/* 1. Top Accreditation Status Tracker Card */}
+      {/* 1. Header Banner & Status Summary with Interactive TODA Logo Upload */}
       <Card
+        elevation={0}
         sx={{
+          p: 3.5,
           borderRadius: 'var(--mac-radius-lg)',
           border: '1px solid var(--mac-border-color)',
-          boxShadow: 'var(--mac-shadow-card)',
           backgroundColor: '#FFFFFF',
+          boxShadow: 'var(--mac-shadow-card)',
           mb: 3.5,
-          overflow: 'hidden',
         }}
       >
-        <Box sx={{ background: 'linear-gradient(135deg, rgba(255, 107, 26, 0.08) 0%, rgba(255, 255, 255, 0.8) 100%)', p: '24px 28px', borderBottom: '1px solid var(--mac-border-color)' }}>
-          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { md: 'center' }, justifyContent: 'space-between', gap: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2.5 }}>
+            {/* Interactive TODA Avatar Logo with Upload Overlay */}
+            <Box sx={{ position: 'relative' }}>
               <Avatar
+                src={logoImage || undefined}
                 sx={{
-                  width: 52,
-                  height: 52,
-                  backgroundColor: 'var(--sakay-orange)',
-                  color: '#FFFFFF',
-                  fontSize: '20px',
+                  width: 72,
+                  height: 72,
+                  background: 'linear-gradient(135deg, var(--sakay-orange) 0%, #ff8a47 100%)',
+                  fontSize: '28px',
                   fontWeight: 700,
-                  boxShadow: '0 8px 18px rgba(255, 107, 26, 0.25)',
+                  boxShadow: '0 10px 24px rgba(255, 107, 26, 0.22)',
                 }}
               >
-                {profile.acronym.substring(0, 2)}
+                {!logoImage && profile.acronym.charAt(0)}
               </Avatar>
-              <Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Typography sx={{ fontSize: '22px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
-                    {profile.name} ({profile.acronym})
-                  </Typography>
-                  <StatusBadge status={profile.accreditationStatus} />
-                </Box>
-                <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', mt: '2px' }}>
-                  LGU Permit No: <strong style={{ color: 'var(--mac-text-primary)' }}>{profile.permitNumber}</strong> • Valid until {profile.accreditationExpiry}
-                </Typography>
-              </Box>
-            </Box>
-
-            <Box sx={{ display: 'flex', gap: 1.5 }}>
-              <Button
-                onClick={() => setEditProfileModalOpen(true)}
-                startIcon={<EditIcon fontSize="small" />}
-                variant="outlined"
+              <IconButton
+                component="label"
+                size="small"
                 sx={{
-                  height: 40,
-                  borderRadius: '10px',
-                  textTransform: 'none',
-                  fontSize: '13.5px',
-                  fontWeight: 600,
-                  borderColor: 'var(--mac-border-color)',
+                  position: 'absolute',
+                  bottom: -4,
+                  right: -4,
                   backgroundColor: '#FFFFFF',
-                  color: 'var(--mac-text-primary)',
-                  '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' },
+                  border: '1px solid var(--mac-border-color)',
+                  boxShadow: 'var(--mac-shadow-subtle)',
+                  p: 0.75,
+                  color: 'var(--sakay-orange)',
+                  '&:hover': { backgroundColor: 'var(--sakay-orange-soft)' },
                 }}
               >
-                Edit TODA Profile
-              </Button>
-              <Button
-                onClick={() => setUploadDocModalOpen(true)}
-                startIcon={<UploadFileIcon fontSize="small" />}
-                variant="contained"
-                sx={{
-                  height: 40,
-                  borderRadius: '10px',
-                  textTransform: 'none',
-                  fontSize: '13.5px',
-                  fontWeight: 600,
-                  backgroundColor: 'var(--sakay-orange)',
-                  color: '#FFFFFF',
-                  '&:hover': { backgroundColor: 'var(--sakay-orange-hover)' },
-                }}
-              >
-                Upload Compliance Files
-              </Button>
+                <PhotoCameraIcon sx={{ fontSize: 16 }} />
+                <input type="file" hidden accept="image/*" onChange={handleLogoChange} />
+              </IconButton>
             </Box>
-          </Box>
-        </Box>
 
-        {/* Quick Compliance Checks Bar */}
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, p: '18px 28px', backgroundColor: '#FAFAFC', gap: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <CheckCircleIcon sx={{ color: '#1E8E3E', fontSize: 22 }} />
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>LGU Accreditation</Typography>
-              <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>Fully Accredited (Q2 2026)</Typography>
-            </Box>
-          </Box>
-
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            {profile.isOtpVerified ? (
-              <CheckCircleIcon sx={{ color: '#1E8E3E', fontSize: 22 }} />
-            ) : (
-              <WarningAmberIcon sx={{ color: 'var(--sakay-orange)', fontSize: 22 }} />
-            )}
-            <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Admin Mobile Phone</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                  {profile.isOtpVerified ? 'OTP Verified' : 'Unverified'}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Typography sx={{ fontSize: '24px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+                  {profile.name}
                 </Typography>
-                {!profile.isOtpVerified && (
-                  <Chip
-                    label="Verify Now"
-                    size="small"
-                    onClick={() => setOtpModalOpen(true)}
-                    sx={{ height: 20, fontSize: '11px', cursor: 'pointer', backgroundColor: 'var(--sakay-orange-soft)', color: 'var(--sakay-orange)' }}
-                  />
-                )}
+                <Chip
+                  icon={<VerifiedIcon sx={{ fontSize: 18, color: '#1E8E3E' }} />}
+                  label={`Permit #${profile.accreditationNo}`}
+                  size="small"
+                  sx={{ backgroundColor: '#E6F4EA', color: '#1E8E3E', fontWeight: 600, fontSize: '13px' }}
+                />
               </Box>
+              <Typography sx={{ fontSize: '14.5px', color: 'var(--mac-text-muted)', mt: '4px' }}>
+                Registration No: {profile.registrationNumber} • Established: {profile.dateEstablished}
+              </Typography>
             </Box>
           </Box>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <CheckCircleIcon sx={{ color: '#1E8E3E', fontSize: 22 }} />
-            <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Driver Roster Record</Typography>
-              <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>24 Registered Franchise Units</Typography>
-            </Box>
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <Button
+              variant="contained"
+              startIcon={<EditIcon />}
+              onClick={() => setEditProfileModalOpen(true)}
+              sx={{
+                height: 42,
+                px: 2.5,
+                borderRadius: '10px',
+                fontSize: '14.5px',
+                fontWeight: 600,
+                textTransform: 'none',
+                backgroundColor: 'var(--sakay-orange)',
+                '&:hover': { backgroundColor: 'var(--sakay-orange-hover)' },
+              }}
+            >
+              Edit TODA Profile
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<UploadFileIcon />}
+              onClick={() => setUploadDocModalOpen(true)}
+              sx={{
+                height: 42,
+                px: 2.5,
+                borderRadius: '10px',
+                fontSize: '14.5px',
+                fontWeight: 600,
+                textTransform: 'none',
+                color: 'var(--mac-text-primary)',
+                borderColor: 'var(--mac-border-color)',
+                '&:hover': { backgroundColor: 'var(--sakay-orange-soft)', borderColor: 'var(--sakay-orange-border)' },
+              }}
+            >
+              Annual Compliance Upload
+            </Button>
           </Box>
         </Box>
       </Card>
 
-      {/* 2. Grid of Information Sections */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 3, mb: 3 }}>
-        {/* Left Column: Organization & Office Details */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {/* Org & Office Info */}
-          <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', p: '24px' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-              <BusinessIcon sx={{ color: 'var(--sakay-orange)', fontSize: 22 }} />
-              <Typography sx={{ fontSize: '17px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
-                Organization & Office Information
+      {/* 2. Balanced 2-Column Grid Layout for TODA Information */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+        {/* Left Column: TODA Organization Information (Renamed per directive, contact info removed) */}
+        <Card
+          elevation={0}
+          sx={{
+            p: 3,
+            borderRadius: 'var(--mac-radius-lg)',
+            border: '1px solid var(--mac-border-color)',
+            backgroundColor: '#FFFFFF',
+            boxShadow: 'var(--mac-shadow-card)',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>
+            <BusinessIcon sx={{ color: 'var(--sakay-orange)', fontSize: 24 }} />
+            <Typography sx={{ fontSize: '18px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+              TODA Organization Information
+            </Typography>
+          </Box>
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.2, flex: 1 }}>
+            <Box>
+              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Official TODA Name</Typography>
+              <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                {profile.name} ({profile.acronym})
               </Typography>
             </Box>
 
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2.5, backgroundColor: '#F8F9FA', padding: '18px', borderRadius: '12px', mb: 2.5 }}>
-              <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '3px' }}>Official Registration No.</Typography>
-                <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{profile.registrationNumber}</Typography>
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '3px' }}>Date Established</Typography>
-                <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{profile.dateEstablished}</Typography>
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '3px' }}>Jurisdiction / Barangay</Typography>
-                <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{profile.barangay}</Typography>
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '3px' }}>Contact Hotline</Typography>
-                <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{profile.contactNumber}</Typography>
-              </Box>
-              <Box sx={{ gridColumn: 'span 2' }}>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '3px' }}>Authorized Service Zone</Typography>
-                <Typography sx={{ fontSize: '14px', fontWeight: 500, color: 'var(--mac-text-primary)' }}>{profile.serviceCoverageArea}</Typography>
-              </Box>
+            <Box>
+              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>LGU Registration Number</Typography>
+              <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                {profile.registrationNumber}
+              </Typography>
             </Box>
 
-            {/* Terminal Location with Relocation State */}
-            <Box sx={{ border: '1px solid var(--mac-border-color)', borderRadius: '12px', p: 2, backgroundColor: '#FFFFFF' }}>
-              <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <LocationOnIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
-                  <Typography sx={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
-                    Active Terminal Location
-                  </Typography>
-                </Box>
-                <Button
-                  size="small"
-                  onClick={() => setRelocateTerminalModalOpen(true)}
-                  sx={{ fontSize: '12px', textTransform: 'none', color: 'var(--sakay-orange)', fontWeight: 600 }}
-                >
-                  Request Relocation
-                </Button>
-              </Box>
-              <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-primary)', mb: 1, pl: 3.5 }}>
+            <Box>
+              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Date Established</Typography>
+              <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                {profile.dateEstablished}
+              </Typography>
+            </Box>
+
+            <Divider sx={{ my: 0.5 }} />
+
+            <Box>
+              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Terminal Address / Location</Typography>
+              <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                 {profile.terminalLocation}
               </Typography>
-
-              {/* Pending LGU Re-approval Banner */}
-              {profile.pendingTerminalLocation && (
-                <Box sx={{ mt: 1.5, p: '12px 16px', borderRadius: '8px', backgroundColor: 'rgba(21, 101, 192, 0.08)', border: '1px solid rgba(21, 101, 192, 0.3)' }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                    <PendingIcon sx={{ color: '#1565C0', fontSize: 18 }} />
-                    <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#1565C0' }}>
-                      Relocation Pending LGU Re-approval
-                    </Typography>
-                  </Box>
-                  <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-secondary)' }}>
-                    Requested site: <strong>{profile.pendingTerminalLocation}</strong>. The active terminal above remains in effect until the LGU Franchising Office completes ocular inspection.
-                  </Typography>
-                </Box>
-              )}
             </Box>
-          </Card>
-        </Box>
 
-        {/* Right Column: Officers & Document Archives */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {/* Officers Board */}
-          <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', p: '24px' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-              <GroupsIcon sx={{ color: 'var(--sakay-orange)', fontSize: 22 }} />
-              <Typography sx={{ fontSize: '17px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
-                TODA Executive Officers
+            <Box>
+              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Barangay Jurisdiction</Typography>
+              <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                {profile.barangay}
               </Typography>
             </Box>
 
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '10px 14px', borderRadius: '8px', backgroundColor: '#FAFAFC', border: '1px solid var(--mac-border-color)' }}>
-                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>President</Typography>
-                <Typography sx={{ fontSize: '14px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>{profile.officers.president}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '10px 14px', borderRadius: '8px', backgroundColor: '#FAFAFC', border: '1px solid var(--mac-border-color)' }}>
-                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Vice President</Typography>
-                <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{profile.officers.vicePresident}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '10px 14px', borderRadius: '8px', backgroundColor: '#FAFAFC', border: '1px solid var(--mac-border-color)' }}>
-                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Secretary</Typography>
-                <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{profile.officers.secretary}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '10px 14px', borderRadius: '8px', backgroundColor: '#FAFAFC', border: '1px solid var(--mac-border-color)' }}>
-                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Treasurer</Typography>
-                <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{profile.officers.treasurer}</Typography>
-              </Box>
+            <Box>
+              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Service Coverage Route</Typography>
+              <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                {profile.serviceCoverageArea}
+              </Typography>
             </Box>
-          </Card>
+          </Box>
+        </Card>
 
-          {/* Compliance Documents */}
-          <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', p: '24px' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <DescriptionIcon sx={{ color: 'var(--sakay-orange)', fontSize: 22 }} />
-                <Typography sx={{ fontSize: '17px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
-                  Accreditation Documents
+        {/* Right Column: Authorized Officers & Accreditation Documents */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, height: '100%' }}>
+          {/* Officers Card */}
+          <Card
+            elevation={0}
+            sx={{
+              p: 3,
+              borderRadius: 'var(--mac-radius-lg)',
+              border: '1px solid var(--mac-border-color)',
+              backgroundColor: '#FFFFFF',
+              boxShadow: 'var(--mac-shadow-card)',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+              <GroupsIcon sx={{ color: 'var(--sakay-orange)', fontSize: 24 }} />
+              <Typography sx={{ fontSize: '18px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                Authorized TODA Officers
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
+              <Box>
+                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>President</Typography>
+                <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                  {profile.officers.president}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Vice President</Typography>
+                <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                  {profile.officers.vicePresident}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Secretary</Typography>
+                <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                  {profile.officers.secretary}
+                </Typography>
+              </Box>
+
+              <Box>
+                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Treasurer</Typography>
+                <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                  {profile.officers.treasurer}
                 </Typography>
               </Box>
             </Box>
+          </Card>
+
+          {/* Annual Accreditation Compliance Documents with Explicit View Buttons */}
+          <Card
+            elevation={0}
+            sx={{
+              p: 3,
+              borderRadius: 'var(--mac-radius-lg)',
+              border: '1px solid var(--mac-border-color)',
+              backgroundColor: '#FFFFFF',
+              boxShadow: 'var(--mac-shadow-card)',
+              flex: 1,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <ShieldIcon sx={{ color: '#059669', fontSize: 24 }} />
+                <Typography sx={{ fontSize: '18px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                  Annual Compliance & Accreditation Renewal
+                </Typography>
+              </Box>
+              <Chip label="Active Accreditation" size="small" sx={{ backgroundColor: '#E6F4EA', color: '#1E8E3E', fontWeight: 600, fontSize: '12.5px' }} />
+            </Box>
+
+            <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-muted)', mb: 2 }}>
+              Documented annual requirements submitted for City LGU Franchising Office accreditation review.
+            </Typography>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-              {/* Barangay Clearance File */}
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '12px 14px', borderRadius: '8px', border: '1px solid var(--mac-border-color)', backgroundColor: '#FAFAFC' }}>
-                <Box>
-                  <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                    Barangay Clearance
-                  </Typography>
-                  <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)' }}>
-                    {profile.barangayClearanceFile.name} • Uploaded {profile.barangayClearanceFile.date}
-                  </Typography>
+              <Box
+                onClick={() => setSelectedDoc({ name: profile.barangayClearanceFile.name, type: 'pdf' })}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  p: 2,
+                  borderRadius: '10px',
+                  backgroundColor: '#FAFAFC',
+                  border: '1px solid var(--mac-border-color)',
+                  cursor: 'pointer',
+                  '&:hover': { backgroundColor: 'var(--sakay-orange-soft)', borderColor: 'var(--sakay-orange-border)' },
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <DescriptionIcon sx={{ color: 'var(--sakay-orange)', fontSize: 22 }} />
+                  <Box>
+                    <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                      Barangay Clearance for TODA Accreditation
+                    </Typography>
+                    <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>
+                      {profile.barangayClearanceFile.name} • Submitted {profile.barangayClearanceFile.date}
+                    </Typography>
+                  </Box>
                 </Box>
-                <ActionButton
-                  label="View File"
-                  showArrow={false}
-                  onClick={() => setSelectedDoc({ name: profile.barangayClearanceFile.name, type: 'PDF Document' })}
-                  sx={{ height: 30, fontSize: '12px' }}
-                />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<VisibilityIcon fontSize="small" />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedDoc({ name: profile.barangayClearanceFile.name, type: 'pdf' });
+                  }}
+                  sx={{
+                    height: 34,
+                    px: 2,
+                    borderRadius: '8px',
+                    fontSize: '13.5px',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    color: 'var(--sakay-orange)',
+                    borderColor: 'var(--sakay-orange-border)',
+                    backgroundColor: 'var(--sakay-orange-soft)',
+                  }}
+                >
+                  View
+                </Button>
               </Box>
 
-              {/* Master Roster File */}
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '12px 14px', borderRadius: '8px', border: '1px solid var(--mac-border-color)', backgroundColor: '#FAFAFC' }}>
-                <Box>
-                  <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                    Accredited Drivers Roster ({profile.rosterFile.count} Units)
-                  </Typography>
-                  <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)' }}>
-                    {profile.rosterFile.name} • Updated {profile.rosterFile.date}
-                  </Typography>
+              <Box
+                onClick={() => setSelectedDoc({ name: profile.rosterFile.name, type: 'pdf' })}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  p: 2,
+                  borderRadius: '10px',
+                  backgroundColor: '#FAFAFC',
+                  border: '1px solid var(--mac-border-color)',
+                  cursor: 'pointer',
+                  '&:hover': { backgroundColor: 'var(--sakay-orange-soft)', borderColor: 'var(--sakay-orange-border)' },
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <DescriptionIcon sx={{ color: '#1565C0', fontSize: 22 }} />
+                  <Box>
+                    <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                      Accredited Master Driver Roster
+                    </Typography>
+                    <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>
+                      {profile.rosterFile.name} • {profile.rosterFile.count} Accredited Members
+                    </Typography>
+                  </Box>
                 </Box>
-                <ActionButton
-                  label="View File"
-                  showArrow={false}
-                  onClick={() => setSelectedDoc({ name: profile.rosterFile.name, type: 'PDF Document' })}
-                  sx={{ height: 30, fontSize: '12px' }}
-                />
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<VisibilityIcon fontSize="small" />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedDoc({ name: profile.rosterFile.name, type: 'pdf' });
+                  }}
+                  sx={{
+                    height: 34,
+                    px: 2,
+                    borderRadius: '8px',
+                    fontSize: '13.5px',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    color: 'var(--sakay-orange)',
+                    borderColor: 'var(--sakay-orange-border)',
+                    backgroundColor: 'var(--sakay-orange-soft)',
+                  }}
+                >
+                  View
+                </Button>
               </Box>
             </Box>
           </Card>
         </Box>
       </Box>
 
-      {/* 3. Edit TODA Profile Modal */}
+      {/* 3. Edit TODA Organizational Profile Centered Modal */}
       <MacCenterModal
         open={editProfileModalOpen}
         onClose={() => setEditProfileModalOpen(false)}
-        title="Edit TODA Administrative Profile"
-        subtitle="Update contact phone, email, and executive officer names."
-        maxWidth={600}
-        primaryActionLabel="Save Profile Changes"
+        title="Edit TODA Organizational Profile"
+        subtitle={`Update official TODA records and authorized officers for ${profile.name}`}
+        maxWidth={760}
+        primaryActionLabel="Save Organizational Profile"
         onPrimaryAction={handleEditProfileSubmit}
         secondaryActionLabel="Cancel"
         onSecondaryAction={() => setEditProfileModalOpen(false)}
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          <TextField
-            fullWidth
-            label="TODA President Full Name"
-            value={editPresident}
-            onChange={(e) => setEditPresident(e.target.value)}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-          />
-
-          <TextField
-            fullWidth
-            label="Official Contact Hotline"
-            value={editContact}
-            onChange={(e) => setEditContact(e.target.value)}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-          />
-
-          <TextField
-            fullWidth
-            label="Official Email Address"
-            type="email"
-            value={editEmail}
-            onChange={(e) => setEditEmail(e.target.value)}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-          />
-
-          <TextField
-            fullWidth
-            label="Administrative Password Reset"
-            type="password"
-            placeholder="Leave blank to keep existing password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-          />
-        </Box>
-      </MacCenterModal>
-
-      {/* 4. Terminal Relocation Request Modal */}
-      <MacCenterModal
-        open={relocateTerminalModalOpen}
-        onClose={() => setRelocateTerminalModalOpen(false)}
-        title="Request Terminal Relocation"
-        subtitle="Submits a relocation application to the LGU Franchising Office for review."
-        maxWidth={620}
-        primaryActionLabel="Submit Relocation Request"
-        onPrimaryAction={handleRelocateSubmit}
-        secondaryActionLabel="Cancel"
-        onSecondaryAction={() => setRelocateTerminalModalOpen(false)}
-      >
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          <Box sx={{ backgroundColor: '#F0F9FF', border: '1px solid #BAE6FD', padding: '14px 18px', borderRadius: '10px' }}>
-            <Typography sx={{ fontSize: '13px', color: '#0369A1', lineHeight: 1.4 }}>
-              <strong>Municipal Transport Policy Rule:</strong> Terminal relocations cannot take effect immediately. Submitting this request will flag the new location as <em>Pending LGU Re-approval</em> while drivers continue operating from the current approved site.
-            </Typography>
-          </Box>
-
-          <TextField
-            fullWidth
-            label="Proposed New Terminal Address"
-            placeholder="e.g. San Vicente Diversion Road Plaza, Calapan City"
-            value={newTerminalAddress}
-            onChange={(e) => setNewTerminalAddress(e.target.value)}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-          />
-
-          <TextField
-            fullWidth
-            multiline
-            rows={3}
-            label="Operational Justification / Rationale"
-            placeholder="Describe the reason for relocation (e.g. increased passenger throughput, DPWH construction)..."
-            value={relocationReason}
-            onChange={(e) => setRelocationReason(e.target.value)}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-          />
-        </Box>
-      </MacCenterModal>
-
-      {/* 5. Mobile OTP Verification Modal */}
-      <MacCenterModal
-        open={otpModalOpen}
-        onClose={() => setOtpModalOpen(false)}
-        title="Mobile OTP Security Verification"
-        subtitle={`Verify ownership of TODA admin hotline (${profile.contactNumber})`}
-        maxWidth={480}
-        primaryActionLabel="Verify Code"
-        onPrimaryAction={handleVerifyOtp}
-        secondaryActionLabel="Cancel"
-        onSecondaryAction={() => setOtpModalOpen(false)}
-      >
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, textAlign: 'center', py: 1 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-            <PhoneIphoneIcon sx={{ fontSize: 48, color: 'var(--sakay-orange)' }} />
-          </Box>
-
-          <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-secondary)' }}>
-            {otpSent
-              ? `We sent a 6-digit code to ${profile.contactNumber}. (Demo: Enter any 6 digits e.g. 123456)`
-              : `Click "Send OTP" to transmit a verification code to ${profile.contactNumber}.`}
+          <Typography sx={{ fontSize: '15px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+            TODA Organization Information
           </Typography>
 
-          {!otpSent ? (
-            <Button
-              variant="contained"
-              onClick={handleSendOtp}
-              sx={{
-                backgroundColor: 'var(--sakay-orange)',
-                '&:hover': { backgroundColor: 'var(--sakay-orange-hover)' },
-                textTransform: 'none',
-                borderRadius: '10px',
-                height: 42,
-                fontWeight: 600,
-              }}
-            >
-              Send OTP Code
-            </Button>
-          ) : (
-            <Box>
-              <TextField
-                fullWidth
-                placeholder="123456"
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                error={otpError}
-                helperText={otpError ? 'Please enter a valid 6-digit code' : ''}
-                slotProps={{
-                  htmlInput: {
-                    style: { textAlign: 'center', fontSize: '24px', letterSpacing: '8px', fontWeight: 700 },
-                  },
-                }}
-                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-              />
-              <Button
-                onClick={handleSendOtp}
-                size="small"
-                sx={{ mt: 1, textTransform: 'none', color: 'var(--sakay-orange)', fontSize: '12px' }}
-              >
-                Resend OTP Code
-              </Button>
-            </Box>
-          )}
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
+            <TextField
+              label="Official TODA Name"
+              value={editTodaName}
+              onChange={(e) => setEditTodaName(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
+            />
+            <TextField
+              label="TODA Acronym"
+              value={editTodaAcronym}
+              onChange={(e) => setEditTodaAcronym(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
+            />
+            <TextField
+              label="Registration Number"
+              value={editRegNum}
+              onChange={(e) => setEditRegNum(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
+            />
+            <TextField
+              label="Date Established"
+              value={editDateEst}
+              onChange={(e) => setEditDateEst(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
+            />
+          </Box>
+
+          <TextField
+            label="Terminal Address / Location"
+            value={editTerminalLoc}
+            onChange={(e) => setEditTerminalLoc(e.target.value)}
+            fullWidth
+            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
+          />
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
+            <TextField
+              label="Barangay Jurisdiction"
+              value={editBarangay}
+              onChange={(e) => setEditBarangay(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
+            />
+            <TextField
+              label="Service Coverage Area"
+              value={editCoverage}
+              onChange={(e) => setEditCoverage(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
+            />
+          </Box>
+
+          <Divider sx={{ my: 1 }} />
+
+          <Typography sx={{ fontSize: '15px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+            Authorized Officers Roster
+          </Typography>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
+            <TextField
+              label="President"
+              value={editPresident}
+              onChange={(e) => setEditPresident(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
+            />
+            <TextField
+              label="Vice President"
+              value={editVicePresident}
+              onChange={(e) => setEditVicePresident(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
+            />
+            <TextField
+              label="Secretary"
+              value={editSecretary}
+              onChange={(e) => setEditSecretary(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
+            />
+            <TextField
+              label="Treasurer"
+              value={editTreasurer}
+              onChange={(e) => setEditTreasurer(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
+            />
+          </Box>
         </Box>
       </MacCenterModal>
 
-      {/* 6. Upload Document Modal */}
+      {/* 4. Upload Annual Compliance Document Centered Modal with SAKAY Orange MUI Select & Drag/Drop File Attachment Zone */}
       <MacCenterModal
         open={uploadDocModalOpen}
         onClose={() => setUploadDocModalOpen(false)}
-        title="Upload Compliance File"
-        subtitle="Submit updated accreditation files to the LGU administrative repository."
-        maxWidth={540}
-        primaryActionLabel="Confirm & Upload"
-        onPrimaryAction={handleDocumentUploadSubmit}
+        title="Annual Barangay Clearance & Master Roster Upload"
+        subtitle="Submit updated accreditation compliance files for City LGU review"
+        maxWidth={660}
+        primaryActionLabel={selectedFile ? "Submit Document for LGU Review" : undefined}
+        onPrimaryAction={selectedFile ? handleDocumentUploadSubmit : undefined}
         secondaryActionLabel="Cancel"
         onSecondaryAction={() => setUploadDocModalOpen(false)}
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          <TextField
-            select
-            fullWidth
-            label="Document Category"
-            value={docCategory}
-            onChange={(e) => setDocCategory(e.target.value as any)}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-          >
-            <MenuItem value="Barangay Clearance">Barangay Clearance for TODA Accreditation</MenuItem>
-            <MenuItem value="Driver Master List">List of Accredited Drivers & Franchise Numbers</MenuItem>
-          </TextField>
+          {/* Styled SAKAY Orange MUI Select Dropdown (Fixes Photo 3 bug) */}
+          <FormControl fullWidth size="small">
+            <InputLabel id="doc-category-label" sx={{ fontSize: '15px', color: 'var(--mac-text-secondary)' }}>
+              Document Category
+            </InputLabel>
+            <Select
+              labelId="doc-category-label"
+              label="Document Category"
+              value={docCategory}
+              onChange={(e) => setDocCategory(e.target.value as any)}
+              MenuProps={{
+                slotProps: {
+                  paper: {
+                    sx: {
+                      borderRadius: '12px',
+                      boxShadow: 'var(--mac-shadow-popover)',
+                      border: '1px solid var(--mac-border-color)',
+                      mt: 1,
+                    },
+                  },
+                },
+              }}
+              sx={{
+                borderRadius: '10px',
+                backgroundColor: '#FFFFFF',
+                fontSize: '15px',
+                fontWeight: 600,
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'var(--sakay-orange) !important',
+                  borderWidth: '2px',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'var(--sakay-orange-border)',
+                },
+              }}
+            >
+              <MenuItem value="Barangay Clearance" sx={{ fontSize: '15px', py: 1.2 }}>
+                Annual Barangay Clearance for Accreditation
+              </MenuItem>
+              <MenuItem value="Driver Master List" sx={{ fontSize: '15px', py: 1.2 }}>
+                Updated Accredited Driver Master Roster
+              </MenuItem>
+            </Select>
+          </FormControl>
 
-          <TextField
-            fullWidth
-            label="File Name / Reference"
-            placeholder="e.g. CCTODA_BarangayClearance_Q3_2026.pdf"
-            value={uploadedFileName}
-            onChange={(e) => setUploadedFileName(e.target.value)}
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-          />
+          {/* Real Drag & Drop File Upload Zone */}
+          <Box>
+            <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)', mb: 1 }}>
+              Attach Compliance Document File
+            </Typography>
 
-          <Box
-            sx={{
-              p: 3,
-              border: '2px dashed var(--mac-border-color)',
-              borderRadius: '10px',
-              backgroundColor: '#FAFAFC',
-              textAlign: 'center',
-            }}
-          >
-            <UploadFileIcon sx={{ fontSize: 36, color: 'var(--mac-text-muted)', mb: 1 }} />
-            <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-              Mock PDF Upload Ready
-            </Typography>
-            <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)' }}>
-              Files will be cryptographically hashed for LGU verification.
-            </Typography>
+            <Box
+              component="label"
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '28px 20px',
+                borderRadius: '12px',
+                border: '2px dashed var(--sakay-orange-border)',
+                backgroundColor: 'var(--sakay-orange-soft)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 107, 26, 0.12)',
+                  borderColor: 'var(--sakay-orange)',
+                },
+              }}
+            >
+              <input
+                type="file"
+                hidden
+                accept=".pdf,.doc,.docx,.png,.jpg"
+                onChange={handleFileSelect}
+              />
+              <UploadFileIcon sx={{ fontSize: 40, color: 'var(--sakay-orange)', mb: 1 }} />
+              <Typography sx={{ fontSize: '15px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+                {selectedFile ? selectedFile.name : 'Click or Drag File to Attach'}
+              </Typography>
+              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mt: 0.5 }}>
+                {selectedFile
+                  ? `${(selectedFile.size / 1024).toFixed(1)} KB • Ready for upload`
+                  : 'Supports PDF, DOCX, PNG, JPG (Max 25MB)'}
+              </Typography>
+            </Box>
+
+            {selectedFile && (
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  mt: 1.5,
+                  p: 1.5,
+                  borderRadius: '10px',
+                  backgroundColor: '#F5F5F7',
+                  border: '1px solid var(--mac-border-color)',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <InsertDriveFileIcon sx={{ color: 'var(--sakay-orange)' }} />
+                  <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    {selectedFile.name}
+                  </Typography>
+                </Box>
+                <Chip label="Selected File" size="small" color="primary" sx={{ fontSize: '12px', fontWeight: 600 }} />
+              </Box>
+            )}
           </Box>
+
+          <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', lineHeight: 1.4 }}>
+            Submitted compliance files will be transmitted directly to the City LGU Franchising Office for annual accreditation renewal verification.
+          </Typography>
         </Box>
       </MacCenterModal>
 
-      {/* 7. Document Preview Modal */}
+      {/* Document Preview Modal */}
       {selectedDoc && (
         <DocumentPreviewModal
           open={Boolean(selectedDoc)}

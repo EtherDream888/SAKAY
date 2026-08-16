@@ -3,19 +3,20 @@ import { Chip, ChipProps } from '@mui/material';
 import { StatusType } from '../../types/toda';
 
 interface StatusBadgeProps extends Omit<ChipProps, 'color'> {
-  status: StatusType;
+  status: StatusType | string;
   label?: string;
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label, sx, ...props }) => {
-  const getStatusStyles = (status: StatusType) => {
-    switch (status) {
+  const getStatusStyles = (statusStr: string) => {
+    switch (statusStr) {
       case 'Approved':
       case 'Active':
       case 'Verified':
       case 'Resolved':
       case 'Valid':
       case 'Published':
+      case 'Completed':
       case 'Resolved (TODA Level)':
         return {
           backgroundColor: 'rgba(52, 168, 83, 0.12)',
@@ -28,6 +29,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label, sx, ...
       case 'Submitted':
       case 'TODA Review':
       case 'Pending Verification':
+      case 'In Progress':
         return {
           backgroundColor: 'rgba(251, 188, 4, 0.15)',
           color: '#B06000',
@@ -36,6 +38,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label, sx, ...
       case 'TODA Endorsed':
       case 'Under Investigation':
       case 'Pending LGU Re-approval':
+      case 'Endorsed':
         return {
           backgroundColor: 'rgba(21, 101, 192, 0.12)',
           color: '#1565C0',
@@ -44,6 +47,8 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label, sx, ...
       case 'Expiring Soon':
       case 'Resubmission Required':
       case 'Escalated to LGU':
+      case 'Suspension Review':
+      case 'Reactivation Review':
         return {
           backgroundColor: 'rgba(255, 107, 26, 0.14)',
           color: 'var(--sakay-orange)',
@@ -52,6 +57,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label, sx, ...
       case 'Dismissed':
       case 'Unpublished':
       case 'Draft':
+      case 'Cancelled':
         return {
           backgroundColor: 'rgba(142, 142, 147, 0.12)',
           color: '#5F6368',
@@ -80,7 +86,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label, sx, ...
     }
   };
 
-  const styles = getStatusStyles(status);
+  const styles = getStatusStyles(status as string);
 
   return (
     <Chip

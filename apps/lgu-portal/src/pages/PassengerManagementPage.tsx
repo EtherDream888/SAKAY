@@ -253,9 +253,7 @@ export const PassengerManagementPage: React.FC = () => {
               filteredPassengers.map((passenger) => (
                 <TableRow
                   key={passenger.id}
-                  onClick={() => setSelectedPassenger(passenger)}
                   sx={{
-                    cursor: 'pointer',
                     transition: 'var(--mac-transition-fast)',
                     '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' },
                   }}

@@ -180,9 +180,7 @@ export const AuditLogPage: React.FC = () => {
                 return (
                   <TableRow
                     key={log.id}
-                    onClick={() => setSelectedLog(log)}
                     sx={{
-                      cursor: 'pointer',
                       transition: 'var(--mac-transition-fast)',
                       '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' },
                     }}

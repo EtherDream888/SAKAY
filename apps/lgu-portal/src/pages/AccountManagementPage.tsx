@@ -347,12 +347,7 @@ export const AccountManagementPage: React.FC = () => {
                 return (
                   <TableRow
                     key={admin.id}
-                    onClick={() => {
-                      setSelectedAdmin(admin);
-                      setSelectedNewRole(admin.role);
-                    }}
                     sx={{
-                      cursor: 'pointer',
                       transition: 'var(--mac-transition-fast)',
                       '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' },
                     }}

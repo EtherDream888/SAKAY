@@ -1,53 +1,46 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { TodaLayout } from '../components/layout/TodaLayout';
+
 import { TodaOperationsPage } from '../pages/TodaOperationsPage';
 import { TodaDriverVerificationPage } from '../pages/TodaDriverVerificationPage';
 import { TodaDriverMembershipPage } from '../pages/TodaDriverMembershipPage';
 import { TodaAnnouncementsPage } from '../pages/TodaAnnouncementsPage';
 import { TodaReportingPage } from '../pages/TodaReportingPage';
-import { TodaAccountManagementPage } from '../pages/TodaAccountManagementPage';
 import { TodaAuditLogsPage } from '../pages/TodaAuditLogsPage';
+import { TodaAccountManagementPage } from '../pages/TodaAccountManagementPage';
 
 export const TodaRoutes: React.FC = () => {
   return (
     <Routes>
+      {/* Default redirect to /operations */}
       <Route path="/" element={<Navigate to="/operations" replace />} />
 
-      {/* Main Operations Monitoring */}
+      {/* Operations Monitoring Screen */}
       <Route
         path="/operations"
         element={
-          <TodaLayout
-            pageTitle="Operations Monitoring"
-            pageSubtitle="Live monitoring of Calapan Central TODA active drivers, bookings, and terminal queue"
-          >
+          <TodaLayout pageTitle="Operations Monitoring" pageSubtitle="Real-time overview of Calapan Central TODA terminal and driver fleet">
             <TodaOperationsPage />
           </TodaLayout>
         }
       />
 
-      {/* Driver Verification Queue */}
+      {/* Driver Verification */}
       <Route
         path="/driver-verification"
         element={
-          <TodaLayout
-            pageTitle="Driver Verification (TODA Stage)"
-            pageSubtitle="Initial credential screening, master roster match verification, and LGU endorsement"
-          >
+          <TodaLayout pageTitle="Driver Verification" pageSubtitle="Screen TODA member driver applications before LGU accreditation endorsement">
             <TodaDriverVerificationPage />
           </TodaLayout>
         }
       />
 
-      {/* Driver Membership & Exemption Appeals */}
+      {/* Driver Membership */}
       <Route
         path="/drivers"
         element={
-          <TodaLayout
-            pageTitle="Driver Membership & Roster"
-            pageSubtitle="Manage affiliated member drivers, shift allocations, TODA suspensions, and strike appeals"
-          >
+          <TodaLayout pageTitle="Driver Membership" pageSubtitle="Manage TODA member driver roster, strikes, and governance suspensions">
             <TodaDriverMembershipPage />
           </TodaLayout>
         }
@@ -57,37 +50,18 @@ export const TodaRoutes: React.FC = () => {
       <Route
         path="/announcements"
         element={
-          <TodaLayout
-            pageTitle="TODA Driver Announcements"
-            pageSubtitle="Broadcast terminal rules, schedule updates, and compliance notices to affiliated drivers"
-          >
+          <TodaLayout pageTitle="Announcements" pageSubtitle="Broadcast notices and terminal policy updates to TODA member drivers">
             <TodaAnnouncementsPage />
           </TodaLayout>
         }
       />
 
-      {/* TODA Reporting & Incident Triage */}
+      {/* Reports & Incidents */}
       <Route
         path="/reports"
         element={
-          <TodaLayout
-            pageTitle="TODA Reports & Incident Review"
-            pageSubtitle="Export trip ledgers and perform TODA-level complaint mediation with LGU escalation"
-          >
+          <TodaLayout pageTitle="TODA Reports & Incidents" pageSubtitle="Review TODA trip activity, gross fare ledgers, and driver complaint incidents">
             <TodaReportingPage />
-          </TodaLayout>
-        }
-      />
-
-      {/* Account & Accreditation */}
-      <Route
-        path="/account"
-        element={
-          <TodaLayout
-            pageTitle="Account & Accreditation"
-            pageSubtitle="Manage TODA organizational profile, executive officers, clearance documents, and terminal location"
-          >
-            <TodaAccountManagementPage />
           </TodaLayout>
         }
       />
@@ -96,15 +70,23 @@ export const TodaRoutes: React.FC = () => {
       <Route
         path="/audit-logs"
         element={
-          <TodaLayout
-            pageTitle="TODA Audit Trail"
-            pageSubtitle="Cryptographic administrative activity ledger for TODA officer actions and decisions"
-          >
+          <TodaLayout pageTitle="Audit Logs" pageSubtitle="Immutable security trail of TODA administrative actions and endorsements">
             <TodaAuditLogsPage />
           </TodaLayout>
         }
       />
 
+      {/* Account Management */}
+      <Route
+        path="/account"
+        element={
+          <TodaLayout pageTitle="Account & Accreditation" pageSubtitle="Manage TODA organizational information, officers roster, and annual LGU accreditation">
+            <TodaAccountManagementPage />
+          </TodaLayout>
+        }
+      />
+
+      {/* Catch-all fallback */}
       <Route path="*" element={<Navigate to="/operations" replace />} />
     </Routes>
   );

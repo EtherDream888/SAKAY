@@ -106,9 +106,7 @@ export const AccreditedTodasPage: React.FC = () => {
               filteredTodas.map((toda) => (
                 <TableRow
                   key={toda.id}
-                  onClick={() => setSelectedToda(toda)}
                   sx={{
-                    cursor: 'pointer',
                     transition: 'var(--mac-transition-fast)',
                     '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' },
                   }}

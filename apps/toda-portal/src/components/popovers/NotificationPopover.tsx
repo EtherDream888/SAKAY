@@ -1,11 +1,11 @@
 import React from 'react';
 import { Box, Typography, Popover, Button, List, ListItem, ListItemText, Divider } from '@mui/material';
-import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import { NotificationItem } from '../../types/toda';
 
 interface NotificationPopoverProps {
   open: boolean;
   onClose: () => void;
+  anchorEl: HTMLElement | null;
   notifications: NotificationItem[];
   onMarkAllAsRead: () => void;
 }
@@ -13,12 +13,14 @@ interface NotificationPopoverProps {
 export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
   open,
   onClose,
+  anchorEl,
   notifications,
   onMarkAllAsRead,
 }) => {
   return (
     <Popover
       open={open}
+      anchorEl={anchorEl}
       onClose={onClose}
       anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       transformOrigin={{ vertical: 'top', horizontal: 'right' }}
@@ -27,8 +29,8 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
           className: 'mac-glass-popover',
           sx: {
             mt: 1.5,
-            width: 360,
-            maxHeight: 440,
+            width: 380,
+            maxHeight: 460,
             borderRadius: 'var(--mac-radius-lg)',
             boxShadow: 'var(--mac-shadow-popover)',
             overflow: 'hidden',
@@ -37,14 +39,14 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
       }}
     >
       <Box sx={{ p: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--mac-border-color)' }}>
-        <Typography sx={{ fontSize: '15px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+        <Typography sx={{ fontSize: '16px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
           TODA Notifications
         </Typography>
         <Button
           size="small"
           onClick={onMarkAllAsRead}
           sx={{
-            fontSize: '12px',
+            fontSize: '13px',
             textTransform: 'none',
             color: 'var(--sakay-orange)',
             fontWeight: 600,
@@ -56,7 +58,7 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
         </Button>
       </Box>
 
-      <List sx={{ p: 0, maxHeight: 360, overflowY: 'auto' }}>
+      <List sx={{ p: 0, maxHeight: 380, overflowY: 'auto' }}>
         {notifications.length > 0 ? (
           notifications.map((n, idx) => (
             <React.Fragment key={n.id}>
@@ -71,7 +73,7 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
                 <ListItemText
                   primary={
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-                      <Typography sx={{ fontSize: '13.5px', fontWeight: n.unread ? 700 : 500, color: 'var(--mac-text-primary)' }}>
+                      <Typography sx={{ fontSize: '14.5px', fontWeight: n.unread ? 700 : 500, color: 'var(--mac-text-primary)' }}>
                         {n.title}
                       </Typography>
                       {n.unread && (
@@ -81,10 +83,10 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
                   }
                   secondary={
                     <Box>
-                      <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-secondary)', lineHeight: 1.4 }}>
+                      <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-secondary)', lineHeight: 1.4 }}>
                         {n.description}
                       </Typography>
-                      <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mt: 0.5 }}>
+                      <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mt: 0.5 }}>
                         {n.time}
                       </Typography>
                     </Box>
@@ -96,7 +98,7 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
           ))
         ) : (
           <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-muted)' }}>
               No notifications at this time.
             </Typography>
           </Box>

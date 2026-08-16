@@ -286,9 +286,7 @@ export const TodaApplicationsPage: React.FC = () => {
               filteredApps.map((app) => (
                 <TableRow
                   key={app.id}
-                  onClick={() => setSelectedApp(app)}
                   sx={{
-                    cursor: 'pointer',
                     transition: 'var(--mac-transition-fast)',
                     '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' },
                   }}

@@ -21,6 +21,8 @@ export type StatusType =
   | 'Pending Review'
   | 'Under Investigation'
   | 'TODA Endorsed'
+  | 'Endorsed to LGU'
+  | 'Awaiting Screening'
   | 'Submitted'
   | 'TODA Review'
   | 'Pending LGU Re-approval'
@@ -29,7 +31,10 @@ export type StatusType =
   | 'Draft'
   | 'Escalated to LGU'
   | 'Resolved (TODA Level)'
-  | 'Dismissed';
+  | 'Dismissed'
+  | 'Suspension Review'
+  | 'Reactivation Review'
+  | 'Endorsed';
 
 export interface TodaProfile {
   id: string;
@@ -51,6 +56,7 @@ export interface TodaProfile {
   };
   accreditationStatus: 'Active' | 'Pending Verification' | 'Suspended' | 'Deactivated';
   accreditationExpiry: string;
+  accreditationNo: string;
   permitNumber: string;
   barangayClearanceFile: { name: string; date: string; url?: string };
   rosterFile: { name: string; date: string; count: number; url?: string };
@@ -69,12 +75,12 @@ export interface DriverApplicant {
   franchiseNo: string;
   submittedDate: string;
   daysPending: number;
-  isOverdue: boolean; // >3 days warning, >5 days SLA violation
-  onSubmittedRoster: boolean; // Rule 2.4: Mismatch detection
+  isOverdue: boolean; // >3 days warning
+  onSubmittedRoster: boolean; // Master Roster Mismatch detection
   tricyclePhotoUrl: string;
   photoVerified: boolean;
   rosterVerified: boolean;
-  todaStageStatus: 'Submitted' | 'TODA Review' | 'TODA Endorsed' | 'Rejected' | 'Resubmission Required';
+  todaStageStatus: 'Awaiting Screening' | 'Submitted' | 'TODA Review' | 'TODA Endorsed' | 'Endorsed to LGU' | 'Rejected' | 'Resubmission Required';
   rejectionReason?: string;
   notes?: string;
 }
@@ -88,17 +94,24 @@ export interface TodaDriverMember {
   vehiclePlate: string;
   franchiseNo: string;
   licenseNo: string;
-  terminalShift: string;
+  terminalShift?: string;
   serviceZone: string;
   todaVerificationStatus: 'Verified' | 'Endorsed' | 'Pending';
   lguVerificationStatus: 'Verified' | 'Pending' | 'Suspended';
-  accountStatus: 'Active' | 'TODA Suspended' | 'LGU Deactivated';
+  accountStatus: 'Active' | 'TODA Suspended' | 'LGU Deactivated' | 'Suspension Review' | 'Reactivation Review';
   suspensionReason?: string;
   suspendedAt?: string;
   strikesCount: number;
   rating: number;
   totalTrips: number;
   joinedDate: string;
+}
+
+export interface EvidenceFileItem {
+  id: string;
+  name: string;
+  type: 'image' | 'pdf' | 'document';
+  url: string;
 }
 
 export interface DriverExemptionRequest {
@@ -108,7 +121,7 @@ export interface DriverExemptionRequest {
   strikeId: string;
   incidentCategory: string;
   reason: string;
-  evidenceFiles: string[];
+  evidenceFiles: EvidenceFileItem[];
   submittedAt: string;
   status: 'Pending Review' | 'Approved' | 'Escalated to LGU' | 'Rejected';
   decisionNotes?: string;
@@ -139,7 +152,7 @@ export interface TodaBooking {
   fareAmount: number;
   tripMode: 'Single Commuter' | 'Solo Charter' | 'Shared Ride';
   status: 'Completed' | 'In Progress' | 'Cancelled';
-  paymentMethod: 'Cash' | 'GCash / Digital';
+  paymentMethod: 'Cash';
   timestamp: string;
 }
 

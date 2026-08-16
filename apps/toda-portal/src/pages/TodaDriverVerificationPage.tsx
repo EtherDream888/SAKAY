@@ -13,44 +13,28 @@ import {
   Chip,
   Checkbox,
   FormControlLabel,
-  Alert,
   Avatar,
 } from '@mui/material';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import SendIcon from '@mui/icons-material/Send';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import TwoWheelerIcon from '@mui/icons-material/TwoWheeler';
-import CancelIcon from '@mui/icons-material/Cancel';
-import ReplayIcon from '@mui/icons-material/Replay';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import InboxIcon from '@mui/icons-material/Inbox';
+import VerifiedIcon from '@mui/icons-material/Verified';
 
-import { MOCK_DRIVER_APPLICANTS, CURRENT_TODA_PROFILE } from '../mockData/todaData';
+import { MOCK_DRIVER_APPLICANTS, CURRENT_TODA_PROFILE, MOCK_TODA_DRIVERS } from '../mockData/todaData';
 import { DriverApplicant } from '../types/toda';
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
 import { StatusBadge } from '../components/common/StatusBadge';
-import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
+import { DocumentPreviewModal } from '../components/admin/DocumentPreviewModal';
 import {
   fetchDriverApplicants,
-  updateApplicantVerification,
   forwardApplicantToLgu,
   recordTodaAuditAction,
 } from '../services/todaApiService';
 
-/**
- * ============================================================================
- * TODA DRIVER VERIFICATION PAGE COMPONENT
- * ============================================================================
- * Purpose:
- *   Handles Stage 1 of the sequential 2-step verification pipeline.
- *   TODA officers cross-examine applicant credentials against their official
- *   submitted member roster and verify physical tricycle photos before
- *   endorsing the driver to the City LGU.
- * ============================================================================
- */
 export const TodaDriverVerificationPage: React.FC = () => {
-  // State: Driver applicant screening queue and active filters
   const [applicants, setApplicants] = useState<DriverApplicant[]>(MOCK_DRIVER_APPLICANTS);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -59,6 +43,7 @@ export const TodaDriverVerificationPage: React.FC = () => {
 
   // Selected Applicant for Review Modal
   const [selectedApplicant, setSelectedApplicant] = useState<DriverApplicant | null>(null);
+  const [previewDocModalOpen, setPreviewDocModalOpen] = useState(false);
 
   // Review Checkbox States
   const [rosterChecked, setRosterChecked] = useState(false);
@@ -69,9 +54,6 @@ export const TodaDriverVerificationPage: React.FC = () => {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [resubmitDialogOpen, setResubmitDialogOpen] = useState(false);
 
-  /**
-   * Effect: Fetch live applicant queue from backend on initial mount.
-   */
   useEffect(() => {
     let isMounted = true;
     fetchDriverApplicants()
@@ -101,129 +83,153 @@ export const TodaDriverVerificationPage: React.FC = () => {
       app.franchiseNo.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = statusFilter === 'All' || app.todaStageStatus === statusFilter;
-    const matchesRoster =
-      rosterFilter === 'All' ||
-      (rosterFilter === 'On Roster' && app.onSubmittedRoster) ||
-      (rosterFilter === 'Roster Mismatch' && !app.onSubmittedRoster);
+
+    let matchesRoster = true;
+    if (rosterFilter === 'Matched') matchesRoster = app.onSubmittedRoster;
+    if (rosterFilter === 'Mismatch') matchesRoster = !app.onSubmittedRoster;
 
     return matchesSearch && matchesStatus && matchesRoster;
   });
 
-  // KPI Counts
-  const totalCount = applicants.length;
-  const pendingCount = applicants.filter((a) => a.todaStageStatus === 'Submitted' || a.todaStageStatus === 'TODA Review').length;
-  const overdueCount = applicants.filter((a) => a.isOverdue).length;
-  const endorsedCount = applicants.filter((a) => a.todaStageStatus === 'TODA Endorsed').length;
+  // KPI Metrics (Accurate TODA Operational Governance Breakdown)
+  const pendingCount = applicants.filter(
+    (a) => a.todaStageStatus === 'Awaiting Screening' || a.todaStageStatus === 'Submitted' || a.todaStageStatus === 'TODA Review'
+  ).length;
+
+  const overdueCount = applicants.filter(
+    (a) => a.isOverdue && (a.todaStageStatus === 'Awaiting Screening' || a.todaStageStatus === 'Submitted' || a.todaStageStatus === 'TODA Review')
+  ).length;
+
+  const endorsedCount = applicants.filter(
+    (a) => a.todaStageStatus === 'Endorsed to LGU' || a.todaStageStatus === 'TODA Endorsed'
+  ).length;
+
+  const lguVerifiedCount = MOCK_TODA_DRIVERS.filter(
+    (d) => d.lguVerificationStatus === 'Verified'
+  ).length;
 
   const statusOptions: FilterOption[] = [
-    { label: 'All Statuses', value: 'All' },
-    { label: 'Submitted', value: 'Submitted' },
-    { label: 'TODA Review', value: 'TODA Review' },
-    { label: 'TODA Endorsed', value: 'TODA Endorsed' },
-    { label: 'Rejected', value: 'Rejected' },
+    { label: 'All Stage Statuses', value: 'All' },
+    { label: 'Awaiting Screening (Pending TODA)', value: 'Awaiting Screening' },
+    { label: 'TODA Review (In Progress)', value: 'TODA Review' },
+    { label: 'Endorsed to LGU (Sent to Franchising)', value: 'Endorsed to LGU' },
     { label: 'Resubmission Required', value: 'Resubmission Required' },
+    { label: 'Rejected (TODA Level)', value: 'Rejected' },
   ];
 
   const rosterOptions: FilterOption[] = [
     { label: 'All Roster Records', value: 'All' },
-    { label: 'On Roster (Matched)', value: 'On Roster' },
-    { label: 'Roster Mismatch (Violation Flag)', value: 'Roster Mismatch' },
+    { label: 'Master Roster Verified', value: 'Matched' },
+    { label: 'Roster Mismatch Flag', value: 'Mismatch' },
   ];
 
-  // Open review modal
   const handleOpenReview = (app: DriverApplicant) => {
     setSelectedApplicant(app);
     setRosterChecked(app.rosterVerified);
     setPhotoChecked(app.photoVerified);
   };
 
-  /**
-   * Action Handler: Endorses and forwards screened driver applicant to City LGU.
-   */
   const handleForwardConfirm = async () => {
     if (!selectedApplicant) return;
 
-    // Backend API Call
-    try {
-      await forwardApplicantToLgu(selectedApplicant.id);
-    } catch (err) {
-      console.warn('[TodaVerification] Backend error during endorsement:', err);
+    const updated = await forwardApplicantToLgu(selectedApplicant.id);
+    if (updated) {
+      setApplicants((prev) =>
+        prev.map((a) => (a.id === selectedApplicant.id ? { ...a, todaStageStatus: 'Endorsed to LGU', rosterVerified: true, photoVerified: true } : a))
+      );
+    } else {
+      setApplicants((prev) =>
+        prev.map((a) => (a.id === selectedApplicant.id ? { ...a, todaStageStatus: 'Endorsed to LGU' } : a))
+      );
     }
 
-    setApplicants((prev) =>
-      prev.map((a) =>
-        a.id === selectedApplicant.id
-          ? { ...a, todaStageStatus: 'TODA Endorsed', rosterVerified: true, photoVerified: true }
-          : a
-      )
-    );
-    setSelectedApplicant((prev) => (prev ? { ...prev, todaStageStatus: 'TODA Endorsed' } : null));
-
-    // Commit Action to TODA Audit Trail
     recordTodaAuditAction({
-      actionType: 'DRIVER_ENDORSED_TO_LGU',
+      actionType: 'DRIVER_APPLICANT_ENDORSED_TO_LGU',
       targetId: selectedApplicant.id,
       targetName: selectedApplicant.name,
-      details: `Verified master roster membership and tricycle roadworthiness. Forwarded application for ${selectedApplicant.name} (${selectedApplicant.vehiclePlate}) to LGU Administrator for final accreditation.`,
+      details: `Screened and endorsed driver ${selectedApplicant.name} (${selectedApplicant.vehiclePlate}) to City LGU Franchising Office for official accreditation.`,
       category: 'Driver Verification',
     });
 
     setForwardDialogOpen(false);
+    setSelectedApplicant(null);
   };
 
-  // Action: Reject
-  const handleRejectConfirm = (reason?: string) => {
+  const handleRejectConfirm = () => {
     if (!selectedApplicant) return;
 
     setApplicants((prev) =>
-      prev.map((a) =>
-        a.id === selectedApplicant.id
-          ? { ...a, todaStageStatus: 'Rejected', rejectionReason: reason }
-          : a
-      )
+      prev.map((a) => (a.id === selectedApplicant.id ? { ...a, todaStageStatus: 'Rejected' } : a))
     );
-    setSelectedApplicant((prev) => (prev ? { ...prev, todaStageStatus: 'Rejected', rejectionReason: reason } : null));
 
     recordTodaAuditAction({
-      actionType: 'DRIVER_APPLICATION_REJECTED',
+      actionType: 'DRIVER_APPLICANT_REJECTED',
       targetId: selectedApplicant.id,
       targetName: selectedApplicant.name,
-      details: `Rejected driver applicant ${selectedApplicant.name}. Reason: ${reason || 'Failed TODA screening requirements.'}`,
+      details: `Rejected driver applicant ${selectedApplicant.name} at TODA level. Reason: Unmatched master roster membership.`,
       category: 'Driver Verification',
     });
 
     setRejectDialogOpen(false);
+    setSelectedApplicant(null);
   };
 
-  // Action: Request Resubmission
-  const handleResubmitConfirm = (reason?: string) => {
+  const handleResubmitConfirm = () => {
     if (!selectedApplicant) return;
 
     setApplicants((prev) =>
-      prev.map((a) =>
-        a.id === selectedApplicant.id
-          ? { ...a, todaStageStatus: 'Resubmission Required', notes: reason }
-          : a
-      )
+      prev.map((a) => (a.id === selectedApplicant.id ? { ...a, todaStageStatus: 'Resubmission Required' } : a))
     );
-    setSelectedApplicant((prev) => (prev ? { ...prev, todaStageStatus: 'Resubmission Required', notes: reason } : null));
 
     recordTodaAuditAction({
       actionType: 'DRIVER_RESUBMISSION_REQUESTED',
       targetId: selectedApplicant.id,
       targetName: selectedApplicant.name,
-      details: `Requested document/photo resubmission for applicant ${selectedApplicant.name}. Reason: ${reason || 'Unclear franchise markings or license photo.'}`,
+      details: `Requested document resubmission for ${selectedApplicant.name}.`,
       category: 'Driver Verification',
     });
 
     setResubmitDialogOpen(false);
+    setSelectedApplicant(null);
   };
 
-  const isForwardEnabled = rosterChecked && photoChecked && selectedApplicant?.onSubmittedRoster;
+  const canEndorse = rosterChecked && photoChecked;
 
   return (
     <Box sx={{ maxWidth: 1600, margin: '0 auto', pb: 6 }}>
-      {/* 1. Summary Information Panels */}
+      {/* 1. 3-Day Operational Governance Banner (Simplified Non-Technical Language) */}
+      <Box
+        sx={{
+          mb: 3.5,
+          backgroundColor: '#FFF7ED',
+          border: '1px solid #FDBA74',
+          borderRadius: 'var(--mac-radius-lg)',
+          padding: '18px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          boxShadow: 'var(--mac-shadow-subtle)',
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <WarningAmberIcon sx={{ color: '#EA580C', fontSize: 26, flexShrink: 0 }} />
+          <Box>
+            <Typography sx={{ fontSize: '15px', fontWeight: 700, color: '#9A3412', mb: '3px' }}>
+              TODA Operational Governance Rule — 3-Calendar-Day Review Deadline
+            </Typography>
+            <Typography sx={{ fontSize: '13.5px', color: '#C2410C', lineHeight: 1.4 }}>
+              TODA Officers must screen new driver applications against the active TODA Driver Master Roster and endorse or return them within <strong>3 calendar days</strong> of submission. Applications exceeding this 3-day standard processing window are flagged as Overdue.
+            </Typography>
+          </Box>
+        </Box>
+        <Chip
+          label="3-Day Processing Deadline"
+          size="small"
+          sx={{ backgroundColor: '#EA580C', color: '#FFFFFF', fontWeight: 700, fontSize: '12.5px', px: 1, height: 26 }}
+        />
+      </Box>
+
+      {/* 2. Clear KPI Breakdown Cards */}
       <Box
         sx={{
           display: 'grid',
@@ -232,29 +238,67 @@ export const TodaDriverVerificationPage: React.FC = () => {
           mb: 3.5,
         }}
       >
+        {/* Pending TODA Action */}
         <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Total Applications</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>{totalCount}</Typography>
+          <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', mb: 1 }}>
+            Awaiting TODA Screening
+          </Typography>
+          <Typography sx={{ fontSize: '30px', fontWeight: 700, color: 'var(--sakay-orange)' }}>
+            {pendingCount}
+          </Typography>
+          <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mt: 0.5 }}>
+            Applications requiring TODA manual screening
+          </Typography>
         </Box>
+
+        {/* Overdue (>3 Days) */}
         <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Awaiting TODA Screening</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: 'var(--sakay-orange)' }}>{pendingCount}</Typography>
+          <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', mb: 1 }}>
+            Overdue Screening (&gt;3 Days)
+          </Typography>
+          <Typography sx={{ fontSize: '30px', fontWeight: 700, color: '#DC2626' }}>
+            {overdueCount}
+          </Typography>
+          <Typography sx={{ fontSize: '12px', color: '#DC2626', fontWeight: 600, mt: 0.5 }}>
+            Exceeds 3-day standard processing time
+          </Typography>
         </Box>
+
+        {/* Endorsed to LGU */}
         <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Overdue SLA (3+ Days)</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: '#C62828' }}>{overdueCount}</Typography>
+          <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', mb: 1 }}>
+            Endorsed to LGU
+          </Typography>
+          <Typography sx={{ fontSize: '30px', fontWeight: 700, color: '#1565C0' }}>
+            {endorsedCount}
+          </Typography>
+          <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mt: 0.5 }}>
+            Sent to City LGU Franchising Office
+          </Typography>
         </Box>
+
+        {/* LGU Verified Drivers Card */}
         <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Forwarded / Endorsed to LGU</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: '#1565C0' }}>{endorsedCount}</Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+            <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)' }}>
+              Verified Drivers (LGU Accredited)
+            </Typography>
+            <VerifiedIcon sx={{ color: '#1E8E3E', fontSize: 18 }} />
+          </Box>
+          <Typography sx={{ fontSize: '30px', fontWeight: 700, color: '#1E8E3E' }}>
+            {lguVerifiedCount}
+          </Typography>
+          <Typography sx={{ fontSize: '12px', color: '#1E8E3E', fontWeight: 600, mt: 0.5 }}>
+            Active & verified by City Franchising Office
+          </Typography>
         </Box>
       </Box>
 
-      {/* 2. Filter Toolbar */}
+      {/* 3. Floating Filter Toolbar with Rightmost Filter Alignment */}
       <FilterToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder="Search driver name, plate, franchise, or license..."
+        searchPlaceholder="Search driver applicant, plate, license, or franchise..."
         selectFilters={[
           {
             id: 'status',
@@ -265,7 +309,7 @@ export const TodaDriverVerificationPage: React.FC = () => {
           },
           {
             id: 'roster',
-            label: 'Roster Match',
+            label: 'Roster Matching',
             value: rosterFilter,
             options: rosterOptions,
             onChange: setRosterFilter,
@@ -278,7 +322,7 @@ export const TodaDriverVerificationPage: React.FC = () => {
         }}
       />
 
-      {/* 3. Driver Applications Table */}
+      {/* 4. Applications Roster Table */}
       <TableContainer
         component={Paper}
         elevation={0}
@@ -292,313 +336,253 @@ export const TodaDriverVerificationPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>APPLICANT DRIVER</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>VEHICLE & FRANCHISE</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ROSTER STATUS (RULE 2.4)</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>SLA REVIEW TRACKER</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>STAGE STATUS</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACTIONS</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>DRIVER APPLICANT</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>VEHICLE & FRANCHISE</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>MASTER ROSTER CHECK</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>SUBMISSION & AGE</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>STAGE STATUS</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3, width: 180 }}>ACTIONS</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredApplicants.length > 0 ? (
+            {filteredApplicants.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 7 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                    <InboxIcon sx={{ fontSize: 48, color: 'var(--mac-text-tertiary)' }} />
+                    <Typography sx={{ fontSize: '16px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+                      No Driver Applications Found
+                    </Typography>
+                    <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)' }}>
+                      There are currently no driver applications matching the "{statusFilter !== 'All' ? statusFilter : 'selected'}" filter criteria.
+                    </Typography>
+                  </Box>
+                </TableCell>
+              </TableRow>
+            ) : (
               filteredApplicants.map((app) => (
-                <TableRow
-                  key={app.id}
-                  onClick={() => handleOpenReview(app)}
-                  sx={{
-                    cursor: 'pointer',
-                    transition: 'var(--mac-transition-fast)',
-                    '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' },
-                  }}
-                >
-                  <TableCell sx={{ py: 2.2, px: 3 }}>
+                <TableRow key={app.id} sx={{ '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' } }}>
+                  <TableCell sx={{ py: 2, px: 3 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Avatar sx={{ width: 36, height: 36, backgroundColor: 'var(--sakay-orange-soft)', color: 'var(--sakay-orange)', fontSize: '13px', fontWeight: 700 }}>
+                      <Avatar sx={{ width: 38, height: 38, backgroundColor: 'var(--sakay-orange-soft)', color: 'var(--sakay-orange)', fontSize: '14.5px', fontWeight: 700 }}>
                         {app.name.charAt(0)}
                       </Avatar>
                       <Box>
-                        <Typography sx={{ fontWeight: 600, fontSize: '14.5px', color: 'var(--mac-text-primary)' }}>
+                        <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                           {app.name}
                         </Typography>
-                        <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mt: '2px' }}>
+                        <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
                           License: {app.licenseNo} • {app.phone}
                         </Typography>
                       </Box>
                     </Box>
                   </TableCell>
-                  <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+
+                  <TableCell sx={{ py: 2, px: 3 }}>
+                    <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                       Plate: {app.vehiclePlate}
                     </Typography>
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mt: '2px' }}>
-                      Franchise: {app.franchiseNo}
+                    <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+                      MTOP: {app.franchiseNo}
                     </Typography>
                   </TableCell>
-                  <TableCell sx={{ py: 2.2, px: 3 }}>
+
+                  <TableCell sx={{ py: 2, px: 3 }}>
                     {app.onSubmittedRoster ? (
                       <Chip
-                        label="Matched on Roster"
+                        icon={<CheckCircleIcon sx={{ fontSize: 15, color: '#1E8E3E' }} />}
+                        label="Master Roster Verified"
                         size="small"
-                        icon={<CheckCircleIcon sx={{ fontSize: '14px !important', color: '#1E8E3E !important' }} />}
-                        sx={{ backgroundColor: '#E6F4EA', color: '#1E8E3E', fontWeight: 600, fontSize: '12px', height: 24 }}
+                        sx={{ backgroundColor: '#E6F4EA', color: '#1E8E3E', fontWeight: 600, fontSize: '12.5px' }}
                       />
                     ) : (
                       <Chip
-                        label="Mismatch: Not on Roster"
+                        icon={<WarningAmberIcon sx={{ fontSize: 15, color: '#DC2626' }} />}
+                        label="Roster Mismatch Flag"
                         size="small"
-                        icon={<WarningAmberIcon sx={{ fontSize: '14px !important', color: '#DC2626 !important' }} />}
-                        sx={{ backgroundColor: '#FEE2E2', color: '#DC2626', fontWeight: 700, fontSize: '12px', height: 24 }}
+                        sx={{ backgroundColor: '#FEF2F2', color: '#DC2626', fontWeight: 600, fontSize: '12.5px' }}
                       />
                     )}
                   </TableCell>
-                  <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: app.isOverdue ? '#DC2626' : 'var(--mac-text-primary)' }}>
-                        {app.daysPending} {app.daysPending === 1 ? 'day' : 'days'} pending
+
+                  <TableCell sx={{ py: 2, px: 3 }}>
+                    <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-primary)', fontWeight: 500 }}>
+                      {app.submittedDate}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: '2px' }}>
+                      <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+                        {app.daysPending} day(s) ago
                       </Typography>
-                      {app.isOverdue && (
-                        <Chip
-                          label={app.daysPending > 5 ? 'SLA Overdue' : 'Approaching SLA'}
-                          size="small"
-                          sx={{ backgroundColor: '#FEE2E2', color: '#DC2626', fontWeight: 700, fontSize: '11px', height: 20 }}
-                        />
+                      {app.isOverdue && (app.todaStageStatus === 'Awaiting Screening' || app.todaStageStatus === 'Submitted' || app.todaStageStatus === 'TODA Review') && (
+                        <Chip label="Overdue (>3 Days)" size="small" sx={{ backgroundColor: '#FEF2F2', color: '#DC2626', fontSize: '11px', fontWeight: 700, height: 20 }} />
                       )}
                     </Box>
                   </TableCell>
-                  <TableCell sx={{ py: 2.2, px: 3 }}>
+
+                  <TableCell sx={{ py: 2, px: 3 }}>
                     <StatusBadge status={app.todaStageStatus} />
                   </TableCell>
-                  <TableCell align="right" sx={{ py: 2.2, px: 3 }}>
-                    <ActionButton
-                      label="Screen Applicant"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleOpenReview(app);
+
+                  <TableCell align="right" sx={{ py: 2, px: 3 }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<VisibilityIcon fontSize="small" />}
+                      onClick={() => handleOpenReview(app)}
+                      sx={{
+                        height: 34,
+                        px: 2,
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        color: 'var(--sakay-orange)',
+                        borderColor: 'var(--sakay-orange-border)',
+                        backgroundColor: 'var(--sakay-orange-soft)',
+                        whiteSpace: 'nowrap',
+                        '&:hover': {
+                          backgroundColor: 'var(--sakay-orange)',
+                          color: '#FFFFFF',
+                          borderColor: 'var(--sakay-orange)',
+                        },
                       }}
-                    />
+                    >
+                      {app.todaStageStatus === 'Endorsed to LGU' ? 'View Details' : 'Screen Application'}
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
-                  <Typography sx={{ fontSize: '15px', color: 'var(--mac-text-muted)', fontWeight: 500 }}>
-                    No driver applications matching your filter criteria.
-                  </Typography>
-                </TableCell>
-              </TableRow>
             )}
           </TableBody>
         </Table>
       </TableContainer>
 
-      {/* 4. Driver Screening & Verification Modal */}
+      {/* 5. Driver Application Review Centered Modal */}
       {selectedApplicant && (
         <MacCenterModal
           open={Boolean(selectedApplicant)}
           onClose={() => setSelectedApplicant(null)}
-          title={`Initial Driver Screening — ${selectedApplicant.name}`}
-          subtitle={`Affiliation Request for ${CURRENT_TODA_PROFILE.name}`}
+          title={`Screen Driver Application — ${selectedApplicant.name}`}
+          subtitle={`Submitted: ${selectedApplicant.submittedDate} • ${selectedApplicant.daysPending} days pending`}
           badge={<StatusBadge status={selectedApplicant.todaStageStatus} />}
           maxWidth={760}
+          primaryActionLabel={selectedApplicant.todaStageStatus !== 'Endorsed to LGU' ? "Endorse to City LGU" : undefined}
+          onPrimaryAction={selectedApplicant.todaStageStatus !== 'Endorsed to LGU' && canEndorse ? () => setForwardDialogOpen(true) : undefined}
+          secondaryActionLabel="Close"
+          onSecondaryAction={() => setSelectedApplicant(null)}
         >
-          <Box sx={{ mb: 3 }}>
-            {/* Rule 2.4 Mismatch Warning Banner */}
-            {!selectedApplicant.onSubmittedRoster && (
-              <Alert
-                severity="error"
-                icon={<WarningAmberIcon fontSize="inherit" />}
-                sx={{ mb: 3, borderRadius: '10px' }}
-              >
-                <Typography sx={{ fontSize: '13.5px', fontWeight: 700 }}>
-                  Rule 2.4 Compliance Warning: Driver Mismatch Detected
-                </Typography>
-                <Typography sx={{ fontSize: '12.5px', mt: 0.5 }}>
-                  This applicant does <strong>NOT</strong> appear in the official accredited drivers master list submitted by {CURRENT_TODA_PROFILE.acronym} to the LGU. Endorsing a non-roster driver constitutes an accreditation violation and will trigger supervisory review.
-                </Typography>
-              </Alert>
-            )}
-
-            {/* Applicant Details Grid */}
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2, backgroundColor: '#F8F9FA', padding: '20px', borderRadius: '12px', mb: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2, backgroundColor: '#F8F9FA', p: 2.5, borderRadius: '12px' }}>
               <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Driver License No.</Typography>
+                <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>Driver License No.</Typography>
                 <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedApplicant.licenseNo}</Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Contact Mobile Number</Typography>
-                <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedApplicant.phone}</Typography>
+                <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>Vehicle Plate Number</Typography>
+                <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedApplicant.vehiclePlate}</Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Vehicle Plate & Franchise</Typography>
-                <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                  Plate: {selectedApplicant.vehiclePlate} • {selectedApplicant.franchiseNo}
-                </Typography>
+                <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>Chassis Number</Typography>
+                <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedApplicant.chassisNo}</Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Chassis & Motor Serial</Typography>
-                <Typography sx={{ fontSize: '14px', fontWeight: 500, color: 'var(--mac-text-primary)' }}>
-                  {selectedApplicant.chassisNo} / {selectedApplicant.motorNo}
-                </Typography>
+                <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>Motor Number</Typography>
+                <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedApplicant.motorNo}</Typography>
               </Box>
             </Box>
 
-            {/* Required TODA Screening Checklist */}
-            <Typography sx={{ fontSize: '13px', fontWeight: 700, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1.5 }}>
-              Mandatory TODA Screening Verification Checklist
+            {/* Checklist items */}
+            <Typography sx={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+              TODA Officer Screening Checklist
             </Typography>
 
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 3 }}>
-              {/* Check 1: Roster Match */}
-              <Box sx={{ p: '14px 18px', borderRadius: '10px', border: '1px solid var(--mac-border-color)', backgroundColor: selectedApplicant.onSubmittedRoster ? '#FAFAFC' : '#FFF1F2' }}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={rosterChecked}
-                      disabled={!selectedApplicant.onSubmittedRoster || selectedApplicant.todaStageStatus === 'TODA Endorsed'}
-                      onChange={(e) => setRosterChecked(e.target.checked)}
-                      sx={{ color: 'var(--sakay-orange)', '&.Mui-checked': { color: 'var(--sakay-orange)' } }}
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                        1. Master Roster Membership Verification
-                      </Typography>
-                      <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
-                        Confirm applicant holds valid membership in {CURRENT_TODA_PROFILE.name} franchise allocation.
-                      </Typography>
-                    </Box>
-                  }
-                />
-              </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={rosterChecked}
+                    onChange={(e) => setRosterChecked(e.target.checked)}
+                    sx={{ color: 'var(--sakay-orange)', '&.Mui-checked': { color: 'var(--sakay-orange)' } }}
+                  />
+                }
+                label={
+                  <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    Verify membership against active {CURRENT_TODA_PROFILE.name} Master Driver Roster
+                  </Typography>
+                }
+              />
 
-              {/* Check 2: Tricycle Roadworthiness Photo */}
-              <Box sx={{ p: '14px 18px', borderRadius: '10px', border: '1px solid var(--mac-border-color)', backgroundColor: '#FAFAFC' }}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={photoChecked}
-                      disabled={selectedApplicant.todaStageStatus === 'TODA Endorsed'}
-                      onChange={(e) => setPhotoChecked(e.target.checked)}
-                      sx={{ color: 'var(--sakay-orange)', '&.Mui-checked': { color: 'var(--sakay-orange)' } }}
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                        2. Tricycle Photo & Franchise Stencil Inspection
-                      </Typography>
-                      <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
-                        Verify vehicle photo clearly displays official franchise stencil #{selectedApplicant.franchiseNo} and {CURRENT_TODA_PROFILE.acronym} body sticker.
-                      </Typography>
-                    </Box>
-                  }
-                />
-              </Box>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={photoChecked}
+                    onChange={(e) => setPhotoChecked(e.target.checked)}
+                    sx={{ color: 'var(--sakay-orange)', '&.Mui-checked': { color: 'var(--sakay-orange)' } }}
+                  />
+                }
+                label={
+                  <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    Inspect tricycle unit photograph & plate specifications
+                  </Typography>
+                }
+              />
             </Box>
 
-            {/* Action Buttons Bar */}
-            <Typography sx={{ fontSize: '13px', fontWeight: 700, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1.5 }}>
-              TODA Administrative Decision
-            </Typography>
-
-            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'center', justifyContent: 'space-between', gap: 2, p: 2, borderRadius: '10px', backgroundColor: '#F5F5F7' }}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  size="small"
-                  startIcon={<CancelIcon />}
-                  disabled={selectedApplicant.todaStageStatus === 'TODA Endorsed'}
-                  onClick={() => setRejectDialogOpen(true)}
-                  sx={{ height: 38, textTransform: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}
-                >
-                  Reject Application
-                </Button>
-
-                <Button
-                  variant="outlined"
-                  color="warning"
-                  size="small"
-                  startIcon={<ReplayIcon />}
-                  disabled={selectedApplicant.todaStageStatus === 'TODA Endorsed'}
-                  onClick={() => setResubmitDialogOpen(true)}
-                  sx={{ height: 38, textTransform: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}
-                >
-                  Require Resubmission
-                </Button>
+            {/* Supporting Evidence View */}
+            <Box sx={{ p: 2, borderRadius: '10px', backgroundColor: '#FAFAFC', border: '1px solid var(--mac-border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Avatar src={selectedApplicant.tricyclePhotoUrl} variant="rounded" sx={{ width: 44, height: 44 }} />
+                <Box>
+                  <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    Tricycle Unit Inspection Photo
+                  </Typography>
+                  <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+                    Plate: {selectedApplicant.vehiclePlate}
+                  </Typography>
+                </Box>
               </Box>
-
               <Button
-                variant="contained"
-                disabled={!isForwardEnabled || selectedApplicant.todaStageStatus === 'TODA Endorsed'}
-                onClick={() => setForwardDialogOpen(true)}
-                startIcon={<SendIcon />}
+                variant="outlined"
+                size="small"
+                startIcon={<VisibilityIcon fontSize="small" />}
+                onClick={() => setPreviewDocModalOpen(true)}
                 sx={{
-                  height: 38,
-                  padding: '0 20px',
+                  height: 34,
+                  px: 2,
                   borderRadius: '8px',
-                  textTransform: 'none',
-                  fontSize: '13.5px',
+                  fontSize: '13px',
                   fontWeight: 600,
-                  backgroundColor: 'var(--sakay-orange)',
-                  color: '#FFFFFF',
-                  '&:hover': { backgroundColor: 'var(--sakay-orange-hover)' },
+                  textTransform: 'none',
+                  color: 'var(--sakay-orange)',
+                  borderColor: 'var(--sakay-orange-border)',
+                  backgroundColor: 'var(--sakay-orange-soft)',
                 }}
               >
-                {selectedApplicant.todaStageStatus === 'TODA Endorsed' ? 'Endorsed to LGU' : 'Forward to LGU Administrator'}
+                View Photo
               </Button>
             </Box>
-
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mt: 1.5, textAlign: 'center' }}>
-              <strong>Notice:</strong> Forwarding this application transmits the endorsed driver record to the LGU verification queue. Final credential clearance and mobile app activation is granted exclusively by the LGU Administrator.
-            </Typography>
           </Box>
         </MacCenterModal>
       )}
 
-      {/* 5. Forward to LGU Confirmation Dialog */}
-      {selectedApplicant && (
-        <MacConfirmDialog
-          open={forwardDialogOpen}
-          onClose={() => setForwardDialogOpen(false)}
-          title="Forward Endorsement to LGU Administrator?"
-          message={`Are you sure you want to endorse "${selectedApplicant.name}" (${selectedApplicant.vehiclePlate}) for final LGU Administrator review and municipal platform activation?`}
-          confirmLabel="Forward to LGU"
-          confirmVariant="orange"
-          onConfirm={handleForwardConfirm}
-        />
-      )}
+      {/* Confirmation Dialogs */}
+      <MacConfirmDialog
+        open={forwardDialogOpen}
+        onClose={() => setForwardDialogOpen(false)}
+        title="Endorse Driver to City LGU Franchising Office?"
+        message={`Confirm endorsement of driver applicant ${selectedApplicant?.name} (${selectedApplicant?.vehiclePlate}) to the City LGU for official accreditation.`}
+        confirmLabel="Confirm Endorsement"
+        confirmVariant="primary"
+        onConfirm={handleForwardConfirm}
+      />
 
-      {/* 6. Reject Confirmation Dialog */}
-      {selectedApplicant && (
-        <MacConfirmDialog
-          open={rejectDialogOpen}
-          onClose={() => setRejectDialogOpen(false)}
-          title="Reject Driver Application?"
-          message={`Reject application for "${selectedApplicant.name}"? This decision is logged in the TODA archive.`}
-          confirmLabel="Reject Application"
-          confirmVariant="danger"
-          requireReason
-          reasonPlaceholder="Specify reason for TODA rejection (e.g. Failed background check, non-compliant tricycle)..."
-          onConfirm={handleRejectConfirm}
-        />
-      )}
-
-      {/* 7. Require Resubmission Confirmation Dialog */}
-      {selectedApplicant && (
-        <MacConfirmDialog
-          open={resubmitDialogOpen}
-          onClose={() => setResubmitDialogOpen(false)}
-          title="Request Resubmission?"
-          message={`Notify "${selectedApplicant.name}" to resubmit documents or updated tricycle photos?`}
-          confirmLabel="Send Resubmission Request"
-          confirmVariant="orange"
-          requireReason
-          reasonPlaceholder="Specify required corrections (e.g. Unclear franchise photo, expired Barangay clearance)..."
-          onConfirm={handleResubmitConfirm}
+      {/* Photo Preview Modal */}
+      {previewDocModalOpen && selectedApplicant && (
+        <DocumentPreviewModal
+          open={previewDocModalOpen}
+          onClose={() => setPreviewDocModalOpen(false)}
+          documentName={`Tricycle_Unit_Inspection_${selectedApplicant.vehiclePlate}.png`}
+          documentType="image"
         />
       )}
     </Box>

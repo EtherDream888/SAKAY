@@ -5,13 +5,13 @@
   --mac-header-height: 88px;
 
   /* Base surfaces */
-  --mac-canvas-bg: #f4f5f7;
-  --mac-shell-bg: rgba(255, 255, 255, 0.72);
-  --mac-card-bg: rgba(255, 255, 255, 0.82);
-  --mac-sidebar-bg: rgba(255, 255, 255, 0.74);
-  --mac-header-bg: rgba(255, 255, 255, 0.72);
-  --mac-glass-bg: rgba(255, 255, 255, 0.72);
-  --mac-popover-bg: rgba(255, 255, 255, 0.84);
+  --mac-canvas-bg: #FFF8F2;
+  --mac-shell-bg: #FFF8F2;
+  --mac-card-bg: #FFFFFF;
+  --mac-sidebar-bg: rgba(255, 255, 255, 0.88);
+  --mac-header-bg: #FFFFFF;
+  --mac-glass-bg: rgba(255, 255, 255, 0.82);
+  --mac-popover-bg: rgba(255, 255, 255, 0.94);
 
   /* Brand accents */
   --sakay-orange: #ff6b1a;
@@ -66,8 +66,53 @@
   /* Transitions */
   --mac-transition-fast: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   --mac-transition-normal: all 0.24s cubic-bezier(0.16, 1, 0.3, 1);
-  --mac-sidebar-transition: width 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  --mac-sidebar-transition: width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), padding 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* Typography */
   --mac-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Inter", "Segoe UI", sans-serif;
+}
+
+/* Global Font Scaling (-2px across body, tables, buttons, inputs, chips) */
+body, html {
+  font-size: 13px !important;
+}
+
+.MuiTableCell-root {
+  font-size: 12.5px !important;
+}
+
+.MuiButton-root {
+  font-size: 12px !important;
+}
+
+.MuiInputBase-input {
+  font-size: 12.5px !important;
+}
+
+.MuiChip-root {
+  font-size: 11.5px !important;
+}
+
+/* Apple/macOS Auto-Hiding Scrollbar Fade System */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+  transition: background-color 0.8s ease-in-out;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.22);
+}
+
+*:hover::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.45);
 }

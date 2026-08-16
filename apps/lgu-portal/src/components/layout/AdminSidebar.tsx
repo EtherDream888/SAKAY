@@ -99,7 +99,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
     <Box
       component="aside"
       sx={{
-        width: collapsed ? 74 : 255,
+        width: collapsed ? 74 : 275,
         height: '100vh',
         background: 'rgba(255, 255, 255, 0.88)',
         backdropFilter: 'blur(18px)',
@@ -189,7 +189,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
               height: 24,
               objectFit: 'contain',
               opacity: collapsed ? 0 : 1,
-              maxWidth: collapsed ? 0 : 150,
+              maxWidth: collapsed ? 0 : 180,
               marginLeft: collapsed ? 0 : '10px',
               overflow: 'hidden',
               transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), max-width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), margin-left 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)',
@@ -225,7 +225,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
             {/* Section Header Title */}
             <Typography
               sx={{
-                fontSize: '11.5px',
+                fontSize: '12.5px',
                 fontWeight: 700,
                 color: 'var(--mac-text-muted)',
                 letterSpacing: '0.12em',
@@ -267,112 +267,117 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
                   location.pathname === item.path ||
                   (item.path === '/dashboard' && location.pathname === '/');
 
-                return (
-                  <MacTooltip key={item.id} title={item.label} disabled={!collapsed}>
+                const navContent = (
+                  <Box
+                    onClick={() => navigate(item.path)}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: collapsed ? 'center' : 'space-between',
+                      width: collapsed ? 44 : '100%',
+                      height: collapsed ? 44 : 46,
+                      borderRadius: '12px',
+                      padding: collapsed ? 0 : '0 12px 0 12px',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      margin: collapsed ? '0 auto' : 0,
+                      background: isActive
+                        ? 'linear-gradient(135deg, var(--sakay-orange) 0%, #ff8a47 100%)'
+                        : 'transparent',
+                      color: isActive ? '#FFFFFF' : 'var(--mac-text-primary)',
+                      boxShadow: isActive ? '0 10px 24px rgba(255, 107, 26, 0.22)' : 'none',
+                      transition: 'all 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                      overflow: 'hidden',
+                      '&:hover': {
+                        background: isActive
+                          ? 'linear-gradient(135deg, var(--sakay-orange-hover) 0%, #ff8b46 100%)'
+                          : 'rgba(17, 24, 39, 0.04)',
+                        transform: 'translateX(1px)',
+                      },
+                    }}
+                  >
                     <Box
-                      onClick={() => navigate(item.path)}
                       sx={{
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: collapsed ? 'center' : 'space-between',
-                        width: collapsed ? 42 : '100%',
-                        height: collapsed ? 42 : 44,
-                        borderRadius: '12px',
-                        padding: collapsed ? 0 : '0 12px 0 10px',
-                        cursor: 'pointer',
-                        flexShrink: 0,
-                        margin: collapsed ? '0 auto' : 0,
-                        background: isActive
-                          ? 'linear-gradient(135deg, var(--sakay-orange) 0%, #ff8a47 100%)'
-                          : 'transparent',
-                        color: isActive ? '#FFFFFF' : 'var(--mac-text-primary)',
-                        boxShadow: isActive ? '0 10px 24px rgba(255, 107, 26, 0.22)' : 'none',
-                        transition: 'all 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                        justifyContent: collapsed ? 'center' : 'flex-start',
+                        width: collapsed ? '100%' : 'auto',
                         overflow: 'hidden',
-                        '&:hover': {
-                          background: isActive
-                            ? 'linear-gradient(135deg, var(--sakay-orange-hover) 0%, #ff8b46 100%)'
-                            : 'rgba(17, 24, 39, 0.04)',
-                          transform: 'translateX(1px)',
-                        },
                       }}
                     >
                       <Box
                         sx={{
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: collapsed ? 'center' : 'flex-start',
+                          justifyContent: 'center',
+                          color: isActive ? '#FFFFFF' : 'var(--mac-text-secondary)',
+                          flexShrink: 0,
                           width: collapsed ? '100%' : 'auto',
-                          overflow: 'hidden',
                         }}
                       >
-                        <Box
-                          sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: isActive ? '#FFFFFF' : 'var(--mac-text-secondary)',
-                            flexShrink: 0,
-                            width: collapsed ? '100%' : 'auto',
-                          }}
-                        >
-                          {item.icon}
-                        </Box>
-                        
-                        {/* Nav Label Text */}
-                        <Typography
-                          sx={{
-                            fontSize: '14.5px',
-                            fontWeight: isActive ? 700 : 500,
-                            letterSpacing: '-0.08px',
-                            whiteSpace: 'nowrap',
-                            opacity: collapsed ? 0 : 1,
-                            maxWidth: collapsed ? 0 : 150,
-                            marginLeft: collapsed ? 0 : '10px',
-                            overflow: 'hidden',
-                            transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), max-width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), margin-left 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.2s ease',
-                            transform: collapsed ? 'translateX(-4px)' : 'translateX(0)',
-                          }}
-                        >
-                          {item.label}
-                        </Typography>
+                        {item.icon}
                       </Box>
-
-                      {/* Nav Item Badge — Render ONLY when expanded so collapsed item has EXACTLY 1 centered icon child */}
-                      {!collapsed && item.badge !== undefined && (
-                        <Box
-                          sx={{
-                            backgroundColor:
-                              item.badgeType === 'green'
-                                ? 'transparent'
-                                : isActive
-                                ? 'rgba(255, 255, 255, 0.22)'
-                                : 'var(--sakay-orange-soft)',
-                            color:
-                              item.badgeType === 'green'
-                                ? '#30a46c'
-                                : isActive
-                                ? '#FFFFFF'
-                                : 'var(--sakay-orange)',
-                            fontSize: item.badgeType === 'green' ? '13px' : '11.5px',
-                            fontWeight: 700,
-                            padding: item.badgeType === 'green' ? '0' : '3px 8px',
-                            borderRadius: '999px',
-                            minWidth: item.badgeType === 'green' ? 'auto' : '26px',
-                            textAlign: 'center',
-                            opacity: 1,
-                            maxWidth: 40,
-                            marginLeft: '6px',
-                            overflow: 'hidden',
-                            flexShrink: 0,
-                            transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
-                          }}
-                        >
-                          {item.badge}
-                        </Box>
-                      )}
+                      
+                      {/* Nav Label Text */}
+                      <Typography
+                        sx={{
+                          fontSize: '15px',
+                          fontWeight: isActive ? 700 : 500,
+                          letterSpacing: '-0.01em',
+                          whiteSpace: 'nowrap',
+                          opacity: collapsed ? 0 : 1,
+                          maxWidth: collapsed ? 0 : 190,
+                          marginLeft: collapsed ? 0 : '10px',
+                          overflow: 'hidden',
+                          transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), max-width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), margin-left 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                        }}
+                      >
+                        {item.label}
+                      </Typography>
                     </Box>
+
+                    {/* Nav Item Badge */}
+                    {!collapsed && item.badge !== undefined && (
+                      <Box
+                        sx={{
+                          backgroundColor:
+                            item.badgeType === 'green'
+                              ? 'transparent'
+                              : isActive
+                              ? 'rgba(255, 255, 255, 0.22)'
+                              : 'var(--sakay-orange-soft)',
+                          color:
+                            item.badgeType === 'green'
+                              ? '#30a46c'
+                              : isActive
+                              ? '#FFFFFF'
+                              : 'var(--sakay-orange)',
+                          fontSize: item.badgeType === 'green' ? '14px' : '12px',
+                          fontWeight: 700,
+                          padding: item.badgeType === 'green' ? '0' : '3px 8px',
+                          borderRadius: '999px',
+                          minWidth: item.badgeType === 'green' ? 'auto' : '26px',
+                          textAlign: 'center',
+                          opacity: 1,
+                          maxWidth: 40,
+                          marginLeft: '6px',
+                          overflow: 'hidden',
+                          flexShrink: 0,
+                          transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1)',
+                        }}
+                      >
+                        {item.badge}
+                      </Box>
+                    )}
+                  </Box>
+                );
+
+                return collapsed ? (
+                  <MacTooltip key={item.id} title={item.label}>
+                    {navContent}
                   </MacTooltip>
+                ) : (
+                  <React.Fragment key={item.id}>{navContent}</React.Fragment>
                 );
               })}
             </Box>
@@ -380,11 +385,11 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
         ))}
       </Box>
 
-      {/* Footer Profile Box — Interactive Account Details Modal Trigger */}
+      {/* Footer Profile Box */}
       <Box
         onClick={() => setProfileModalOpen(true)}
         sx={{
-          height: 64,
+          height: 68,
           flexShrink: 0,
           borderTop: '1px solid var(--mac-border-color)',
           padding: collapsed ? 0 : '0 14px 0 12px',
@@ -415,10 +420,10 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
         >
           <Avatar
             sx={{
-              width: 32,
-              height: 32,
+              width: 36,
+              height: 36,
               background: 'linear-gradient(135deg, var(--sakay-orange) 0%, #ff8a47 100%)',
-              fontSize: '12.5px',
+              fontSize: '14px',
               fontWeight: 700,
               boxShadow: '0 10px 18px rgba(255, 107, 26, 0.18)',
               flexShrink: 0,
@@ -429,7 +434,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
           </Avatar>
           <Box
             sx={{
-              maxWidth: collapsed ? 0 : 155,
+              maxWidth: collapsed ? 0 : 180,
               opacity: collapsed ? 0 : 1,
               marginLeft: collapsed ? 0 : '10px',
               overflow: 'hidden',
@@ -437,10 +442,10 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
               transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), max-width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), margin-left 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)',
             }}
           >
-            <Typography sx={{ fontWeight: 700, fontSize: '13px', color: 'var(--mac-text-primary)', lineHeight: 1.2, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+            <Typography sx={{ fontWeight: 700, fontSize: '14px', color: 'var(--mac-text-primary)', lineHeight: 1.2, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
               {CURRENT_ADMIN.name}
             </Typography>
-            <Typography sx={{ fontSize: '11px', color: 'var(--sakay-orange)', fontWeight: 600, lineHeight: 1.2, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+            <Typography sx={{ fontSize: '12px', color: 'var(--sakay-orange)', fontWeight: 600, lineHeight: 1.2, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
               {CURRENT_ADMIN.role}
             </Typography>
           </Box>

@@ -148,9 +148,7 @@ export const DriverManagementPage: React.FC = () => {
               filteredDrivers.map((driver) => (
                 <TableRow
                   key={driver.id}
-                  onClick={() => setSelectedDriver(driver)}
                   sx={{
-                    cursor: 'pointer',
                     transition: 'var(--mac-transition-fast)',
                     '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' },
                   }}
@@ -235,10 +233,15 @@ export const DriverManagementPage: React.FC = () => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
-                  <Typography sx={{ fontSize: '15px', color: 'var(--mac-text-muted)', fontWeight: 500 }}>
-                    No driver records found matching your filters.
-                  </Typography>
+                <TableCell colSpan={7} align="center" sx={{ py: 7 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                    <Typography sx={{ fontSize: '16.5px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+                      No Drivers Found
+                    </Typography>
+                    <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-muted)' }}>
+                      There are currently no driver records matching the "{verificationFilter !== 'All' ? verificationFilter : 'selected'}" filter criteria.
+                    </Typography>
+                  </Box>
                 </TableCell>
               </TableRow>
             )}

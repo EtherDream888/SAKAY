@@ -10,10 +10,7 @@ html, body, #root {
   height: 100%;
   width: 100%;
   font-family: var(--mac-font-family);
-  background:
-    radial-gradient(circle at top left, rgba(255, 122, 26, 0.16), transparent 24%),
-    radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.10), transparent 20%),
-    linear-gradient(180deg, #f7f7f8 0%, #f1f3f6 100%);
+  background: #FFF8F2;
   color: var(--mac-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -22,6 +19,7 @@ html, body, #root {
 body {
   min-height: 100vh;
   letter-spacing: -0.01em;
+  background-color: #FFF8F2;
 }
 
 ::selection {

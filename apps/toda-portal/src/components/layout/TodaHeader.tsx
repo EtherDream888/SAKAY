@@ -1,12 +1,10 @@
 import React, { useState } from 'react';
-import { Box, Typography, Button, IconButton, Badge } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import { Box, Typography, IconButton, Badge, Button } from '@mui/material';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
-import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import VerifiedIcon from '@mui/icons-material/Verified';
 
 import { NotificationPopover } from '../popovers/NotificationPopover';
-import { DateCalendarPopover } from '../popovers/DateCalendarPopover';
 import { MOCK_TODA_NOTIFICATIONS, CURRENT_TODA_PROFILE } from '../../mockData/todaData';
 import { NotificationItem } from '../../types/toda';
 
@@ -19,10 +17,9 @@ export const TodaHeader: React.FC<TodaHeaderProps> = ({
   pageTitle = 'Operations Monitoring',
   pageSubtitle = 'Real-time overview of Calapan Central TODA terminal and driver fleet',
 }) => {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationItem[]>(MOCK_TODA_NOTIFICATIONS);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [dateOpen, setDateOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date(2026, 4, 12)); // May 12, 2026
+  const [notifAnchor, setNotifAnchor] = useState<HTMLElement | null>(null);
 
   const unreadCount = notifications.filter((n) => n.unread).length;
 
@@ -30,71 +27,45 @@ export const TodaHeader: React.FC<TodaHeaderProps> = ({
     setNotifications(notifications.map((n) => ({ ...n, unread: false })));
   };
 
-  const formatDateLabel = (date: Date) => {
-    const month = date.toLocaleString('en-US', { month: 'short' });
-    const day = date.getDate();
-    const year = date.getFullYear();
-    return `${month} ${day}, ${year}`;
-  };
-
   return (
     <Box
       component="header"
       sx={{
-        height: 'var(--mac-header-height)',
-        padding: '0 32px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: 'var(--mac-header-bg)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderBottom: '1px solid var(--mac-border-color)',
         position: 'sticky',
         top: 0,
         zIndex: 80,
+        height: 'var(--mac-header-height)',
+        flexShrink: 0,
+        backgroundColor: '#FFFFFF',
+        borderBottom: '1px solid var(--mac-border-color)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '0 36px',
       }}
     >
-      {/* Left: Page Title & Subtitle */}
-      <Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Typography
-            variant="h1"
-            sx={{
-              fontSize: '24px',
-              fontWeight: 700,
-              color: 'var(--mac-text-primary)',
-              letterSpacing: '-0.02em',
-            }}
-          >
-            {pageTitle}
-          </Typography>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 0.5,
-              backgroundColor: 'rgba(52, 168, 83, 0.12)',
-              color: '#1E8E3E',
-              px: 1.2,
-              py: 0.4,
-              borderRadius: '6px',
-              border: '1px solid rgba(52, 168, 83, 0.3)',
-            }}
-          >
-            <VerifiedIcon sx={{ fontSize: 14 }} />
-            <Typography sx={{ fontSize: '11.5px', fontWeight: 700 }}>
-              {CURRENT_TODA_PROFILE.acronym}
-            </Typography>
-          </Box>
-        </Box>
+      {/* Left: Primary Page Title & Subtitle inside Sticky Header */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <Typography
+          variant="h1"
+          sx={{
+            fontSize: '30px',
+            fontWeight: 600,
+            color: 'var(--mac-text-primary)',
+            letterSpacing: '-0.4px',
+            lineHeight: 1.2,
+          }}
+        >
+          {pageTitle}
+        </Typography>
         {pageSubtitle && (
           <Typography
             sx={{
-              fontSize: '13px',
-              color: 'var(--mac-text-muted)',
+              fontSize: '15px',
               fontWeight: 400,
-              mt: '2px',
+              color: 'var(--mac-text-muted)',
+              lineHeight: 1.3,
+              mt: '3px',
             }}
           >
             {pageSubtitle}
@@ -102,15 +73,16 @@ export const TodaHeader: React.FC<TodaHeaderProps> = ({
         )}
       </Box>
 
-      {/* Right Controls */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        {/* Notification Bell */}
+      {/* Right Controls: Notifications & TODA Organization Navigation Chip */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, position: 'relative' }}>
+        {/* Notifications Icon Button */}
         <Box sx={{ position: 'relative' }}>
           <IconButton
-            onClick={() => setNotifOpen(!notifOpen)}
+            size="small"
+            onClick={(e) => setNotifAnchor(e.currentTarget)}
             sx={{
-              width: 42,
-              height: 42,
+              width: 44,
+              height: 44,
               borderRadius: '10px',
               border: '1px solid var(--mac-border-color)',
               backgroundColor: '#FFFFFF',
@@ -124,52 +96,55 @@ export const TodaHeader: React.FC<TodaHeaderProps> = ({
             }}
           >
             <Badge badgeContent={unreadCount} color="error" variant="dot">
-              <NotificationsNoneIcon fontSize="small" sx={{ fontSize: 20 }} />
+              <NotificationsNoneIcon fontSize="small" sx={{ fontSize: 22 }} />
             </Badge>
           </IconButton>
           <NotificationPopover
-            open={notifOpen}
-            onClose={() => setNotifOpen(false)}
+            open={Boolean(notifAnchor)}
+            anchorEl={notifAnchor}
+            onClose={() => setNotifAnchor(null)}
             notifications={notifications}
             onMarkAllAsRead={handleMarkAllAsRead}
           />
         </Box>
 
-        {/* Date Selector Button */}
-        <Box sx={{ position: 'relative' }}>
-          <Button
-            onClick={() => setDateOpen(!dateOpen)}
-            startIcon={<CalendarTodayIcon fontSize="small" sx={{ fontSize: 16 }} />}
-            endIcon={<KeyboardArrowDownIcon fontSize="small" sx={{ fontSize: 18 }} />}
+        {/* TODA Organization Navigation Chip (Direct Redirect to /account) */}
+        <Button
+          onClick={() => navigate('/account')}
+          startIcon={<VerifiedIcon fontSize="small" sx={{ fontSize: 18, color: '#1E8E3E' }} />}
+          sx={{
+            height: 44,
+            padding: '0 18px',
+            borderRadius: '10px',
+            border: '1px solid var(--mac-border-color)',
+            backgroundColor: '#FFFFFF',
+            color: 'var(--mac-text-primary)',
+            fontSize: '14.5px',
+            fontWeight: 600,
+            textTransform: 'none',
+            boxShadow: 'var(--mac-shadow-subtle)',
+            transition: 'var(--mac-transition-fast)',
+            maxWidth: 260,
+            '&:hover': {
+              backgroundColor: 'var(--sakay-orange-soft)',
+              color: 'var(--sakay-orange)',
+              borderColor: 'var(--sakay-orange-border)',
+            },
+          }}
+        >
+          <Typography
             sx={{
-              height: 42,
-              padding: '0 20px',
-              borderRadius: '10px',
-              border: '1px solid var(--mac-border-color)',
-              backgroundColor: '#FFFFFF',
-              color: 'var(--mac-text-primary)',
-              fontSize: '14px',
-              fontWeight: 400,
-              textTransform: 'none',
-              boxShadow: 'var(--mac-shadow-subtle)',
-              transition: 'var(--mac-transition-fast)',
-              '&:hover': {
-                backgroundColor: 'var(--sakay-orange-soft)',
-                color: 'var(--sakay-orange)',
-                borderColor: 'var(--sakay-orange-border)',
-              },
+              fontSize: '14.5px',
+              fontWeight: 600,
+              color: 'inherit',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
             }}
           >
-            {formatDateLabel(selectedDate)}
-          </Button>
-
-          <DateCalendarPopover
-            open={dateOpen}
-            onClose={() => setDateOpen(false)}
-            selectedDate={selectedDate}
-            onSelectDate={setSelectedDate}
-          />
-        </Box>
+            {CURRENT_TODA_PROFILE.name}
+          </Typography>
+        </Button>
       </Box>
     </Box>
   );

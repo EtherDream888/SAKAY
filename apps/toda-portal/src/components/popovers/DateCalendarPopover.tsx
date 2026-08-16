@@ -6,6 +6,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 interface DateCalendarPopoverProps {
   open: boolean;
   onClose: () => void;
+  anchorEl: HTMLElement | null;
   selectedDate: Date;
   onSelectDate: (date: Date) => void;
 }
@@ -13,6 +14,7 @@ interface DateCalendarPopoverProps {
 export const DateCalendarPopover: React.FC<DateCalendarPopoverProps> = ({
   open,
   onClose,
+  anchorEl,
   selectedDate,
   onSelectDate,
 }) => {
@@ -40,6 +42,7 @@ export const DateCalendarPopover: React.FC<DateCalendarPopoverProps> = ({
   return (
     <Popover
       open={open}
+      anchorEl={anchorEl}
       onClose={onClose}
       anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       transformOrigin={{ vertical: 'top', horizontal: 'right' }}
@@ -57,7 +60,7 @@ export const DateCalendarPopover: React.FC<DateCalendarPopoverProps> = ({
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+        <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
           {monthYearLabel}
         </Typography>
         <Box sx={{ display: 'flex', gap: 0.5 }}>
@@ -73,7 +76,7 @@ export const DateCalendarPopover: React.FC<DateCalendarPopoverProps> = ({
       {/* Weekdays */}
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5, textAlign: 'center', mb: 1 }}>
         {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
-          <Typography key={d} sx={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--mac-text-muted)' }}>
+          <Typography key={d} sx={{ fontSize: '12px', fontWeight: 600, color: 'var(--mac-text-muted)' }}>
             {d}
           </Typography>
         ))}
@@ -101,7 +104,7 @@ export const DateCalendarPopover: React.FC<DateCalendarPopoverProps> = ({
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: '8px',
-                fontSize: '13px',
+                fontSize: '13.5px',
                 fontWeight: isSelected ? 700 : 500,
                 backgroundColor: isSelected ? 'var(--sakay-orange)' : 'transparent',
                 color: isSelected ? '#FFFFFF' : 'var(--mac-text-primary)',

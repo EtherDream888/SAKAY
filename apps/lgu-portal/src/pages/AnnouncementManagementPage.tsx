@@ -383,9 +383,7 @@ export const AnnouncementManagementPage: React.FC = () => {
                 return (
                   <TableRow
                     key={ann.id}
-                    onClick={() => setSelectedAnn(ann)}
                     sx={{
-                      cursor: 'pointer',
                       transition: 'var(--mac-transition-fast)',
                       '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' },
                     }}
@@ -618,6 +616,34 @@ export const AnnouncementManagementPage: React.FC = () => {
               </Box>
 
               <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  onClick={() => {
+                    setFormTitle(selectedAnn.title);
+                    setFormMessage(selectedAnn.message);
+                    setFormRole(selectedAnn.target_role);
+                    setFormTodaId(selectedAnn.toda_id || 'all-todas');
+                    setFormTiming(selectedAnn.publish_timing || 'Immediate');
+                    setSelectedAnn(null);
+                    setCreateModalOpen(true);
+                  }}
+                  variant="outlined"
+                  size="small"
+                  startIcon={<EditIcon fontSize="small" />}
+                  sx={{
+                    height: 34,
+                    fontSize: '12.5px',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    borderRadius: '8px',
+                    color: 'var(--sakay-orange)',
+                    borderColor: 'var(--sakay-orange-border)',
+                    backgroundColor: 'var(--sakay-orange-soft)',
+                    '&:hover': { backgroundColor: 'var(--sakay-orange)', color: '#FFFFFF' },
+                  }}
+                >
+                  Edit Announcement
+                </Button>
+
                 <Button
                   onClick={() => handleTogglePublish(selectedAnn)}
                   variant="outlined"

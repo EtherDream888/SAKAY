@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Box } from '@mui/material';
+import { Outlet } from 'react-router-dom';
 import { TodaHeader } from './TodaHeader';
 import { TodaSidebar } from './TodaSidebar';
 
 interface TodaLayoutProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   pageTitle?: string;
   pageSubtitle?: string;
 }
@@ -14,33 +15,47 @@ export const TodaLayout: React.FC<TodaLayoutProps> = ({
   pageTitle,
   pageSubtitle,
 }) => {
-  const [collapsed, setCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', width: '100%', overflow: 'hidden' }}>
-      {/* Collapsible Sidebar */}
+    <Box
+      sx={{
+        display: 'flex',
+        width: '100vw',
+        height: '100vh',
+        overflow: 'hidden',
+        backgroundColor: '#FFF8F2',
+      }}
+    >
       <TodaSidebar
-        collapsed={collapsed}
-        onToggleCollapse={() => setCollapsed(!collapsed)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
-      {/* Main Content Area */}
       <Box
-        component="main"
         sx={{
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          minWidth: 0,
           height: '100vh',
-          overflowY: 'auto',
-          backgroundColor: 'var(--mac-canvas-bg)',
+          minWidth: 0,
+          overflow: 'hidden',
+          backgroundColor: '#FFF8F2',
         }}
       >
         <TodaHeader pageTitle={pageTitle} pageSubtitle={pageSubtitle} />
 
-        <Box sx={{ flex: 1, padding: '32px' }}>
-          {children}
+        <Box
+          component="main"
+          sx={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            padding: { xs: '20px', md: '28px', lg: '32px' },
+            backgroundColor: '#FFF8F2',
+          }}
+        >
+          {children || <Outlet />}
         </Box>
       </Box>
     </Box>

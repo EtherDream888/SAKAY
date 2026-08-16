@@ -21,17 +21,19 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
       onClick={onClick}
       endIcon={showArrow ? <ArrowForwardIosIcon sx={{ fontSize: '10px !important', ml: '-2px' }} /> : undefined}
       sx={{
-        height: '32px',
-        padding: showArrow ? '0 12px 0 14px' : '0 14px',
-        borderRadius: '8px',
+        height: '34px',
+        padding: showArrow ? '0 14px 0 16px' : '0 16px',
+        borderRadius: '9px',
         borderColor: 'var(--mac-border-color)',
         backgroundColor: '#FFFFFF',
         color: 'var(--mac-text-primary)',
-        fontSize: '12.5px',
+        fontSize: '12px',
         fontWeight: 500,
         textTransform: 'none',
+        whiteSpace: 'nowrap',
         boxShadow: 'var(--mac-shadow-subtle)',
         transition: 'var(--mac-transition-fast)',
+        flexShrink: 0,
         '&:hover': {
           backgroundColor: 'var(--sakay-orange-soft)',
           borderColor: 'var(--sakay-orange-border)',

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Card, CardContent } from '@mui/material';
+import { Box, Typography, Card, CardContent, Button } from '@mui/material';
 import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import GavelIcon from '@mui/icons-material/Gavel';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
@@ -57,15 +57,41 @@ export const RecentIncidentReportsCard: React.FC = () => {
       }}
     >
       <CardContent sx={{ padding: '24px !important', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
           <Box>
             <Typography sx={{ fontSize: '17px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
               Recent Incident Reports
             </Typography>
-            <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mt: '2px' }}>
+            <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', mt: '2px' }}>
               Passenger complaints requiring LGU officer review
             </Typography>
           </Box>
+
+          <Button
+            onClick={() => navigate('/incident-reports')}
+            size="small"
+            sx={{
+              height: 38,
+              padding: '0 18px',
+              borderRadius: '9px',
+              backgroundColor: '#FFFFFF',
+              color: 'var(--mac-text-primary)',
+              fontSize: '14px',
+              fontWeight: 500,
+              textTransform: 'none',
+              border: '1px solid var(--mac-border-color)',
+              boxShadow: 'var(--mac-shadow-subtle)',
+              transition: 'var(--mac-transition-fast)',
+              flexShrink: 0,
+              '&:hover': {
+                backgroundColor: 'var(--sakay-orange-soft)',
+                color: 'var(--sakay-orange)',
+                borderColor: 'var(--sakay-orange-border)',
+              },
+            }}
+          >
+            View all
+          </Button>
         </Box>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, flexGrow: 1, justifyContent: 'center' }}>

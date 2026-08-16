@@ -1,5 +1,14 @@
 import React from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Box, Typography, IconButton, Button } from '@mui/material';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Box,
+  Typography,
+  IconButton,
+  Button,
+} from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 
 interface MacCenterModalProps {
@@ -8,12 +17,13 @@ interface MacCenterModalProps {
   title: string;
   subtitle?: string;
   badge?: React.ReactNode;
-  maxWidth?: 'xs' | 'sm' | 'md' | 'lg' | number;
   children: React.ReactNode;
   primaryActionLabel?: string;
   onPrimaryAction?: () => void;
+  primaryActionColor?: 'primary' | 'error' | 'success' | 'warning';
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
+  maxWidth?: number | string;
 }
 
 export const MacCenterModal: React.FC<MacCenterModalProps> = ({
@@ -22,12 +32,13 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
   title,
   subtitle,
   badge,
-  maxWidth = 680,
   children,
   primaryActionLabel,
   onPrimaryAction,
-  secondaryActionLabel,
+  primaryActionColor = 'primary',
+  secondaryActionLabel = 'Close',
   onSecondaryAction,
+  maxWidth = 720,
 }) => {
   return (
     <Dialog
@@ -47,10 +58,9 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
             width: '100%',
             backgroundColor: '#FFFFFF',
             boxShadow: 'var(--mac-shadow-popover)',
+            border: '1px solid var(--mac-border-color)',
             overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-            maxHeight: '88vh',
+            margin: '20px',
           },
         },
       }}
@@ -58,23 +68,22 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
       {/* Modal Header */}
       <DialogTitle
         sx={{
-          padding: '22px 28px 20px 28px',
+          padding: '24px 28px 20px',
           borderBottom: '1px solid var(--mac-border-color)',
           display: 'flex',
           alignItems: 'flex-start',
           justifyContent: 'space-between',
-          backgroundColor: '#FAFAFC',
         }}
       >
         <Box sx={{ pr: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: '6px' }}>
-            <Typography sx={{ fontSize: '20px', fontWeight: 600, color: 'var(--mac-text-primary)', lineHeight: 1.2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: subtitle ? '4px' : 0 }}>
+            <Typography sx={{ fontSize: '20px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
               {title}
             </Typography>
             {badge}
           </Box>
           {subtitle && (
-            <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', fontWeight: 400, mt: '4px' }}>
+            <Typography sx={{ fontSize: '14.5px', color: 'var(--mac-text-muted)', fontWeight: 400 }}>
               {subtitle}
             </Typography>
           )}
@@ -84,35 +93,28 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
           onClick={onClose}
           size="small"
           sx={{
-            width: 32,
-            height: 32,
-            borderRadius: '8px',
             color: 'var(--mac-text-muted)',
-            '&:hover': { backgroundColor: 'var(--mac-canvas-bg)', color: 'var(--mac-text-primary)' },
+            backgroundColor: 'var(--mac-canvas-bg)',
+            '&:hover': {
+              backgroundColor: 'rgba(0,0,0,0.06)',
+              color: 'var(--mac-text-primary)',
+            },
           }}
         >
-          <CloseIcon fontSize="small" />
+          <CloseIcon fontSize="small" sx={{ fontSize: 18 }} />
         </IconButton>
       </DialogTitle>
 
-      {/* Modal Body with Guaranteed 32px Top Spacing After Header Divider Line */}
-      <DialogContent
-        sx={{
-          paddingTop: '32px !important',
-          paddingBottom: '32px !important',
-          paddingLeft: '32px !important',
-          paddingRight: '32px !important',
-          overflowY: 'auto',
-        }}
-      >
+      {/* Modal Content */}
+      <DialogContent sx={{ padding: '24px 28px 28px', pt: '24px !important' }}>
         {children}
       </DialogContent>
 
-      {/* Modal Footer Bar if Actions Provided */}
+      {/* Modal Footer */}
       {(primaryActionLabel || secondaryActionLabel) && (
         <DialogActions
           sx={{
-            padding: '16px 28px',
+            padding: '18px 28px 24px',
             borderTop: '1px solid var(--mac-border-color)',
             backgroundColor: '#FAFAFC',
             gap: 1.5,
@@ -120,19 +122,23 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
         >
           {secondaryActionLabel && (
             <Button
-              onClick={onSecondaryAction}
               variant="outlined"
-              color="error"
+              onClick={onSecondaryAction || onClose}
               sx={{
-                height: 38,
+                height: 40,
                 padding: '0 20px',
-                borderRadius: '9px',
-                textTransform: 'none',
-                fontSize: '14px',
+                borderRadius: '8px',
+                borderColor: 'var(--mac-border-color)',
+                color: 'var(--mac-text-secondary)',
+                fontSize: '14.5px',
                 fontWeight: 500,
-                borderColor: '#FCA5A5',
-                color: '#DC2626',
-                '&:hover': { backgroundColor: '#FEF2F2', borderColor: '#DC2626' },
+                textTransform: 'none',
+                backgroundColor: '#FFFFFF',
+                '&:hover': {
+                  backgroundColor: 'var(--mac-canvas-bg)',
+                  borderColor: 'var(--mac-text-muted)',
+                  color: 'var(--mac-text-primary)',
+                },
               }}
             >
               {secondaryActionLabel}
@@ -141,19 +147,22 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
 
           {primaryActionLabel && (
             <Button
-              onClick={onPrimaryAction}
               variant="contained"
+              onClick={onPrimaryAction}
+              color={primaryActionColor}
               sx={{
-                height: 38,
-                padding: '0 20px',
-                borderRadius: '9px',
-                textTransform: 'none',
-                fontSize: '14px',
+                height: 40,
+                padding: '0 22px',
+                borderRadius: '8px',
+                fontSize: '14.5px',
                 fontWeight: 600,
-                backgroundColor: 'var(--sakay-orange)',
-                color: '#FFFFFF',
-                boxShadow: 'var(--mac-shadow-subtle)',
-                '&:hover': { backgroundColor: 'var(--sakay-orange-hover)' },
+                textTransform: 'none',
+                backgroundColor:
+                  primaryActionColor === 'primary' ? 'var(--sakay-orange)' : undefined,
+                '&:hover': {
+                  backgroundColor:
+                    primaryActionColor === 'primary' ? 'var(--sakay-orange-hover)' : undefined,
+                },
               }}
             >
               {primaryActionLabel}

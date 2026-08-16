@@ -378,9 +378,7 @@ export const FareConfigurationPage: React.FC = () => {
               {fareHistory.map((version) => (
                 <TableRow
                   key={version.id}
-                  onClick={() => setSelectedVersion(version)}
                   sx={{
-                    cursor: 'pointer',
                     transition: 'var(--mac-transition-fast)',
                     backgroundColor: version.is_active ? 'rgba(255, 107, 26, 0.03)' : 'transparent',
                     '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' },
