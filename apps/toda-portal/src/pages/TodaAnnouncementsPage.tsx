@@ -28,6 +28,7 @@ import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
 import { recordTodaAuditAction } from '../services/todaApiService';
 
+// toda announcements broadcast management and driver mobile PWA push notifications
 export const TodaAnnouncementsPage: React.FC = () => {
   const [announcements, setAnnouncements] = useState<TodaAnnouncement[]>(MOCK_TODA_ANNOUNCEMENTS);
   const [searchQuery, setSearchQuery] = useState('');

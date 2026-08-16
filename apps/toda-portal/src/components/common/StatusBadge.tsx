@@ -7,6 +7,7 @@ interface StatusBadgeProps extends Omit<ChipProps, 'color'> {
   label?: string;
 }
 
+// status badge colors for driver, application, and announcement states
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label, sx, ...props }) => {
   const getStatusStyles = (statusStr: string) => {
     switch (statusStr) {

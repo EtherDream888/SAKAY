@@ -26,6 +26,7 @@ interface MacCenterModalProps {
   maxWidth?: number | string;
 }
 
+// macos-style centered modal with blurred backdrop and action buttons
 export const MacCenterModal: React.FC<MacCenterModalProps> = ({
   open,
   onClose,

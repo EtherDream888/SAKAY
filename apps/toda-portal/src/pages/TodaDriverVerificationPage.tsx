@@ -34,6 +34,7 @@ import {
   recordTodaAuditAction,
 } from '../services/todaApiService';
 
+// toda driver application screening and lgu endorsement page
 export const TodaDriverVerificationPage: React.FC = () => {
   const [applicants, setApplicants] = useState<DriverApplicant[]>(MOCK_DRIVER_APPLICANTS);
   const [isLoading, setIsLoading] = useState<boolean>(true);

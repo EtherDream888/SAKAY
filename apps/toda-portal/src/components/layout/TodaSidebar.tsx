@@ -37,6 +37,7 @@ interface NavGroup {
   items: NavItem[];
 }
 
+// sidebar layout with collapsible width and fixed app icon header
 export const TodaSidebar: React.FC<TodaSidebarProps> = ({ collapsed, onToggleCollapse }) => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -52,6 +53,7 @@ export const TodaSidebar: React.FC<TodaSidebarProps> = ({ collapsed, onToggleCol
     {
       groupTitle: 'DRIVERS & FLEET',
       items: [
+        // only count applications that still need toda officer manual review
         { id: 'driver-verification', label: 'Driver Verification', path: '/driver-verification', icon: <AssignmentIcon fontSize="small" />, badge: 2, badgeType: 'orange' },
         { id: 'drivers', label: 'Driver Membership', path: '/drivers', icon: <PeopleIcon fontSize="small" /> },
       ],
