@@ -3,200 +3,391 @@ import { supabase } from '../config/supabase';
 
 const router = Router();
 
-// In-memory fallback seed data for TODAs
-interface TodaRecord {
-  toda_id: string;
-  toda_name: string;
-  toda_acronym?: string;
-  registration_number: string;
-  date_established?: string;
-  terminal_latitude?: number;
-  terminal_longitude?: number;
-  barangay?: string;
-  service_coverage_area?: string;
-  contact_number?: string;
-  email?: string;
-  president_name?: string;
-  registered_tricycle_count: number;
-  active_driver_count: number;
-  certificate_number?: string;
-  certificate_expiry?: string;
-  account_status: 'Active' | 'Pending Verification' | 'Suspended' | 'Deactivated';
-  created_at: string;
-}
-
-let todaApplications = [
-  {
-    application_id: 'APP-TODA-001',
-    toda_name: 'San Vicente Tricycle Operators Association',
-    toda_acronym: 'SVTODA',
-    barangay: 'San Vicente Central',
-    terminal_location: 'San Vicente Market Crossing, JP Rizal',
-    registered_units: 32,
-    active_drivers: 28,
-    president_name: 'Rolando D. Garcia',
-    contact_number: '+63 917 555 1201',
-    status: 'Under Review',
-    submitted_at: '2026-08-10T08:30:00Z',
-    compliance_score: 94,
-    documents: [
-      { name: 'Barangay Clearance 2026', status: 'Verified' },
-      { name: 'SEC / CDA Registration', status: 'Verified' },
-      { name: 'Official Driver Roster (32 Units)', status: 'Verified' },
-    ],
-  },
-  {
-    application_id: 'APP-TODA-002',
-    toda_name: 'Balite-Lalud Transport Federation',
-    toda_acronym: 'BLTODA',
-    barangay: 'Balite',
-    terminal_location: 'Balite Public Terminal, Calapan City',
-    registered_units: 45,
-    active_drivers: 41,
-    president_name: 'Eduardo M. Perez',
-    contact_number: '+63 928 444 8902',
-    status: 'Pending LGU Verification',
-    submitted_at: '2026-08-12T14:15:00Z',
-    compliance_score: 88,
-    documents: [
-      { name: 'Barangay Clearance 2026', status: 'Verified' },
-      { name: 'SEC / CDA Registration', status: 'Pending Review' },
-      { name: 'Driver Master List', status: 'Verified' },
-    ],
-  },
-];
-
-let accreditedTodas: TodaRecord[] = [
-
-  {
-    toda_id: 'toda-1',
-    toda_name: 'Calapan Central TODA',
-    toda_acronym: 'CCTODA',
-    registration_number: 'CAL-TODA-2024-001',
-    date_established: '2015-03-12',
-    terminal_latitude: 13.4115,
-    terminal_longitude: 121.1803,
-    barangay: 'San Vicente Central',
-    service_coverage_area: 'Poblacion, San Vicente, Sto. Niño',
-    contact_number: '+63 917 888 1234',
-    email: 'cctoda.calapan@gmail.com',
-    president_name: 'Mario S. De Chavez',
-    registered_tricycle_count: 24,
-    active_driver_count: 24,
-    certificate_number: 'LGU-MTOP-CERT-2024-001',
-    certificate_expiry: '2027-12-31',
-    account_status: 'Active',
-    created_at: '2024-01-15T00:00:00Z',
-  },
-  {
-    toda_id: 'toda-2',
-    toda_name: 'Lumangbayan Integrated TODA',
-    toda_acronym: 'LITODA',
-    registration_number: 'CAL-TODA-2024-002',
-    date_established: '2018-07-20',
-    terminal_latitude: 13.4022,
-    terminal_longitude: 121.1711,
-    barangay: 'Lumangbayan',
-    service_coverage_area: 'Lumangbayan, Tawiran, Guinobatan',
-    contact_number: '+63 920 999 5678',
-    email: 'litoda.calapan@gmail.com',
-    president_name: 'Vicente B. Ramos',
-    registered_tricycle_count: 18,
-    active_driver_count: 16,
-    certificate_number: 'LGU-MTOP-CERT-2024-002',
-    certificate_expiry: '2027-12-31',
-    account_status: 'Active',
-    created_at: '2024-02-10T00:00:00Z',
-  },
-];
-
-// GET /api/admin/todas/applications - List pending TODA accreditation applications
-router.get('/applications', async (_req: Request, res: Response) => {
+// ============================================================================
+// 1. LIST TODA APPLICATIONS (Pending Verification / Review / Return / All)
+// ============================================================================
+router.get('/applications', async (req: Request, res: Response) => {
   try {
-    return res.json({ success: true, data: todaApplications });
+    const { status, barangay, search } = req.query;
+
+    if (supabase) {
+      let query = supabase
+        .from('toda')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (status && status !== 'All') {
+        query = query.eq('account_status', status);
+      } else {
+        // By default on applications page, include all non-active or all records if requested
+        // Or show pending / under review / returned / deactivated
+      }
+
+      if (barangay && barangay !== 'All') {
+        query = query.eq('barangay', barangay);
+      }
+
+      const { data, error } = await query;
+
+      if (!error && data) {
+        // Format database rows into structured application records
+        const formatted = data.map((row: any) => ({
+          id: row.toda_id,
+          name: row.toda_name,
+          acronym: row.toda_acronym || '',
+          registrationNumber: row.registration_number,
+          dateEstablished: row.date_established || '',
+          representative: row.president_name || 'Designated Representative',
+          phone: row.contact_number || row.president_contact || '+63 900 000 0000',
+          email: row.email || '',
+          barangay: row.barangay || 'Calapan City',
+          terminalLocation: row.service_coverage_area || 'Calapan City Terminal',
+          terminalLatitude: row.terminal_latitude || 13.4115,
+          terminalLongitude: row.terminal_longitude || 121.1803,
+          serviceCoverageArea: row.service_coverage_area || '',
+          memberCount: row.active_driver_count || row.registered_tricycle_count || 0,
+          registeredTricycleCount: row.registered_tricycle_count || 0,
+          activeDriverCount: row.active_driver_count || 0,
+          barangayClearanceExpiry: row.certificate_expiry
+            ? new Date(row.certificate_expiry).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            : 'Dec 31, 2026',
+          clearanceStatus: row.account_status === 'Active' ? 'Valid' : 'Under Review',
+          submittedDate: row.created_at
+            ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+            : 'Recent',
+          status: row.account_status === 'Active'
+            ? 'Approved'
+            : row.account_status === 'Deactivated'
+            ? 'Declined'
+            : 'Pending',
+          officers: {
+            president: row.president_name || 'N/A',
+            presidentContact: row.president_contact || row.contact_number || 'N/A',
+            vicePresident: row.vice_president_name || 'N/A',
+            vicePresidentContact: row.vice_president_contact || 'N/A',
+            secretary: row.secretary_name || 'N/A',
+            secretaryContact: row.secretary_contact || 'N/A',
+            treasurer: row.treasurer_name || 'N/A',
+            treasurerContact: row.treasurer_contact || 'N/A',
+          },
+          documents: [
+            {
+              name: `Barangay Clearance (${row.barangay || 'Calapan City'})`,
+              type: 'PDF Document (Official LGU Seal)',
+              date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '2026',
+              status: 'Verified',
+              url: null,
+            },
+            {
+              name: 'SEC / CDA Certificate of Registration',
+              type: 'Certified True Copy',
+              date: row.date_established || '2024',
+              status: 'Verified',
+              url: null,
+            },
+            {
+              name: `Official Driver Master Roster (${row.active_driver_count || row.registered_tricycle_count || 0} Units)`,
+              type: 'Master Roster Ledger (PDF)',
+              date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '2026',
+              status: 'Verified',
+              url: null,
+            },
+            {
+              name: "Mayor's Permit & Franchise Clearance",
+              type: 'Official Municipal Permit',
+              date: '2026',
+              status: 'Verified',
+              url: null,
+            },
+          ],
+        }));
+
+        let filtered = formatted;
+        if (search) {
+          const q = (search as string).toLowerCase();
+          filtered = filtered.filter(
+            (t) =>
+              t.name.toLowerCase().includes(q) ||
+              t.representative.toLowerCase().includes(q) ||
+              t.barangay.toLowerCase().includes(q) ||
+              t.id.toLowerCase().includes(q)
+          );
+        }
+
+        return res.json({ success: true, data: filtered });
+      }
+    }
+
+    return res.json({ success: true, data: [] });
   } catch (err) {
+    console.error('[todaRoutes] /applications error:', err);
     return res.status(500).json({ success: false, error: (err as Error).message });
   }
 });
 
-// GET /api/admin/todas/accredited - List verified accredited TODAs
-router.get('/accredited', async (_req: Request, res: Response) => {
+// ============================================================================
+// 2. LIST ACCREDITED TODAS (account_status = 'Active')
+// ============================================================================
+router.get('/accredited', async (req: Request, res: Response) => {
   try {
+    const { search } = req.query;
+
     if (supabase) {
-      const { data, error } = await supabase.from('toda').select('*').order('toda_name');
-      if (!error && data && data.length > 0) {
+      const { data, error } = await supabase
+        .from('toda')
+        .select('*')
+        .eq('account_status', 'Active')
+        .order('toda_name', { ascending: true });
+
+      if (!error && data) {
+        let result = data;
+        if (search) {
+          const q = (search as string).toLowerCase();
+          result = result.filter(
+            (t: any) =>
+              t.toda_name.toLowerCase().includes(q) ||
+              (t.barangay && t.barangay.toLowerCase().includes(q)) ||
+              (t.president_name && t.president_name.toLowerCase().includes(q)) ||
+              (t.registration_number && t.registration_number.toLowerCase().includes(q))
+          );
+        }
+        return res.json({ success: true, data: result });
+      }
+    }
+
+    return res.json({ success: true, data: [] });
+  } catch (err) {
+    console.error('[todaRoutes] /accredited error:', err);
+    return res.status(500).json({ success: false, error: (err as Error).message });
+  }
+});
+
+// ============================================================================
+// 3. GET SINGLE TODA DETAILS
+// ============================================================================
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('toda')
+        .select('*')
+        .eq('toda_id', id)
+        .maybeSingle();
+
+      if (!error && data) {
         return res.json({ success: true, data });
       }
     }
-    return res.json({ success: true, data: accreditedTodas });
+
+    return res.status(404).json({ success: false, error: 'TODA record not found' });
   } catch (err) {
     return res.status(500).json({ success: false, error: (err as Error).message });
   }
 });
 
-// POST /api/admin/todas/:id/approve - Approve TODA accreditation
+// ============================================================================
+// 4. APPROVE TODA APPLICATION
+// ============================================================================
 router.post('/:id/approve', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { remarks } = req.body;
+    const { certificate_number, remarks, actor_name = 'LGU Administrator' } = req.body;
 
-    const applicationIndex = todaApplications.findIndex((a) => a.application_id === id);
-    if (applicationIndex === -1) {
-      return res.status(404).json({ success: false, error: 'Application not found' });
+    const certNo = certificate_number || `CERT-LGU-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+    const certExpiry = new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString();
+
+    if (supabase) {
+      // 1. Update toda table
+      const { data, error } = await supabase
+        .from('toda')
+        .update({
+          account_status: 'Active',
+          certificate_number: certNo,
+          certificate_expiry: certExpiry,
+        })
+        .eq('toda_id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      // 2. Insert audit log record
+      try {
+        await supabase.from('audit_log').insert([
+          {
+            action_type: 'TODA_ACCREDITATION_APPROVED',
+            target_id: id,
+            details: `[Accreditation] ${actor_name}: Approved municipal accreditation for TODA '${data?.toda_name || id}'. Issued Certificate ${certNo}. ${remarks ? 'Remarks: ' + remarks : ''}`,
+            performed_at: new Date().toISOString(),
+          },
+        ]);
+      } catch (auditErr) {
+        console.warn('[todaRoutes] Audit log recording failed:', auditErr);
+      }
+
+      return res.json({
+        success: true,
+        message: `TODA ${data?.toda_name || id} successfully accredited. Certificate ${certNo} issued.`,
+        data,
+      });
     }
 
-    const app = todaApplications[applicationIndex];
-    const newAccredited: TodaRecord = {
-      toda_id: `toda-${Date.now()}`,
-      toda_name: app.toda_name,
-      toda_acronym: app.toda_acronym,
-      registration_number: `CAL-TODA-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
-      barangay: app.barangay,
-      service_coverage_area: `${app.barangay} Service Corridor`,
-      contact_number: app.contact_number,
-      president_name: app.president_name,
-      registered_tricycle_count: app.registered_units,
-      active_driver_count: app.active_drivers,
-      certificate_number: `LGU-MTOP-CERT-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
-      certificate_expiry: new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      account_status: 'Active',
-      created_at: new Date().toISOString(),
-    };
-
-    todaApplications.splice(applicationIndex, 1);
-    accreditedTodas.push(newAccredited);
-
-    return res.json({
-      success: true,
-      message: `TODA ${app.toda_name} (${app.toda_acronym}) successfully accredited!`,
-      data: newAccredited,
-      remarks,
-    });
+    return res.status(500).json({ success: false, error: 'Database service unavailable' });
   } catch (err) {
+    console.error('[todaRoutes] /:id/approve error:', err);
     return res.status(500).json({ success: false, error: (err as Error).message });
   }
 });
 
-// POST /api/admin/todas/:id/decline - Decline or reject TODA application
-router.post('/:id/decline', async (req: Request, res: Response) => {
+// ============================================================================
+// 5. RETURN TODA APPLICATION FOR CORRECTION
+// ============================================================================
+router.post('/:id/return-correction', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { reason } = req.body;
+    const { reason, actor_name = 'LGU Administrator' } = req.body;
 
-    const application = todaApplications.find((a) => a.application_id === id);
-    if (!application) {
-      return res.status(404).json({ success: false, error: 'Application not found' });
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        error: 'A mandatory reason or correction instructions must be specified.',
+      });
     }
 
-    application.status = 'Declined';
-    return res.json({
-      success: true,
-      message: `Application ${id} has been declined.`,
-      data: { id, reason },
-    });
+    if (supabase) {
+      // 1. Fetch current TODA details
+      const { data: toda } = await supabase
+        .from('toda')
+        .select('toda_name')
+        .eq('toda_id', id)
+        .maybeSingle();
+
+      // 2. Insert audit log record
+      await supabase.from('audit_log').insert([
+        {
+          action_type: 'TODA_APPLICATION_RETURNED_FOR_CORRECTION',
+          target_id: id,
+          details: `[Accreditation Review] ${actor_name}: Returned accreditation application for TODA '${toda?.toda_name || id}' for correction. Required Correction: ${reason}`,
+          performed_at: new Date().toISOString(),
+        },
+      ]);
+
+      return res.json({
+        success: true,
+        message: `Application for ${toda?.toda_name || id} has been returned for correction.`,
+        data: { id, reason, status: 'Returned for Correction' },
+      });
+    }
+
+    return res.status(500).json({ success: false, error: 'Database service unavailable' });
   } catch (err) {
+    console.error('[todaRoutes] /:id/return-correction error:', err);
     return res.status(500).json({ success: false, error: (err as Error).message });
   }
+});
+
+// ============================================================================
+// 6. REJECT / DECLINE TODA APPLICATION
+// ============================================================================
+router.post('/:id/reject', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { reason, actor_name = 'LGU Administrator' } = req.body;
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        error: 'A mandatory rejection reason must be provided.',
+      });
+    }
+
+    if (supabase) {
+      // 1. Update toda account_status to Deactivated
+      const { data, error } = await supabase
+        .from('toda')
+        .update({
+          account_status: 'Deactivated',
+        })
+        .eq('toda_id', id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      // 2. Insert audit log record
+      await supabase.from('audit_log').insert([
+        {
+          action_type: 'TODA_APPLICATION_REJECTED',
+          target_id: id,
+          details: `[Accreditation Review] ${actor_name}: Permanently declined accreditation application for TODA '${data?.toda_name || id}'. Rejection Reason: ${reason}`,
+          performed_at: new Date().toISOString(),
+        },
+      ]);
+
+      return res.json({
+        success: true,
+        message: `Application for TODA '${data?.toda_name || id}' has been rejected.`,
+        data,
+      });
+    }
+
+    return res.status(500).json({ success: false, error: 'Database service unavailable' });
+  } catch (err) {
+    console.error('[todaRoutes] /:id/reject error:', err);
+    return res.status(500).json({ success: false, error: (err as Error).message });
+  }
+});
+
+// Backwards compatibility alias for decline
+router.post('/:id/decline', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { reason, actor_name = 'LGU Administrator' } = req.body;
+
+  if (!reason) {
+    return res.status(400).json({
+      success: false,
+      error: 'A mandatory rejection reason must be provided.',
+    });
+  }
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('toda')
+        .update({ account_status: 'Deactivated' })
+        .eq('toda_id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      await supabase.from('audit_log').insert([
+        {
+          action_type: 'TODA_APPLICATION_REJECTED',
+          target_id: id,
+          details: `[Accreditation Review] ${actor_name}: Declined accreditation application for '${data?.toda_name || id}'. Reason: ${reason}`,
+          performed_at: new Date().toISOString(),
+        },
+      ]);
+
+      return res.json({
+        success: true,
+        message: `Application for TODA '${data?.toda_name || id}' has been declined.`,
+        data,
+      });
+    } catch (err) {
+      return res.status(500).json({ success: false, error: (err as Error).message });
+    }
+  }
+
+  return res.status(500).json({ success: false, error: 'Database service unavailable' });
 });
 
 export default router;
+

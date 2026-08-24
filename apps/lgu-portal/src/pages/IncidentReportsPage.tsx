@@ -1,11 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Card, CardContent, Chip } from '@mui/material';
+import {
+  Box,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Card,
+  CardContent,
+  CircularProgress,
+  Button,
+} from '@mui/material';
 import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
-import { MOCK_INCIDENT_REPORTS_DETAILED, IncidentReportRecord } from '../mockData/adminData';
+import { IncidentReportRecord } from '../mockData/adminData';
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
@@ -14,61 +29,60 @@ import { fetchIncidents, updateIncidentStatus, recordAdminAuditAction } from '..
 
 /**
  * ============================================================================
- * INCIDENT REPORTS PAGE COMPONENT
+ * INCIDENT REPORTS PAGE COMPONENT (IncidentReportsPage.tsx)
  * ============================================================================
- * Purpose:
- *   Enables LGU Transport Officers to investigate commuter safety complaints,
- *   triage fare overcharging or route deviation violations, track repeated
- *   complaint flags against drivers, and record resolution findings.
+ * Checklist Scope:
+ *   ● Manage Incident Reports
+ *     ○ View submitted incident reports
+ *     ○ Review incident details
+ *     ○ View related trip information
+ *     ○ Update incident status
  * ============================================================================
  */
 export const IncidentReportsPage: React.FC = () => {
-  // State: Incident reports list and filter controls
-  const [incidents, setIncidents] = useState<IncidentReportRecord[]>(MOCK_INCIDENT_REPORTS_DETAILED);
+  const [incidents, setIncidents] = useState<IncidentReportRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [selectedIncident, setSelectedIncident] = useState<IncidentReportRecord | null>(null);
 
-  /**
-   * Effect: Fetch live incident reports from the backend on component mount.
-   * Falls back gracefully to mock data when operating offline.
-   */
-  useEffect(() => {
-    let isMounted = true;
-    fetchIncidents()
-      .then((data) => {
-        if (isMounted && data && data.length > 0) {
-          setIncidents(data);
-        }
-      })
-      .catch((err) => {
-        console.warn('[IncidentReports] Failed to fetch incidents, using fallback:', err);
-      })
-      .finally(() => {
-        if (isMounted) setIsLoading(false);
-      });
+  const loadIncidents = async () => {
+    setIsLoading(true);
+    try {
+      const data = await fetchIncidents();
+      setIncidents(data);
+    } catch (err) {
+      console.error('[IncidentReportsPage] Failed to fetch incidents:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    return () => {
-      isMounted = false;
-    };
+  useEffect(() => {
+    loadIncidents();
   }, []);
 
-  // Filter logic: Search by ID, booking ID, driver name, reporter name, or category
+  // Filter logic
   const filteredIncidents = incidents.filter((inc) => {
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      inc.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inc.bookingId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inc.driverName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inc.reporterName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      inc.category.toLowerCase().includes(searchQuery.toLowerCase());
+      inc.id.toLowerCase().includes(q) ||
+      inc.bookingId.toLowerCase().includes(q) ||
+      inc.driverName.toLowerCase().includes(q) ||
+      inc.reporterName.toLowerCase().includes(q) ||
+      inc.category.toLowerCase().includes(q);
 
     const matchesStatus = statusFilter === 'All' || inc.status === statusFilter;
     const matchesCategory = categoryFilter === 'All' || inc.category === categoryFilter;
 
     return matchesSearch && matchesStatus && matchesCategory;
   });
+
+  const pendingCount = incidents.filter((i) => i.status === 'Pending Review').length;
+  const investigationCount = incidents.filter((i) => i.status === 'Under Investigation').length;
+  const resolvedCount = incidents.filter((i) => i.status === 'Resolved').length;
+  const dismissedCount = incidents.filter((i) => i.status === 'Dismissed').length;
 
   const statusOptions: FilterOption[] = [
     { label: 'All Incident Statuses', value: 'All' },
@@ -92,76 +106,31 @@ export const IncidentReportsPage: React.FC = () => {
     { label: 'Others', value: 'Others' },
   ];
 
-  /**
-   * Action Handler: Triages and updates the status of an incident report.
-   * Synchronizes with the Express backend and records an audit log entry.
-   */
   const handleStatusUpdate = async (
     incidentId: string,
     newStatus: 'Under Investigation' | 'Resolved' | 'Dismissed',
     findings?: string
   ) => {
-    const targetInc = incidents.find((i) => i.id === incidentId);
-
-    // Backend API Call
     try {
       await updateIncidentStatus(incidentId, newStatus, findings);
+      setIncidents((prev) =>
+        prev.map((inc) =>
+          inc.id === incidentId
+            ? { ...inc, status: newStatus, findings: findings || inc.findings }
+            : inc
+        )
+      );
+      if (selectedIncident && selectedIncident.id === incidentId) {
+        setSelectedIncident((prev) => (prev ? { ...prev, status: newStatus, findings: findings || prev.findings } : null));
+      }
     } catch (err) {
-      console.warn('[IncidentReports] Backend error during incident status update:', err);
+      console.error('[IncidentReports] Status update error:', err);
     }
-
-    // Update local state
-    setIncidents((prev) =>
-      prev.map((inc) =>
-        inc.id === incidentId
-          ? {
-              ...inc,
-              status: newStatus,
-              findings: findings || inc.findings,
-              statusHistory: [
-                ...inc.statusHistory,
-                {
-                  step: `Updated to ${newStatus}`,
-                  timestamp: new Date().toLocaleString(),
-                  actor: 'LGU Admin Officer',
-                },
-              ],
-            }
-          : inc
-      )
-    );
-
-    setSelectedIncident((prev) =>
-      prev && prev.id === incidentId
-        ? {
-            ...prev,
-            status: newStatus,
-            findings: findings || prev.findings,
-            statusHistory: [
-              ...prev.statusHistory,
-              {
-                step: `Updated to ${newStatus}`,
-                timestamp: new Date().toLocaleString(),
-                actor: 'LGU Admin Officer',
-              },
-            ],
-          }
-        : null
-    );
-
-    // Record Action in Immutable Audit Trail
-    recordAdminAuditAction({
-      actionType: `INCIDENT_${newStatus.toUpperCase().replace(/\s+/g, '_')}`,
-      targetId: incidentId,
-      targetName: targetInc ? `Incident #${incidentId} (${targetInc.category})` : `Incident #${incidentId}`,
-      details: `Updated incident investigation status to "${newStatus}". Findings/Notes: ${findings || 'Status updated during administrative triage.'}`,
-      category: 'User Oversight',
-    });
   };
 
   return (
     <Box sx={{ maxWidth: 1600, margin: '0 auto', pb: 6 }}>
-      {/* 1. Summary Cards (Identical Layout to Dashboard) */}
+      {/* 1. Summary Cards */}
       <Box
         sx={{
           display: 'grid',
@@ -170,7 +139,16 @@ export const IncidentReportsPage: React.FC = () => {
           mb: 4,
         }}
       >
-        <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
+        <Card
+          onClick={() => setStatusFilter(statusFilter === 'Pending Review' ? 'All' : 'Pending Review')}
+          sx={{
+            cursor: 'pointer',
+            borderRadius: 'var(--mac-radius-lg)',
+            border: statusFilter === 'Pending Review' ? '2px solid var(--sakay-orange)' : '1px solid var(--mac-border-color)',
+            boxShadow: 'var(--mac-shadow-card)',
+            backgroundColor: '#FFFFFF',
+          }}
+        >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
@@ -178,8 +156,8 @@ export const IncidentReportsPage: React.FC = () => {
               </Typography>
               <ReportProblemIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
             </Box>
-            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
-              12
+            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
+              {pendingCount}
             </Typography>
             <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
               Awaiting initial LGU triage
@@ -187,53 +165,80 @@ export const IncidentReportsPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
+        <Card
+          onClick={() => setStatusFilter(statusFilter === 'Under Investigation' ? 'All' : 'Under Investigation')}
+          sx={{
+            cursor: 'pointer',
+            borderRadius: 'var(--mac-radius-lg)',
+            border: statusFilter === 'Under Investigation' ? '2px solid var(--sakay-orange)' : '1px solid var(--mac-border-color)',
+            boxShadow: 'var(--mac-shadow-card)',
+            backgroundColor: '#FFFFFF',
+          }}
+        >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Under Investigation
               </Typography>
-              <HourglassEmptyIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
+              <HourglassEmptyIcon sx={{ color: '#1565C0', fontSize: 20 }} />
             </Box>
-            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
-              5
+            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#1565C0', mb: 0.5 }}>
+              {investigationCount}
             </Typography>
             <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
-              Assigned to LGU officer
+              Assigned to LGU triage officer
             </Typography>
           </CardContent>
         </Card>
 
-        <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
+        <Card
+          onClick={() => setStatusFilter(statusFilter === 'Resolved' ? 'All' : 'Resolved')}
+          sx={{
+            cursor: 'pointer',
+            borderRadius: 'var(--mac-radius-lg)',
+            border: statusFilter === 'Resolved' ? '2px solid var(--sakay-orange)' : '1px solid var(--mac-border-color)',
+            boxShadow: 'var(--mac-shadow-card)',
+            backgroundColor: '#FFFFFF',
+          }}
+        >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Resolved Reports
               </Typography>
-              <CheckCircleIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
+              <CheckCircleIcon sx={{ color: '#2E7D32', fontSize: 20 }} />
             </Box>
-            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
-              34
+            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#2E7D32', mb: 0.5 }}>
+              {resolvedCount}
             </Typography>
             <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
-              Sanctions or waivers issued
+              Sanctions or waivers finalized
             </Typography>
           </CardContent>
         </Card>
 
-        <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
+        <Card
+          onClick={() => setStatusFilter(statusFilter === 'Dismissed' ? 'All' : 'Dismissed')}
+          sx={{
+            cursor: 'pointer',
+            borderRadius: 'var(--mac-radius-lg)',
+            border: statusFilter === 'Dismissed' ? '2px solid var(--sakay-orange)' : '1px solid var(--mac-border-color)',
+            boxShadow: 'var(--mac-shadow-card)',
+            backgroundColor: '#FFFFFF',
+          }}
+        >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Dismissed
               </Typography>
-              <CancelIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
+              <CancelIcon sx={{ color: '#757575', fontSize: 20 }} />
             </Box>
-            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
-              8
+            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#757575', mb: 0.5 }}>
+              {dismissedCount}
             </Typography>
             <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
-              Unfounded / grace period compliant
+              Unfounded or duplicate reports
             </Typography>
           </CardContent>
         </Card>
@@ -243,7 +248,7 @@ export const IncidentReportsPage: React.FC = () => {
       <FilterToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder="Search incident ID, driver name, passenger name, or category..."
+        searchPlaceholder="Search incident ID, driver name, complainant, or category..."
         selectFilters={[
           {
             id: 'status',
@@ -254,7 +259,7 @@ export const IncidentReportsPage: React.FC = () => {
           },
           {
             id: 'category',
-            label: 'Incident Category',
+            label: 'Category',
             value: categoryFilter,
             options: categoryOptions,
             onChange: setCategoryFilter,
@@ -267,7 +272,7 @@ export const IncidentReportsPage: React.FC = () => {
         }}
       />
 
-      {/* 3. Incident Reports Table */}
+      {/* 3. Incidents Table */}
       <TableContainer
         component={Paper}
         elevation={0}
@@ -276,64 +281,89 @@ export const IncidentReportsPage: React.FC = () => {
           border: '1px solid var(--mac-border-color)',
           boxShadow: 'var(--mac-shadow-card)',
           overflow: 'hidden',
+          backgroundColor: '#FFFFFF',
         }}
       >
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>INCIDENT ID</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>CATEGORY</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>REPORTED BY</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>DRIVER & TODA</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>SUBMITTED DATE</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>STATUS</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACTIONS</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+                INCIDENT ID & CATEGORY
+              </TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+                REPORTED ENTITY / DRIVER
+              </TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+                COMPLAINANT
+              </TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+                SUBMITTED DATE
+              </TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+                STATUS
+              </TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+                ACTIONS
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredIncidents.length > 0 ? (
-              filteredIncidents.map((incident) => (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                  <CircularProgress size={32} sx={{ color: 'var(--sakay-orange)', mb: 1.5 }} />
+                  <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-muted)' }}>
+                    Loading incident reports...
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : filteredIncidents.length > 0 ? (
+              filteredIncidents.map((inc) => (
                 <TableRow
-                  key={incident.id}
+                  key={inc.id}
                   sx={{
                     transition: 'var(--mac-transition-fast)',
                     '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' },
                   }}
                 >
-                  <TableCell sx={{ py: 2.2, px: 3, fontWeight: 700, fontSize: '14px', color: 'var(--mac-text-primary)' }}>
-                    #{incident.id}
+                  <TableCell sx={{ py: 2.2, px: 3 }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--mac-text-primary)' }}>
+                      {inc.id}
+                    </Typography>
+                    <Typography sx={{ fontSize: '12.5px', color: 'var(--sakay-orange)', fontWeight: 600, mt: '3px' }}>
+                      {inc.category}
+                    </Typography>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--sakay-orange)' }}>
-                      {incident.category}
+                    <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                      {inc.driverName}
                     </Typography>
                     <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
-                      Trip Ref: {incident.tripId}
+                      {inc.todaName}
                     </Typography>
-                  </TableCell>
-                  <TableCell sx={{ fontSize: '14px', color: 'var(--mac-text-primary)', py: 2.2, px: 3 }}>
-                    {incident.reportedBy}: <span style={{ fontWeight: 600 }}>{incident.reporterName}</span>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-primary)' }}>
-                      {incident.driverName}
+                    <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-primary)' }}>
+                      {inc.reporterName} ({inc.reportedBy})
                     </Typography>
-                    <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
-                      {incident.todaName} ({incident.vehiclePlate})
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ fontSize: '13.5px', color: 'var(--mac-text-secondary)', py: 2.2, px: 3 }}>
-                    {incident.submittedDate} • {incident.submittedTime}
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <StatusBadge status={incident.status} />
+                    <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-primary)' }}>
+                      {inc.submittedDate}
+                    </Typography>
+                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+                      {inc.submittedTime}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ py: 2.2, px: 3 }}>
+                    <StatusBadge status={inc.status as any} />
                   </TableCell>
                   <TableCell align="right" sx={{ py: 2.2, px: 3 }}>
                     <ActionButton
-                      label="Review"
+                      label="Investigate"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedIncident(incident);
+                        setSelectedIncident(inc);
                       }}
                     />
                   </TableCell>
@@ -341,10 +371,31 @@ export const IncidentReportsPage: React.FC = () => {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 6 }}>
-                  <Typography sx={{ fontSize: '15px', color: 'var(--mac-text-muted)', fontWeight: 500 }}>
-                    No incident reports found matching your filters.
-                  </Typography>
+                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                    <ReportProblemIcon sx={{ fontSize: 44, color: 'var(--mac-border-color)' }} />
+                    <Typography sx={{ fontSize: '15px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
+                      No incident reports found
+                    </Typography>
+                    <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
+                      {searchQuery || statusFilter !== 'All'
+                        ? 'No reports match your active search or filter criteria.'
+                        : 'There are currently no incident reports recorded.'}
+                    </Typography>
+                    <Button
+                      onClick={loadIncidents}
+                      startIcon={<RefreshIcon />}
+                      sx={{
+                        mt: 1,
+                        textTransform: 'none',
+                        fontSize: '13.5px',
+                        color: 'var(--sakay-orange)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      Refresh
+                    </Button>
+                  </Box>
                 </TableCell>
               </TableRow>
             )}
@@ -352,7 +403,7 @@ export const IncidentReportsPage: React.FC = () => {
         </Table>
       </TableContainer>
 
-      {/* 4. Incident Detail Review Modal */}
+      {/* 4. Centered Widescreen Incident Detail & Triage Modal */}
       {selectedIncident && (
         <IncidentDetailModal
           open={Boolean(selectedIncident)}

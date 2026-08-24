@@ -1,15 +1,20 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AdminLayout } from '../components/layout/AdminLayout';
+import { ProtectedRoute, PublicOnlyRoute } from '../components/auth/ProtectedRoute';
+import { LoginPage } from '../pages/LoginPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { TodaApplicationsPage } from '../pages/TodaApplicationsPage';
 import { AccreditedTodasPage } from '../pages/AccreditedTodasPage';
 import { DriverManagementPage } from '../pages/DriverManagementPage';
 import { PassengerManagementPage } from '../pages/PassengerManagementPage';
+import { PassengerFeedbackPage } from '../pages/PassengerFeedbackPage';
 import { LiveTripsPage } from '../pages/LiveTripsPage';
 import { IncidentReportsPage } from '../pages/IncidentReportsPage';
 import { AnnouncementManagementPage } from '../pages/AnnouncementManagementPage';
 import { FareConfigurationPage } from '../pages/FareConfigurationPage';
+import { ReportsPage } from '../pages/ReportsPage';
+import { AnalyticsPage } from '../pages/AnalyticsPage';
 import { AccountManagementPage } from '../pages/AccountManagementPage';
 import { AuditLogPage } from '../pages/AuditLogPage';
 import { PlaceholderPage } from '../pages/PlaceholderPage';
@@ -17,16 +22,28 @@ import { PlaceholderPage } from '../pages/PlaceholderPage';
 export const AdminRoutes: React.FC = () => {
   return (
     <Routes>
+      {/* Public Login Route */}
+      <Route
+        path="/login"
+        element={
+          <PublicOnlyRoute>
+            <LoginPage />
+          </PublicOnlyRoute>
+        }
+      />
+
       {/* Default redirect to /dashboard */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-      {/* Dashboard Screen */}
+      {/* Protected Dashboard Screen */}
       <Route
         path="/dashboard"
         element={
-          <AdminLayout pageTitle="Dashboard" pageSubtitle="Overview of SAKAY operations in Calapan City">
-            <DashboardPage />
-          </AdminLayout>
+          <ProtectedRoute>
+            <AdminLayout pageTitle="Dashboard" pageSubtitle="Overview of SAKAY operations in Calapan City">
+              <DashboardPage />
+            </AdminLayout>
+          </ProtectedRoute>
         }
       />
 
@@ -34,36 +51,55 @@ export const AdminRoutes: React.FC = () => {
       <Route
         path="/toda-applications"
         element={
-          <AdminLayout pageTitle="TODA Applications" pageSubtitle="Review and manage TODA accreditation requests.">
-            <TodaApplicationsPage />
-          </AdminLayout>
+          <ProtectedRoute>
+            <AdminLayout pageTitle="TODA Applications" pageSubtitle="Review and manage TODA accreditation requests.">
+              <TodaApplicationsPage />
+            </AdminLayout>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/accredited-todas"
         element={
-          <AdminLayout pageTitle="Accredited TODAs" pageSubtitle="Manage accredited TODAs, service zones, and registration records.">
-            <AccreditedTodasPage />
-          </AdminLayout>
+          <ProtectedRoute>
+            <AdminLayout pageTitle="Accredited TODAs" pageSubtitle="Manage accredited TODAs, service zones, and registration records.">
+              <AccreditedTodasPage />
+            </AdminLayout>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/drivers"
         element={
-          <AdminLayout pageTitle="Driver Verification & Management" pageSubtitle="Review driver credentials, affiliations, and verification status.">
-            <DriverManagementPage />
-          </AdminLayout>
+          <ProtectedRoute>
+            <AdminLayout pageTitle="Driver Verification & Management" pageSubtitle="Review driver credentials, affiliations, and verification status.">
+              <DriverManagementPage />
+            </AdminLayout>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/passengers"
         element={
-          <AdminLayout pageTitle="Passenger Management" pageSubtitle="Manage passenger accounts, sessions, and feedback.">
-            <PassengerManagementPage />
-          </AdminLayout>
+          <ProtectedRoute>
+            <AdminLayout pageTitle="Passenger Management" pageSubtitle="Manage passenger accounts, sessions, and compliance.">
+              <PassengerManagementPage />
+            </AdminLayout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/feedback"
+        element={
+          <ProtectedRoute>
+            <AdminLayout pageTitle="Passenger Feedback & Ratings" pageSubtitle="Review commuter trip feedback, star evaluations, and triage complaints.">
+              <PassengerFeedbackPage />
+            </AdminLayout>
+          </ProtectedRoute>
         }
       />
 
@@ -71,27 +107,33 @@ export const AdminRoutes: React.FC = () => {
       <Route
         path="/live-trips"
         element={
-          <AdminLayout pageTitle="Live Trips" pageSubtitle="Monitor active trips and online drivers across Calapan City.">
-            <LiveTripsPage />
-          </AdminLayout>
+          <ProtectedRoute>
+            <AdminLayout pageTitle="Transportation Operations Monitoring" pageSubtitle="Monitor active trips, completed rides, cancelled bookings, and live vehicle locations.">
+              <LiveTripsPage />
+            </AdminLayout>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/incident-reports"
         element={
-          <AdminLayout pageTitle="Incident Reports" pageSubtitle="Review and manage passenger and driver incident reports.">
-            <IncidentReportsPage />
-          </AdminLayout>
+          <ProtectedRoute>
+            <AdminLayout pageTitle="Incident Reports" pageSubtitle="Review and manage passenger and driver incident reports.">
+              <IncidentReportsPage />
+            </AdminLayout>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/announcements"
         element={
-          <AdminLayout pageTitle="Announcement Management" pageSubtitle="Broadcast official municipal notices, route advisories, and policy reminders.">
-            <AnnouncementManagementPage />
-          </AdminLayout>
+          <ProtectedRoute>
+            <AdminLayout pageTitle="Announcement Management" pageSubtitle="Broadcast official municipal notices, route advisories, and policy reminders.">
+              <AnnouncementManagementPage />
+            </AdminLayout>
+          </ProtectedRoute>
         }
       />
 
@@ -99,9 +141,11 @@ export const AdminRoutes: React.FC = () => {
       <Route
         path="/fare-configuration"
         element={
-          <AdminLayout pageTitle="Fare Configuration" pageSubtitle="Enact and manage municipal tricycle fare matrix rates and derived formulas.">
-            <FareConfigurationPage />
-          </AdminLayout>
+          <ProtectedRoute>
+            <AdminLayout pageTitle="Fare Configuration" pageSubtitle="Enact and manage municipal tricycle fare matrix rates and derived formulas.">
+              <FareConfigurationPage />
+            </AdminLayout>
+          </ProtectedRoute>
         }
       />
 
@@ -109,24 +153,22 @@ export const AdminRoutes: React.FC = () => {
       <Route
         path="/reports"
         element={
-          <AdminLayout pageTitle="Reports" pageSubtitle="Generate operational and compliance reports">
-            <PlaceholderPage
-              title="Transportation Reports Generator"
-              subtitle="Export municipal transportation data, TODA compliance statistics, and passenger throughput records."
-            />
-          </AdminLayout>
+          <ProtectedRoute>
+            <AdminLayout pageTitle="Reports" pageSubtitle="Generate operational and compliance reports">
+              <ReportsPage />
+            </AdminLayout>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/analytics"
         element={
-          <AdminLayout pageTitle="Analytics" pageSubtitle="Descriptive transportation performance analytics">
-            <PlaceholderPage
-              title="Descriptive Analytics Dashboard"
-              subtitle="Detailed visual charts analyzing peak ride demand, fare distribution, and TODA coverage efficiency."
-            />
-          </AdminLayout>
+          <ProtectedRoute>
+            <AdminLayout pageTitle="Analytics" pageSubtitle="Descriptive transportation performance analytics">
+              <AnalyticsPage />
+            </AdminLayout>
+          </ProtectedRoute>
         }
       />
 
@@ -134,30 +176,36 @@ export const AdminRoutes: React.FC = () => {
       <Route
         path="/settings"
         element={
-          <AdminLayout pageTitle="Account Management" pageSubtitle="Manage LGU staff administrator profiles, permissions, and credential resets.">
-            <AccountManagementPage />
-          </AdminLayout>
+          <ProtectedRoute>
+            <AdminLayout pageTitle="Account Management" pageSubtitle="Manage LGU staff administrator profiles, permissions, and credential resets.">
+              <AccountManagementPage />
+            </AdminLayout>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/audit-logs"
         element={
-          <AdminLayout pageTitle="Audit Logs" pageSubtitle="Cryptographic administrative activity ledger and compliance security trail.">
-            <AuditLogPage />
-          </AdminLayout>
+          <ProtectedRoute>
+            <AdminLayout pageTitle="Audit Logs" pageSubtitle="Official administrative activity log and compliance security trail.">
+              <AuditLogPage />
+            </AdminLayout>
+          </ProtectedRoute>
         }
       />
 
       <Route
         path="/tulong"
         element={
-          <AdminLayout pageTitle="Tulong / Help" pageSubtitle="LGU Admin user guides and support documentation">
-            <PlaceholderPage
-              title="Tulong & Admin Support Center"
-              subtitle="Access official documentation, municipal operational guidelines, and administrator support contacts."
-            />
-          </AdminLayout>
+          <ProtectedRoute>
+            <AdminLayout pageTitle="Tulong / Help" pageSubtitle="LGU Admin user guides and support documentation">
+              <PlaceholderPage
+                title="Tulong & Admin Support Center"
+                subtitle="Access official documentation, municipal operational guidelines, and administrator support contacts."
+              />
+            </AdminLayout>
+          </ProtectedRoute>
         }
       />
 

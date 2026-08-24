@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Box, Typography, Avatar, IconButton } from '@mui/material';
+import { Box, Typography, Avatar, IconButton, Button } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -15,14 +15,17 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import SecurityIcon from '@mui/icons-material/Security';
 import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
 import CampaignIcon from '@mui/icons-material/Campaign';
+import StarRateIcon from '@mui/icons-material/StarRate';
 import PaidIcon from '@mui/icons-material/Paid';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
+import LogoutIcon from '@mui/icons-material/Logout';
 
 import appIcon from '@sakay/shared/assets/icons/app-icon.png';
 import logoTextOrange from '@sakay/shared/assets/images/logo-text-orange.png';
 import { MacTooltip } from '../common/MacTooltip';
 import { StatusBadge } from '../common/StatusBadge';
 import { MacCenterModal } from '../admin/MacCenterModal';
+import { useAuth } from '../../contexts/AuthContext';
 import { CURRENT_ADMIN } from '../../mockData/adminData';
 
 interface AdminSidebarProps {
@@ -48,6 +51,18 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
   const location = useLocation();
   const navigate = useNavigate();
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const { adminProfile, user, signOut } = useAuth();
+
+  const adminName = adminProfile?.full_name || user?.email || CURRENT_ADMIN.name;
+  const adminRole = adminProfile?.position || 'LGU Administrator';
+  const adminEmail = adminProfile?.email || user?.email || CURRENT_ADMIN.email;
+  const adminId = adminProfile?.admin_id ? `ADM-${adminProfile.admin_id.slice(0, 8).toUpperCase()}` : CURRENT_ADMIN.id;
+
+  const handleSignOut = async () => {
+    setProfileModalOpen(false);
+    await signOut();
+    navigate('/login', { replace: true });
+  };
 
   const navGroups: NavGroup[] = [
     {
@@ -63,6 +78,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
         { id: 'accredited-todas', label: 'Accredited TODAs', path: '/accredited-todas', icon: <VerifiedUserIcon fontSize="small" /> },
         { id: 'drivers', label: 'Drivers', path: '/drivers', icon: <BadgeIcon fontSize="small" /> },
         { id: 'passengers', label: 'Passengers', path: '/passengers', icon: <PeopleIcon fontSize="small" /> },
+        { id: 'feedback', label: 'Passenger Feedback', path: '/feedback', icon: <StarRateIcon fontSize="small" /> },
       ],
     },
     {
@@ -430,7 +446,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
               transition: 'transform 0.2s ease',
             }}
           >
-            {CURRENT_ADMIN.name.charAt(0)}
+            {adminName.charAt(0).toUpperCase()}
           </Avatar>
           <Box
             sx={{
@@ -443,10 +459,10 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
             }}
           >
             <Typography sx={{ fontWeight: 700, fontSize: '14px', color: 'var(--mac-text-primary)', lineHeight: 1.2, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              {CURRENT_ADMIN.name}
+              {adminName}
             </Typography>
             <Typography sx={{ fontSize: '12px', color: 'var(--sakay-orange)', fontWeight: 600, lineHeight: 1.2, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              {CURRENT_ADMIN.role}
+              {adminRole}
             </Typography>
           </Box>
         </Box>
@@ -500,14 +516,14 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
                 boxShadow: '0 10px 24px rgba(255, 107, 26, 0.22)',
               }}
             >
-              {CURRENT_ADMIN.name.charAt(0)}
+              {adminName.charAt(0).toUpperCase()}
             </Avatar>
-            <Box>
+            <Box sx={{ flexGrow: 1 }}>
               <Typography sx={{ fontSize: '18px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
-                {CURRENT_ADMIN.name}
+                {adminName}
               </Typography>
               <Typography sx={{ fontSize: '13.5px', color: 'var(--sakay-orange)', fontWeight: 600, mt: '2px' }}>
-                {CURRENT_ADMIN.role}
+                {adminRole}
               </Typography>
               <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mt: '2px' }}>
                 Calapan City Local Government Unit Transport Oversight
@@ -530,7 +546,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
                 Administrator ID
               </Typography>
               <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                {CURRENT_ADMIN.id}
+                {adminId}
               </Typography>
             </Box>
 
@@ -539,7 +555,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
                 Official Municipal Email
               </Typography>
               <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                {CURRENT_ADMIN.email}
+                {adminEmail}
               </Typography>
             </Box>
 
@@ -560,6 +576,26 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
                 Tier 1 (LGU Executive Officer)
               </Typography>
             </Box>
+          </Box>
+
+          {/* Dedicated Sign Out Button */}
+          <Box sx={{ pt: 1, display: 'flex', justifyContent: 'flex-end' }}>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={handleSignOut}
+              startIcon={<LogoutIcon fontSize="small" />}
+              sx={{
+                borderRadius: '10px',
+                textTransform: 'none',
+                fontWeight: 600,
+                fontSize: '13.5px',
+                px: 2.5,
+                py: 1,
+              }}
+            >
+              Sign Out of LGU Portal
+            </Button>
           </Box>
         </Box>
       </MacCenterModal>

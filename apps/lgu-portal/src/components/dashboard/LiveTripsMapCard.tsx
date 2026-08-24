@@ -2,9 +2,12 @@ import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Button } from '@mui/material';
 import L from 'leaflet';
-import { ACTIVE_TRIP_MARKERS } from '../../mockData/dashboardData';
 
-export const LiveTripsMapCard: React.FC = () => {
+interface LiveTripsMapCardProps {
+  ongoingTripsCount?: number;
+}
+
+export const LiveTripsMapCard: React.FC<LiveTripsMapCardProps> = ({ ongoingTripsCount = 0 }) => {
   const navigate = useNavigate();
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletInstanceRef = useRef<L.Map | null>(null);
@@ -27,21 +30,6 @@ export const LiveTripsMapCard: React.FC = () => {
 
     // Zoom control in bottom right
     L.control.zoom({ position: 'bottomright' }).addTo(map);
-
-    // Custom Icon for Tricycles
-    const customIcon = L.divIcon({
-      className: 'custom-map-marker',
-      html: '🛺',
-      iconSize: [32, 32],
-      iconAnchor: [16, 16],
-    });
-
-    // Add active trip markers
-    ACTIVE_TRIP_MARKERS.forEach((marker) => {
-      L.marker([marker.lat, marker.lng], { icon: customIcon })
-        .addTo(map)
-        .bindPopup(`<b>${marker.driverName}</b><br/>${marker.todaName}`);
-    });
 
     leafletInstanceRef.current = map;
 
@@ -72,10 +60,10 @@ export const LiveTripsMapCard: React.FC = () => {
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2.5 }}>
         <Box>
           <Typography sx={{ fontSize: '17px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-            Live Trips Map
+            Live Trips & Fleet Map
           </Typography>
           <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', mt: '3px' }}>
-            Monitor active trips across Calapan City.
+            Real-time transportation operations in Calapan City.
           </Typography>
         </Box>
 
@@ -105,7 +93,7 @@ export const LiveTripsMapCard: React.FC = () => {
         </Button>
       </Box>
 
-      {/* Map Surface filling maximum available card space */}
+      {/* Map Surface */}
       <Box
         sx={{
           flex: 1,
@@ -136,9 +124,16 @@ export const LiveTripsMapCard: React.FC = () => {
             border: '1px solid var(--mac-border-color)',
           }}
         >
-          <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#34A853' }} />
+          <Box
+            sx={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: ongoingTripsCount > 0 ? '#34A853' : '#9CA3AF',
+            }}
+          />
           <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-            Active Trip ({ACTIVE_TRIP_MARKERS.length})
+            {ongoingTripsCount > 0 ? `Active Trips (${ongoingTripsCount})` : 'No Active Trips in Transit'}
           </Typography>
         </Box>
       </Box>

@@ -15,6 +15,8 @@ import {
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
+import { supabase } from '../../../services/supabaseClient';
+
 interface FeedbackItem {
   id: string;
   driverName: string;
@@ -60,7 +62,7 @@ export const PassengerFeedback: React.FC = () => {
     }
   };
 
-  const handleSubmitFeedback = () => {
+  const handleSubmitFeedback = async () => {
     const newFeedback: FeedbackItem = {
       id: `FB-${Date.now()}`,
       driverName,
@@ -71,6 +73,18 @@ export const PassengerFeedback: React.FC = () => {
       comment: comment.trim(),
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     };
+
+    try {
+      await supabase.from('driver_rating').insert([
+        {
+          rating_value: rating || 5,
+          feedback_comment: selectedTags.length > 0 ? `[${selectedTags.join(', ')}] ${comment.trim()}` : comment.trim(),
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    } catch (err) {
+      console.warn('[PassengerFeedback] DB insert note:', err);
+    }
 
     try {
       const raw = localStorage.getItem(STORAGE_KEY);

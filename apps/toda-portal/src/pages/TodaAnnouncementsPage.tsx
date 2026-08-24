@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -20,20 +20,40 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import InboxIcon from '@mui/icons-material/Inbox';
 
-import { MOCK_TODA_ANNOUNCEMENTS, CURRENT_TODA_PROFILE, CURRENT_TODA_ADMIN } from '../mockData/todaData';
 import { TodaAnnouncement } from '../types/toda';
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
-import { recordTodaAuditAction } from '../services/todaApiService';
+import {
+  fetchTodaAnnouncements,
+  postTodaAnnouncement,
+  deleteTodaAnnouncement,
+  recordTodaAuditAction,
+} from '../services/todaApiService';
 
 // toda announcements broadcast management and driver mobile PWA push notifications
 export const TodaAnnouncementsPage: React.FC = () => {
-  const [announcements, setAnnouncements] = useState<TodaAnnouncement[]>(MOCK_TODA_ANNOUNCEMENTS);
+  const [announcements, setAnnouncements] = useState<TodaAnnouncement[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
+
+  const loadAnnouncements = () => {
+    setIsLoading(true);
+    fetchTodaAnnouncements()
+      .then((data) => setAnnouncements(data || []))
+      .catch((err) => {
+        console.error('[TodaAnnouncements] Error fetching from database:', err);
+        setAnnouncements([]);
+      })
+      .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    loadAnnouncements();
+  }, []);
 
   // Selected announcement for detail/edit modal
   const [selectedAnn, setSelectedAnn] = useState<TodaAnnouncement | null>(null);
@@ -104,58 +124,14 @@ export const TodaAnnouncementsPage: React.FC = () => {
   };
 
   // Action: Create or Edit Announcement
-  const handleSaveAnnouncement = (isPublishingImmediately: boolean) => {
+  const handleSaveAnnouncement = async (isPublishingImmediately: boolean) => {
     if (!formTitle.trim() || !formMessage.trim()) return;
 
-    if (editingAnn) {
-      // Edit existing (draft or published)
-      setAnnouncements((prev) =>
-        prev.map((a) =>
-          a.id === editingAnn.id
-            ? {
-                ...a,
-                title: formTitle.trim(),
-                message: formMessage.trim(),
-                category: formCategory,
-                urgency: formUrgency,
-                isPublished: isPublishingImmediately || a.isPublished,
-                createdAt: `${new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })} (Updated)`,
-              }
-            : a
-        )
-      );
-
-      recordTodaAuditAction({
-        actionType: 'ANNOUNCEMENT_PUBLISHED',
-        targetId: editingAnn.id,
-        targetName: formTitle.trim(),
-        details: `Updated announcement "${formTitle.trim()}" for ${CURRENT_TODA_PROFILE.acronym} drivers.`,
-        category: 'Announcement',
-      });
-    } else {
-      // Create new
-      const newId = `TODA-ANN-00${announcements.length + 1}`;
-      const newRecord: TodaAnnouncement = {
-        id: newId,
-        title: formTitle.trim(),
-        message: formMessage.trim(),
-        category: formCategory,
-        urgency: formUrgency,
-        isPublished: isPublishingImmediately,
-        sendPushNotification: true, // Mandatory auto-notification
-        createdBy: `${CURRENT_TODA_ADMIN.name} (TODA President)`,
-        createdAt: `${new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })} • ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-      };
-
-      setAnnouncements([newRecord, ...announcements]);
-
-      recordTodaAuditAction({
-        actionType: isPublishingImmediately ? 'ANNOUNCEMENT_PUBLISHED' : 'ANNOUNCEMENT_DRAFTED',
-        targetId: newId,
-        targetName: formTitle.trim(),
-        details: `${isPublishingImmediately ? 'Published' : 'Saved draft of'} announcement "${formTitle.trim()}" for ${CURRENT_TODA_PROFILE.acronym} drivers.`,
-        category: 'Announcement',
-      });
+    try {
+      await postTodaAnnouncement(formTitle.trim(), formMessage.trim(), formUrgency);
+      loadAnnouncements();
+    } catch (err) {
+      console.error('[TodaAnnouncements] Save error:', err);
     }
 
     setFormTitle('');
@@ -169,31 +145,20 @@ export const TodaAnnouncementsPage: React.FC = () => {
     setAnnouncements((prev) =>
       prev.map((a) => (a.id === ann.id ? { ...a, isPublished: true } : a))
     );
-
-    recordTodaAuditAction({
-      actionType: 'ANNOUNCEMENT_PUBLISHED',
-      targetId: ann.id,
-      targetName: ann.title,
-      details: `Published draft announcement "${ann.title}" to ${CURRENT_TODA_PROFILE.acronym} Driver App members.`,
-      category: 'Announcement',
-    });
-
     setSelectedAnn(null);
   };
 
   // Action: Delete Announcement
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (!selectedAnn) return;
 
-    setAnnouncements((prev) => prev.filter((a) => a.id !== selectedAnn.id));
-
-    recordTodaAuditAction({
-      actionType: 'ANNOUNCEMENT_DELETED',
-      targetId: selectedAnn.id,
-      targetName: selectedAnn.title,
-      details: `Deleted announcement "${selectedAnn.title}".`,
-      category: 'Announcement',
-    });
+    try {
+      await deleteTodaAnnouncement(selectedAnn.id);
+      loadAnnouncements();
+    } catch (err) {
+      console.error('[TodaAnnouncements] Delete error:', err);
+      setAnnouncements((prev) => prev.filter((a) => a.id !== selectedAnn.id));
+    }
 
     setDeleteDialogOpen(false);
     setSelectedAnn(null);
@@ -358,7 +323,7 @@ export const TodaAnnouncementsPage: React.FC = () => {
 
                   <TableCell sx={{ py: 2, px: 3 }}>
                     <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                      {CURRENT_TODA_PROFILE.acronym} Driver App Members
+                      TODA Driver App Members
                     </Typography>
                   </TableCell>
 
@@ -432,7 +397,7 @@ export const TodaAnnouncementsPage: React.FC = () => {
         open={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
         title={editingAnn ? "Edit TODA Announcement" : "Create New TODA Announcement"}
-        subtitle={`Broadcast notice to ${CURRENT_TODA_PROFILE.name} drivers via their Driver App`}
+        subtitle="Broadcast notice to TODA drivers via their Driver App"
         maxWidth={700}
         primaryActionLabel={isFormValid ? (editingAnn ? "Save Announcement" : "Publish Announcement") : undefined}
         onPrimaryAction={isFormValid ? () => handleSaveAnnouncement(true) : undefined}

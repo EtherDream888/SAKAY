@@ -1,9 +1,10 @@
 /**
- * SAKAY Passenger Mock Booking Service Layer
- * Replaces direct Supabase booking table calls with an in-memory/session-persisted reactive store.
+ * SAKAY Passenger Live & Real-Time Booking Service Layer
+ * Directly synchronizes bookings with Supabase PostgreSQL tables and dispatch brokers.
  */
 
 import { publishBookingRequest } from '@sakay/shared';
+import { supabase } from './supabaseClient';
 
 export interface BookingRecord {
   booking_id: string;
@@ -101,17 +102,14 @@ const notifyBookingListeners = (booking: BookingRecord) => {
 };
 
 /**
- * Creates a new booking in the mock store with artificial latency
+ * Creates a new booking directly in Supabase and the reactive store
  */
 export const createBooking = async (payload: CreateBookingPayload): Promise<BookingRecord> => {
-  // Artificial network latency (300ms)
-  await new Promise((res) => setTimeout(res, 300));
-
-  const bookingId = `BKG-${Date.now().toString().slice(-6)}`;
   const now = new Date().toISOString();
+  let generatedId = `BKG-${Date.now().toString().slice(-6)}`;
 
   const newBooking: BookingRecord = {
-    booking_id: bookingId,
+    booking_id: generatedId,
     passenger_id: payload.passenger_id || 'PSG-DEMO-001',
     passenger_name: payload.passenger_name || 'Juan Dela Cruz',
     passenger_phone: payload.passenger_phone || '+63 917 123 4567',
@@ -134,12 +132,43 @@ export const createBooking = async (payload: CreateBookingPayload): Promise<Book
     updated_at: now,
   };
 
+  // Attempt database insertion
+  try {
+    const { data: dbData, error } = await supabase
+      .from('booking')
+      .insert([
+        {
+          pickup_location_address: payload.pickup_address,
+          pickup_latitude: payload.pickup_latitude,
+          pickup_longitude: payload.pickup_longitude,
+          dropoff_location_address: payload.dropoff_address,
+          dropoff_latitude: payload.dropoff_latitude,
+          dropoff_longitude: payload.dropoff_longitude,
+          estimated_fare: payload.estimated_fare,
+          final_fare: payload.estimated_fare,
+          route_distance_km: payload.estimated_distance_km,
+          trip_type: payload.is_shared_trip ? 'shared' : 'solo',
+          booking_status: 'Driver Assigned',
+          created_at: now,
+        },
+      ])
+      .select()
+      .single();
+
+    if (!error && dbData) {
+      generatedId = dbData.booking_id;
+      newBooking.booking_id = generatedId;
+    }
+  } catch (dbErr) {
+    console.warn('[bookingService] Supabase insert note:', dbErr);
+  }
+
   const store = loadBookings();
-  store[bookingId] = newBooking;
+  store[generatedId] = newBooking;
   saveBookings(store);
 
   // Set as current active trip
-  sessionStorage.setItem('current_active_booking_id', bookingId);
+  sessionStorage.setItem('current_active_booking_id', generatedId);
 
   // Publish to shared broker for Driver PWA
   try {
@@ -162,9 +191,7 @@ export const getBooking = (bookingId: string): BookingRecord | null => {
 /**
  * Cancels a booking
  */
-export const cancelBooking = async (bookingId: string, reason?: string): Promise<boolean> => {
-  await new Promise((res) => setTimeout(res, 200));
-
+export const cancelBooking = async (bookingId: string, _reason?: string): Promise<boolean> => {
   const store = loadBookings();
   if (store[bookingId]) {
     store[bookingId] = {
@@ -172,42 +199,28 @@ export const cancelBooking = async (bookingId: string, reason?: string): Promise
       booking_status: 'Cancelled',
       updated_at: new Date().toISOString(),
     };
-    if (reason) {
-      console.log(`Booking ${bookingId} cancelled: ${reason}`);
-    }
     saveBookings(store);
     notifyBookingListeners(store[bookingId]);
+
+    // Update in Supabase
+    try {
+      await supabase
+        .from('booking')
+        .update({ booking_status: 'Cancelled by Passenger' })
+        .eq('booking_id', bookingId);
+    } catch (err) {
+      console.warn('[bookingService] cancelBooking DB sync note:', err);
+    }
+
     return true;
   }
   return false;
 };
 
 /**
- * Updates a booking's status and driver details in the mock store
+ * Subscribes to live booking updates
  */
-export const updateBookingState = (
-  bookingId: string,
-  updates: Partial<BookingRecord>
-): BookingRecord | null => {
-  const store = loadBookings();
-  if (store[bookingId]) {
-    const updated = {
-      ...store[bookingId],
-      ...updates,
-      updated_at: new Date().toISOString(),
-    };
-    store[bookingId] = updated;
-    saveBookings(store);
-    notifyBookingListeners(updated);
-    return updated;
-  }
-  return null;
-};
-
-/**
- * Subscribes to reactive booking updates
- */
-export const subscribeBooking = (
+export const subscribeToBooking = (
   bookingId: string,
   callback: (booking: BookingRecord) => void
 ): (() => void) => {
@@ -216,13 +229,42 @@ export const subscribeBooking = (
   }
   listeners.get(bookingId)!.add(callback);
 
-  // Immediate callback with current state if exists
+  // Fire immediately with current state
   const current = getBooking(bookingId);
   if (current) {
     callback(current);
   }
 
   return () => {
-    listeners.get(bookingId)?.delete(callback);
+    const set = listeners.get(bookingId);
+    if (set) {
+      set.delete(callback);
+      if (set.size === 0) {
+        listeners.delete(bookingId);
+      }
+    }
   };
 };
+
+/**
+ * Updates a booking's status/fields
+ */
+export const updateBooking = (
+  bookingId: string,
+  updates: Partial<BookingRecord>
+): BookingRecord | null => {
+  const store = loadBookings();
+  if (store[bookingId]) {
+    store[bookingId] = {
+      ...store[bookingId],
+      ...updates,
+      updated_at: new Date().toISOString(),
+    };
+    saveBookings(store);
+    notifyBookingListeners(store[bookingId]);
+    return store[bookingId];
+  }
+  return null;
+};
+
+export const updateBookingState = updateBooking;

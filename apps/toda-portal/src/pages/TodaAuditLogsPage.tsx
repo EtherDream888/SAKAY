@@ -14,27 +14,34 @@ import {
   Button,
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import RefreshIcon from '@mui/icons-material/Refresh';
 
 import { TodaAuditLog } from '../types/toda';
-import { CURRENT_TODA_PROFILE } from '../mockData/todaData';
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
-import { getAuditLogs, subscribeAuditLogs } from '../lib/auditLog';
+import { fetchTodaAuditLogs } from '../services/todaApiService';
 
 export const TodaAuditLogsPage: React.FC = () => {
-  const [logs, setLogs] = useState<TodaAuditLog[]>(getAuditLogs());
+  const [logs, setLogs] = useState<TodaAuditLog[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('All');
   const [selectedLog, setSelectedLog] = useState<TodaAuditLog | null>(null);
 
+  const loadLogs = () => {
+    setIsLoading(true);
+    fetchTodaAuditLogs()
+      .then((data) => setLogs(data || []))
+      .catch((err) => {
+        console.error('[TodaAuditLogs] Error fetching logs from database:', err);
+        setLogs([]);
+      })
+      .finally(() => setIsLoading(false));
+  };
+
   useEffect(() => {
-    const unsubscribe = subscribeAuditLogs(() => {
-      setLogs(getAuditLogs());
-    });
-    return () => {
-      unsubscribe();
-    };
+    loadLogs();
   }, []);
 
   // Filter Logic with Date Filter
@@ -177,7 +184,7 @@ export const TodaAuditLogsPage: React.FC = () => {
                           {log.actor_name}
                         </Typography>
                         <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>
-                          {CURRENT_TODA_PROFILE.acronym}
+                          TODA Administration
                         </Typography>
                       </Box>
                     </Box>

@@ -3,7 +3,6 @@ import { Box, Typography, Button } from '@mui/material';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { DateCalendarPopover } from '../popovers/DateCalendarPopover';
-import { CURRENT_TODA_ADMIN } from '../../mockData/todaData';
 
 interface WelcomeHeaderProps {
   welcomeText?: string;
@@ -12,12 +11,12 @@ interface WelcomeHeaderProps {
 }
 
 export const WelcomeHeader: React.FC<WelcomeHeaderProps> = ({
-  welcomeText = `Welcome back, ${CURRENT_TODA_ADMIN.name}! 👋`,
+  welcomeText = 'Welcome back! 👋',
   supportingText = 'Here is your TODA fleet availability and daily operational monitoring summary.',
   showDateSelector = true,
 }) => {
   const [dateAnchor, setDateAnchor] = useState<HTMLElement | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date(2026, 4, 12)); // May 12, 2026
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   const formatDateLabel = (date: Date) => {
     const month = date.toLocaleString('en-US', { month: 'short' });

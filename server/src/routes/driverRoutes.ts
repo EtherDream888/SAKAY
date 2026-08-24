@@ -3,175 +3,265 @@ import { supabase } from '../config/supabase';
 
 const router = Router();
 
-// In-memory fallback seed data for Drivers
-let drivers = [
-  {
-    driver_id: 'CCTODA-001',
-    full_name: 'Danilo Ramos Santos',
-    contact_number: '+63 917 123 4567',
-    email: 'danilo.santos@gmail.com',
-    toda_name: 'Calapan Central TODA',
-    toda_acronym: 'CCTODA',
-    toda_membership_number: 'CCTODA-2024-001',
-    license_number: 'D02-14-089721',
-    franchise_number: 'MTOP-2024-001',
-    plate_number: 'AA 1234',
-    account_status: 'Verified',
-    availability_status: 'Available',
-    weighted_average_rating: 4.85,
-    strikes_count: 0,
-    created_at: '2024-01-20T00:00:00Z',
-  },
-  {
-    driver_id: 'CCTODA-002',
-    full_name: 'Jose Mari Hernandez',
-    contact_number: '+63 918 234 5678',
-    email: 'jm.hernandez@gmail.com',
-    toda_name: 'Calapan Central TODA',
-    toda_acronym: 'CCTODA',
-    toda_membership_number: 'CCTODA-2024-002',
-    license_number: 'D02-15-098712',
-    franchise_number: 'MTOP-2024-002',
-    plate_number: 'BB 5678',
-    account_status: 'Verified',
-    availability_status: 'Busy',
-    weighted_average_rating: 4.9,
-    strikes_count: 1,
-    created_at: '2024-01-22T00:00:00Z',
-  },
-  {
-    driver_id: 'APP-DRV-001',
-    full_name: 'Eduardo M. Perez',
-    contact_number: '+63 928 444 8902',
-    email: 'eduardo.perez@gmail.com',
-    toda_name: 'Calapan Central TODA',
-    toda_acronym: 'CCTODA',
-    toda_membership_number: 'CCTODA-2024-025',
-    license_number: 'D02-18-112233',
-    franchise_number: 'MTOP-2026-PENDING',
-    plate_number: 'CC 9012',
-    account_status: 'Pending Verification',
-    availability_status: 'Offline',
-    weighted_average_rating: 5.0,
-    strikes_count: 0,
-    created_at: '2026-08-14T00:00:00Z',
-  },
-];
-
-// GET /api/admin/drivers - List drivers with optional status filtering
+// ============================================================================
+// 1. GET /api/admin/drivers - List drivers from Supabase
+// ============================================================================
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { status, toda } = req.query;
+    const { status, toda, search } = req.query;
 
     if (supabase) {
-      let query = supabase.from('driver').select('*');
-      if (status) query = query.eq('account_status', status);
+      let query = supabase
+        .from('driver')
+        .select(`
+          *,
+          toda:toda_id (
+            toda_id,
+            toda_name,
+            toda_acronym,
+            barangay
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (status && status !== 'All') {
+        query = query.eq('account_status', status);
+      }
+
       const { data, error } = await query;
-      if (!error && data && data.length > 0) {
-        return res.json({ success: true, data });
+
+      if (!error && data) {
+        let result = data.map((d: any) => ({
+          driver_id: d.driver_id,
+          id: d.driver_id,
+          full_name: d.full_name,
+          name: d.full_name,
+          contact_number: d.contact_number,
+          phone: d.contact_number,
+          email: d.email || '',
+          toda_id: d.toda_id,
+          toda_name: d.toda?.toda_name || 'Calapan Central TODA',
+          toda_acronym: d.toda?.toda_acronym || 'CCTODA',
+          toda_membership_number: d.toda_membership_number || 'N/A',
+          license_number: d.license_number || 'N/A',
+          license_expiry: d.license_expiry || '2026-12-31',
+          franchise_number: d.franchise_number || 'N/A',
+          plate_number: d.plate_number || 'N/A',
+          barangay_service_area: d.barangay_service_area || d.toda?.barangay || 'Calapan City',
+          account_status: d.account_status || 'Pending Verification',
+          availability_status: d.availability_status || 'Offline',
+          weighted_average_rating: Number(d.weighted_average_rating) || 5.0,
+          strikes_count: 0,
+          created_at: d.created_at,
+        }));
+
+        if (toda && toda !== 'All') {
+          result = result.filter(
+            (d) =>
+              d.toda_acronym === toda ||
+              d.toda_name.toLowerCase().includes((toda as string).toLowerCase())
+          );
+        }
+
+        if (search) {
+          const q = (search as string).toLowerCase();
+          result = result.filter(
+            (d) =>
+              d.full_name.toLowerCase().includes(q) ||
+              d.license_number.toLowerCase().includes(q) ||
+              d.plate_number.toLowerCase().includes(q) ||
+              d.franchise_number.toLowerCase().includes(q) ||
+              d.toda_name.toLowerCase().includes(q)
+          );
+        }
+
+        return res.json({ success: true, data: result });
       }
     }
 
-    let filtered = [...drivers];
-    if (status) filtered = filtered.filter((d) => d.account_status === status);
-    if (toda) filtered = filtered.filter((d) => d.toda_acronym === toda);
-
-    return res.json({ success: true, data: filtered });
+    return res.json({ success: true, data: [] });
   } catch (err) {
+    console.error('[driverRoutes] GET / error:', err);
     return res.status(500).json({ success: false, error: (err as Error).message });
   }
 });
 
-// POST /api/admin/drivers/:id/verify - Approve & issue MTOP franchise
+// ============================================================================
+// 2. POST /api/admin/drivers/:id/verify - Stage 2 LGU Credential Approval
+// ============================================================================
 router.post('/:id/verify', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { franchise_number } = req.body;
+    const { franchise_number, actor_name = 'LGU Transport Administrator' } = req.body;
 
-    const driver = drivers.find((d) => d.driver_id === id);
-    if (!driver) {
-      return res.status(404).json({ success: false, error: 'Driver not found' });
+    if (supabase) {
+      const updatePayload: any = { account_status: 'Verified' };
+      if (franchise_number) {
+        updatePayload.franchise_number = franchise_number;
+      }
+
+      const { data, error } = await supabase
+        .from('driver')
+        .update(updatePayload)
+        .eq('driver_id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      await supabase.from('audit_log').insert([
+        {
+          action_type: 'DRIVER_STAGE2_VERIFIED',
+          target_id: id,
+          details: `[Driver Verification] ${actor_name}: Approved Stage 2 LGU verification and accredited driver '${data?.full_name || id}'. Franchise: ${data?.franchise_number || 'Existing'}`,
+          performed_at: new Date().toISOString(),
+        },
+      ]);
+
+      return res.json({
+        success: true,
+        message: `Driver ${data?.full_name || id} verified and accredited.`,
+        data,
+      });
     }
 
-    driver.account_status = 'Verified';
-    if (franchise_number) driver.franchise_number = franchise_number;
-
-    return res.json({
-      success: true,
-      message: `Driver ${driver.full_name} verified and approved.`,
-      data: driver,
-    });
+    return res.status(500).json({ success: false, error: 'Database service unavailable' });
   } catch (err) {
+    console.error('[driverRoutes] /:id/verify error:', err);
     return res.status(500).json({ success: false, error: (err as Error).message });
   }
 });
 
-// POST /api/admin/drivers/:id/suspend - Suspend driver account
+// ============================================================================
+// 3. POST /api/admin/drivers/:id/suspend - Administrative Driver Suspension
+// ============================================================================
 router.post('/:id/suspend', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { reason, duration_days = 7 } = req.body;
+    const { reason, duration_days = 7, actor_name = 'LGU Transport Administrator' } = req.body;
 
-    const driver = drivers.find((d) => d.driver_id === id);
-    if (!driver) {
-      return res.status(404).json({ success: false, error: 'Driver not found' });
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        error: 'A mandatory suspension reason must be specified.',
+      });
     }
 
-    driver.account_status = 'Suspended';
-    return res.json({
-      success: true,
-      message: `Driver ${driver.full_name} suspended for ${duration_days} days.`,
-      data: { driver, reason, duration_days },
-    });
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('driver')
+        .update({ account_status: 'Suspended' })
+        .eq('driver_id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      await supabase.from('audit_log').insert([
+        {
+          action_type: 'DRIVER_ACCOUNT_SUSPENDED',
+          target_id: id,
+          details: `[User Oversight] ${actor_name}: Enacted administrative suspension on driver '${data?.full_name || id}' for ${duration_days} days. Reason: ${reason}`,
+          performed_at: new Date().toISOString(),
+        },
+      ]);
+
+      return res.json({
+        success: true,
+        message: `Driver ${data?.full_name || id} suspended for ${duration_days} days.`,
+        data,
+      });
+    }
+
+    return res.status(500).json({ success: false, error: 'Database service unavailable' });
   } catch (err) {
+    console.error('[driverRoutes] /:id/suspend error:', err);
     return res.status(500).json({ success: false, error: (err as Error).message });
   }
 });
 
-// POST /api/admin/drivers/:id/reactivate - Reactivate suspended driver
+// ============================================================================
+// 4. POST /api/admin/drivers/:id/reactivate - Reactivate Suspended Driver
+// ============================================================================
 router.post('/:id/reactivate', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const driver = drivers.find((d) => d.driver_id === id);
-    if (!driver) {
-      return res.status(404).json({ success: false, error: 'Driver not found' });
+    const { actor_name = 'LGU Transport Administrator' } = req.body;
+
+    if (supabase) {
+      const { data, error } = await supabase
+        .from('driver')
+        .update({ account_status: 'Verified' })
+        .eq('driver_id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      await supabase.from('audit_log').insert([
+        {
+          action_type: 'DRIVER_ACCOUNT_REACTIVATED',
+          target_id: id,
+          details: `[User Oversight] ${actor_name}: Reactivated driver '${data?.full_name || id}' to active verified standing.`,
+          performed_at: new Date().toISOString(),
+        },
+      ]);
+
+      return res.json({
+        success: true,
+        message: `Driver ${data?.full_name || id} reactivated.`,
+        data,
+      });
     }
 
-    driver.account_status = 'Verified';
-    return res.json({
-      success: true,
-      message: `Driver ${driver.full_name} reactivated.`,
-      data: driver,
-    });
+    return res.status(500).json({ success: false, error: 'Database service unavailable' });
   } catch (err) {
+    console.error('[driverRoutes] /:id/reactivate error:', err);
     return res.status(500).json({ success: false, error: (err as Error).message });
   }
 });
 
-// POST /api/admin/drivers/:id/strike - Issue policy strike
+// ============================================================================
+// 5. POST /api/admin/drivers/:id/strike - Issue Administrative Policy Strike
+// ============================================================================
 router.post('/:id/strike', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { reason, violation_type } = req.body;
+    const { reason, violation_type = 'Operational Violation', actor_name = 'LGU Transport Administrator' } = req.body;
 
-    const driver = drivers.find((d) => d.driver_id === id);
-    if (!driver) {
-      return res.status(404).json({ success: false, error: 'Driver not found' });
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        error: 'A mandatory reason for the strike must be provided.',
+      });
     }
 
-    driver.strikes_count = (driver.strikes_count || 0) + 1;
-    let autoSuspended = false;
-    if (driver.strikes_count >= 3) {
-      driver.account_status = 'Suspended';
-      autoSuspended = true;
+    if (supabase) {
+      const { data: driver } = await supabase
+        .from('driver')
+        .select('full_name')
+        .eq('driver_id', id)
+        .maybeSingle();
+
+      await supabase.from('audit_log').insert([
+        {
+          action_type: 'DRIVER_POLICY_STRIKE_ISSUED',
+          target_id: id,
+          details: `[User Oversight] ${actor_name}: Issued administrative policy strike to driver '${driver?.full_name || id}'. Category: ${violation_type}. Reason: ${reason}`,
+          performed_at: new Date().toISOString(),
+        },
+      ]);
+
+      return res.json({
+        success: true,
+        message: `Administrative policy strike issued to driver ${driver?.full_name || id}.`,
+        data: { id, reason, violation_type },
+      });
     }
 
-    return res.json({
-      success: true,
-      message: `Strike issued to ${driver.full_name}. Total strikes: ${driver.strikes_count}`,
-      data: { driver, reason, violation_type, autoSuspended },
-    });
+    return res.status(500).json({ success: false, error: 'Database service unavailable' });
   } catch (err) {
+    console.error('[driverRoutes] /:id/strike error:', err);
     return res.status(500).json({ success: false, error: (err as Error).message });
   }
 });

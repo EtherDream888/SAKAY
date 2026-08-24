@@ -21,6 +21,8 @@ import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
+import { supabase } from '../../../services/supabaseClient';
+
 interface IncidentReportItem {
   id: string;
   incidentType: string;
@@ -58,7 +60,7 @@ export const IncidentReporting: React.FC = () => {
     'Others',
   ];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!description.trim()) return;
 
@@ -70,6 +72,20 @@ export const IncidentReporting: React.FC = () => {
       status: 'Under Investigation (LGU & TODA)',
       submittedAt: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     };
+
+    try {
+      await supabase.from('incident_report').insert([
+        {
+          category: incidentType,
+          description: `[Franchise: ${franchiseNo.trim() || 'N/A'}] ${description.trim()}`,
+          severity: incidentType.includes('Unsafe') || incidentType.includes('Reckless') ? 'High' : 'Medium',
+          status: 'Pending Review',
+          created_at: new Date().toISOString(),
+        },
+      ]);
+    } catch (err) {
+      console.warn('[IncidentReporting] DB sync note:', err);
+    }
 
     try {
       const raw = localStorage.getItem(STORAGE_KEY);

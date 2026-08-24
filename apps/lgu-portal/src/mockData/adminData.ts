@@ -3,33 +3,56 @@
 export interface TodaApplicationRecord {
   id: string;
   name: string;
+  acronym?: string;
+  registrationNumber?: string;
+  dateEstablished?: string;
   representative: string;
   phone: string;
   email: string;
   barangay: string;
+  terminalLocation?: string;
+  terminalLatitude?: number;
+  terminalLongitude?: number;
+  serviceCoverageArea?: string;
   submittedDate: string;
   memberCount: number;
+  registeredTricycleCount?: number;
+  activeDriverCount?: number;
   status: 'Pending' | 'Under Review' | 'Approved' | 'Declined' | 'Resubmission Required';
   declineReason?: string;
   resubmissionReason?: string;
   barangayClearanceExpiry: string;
-  clearanceStatus: 'Valid' | 'Expiring Soon' | 'Expired';
+  clearanceStatus: 'Valid' | 'Expiring Soon' | 'Expired' | 'Under Review';
   isOverdue5Days?: boolean;
+  officers?: {
+    president: string;
+    presidentContact: string;
+    vicePresident: string;
+    vicePresidentContact: string;
+    secretary: string;
+    secretaryContact: string;
+    treasurer: string;
+    treasurerContact: string;
+  };
   documents: {
     name: string;
     type: string;
     date: string;
-    url: string;
+    url: string | null;
+    status?: string;
   }[];
 }
+
 
 export interface AccreditedTodaRecord {
   id: string;
   name: string;
+  acronym?: string;
   representative: string;
   phone: string;
   email: string;
   barangay: string;
+  serviceZone?: string;
   registeredDrivers: number;
   status: 'Active' | 'Suspended' | 'Inactive';
   accreditationNo: string;
@@ -37,6 +60,7 @@ export interface AccreditedTodaRecord {
   expiryDate: string;
   barangayClearanceExpiry: string;
   clearanceStatus: 'Valid' | 'Expiring Soon' | 'Expired';
+
   confirmedIncidents: number;
   flaggedForReview: boolean;
   centerLat: number;
@@ -254,6 +278,7 @@ export interface AnnouncementRecord {
 export interface AuditLogRecord {
   id: string;
   log_id: string;
+  timestamp?: string;
   lgu_admin_id: string;
   actor_name: string;
   actor_role: string;

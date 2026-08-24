@@ -21,7 +21,6 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import InsertPhotoIcon from '@mui/icons-material/InsertPhoto';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 
-import { MOCK_TODA_DRIVERS, MOCK_EXEMPTION_REQUESTS, CURRENT_TODA_PROFILE } from '../mockData/todaData';
 import { TodaDriverMember, DriverExemptionRequest, EvidenceFileItem } from '../types/toda';
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
 import { StatusBadge } from '../components/common/StatusBadge';
@@ -39,9 +38,9 @@ import {
 // toda driver roster membership, strikes record, and suspension management
 export const TodaDriverMembershipPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<number>(0);
-  const [drivers, setDrivers] = useState<TodaDriverMember[]>(MOCK_TODA_DRIVERS);
+  const [drivers, setDrivers] = useState<TodaDriverMember[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [exemptions, setExemptions] = useState<DriverExemptionRequest[]>(MOCK_EXEMPTION_REQUESTS);
+  const [exemptions, setExemptions] = useState<DriverExemptionRequest[]>([]);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -58,24 +57,23 @@ export const TodaDriverMembershipPage: React.FC = () => {
   const [exemptionDecisionModalOpen, setExemptionDecisionModalOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<EvidenceFileItem | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadDrivers = () => {
+    setIsLoading(true);
     fetchTodaDriverMembers()
       .then((data) => {
-        if (isMounted && data && data.length > 0) {
-          setDrivers(data);
-        }
+        setDrivers(data || []);
       })
       .catch((err) => {
-        console.warn('[TodaMembership] Failed to fetch drivers, using fallback:', err);
+        console.error('[TodaMembership] Failed to fetch drivers from database:', err);
+        setDrivers([]);
       })
       .finally(() => {
-        if (isMounted) setIsLoading(false);
+        setIsLoading(false);
       });
+  };
 
-    return () => {
-      isMounted = false;
-    };
+  useEffect(() => {
+    loadDrivers();
   }, []);
 
   // Filter Logic

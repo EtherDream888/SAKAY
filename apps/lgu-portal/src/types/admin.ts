@@ -42,6 +42,18 @@ export interface LguAdmin {
   createdAt: string;
 }
 
+export interface LguAdminProfile {
+  admin_id: string;
+  auth_user_id: string;
+  full_name: string;
+  email: string;
+  contact_number?: string | null;
+  position?: string | null;
+  account_status: 'Active' | 'Suspended';
+  last_login?: string | null;
+  created_at: string;
+}
+
 export interface FareMatrixItem {
   id: string;
   baseFare: number;

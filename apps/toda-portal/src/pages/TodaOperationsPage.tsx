@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -11,123 +11,129 @@ import {
   Paper,
   Button,
   Chip,
-  Avatar,
+  CircularProgress,
 } from '@mui/material';
-import TwoWheelerIcon from '@mui/icons-material/TwoWheeler';
-import NavigationIcon from '@mui/icons-material/Navigation';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ShieldIcon from '@mui/icons-material/Shield';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
-import { CURRENT_TODA_PROFILE, CURRENT_TODA_ADMIN, MOCK_TODA_DRIVERS, MOCK_TODA_BOOKINGS } from '../mockData/todaData';
+import { TodaProfile, TodaDriverMember, TodaBooking } from '../types/toda';
+import {
+  fetchTodaProfile,
+  fetchTodaDrivers,
+  fetchTodaOperationsTrips,
+} from '../services/todaApiService';
 import { WelcomeHeader } from '../components/layout/WelcomeHeader';
 import { StatusBadge } from '../components/common/StatusBadge';
-import { ActionButton } from '../components/admin/ActionButton';
 
 export const TodaOperationsPage: React.FC = () => {
-  const [lastRefreshed, setLastRefreshed] = useState<string>(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  const [profile, setProfile] = useState<TodaProfile | null>(null);
+  const [drivers, setDrivers] = useState<TodaDriverMember[]>([]);
+  const [bookings, setBookings] = useState<TodaBooking[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [lastRefreshed, setLastRefreshed] = useState<string>(
+    new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  );
 
-  const handleRefresh = () => {
-    setLastRefreshed(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [prof, drvs, trips] = await Promise.all([
+        fetchTodaProfile(),
+        fetchTodaDrivers(),
+        fetchTodaOperationsTrips(),
+      ]);
+
+      if (prof) setProfile(prof);
+      setDrivers(drvs || []);
+
+      const mappedBookings: TodaBooking[] = (trips || []).map((b: any) => ({
+        id: b.booking_id,
+        bookingCode: b.booking_id.slice(0, 8).toUpperCase(),
+        passengerName: b.passenger_name || 'Passenger',
+        passengerPhone: b.passenger_phone || '+63 900 000 0000',
+        driverName: b.driver?.full_name || 'Assigned Driver',
+        vehiclePlate: b.driver?.plate_number || 'MV-101',
+        pickupLocation: b.pickup_address || 'Pickup Point',
+        dropoffLocation: b.dropoff_address || 'Dropoff Point',
+        distanceKm: Number(b.estimated_distance_km) || 2.0,
+        fareAmount: Number(b.estimated_fare) || 15,
+        tripMode: b.is_shared_trip ? 'Shared Ride' : 'Single Commuter',
+        status: b.status === 'Completed' ? 'Completed' : b.status === 'Cancelled' ? 'Cancelled' : 'In Progress',
+        paymentMethod: 'Cash',
+        timestamp: b.created_at ? new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+      }));
+
+      setBookings(mappedBookings);
+      setLastRefreshed(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+    } catch (err) {
+      console.error('[TodaOperations] Error fetching data from database:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Fleet Statistics
-  const totalDrivers = MOCK_TODA_DRIVERS.length;
-  const activeDrivers = MOCK_TODA_DRIVERS.filter((d) => d.accountStatus === 'Active').length;
-  const availableForBooking = 14;
-  const currentlyAssigned = 6;
-  const averageIdleMinutes = 18;
-  const longestIdleMinutes = 42;
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  // Drivers Waiting for SAKAY Bookings (Driver Idle Time Data)
-  const idleDriversList = [
-    { id: 'DRV-001', driver: 'Aurelio "Auring" Bautista', plate: '773-MV', area: 'JP Rizal Terminal', idleTime: '42 mins', status: 'Available' },
-    { id: 'DRV-003', driver: 'Rogelio "Roger" Ramos', plate: '194-MV', area: 'San Vicente Corridor', idleTime: '28 mins', status: 'Available' },
-    { id: 'DRV-005', driver: 'Danilo "Danny" Reyes', plate: '809-MV', area: 'City Hall Complex', idleTime: '15 mins', status: 'Available' },
-    { id: 'DRV-002', driver: 'Vicente "Enteng" Sotto', plate: '482-MV', area: 'Poblacion Core', idleTime: '6 mins', status: 'Assigned (Trip #8641)' },
-  ];
+  const totalDrivers = drivers.length;
+  const activeDrivers = drivers.filter((d) => d.accountStatus === 'Active').length;
+  const activeTrips = bookings.filter((b) => b.status === 'In Progress');
 
   return (
     <Box sx={{ maxWidth: 1600, margin: '0 auto', pb: 6 }}>
       {/* 1. Welcome Section Header */}
       <WelcomeHeader
-        welcomeText={`Welcome back, ${CURRENT_TODA_ADMIN.name}! 👋`}
-        supportingText={`Operational monitoring and fleet availability for ${CURRENT_TODA_PROFILE.name} (${CURRENT_TODA_PROFILE.acronym})`}
+        welcomeText={`Welcome back! 👋`}
+        supportingText={`Operational monitoring and fleet availability for ${profile?.name || 'TODA Association'} (${profile?.acronym || 'TODA'})`}
       />
 
       {/* 2. Supervisory Standing Banner & Compliance Indicators */}
       <Box sx={{ mb: 3.5 }}>
-        {CURRENT_TODA_PROFILE.misteepComplaintsCount >= 3 ? (
-          <Box
-            sx={{
-              p: '18px 24px',
-              borderRadius: 'var(--mac-radius-lg)',
-              backgroundColor: '#FEF2F2',
-              border: '1px solid #FECACA',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              boxShadow: 'var(--mac-shadow-subtle)',
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <WarningAmberIcon sx={{ color: '#DC2626', fontSize: 26 }} />
-              <Box>
-                <Typography sx={{ fontSize: '15px', fontWeight: 600, color: '#991B1B' }}>
-                  LGU Supervisory Review Warning Active
-                </Typography>
-                <Typography sx={{ fontSize: '13.5px', color: '#B91C1C', mt: '2px' }}>
-                  {CURRENT_TODA_PROFILE.name} has recorded 3+ verified passenger complaints in the last 60 days. The City Franchising Office is monitoring dispatch performance.
-                </Typography>
-              </Box>
+        <Box
+          sx={{
+            p: '16px 22px',
+            borderRadius: 'var(--mac-radius-lg)',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid var(--mac-border-color)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: 'var(--mac-shadow-card)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <ShieldIcon sx={{ color: '#059669', fontSize: 24 }} />
+            <Box>
+              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                Accreditation Status — {profile?.name || 'TODA Association'}
+              </Typography>
+              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mt: '2px' }}>
+                Accreditation Permit #{profile?.accreditationNo || 'CAL-TODA-2024-001'} is active.
+              </Typography>
             </Box>
           </Box>
-        ) : (
-          <Box
+          <Button
+            size="small"
+            onClick={loadData}
+            startIcon={<RefreshIcon fontSize="small" />}
             sx={{
-              p: '16px 22px',
-              borderRadius: 'var(--mac-radius-lg)',
-              backgroundColor: '#FFFFFF',
+              height: 36,
+              px: 2,
+              borderRadius: '8px',
+              fontSize: '12.5px',
+              textTransform: 'none',
+              color: 'var(--mac-text-secondary)',
               border: '1px solid var(--mac-border-color)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              boxShadow: 'var(--mac-shadow-card)',
+              backgroundColor: '#FFFFFF',
+              '&:hover': { backgroundColor: 'var(--sakay-orange-soft)', color: 'var(--sakay-orange)' },
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <ShieldIcon sx={{ color: '#059669', fontSize: 24 }} />
-              <Box>
-                <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                  Accreditation Good Standing — {CURRENT_TODA_PROFILE.name}
-                </Typography>
-                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mt: '2px' }}>
-                  Accreditation Permit #{CURRENT_TODA_PROFILE.accreditationNo} is active. Verified complaint count ({CURRENT_TODA_PROFILE.misteepComplaintsCount} / 3) is well below the supervisory review threshold.
-                </Typography>
-              </Box>
-            </Box>
-            <Button
-              size="small"
-              onClick={handleRefresh}
-              startIcon={<RefreshIcon fontSize="small" />}
-              sx={{
-                height: 36,
-                px: 2,
-                borderRadius: '8px',
-                fontSize: '12.5px',
-                textTransform: 'none',
-                color: 'var(--mac-text-secondary)',
-                border: '1px solid var(--mac-border-color)',
-                backgroundColor: '#FFFFFF',
-                '&:hover': { backgroundColor: 'var(--sakay-orange-soft)', color: 'var(--sakay-orange)' },
-              }}
-            >
-              Refreshed {lastRefreshed}
-            </Button>
-          </Box>
-        )}
+            Refreshed {lastRefreshed}
+          </Button>
+        </Box>
       </Box>
 
       {/* 3. Surface-Level Operations KPIs */}
@@ -142,29 +148,29 @@ export const TodaOperationsPage: React.FC = () => {
         <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
           <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Accredited Drivers</Typography>
           <Typography sx={{ fontSize: '32px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>{totalDrivers}</Typography>
-          <Typography sx={{ fontSize: '12px', color: '#059669', mt: 0.5, fontWeight: 500 }}>{activeDrivers} Drivers Active in System</Typography>
+          <Typography sx={{ fontSize: '12px', color: '#059669', mt: 0.5, fontWeight: 500 }}>{activeDrivers} Drivers Active</Typography>
         </Box>
 
         <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Available for SAKAY</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: 'var(--sakay-orange)' }}>{availableForBooking}</Typography>
-          <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mt: 0.5 }}>Ready to Accept Rides</Typography>
+          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Active Trips</Typography>
+          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: 'var(--sakay-orange)' }}>{activeTrips.length}</Typography>
+          <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mt: 0.5 }}>Currently in Transit</Typography>
         </Box>
 
         <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Assigned to Active Bookings</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: '#1565C0' }}>{currentlyAssigned}</Typography>
-          <Typography sx={{ fontSize: '12px', color: '#1565C0', mt: 0.5, fontWeight: 500 }}>En Route or Handling Commuters</Typography>
+          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Completed Today</Typography>
+          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: '#059669' }}>{bookings.filter((b) => b.status === 'Completed').length}</Typography>
+          <Typography sx={{ fontSize: '12px', color: '#059669', mt: 0.5, fontWeight: 500 }}>Logged Trips</Typography>
         </Box>
 
         <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Average Driver Idle Time</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>{averageIdleMinutes} min</Typography>
-          <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mt: 0.5 }}>Longest Idle: {longestIdleMinutes} mins</Typography>
+          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Cancelled Today</Typography>
+          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: '#DC2626' }}>{bookings.filter((b) => b.status === 'Cancelled').length}</Typography>
+          <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mt: 0.5 }}>Total Cancellations</Typography>
         </Box>
       </Box>
 
-      {/* 4. Standard Fare Policy Compliance Warning Card */}
+      {/* 4. Standard Fare Policy Reminder Card */}
       <Box
         sx={{
           mb: 3.5,
@@ -189,9 +195,9 @@ export const TodaOperationsPage: React.FC = () => {
         </Box>
       </Box>
 
-      {/* 5. Driver Idle Time & Availability Section (Replaces Digital Queue) */}
+      {/* 5. Driver Roster & Active Trips Tables */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3, mb: 3.5 }}>
-        {/* Driver Idle Time / SAKAY Availability Card */}
+        {/* Affiliated Drivers Card */}
         <Box
           sx={{
             backgroundColor: '#FFFFFF',
@@ -206,32 +212,17 @@ export const TodaOperationsPage: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Box>
               <Typography sx={{ fontSize: '17px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                Driver Idle Time & Availability
+                Affiliated Driver Roster
               </Typography>
               <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mt: '2px' }}>
-                Drivers currently available to receive SAKAY bookings
+                Drivers registered with {profile?.name || 'this TODA'}
               </Typography>
             </Box>
             <Chip
-              label={`${availableForBooking} Available`}
+              label={`${drivers.length} Drivers`}
               size="small"
               sx={{ backgroundColor: 'var(--sakay-orange-soft)', color: 'var(--sakay-orange)', fontWeight: 600, fontSize: '12px' }}
             />
-          </Box>
-
-          {/* Explicit Physical Terminal Queue Distinction Disclaimer */}
-          <Box
-            sx={{
-              backgroundColor: '#F8F9FA',
-              border: '1px solid var(--mac-border-color)',
-              borderRadius: '10px',
-              padding: '12px 16px',
-              mb: 2.5,
-            }}
-          >
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)', lineHeight: 1.4 }}>
-              <strong>Physical Terminal Queue Note:</strong> Physical TODA terminal loading lines are managed by the TODA outside SAKAY. SAKAY does not digitize or enforce physical terminal FIFO loading order.
-            </Typography>
           </Box>
 
           <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid var(--mac-border-color)', borderRadius: '10px' }}>
@@ -240,33 +231,38 @@ export const TodaOperationsPage: React.FC = () => {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>DRIVER NAME</TableCell>
                   <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>PLATE</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>CURRENT AREA</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>IDLE TIME</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>ZONE</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>STATUS</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {idleDriversList.map((item) => (
-                  <TableRow key={item.id} sx={{ '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' } }}>
-                    <TableCell sx={{ py: 1.5, px: 2, fontWeight: 600, fontSize: '13px' }}>{item.driver}</TableCell>
-                    <TableCell sx={{ py: 1.5, px: 2, fontSize: '13px', color: 'var(--mac-text-secondary)' }}>{item.plate}</TableCell>
-                    <TableCell sx={{ py: 1.5, px: 2, fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>{item.area}</TableCell>
-                    <TableCell sx={{ py: 1.5, px: 2, fontSize: '13px', fontWeight: 600, color: 'var(--sakay-orange)' }}>{item.idleTime}</TableCell>
-                    <TableCell align="right" sx={{ py: 1.5, px: 2 }}>
-                      <Chip
-                        label={item.status}
-                        size="small"
-                        sx={{
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          backgroundColor: item.status === 'Available' ? '#E6F4EA' : '#E8F0FE',
-                          color: item.status === 'Available' ? '#1E8E3E' : '#1A73E8',
-                          height: 22,
-                        }}
-                      />
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                      <CircularProgress size={24} sx={{ color: 'var(--sakay-orange)', mb: 1 }} />
+                      <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>Loading drivers...</Typography>
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : drivers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                      <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)' }}>
+                        No registered drivers currently affiliated with this TODA.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  drivers.map((d) => (
+                    <TableRow key={d.id} sx={{ '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' } }}>
+                      <TableCell sx={{ py: 1.5, px: 2, fontWeight: 600, fontSize: '13px' }}>{d.name}</TableCell>
+                      <TableCell sx={{ py: 1.5, px: 2, fontSize: '13px', color: 'var(--mac-text-secondary)' }}>{d.vehiclePlate}</TableCell>
+                      <TableCell sx={{ py: 1.5, px: 2, fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>{d.serviceZone}</TableCell>
+                      <TableCell align="right" sx={{ py: 1.5, px: 2 }}>
+                        <StatusBadge status={d.accountStatus} />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </TableContainer>
@@ -290,11 +286,11 @@ export const TodaOperationsPage: React.FC = () => {
                 Active SAKAY Bookings
               </Typography>
               <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mt: '2px' }}>
-                Ongoing rides involving {CURRENT_TODA_PROFILE.acronym} drivers
+                Ongoing and recent rides involving {profile?.acronym || 'TODA'} drivers
               </Typography>
             </Box>
             <Chip
-              label={`${MOCK_TODA_BOOKINGS.filter((b) => b.status === 'In Progress').length} Active`}
+              label={`${bookings.length} Bookings`}
               size="small"
               sx={{ backgroundColor: '#E8F0FE', color: '#1A73E8', fontWeight: 600, fontSize: '12px' }}
             />
@@ -307,25 +303,40 @@ export const TodaOperationsPage: React.FC = () => {
                   <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>TRIP CODE</TableCell>
                   <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>DRIVER & PLATE</TableCell>
                   <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>MODE</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>FARE</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>STATUS</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {MOCK_TODA_BOOKINGS.map((bkg) => (
-                  <TableRow key={bkg.id} sx={{ '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' } }}>
-                    <TableCell sx={{ py: 1.5, px: 2, fontWeight: 600, fontSize: '13px', color: 'var(--sakay-orange)' }}>{bkg.bookingCode}</TableCell>
-                    <TableCell sx={{ py: 1.5, px: 2, fontSize: '13px' }}>
-                      <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{bkg.driverName}</Typography>
-                      <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)' }}>{bkg.vehiclePlate}</Typography>
-                    </TableCell>
-                    <TableCell sx={{ py: 1.5, px: 2, fontSize: '12.5px' }}>{bkg.tripMode}</TableCell>
-                    <TableCell sx={{ py: 1.5, px: 2, fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>₱{bkg.fareAmount}</TableCell>
-                    <TableCell align="right" sx={{ py: 1.5, px: 2 }}>
-                      <StatusBadge status={bkg.status} />
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                      <CircularProgress size={24} sx={{ color: 'var(--sakay-orange)', mb: 1 }} />
+                      <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>Loading trips...</Typography>
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : bookings.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                      <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)' }}>
+                        No active bookings recorded at this time.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  bookings.map((bkg) => (
+                    <TableRow key={bkg.id} sx={{ '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' } }}>
+                      <TableCell sx={{ py: 1.5, px: 2, fontWeight: 600, fontSize: '13px', color: 'var(--sakay-orange)' }}>{bkg.bookingCode}</TableCell>
+                      <TableCell sx={{ py: 1.5, px: 2, fontSize: '13px' }}>
+                        <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{bkg.driverName}</Typography>
+                        <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)' }}>{bkg.vehiclePlate}</Typography>
+                      </TableCell>
+                      <TableCell sx={{ py: 1.5, px: 2, fontSize: '12.5px' }}>{bkg.tripMode}</TableCell>
+                      <TableCell align="right" sx={{ py: 1.5, px: 2 }}>
+                        <StatusBadge status={bkg.status} />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </TableContainer>

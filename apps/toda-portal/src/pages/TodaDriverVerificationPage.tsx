@@ -21,7 +21,6 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import InboxIcon from '@mui/icons-material/Inbox';
 import VerifiedIcon from '@mui/icons-material/Verified';
 
-import { MOCK_DRIVER_APPLICANTS, CURRENT_TODA_PROFILE, MOCK_TODA_DRIVERS } from '../mockData/todaData';
 import { DriverApplicant } from '../types/toda';
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
 import { StatusBadge } from '../components/common/StatusBadge';
@@ -30,13 +29,15 @@ import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
 import { DocumentPreviewModal } from '../components/admin/DocumentPreviewModal';
 import {
   fetchDriverApplicants,
+  fetchTodaDrivers,
   forwardApplicantToLgu,
   recordTodaAuditAction,
 } from '../services/todaApiService';
 
 // toda driver application screening and lgu endorsement page
 export const TodaDriverVerificationPage: React.FC = () => {
-  const [applicants, setApplicants] = useState<DriverApplicant[]>(MOCK_DRIVER_APPLICANTS);
+  const [applicants, setApplicants] = useState<DriverApplicant[]>([]);
+  const [lguVerifiedCount, setLguVerifiedCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -55,24 +56,25 @@ export const TodaDriverVerificationPage: React.FC = () => {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [resubmitDialogOpen, setResubmitDialogOpen] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-    fetchDriverApplicants()
-      .then((data) => {
-        if (isMounted && data && data.length > 0) {
-          setApplicants(data);
-        }
+  const loadApplicants = () => {
+    setIsLoading(true);
+    Promise.all([fetchDriverApplicants(), fetchTodaDrivers()])
+      .then(([apps, drvs]) => {
+        setApplicants(apps || []);
+        const verified = (drvs || []).filter((d) => d.lguVerificationStatus === 'Verified').length;
+        setLguVerifiedCount(verified);
       })
       .catch((err) => {
-        console.warn('[TodaVerification] Failed to fetch applicants, using fallback:', err);
+        console.error('[TodaVerification] Failed to fetch applicants from database:', err);
+        setApplicants([]);
       })
       .finally(() => {
-        if (isMounted) setIsLoading(false);
+        setIsLoading(false);
       });
+  };
 
-    return () => {
-      isMounted = false;
-    };
+  useEffect(() => {
+    loadApplicants();
   }, []);
 
   // Filter Logic
@@ -103,10 +105,6 @@ export const TodaDriverVerificationPage: React.FC = () => {
 
   const endorsedCount = applicants.filter(
     (a) => a.todaStageStatus === 'Endorsed to LGU' || a.todaStageStatus === 'TODA Endorsed'
-  ).length;
-
-  const lguVerifiedCount = MOCK_TODA_DRIVERS.filter(
-    (d) => d.lguVerificationStatus === 'Verified'
   ).length;
 
   const statusOptions: FilterOption[] = [
@@ -508,7 +506,7 @@ export const TodaDriverVerificationPage: React.FC = () => {
                 }
                 label={
                   <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                    Verify membership against active {CURRENT_TODA_PROFILE.name} Master Driver Roster
+                    Verify membership against active TODA Master Driver Roster
                   </Typography>
                 }
               />

@@ -5,11 +5,13 @@ import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import LogoutIcon from '@mui/icons-material/Logout';
 
 import { NotificationPopover } from '../popovers/NotificationPopover';
 import { MOCK_NOTIFICATIONS } from '../../mockData/dashboardData';
 import { CURRENT_ADMIN, MOCK_LGU_ADMINS } from '../../mockData/adminData';
 import { NotificationItem, LguAdminRole } from '../../types/admin';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface AdminHeaderProps {
   pageTitle?: string;
@@ -21,11 +23,14 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   pageSubtitle = 'Overview of SAKAY operations in Calapan City',
 }) => {
   const navigate = useNavigate();
+  const { adminProfile, signOut } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>(MOCK_NOTIFICATIONS);
   const [notifOpen, setNotifOpen] = useState(false);
 
-  // Dev-only Role Switcher State
-  const [currentRole, setCurrentRole] = useState<LguAdminRole>(CURRENT_ADMIN.role);
+  // Dev-only Role Switcher State (gated strictly to import.meta.env.DEV)
+  const [currentRole, setCurrentRole] = useState<LguAdminRole>(
+    (adminProfile?.position as LguAdminRole) || CURRENT_ADMIN.role
+  );
   const [roleAnchorEl, setRoleAnchorEl] = useState<null | HTMLElement>(null);
 
   const handleRoleChange = (newRole: LguAdminRole) => {
@@ -38,6 +43,11 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
     }
     setCurrentRole(newRole);
     setRoleAnchorEl(null);
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login', { replace: true });
   };
 
   const unreadCount = notifications.filter((n) => n.unread).length;
@@ -126,81 +136,83 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           />
         </Box>
 
-        {/* Dev Role Switcher */}
-        <Box>
-          <Button
-            onClick={(e) => setRoleAnchorEl(e.currentTarget)}
-            startIcon={<AdminPanelSettingsIcon fontSize="small" sx={{ fontSize: 18, color: 'var(--sakay-orange)' }} />}
-            endIcon={<KeyboardArrowDownIcon fontSize="small" sx={{ fontSize: 18 }} />}
-            sx={{
-              height: 42,
-              padding: '0 16px',
-              borderRadius: '10px',
-              border: '1px solid var(--mac-border-color)',
-              backgroundColor: '#FFFFFF',
-              color: 'var(--mac-text-primary)',
-              fontSize: '13.5px',
-              fontWeight: 500,
-              textTransform: 'none',
-              boxShadow: 'var(--mac-shadow-subtle)',
-              transition: 'var(--mac-transition-fast)',
-              '&:hover': {
-                backgroundColor: 'var(--sakay-orange-soft)',
-                color: 'var(--sakay-orange)',
-                borderColor: 'var(--sakay-orange-border)',
-              },
-            }}
-          >
-            Role: <strong style={{ marginLeft: 4, color: 'var(--sakay-orange)' }}>{currentRole}</strong>
-          </Button>
-
-          <Menu
-            anchorEl={roleAnchorEl}
-            open={Boolean(roleAnchorEl)}
-            onClose={() => setRoleAnchorEl(null)}
-            slotProps={{
-              paper: {
-                sx: {
-                  borderRadius: '12px',
-                  border: '1px solid var(--mac-border-color)',
-                  boxShadow: 'var(--mac-shadow-popover)',
-                  mt: 1,
-                  minWidth: 240,
+        {/* Dev-only Role Switcher (Visible strictly in development mode) */}
+        {import.meta.env.DEV && (
+          <Box>
+            <Button
+              onClick={(e) => setRoleAnchorEl(e.currentTarget)}
+              startIcon={<AdminPanelSettingsIcon fontSize="small" sx={{ fontSize: 18, color: 'var(--sakay-orange)' }} />}
+              endIcon={<KeyboardArrowDownIcon fontSize="small" sx={{ fontSize: 18 }} />}
+              sx={{
+                height: 42,
+                padding: '0 16px',
+                borderRadius: '10px',
+                border: '1px solid var(--mac-border-color)',
+                backgroundColor: '#FFFFFF',
+                color: 'var(--mac-text-primary)',
+                fontSize: '13.5px',
+                fontWeight: 500,
+                textTransform: 'none',
+                boxShadow: 'var(--mac-shadow-subtle)',
+                transition: 'var(--mac-transition-fast)',
+                '&:hover': {
+                  backgroundColor: 'var(--sakay-orange-soft)',
+                  color: 'var(--sakay-orange)',
+                  borderColor: 'var(--sakay-orange-border)',
                 },
-              },
-            }}
-          >
-            <Box sx={{ px: 2, py: 1, borderBottom: '1px solid var(--mac-border-color)' }}>
-              <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
-                Simulate Admin Role (Dev)
-              </Typography>
-            </Box>
-            {(
-              [
-                'Super Administrator',
-                'Verifier',
-                'Incident Officer',
-                'Fare Administrator',
-                'Analytics Viewer',
-              ] as LguAdminRole[]
-            ).map((role) => (
-              <MenuItem
-                key={role}
-                selected={currentRole === role}
-                onClick={() => handleRoleChange(role)}
-                sx={{
-                  fontSize: '13.5px',
-                  fontWeight: currentRole === role ? 600 : 400,
-                  color: currentRole === role ? 'var(--sakay-orange)' : 'var(--mac-text-primary)',
-                  py: 1,
-                  px: 2,
-                }}
-              >
-                {role}
-              </MenuItem>
-            ))}
-          </Menu>
-        </Box>
+              }}
+            >
+              Dev Role: <strong style={{ marginLeft: 4, color: 'var(--sakay-orange)' }}>{currentRole}</strong>
+            </Button>
+
+            <Menu
+              anchorEl={roleAnchorEl}
+              open={Boolean(roleAnchorEl)}
+              onClose={() => setRoleAnchorEl(null)}
+              slotProps={{
+                paper: {
+                  sx: {
+                    borderRadius: '12px',
+                    border: '1px solid var(--mac-border-color)',
+                    boxShadow: 'var(--mac-shadow-popover)',
+                    mt: 1,
+                    minWidth: 240,
+                  },
+                },
+              }}
+            >
+              <Box sx={{ px: 2, py: 1, borderBottom: '1px solid var(--mac-border-color)' }}>
+                <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+                  Simulate Admin Role [Dev Preview]
+                </Typography>
+              </Box>
+              {(
+                [
+                  'Super Administrator',
+                  'Verifier',
+                  'Incident Officer',
+                  'Fare Administrator',
+                  'Analytics Viewer',
+                ] as LguAdminRole[]
+              ).map((role) => (
+                <MenuItem
+                  key={role}
+                  selected={currentRole === role}
+                  onClick={() => handleRoleChange(role)}
+                  sx={{
+                    fontSize: '13.5px',
+                    fontWeight: currentRole === role ? 600 : 400,
+                    color: currentRole === role ? 'var(--sakay-orange)' : 'var(--mac-text-primary)',
+                    py: 1,
+                    px: 2,
+                  }}
+                >
+                  {role}
+                </MenuItem>
+              ))}
+            </Menu>
+          </Box>
+        )}
 
         {/* Tulong Action Button */}
         <Button
@@ -227,6 +239,28 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         >
           Tulong
         </Button>
+
+        {/* Header Sign Out Action */}
+        <IconButton
+          onClick={handleSignOut}
+          title="Sign Out"
+          sx={{
+            width: 42,
+            height: 42,
+            borderRadius: '10px',
+            border: '1px solid var(--mac-border-color)',
+            backgroundColor: '#FFFFFF',
+            color: '#DC2626',
+            transition: 'var(--mac-transition-fast)',
+            '&:hover': {
+              backgroundColor: '#FEF2F2',
+              borderColor: '#FCA5A5',
+              color: '#B91C1C',
+            },
+          }}
+        >
+          <LogoutIcon fontSize="small" sx={{ fontSize: 20 }} />
+        </IconButton>
       </Box>
     </Box>
   );

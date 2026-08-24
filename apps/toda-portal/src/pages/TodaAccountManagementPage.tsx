@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -25,13 +25,42 @@ import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 
-import { CURRENT_TODA_PROFILE } from '../mockData/todaData';
+import { TodaProfile } from '../types/toda';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { DocumentPreviewModal } from '../components/admin/DocumentPreviewModal';
-import { recordTodaAuditAction } from '../services/todaApiService';
+import {
+  fetchTodaProfile,
+  updateTodaProfile,
+  recordTodaAuditAction,
+} from '../services/todaApiService';
 
 export const TodaAccountManagementPage: React.FC = () => {
-  const [profile, setProfile] = useState(CURRENT_TODA_PROFILE);
+  const [profile, setProfile] = useState<TodaProfile>({
+    id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+    name: 'Calapan Central TODA',
+    acronym: 'CCTODA',
+    registrationNumber: 'CAL-TODA-2024-001',
+    dateEstablished: '2024-01-01',
+    terminalLocation: 'Calapan City Terminal',
+    barangay: 'San Vicente Central',
+    serviceCoverageArea: 'Calapan City Corridor',
+    contactNumber: '+63 917 100 2001',
+    email: 'cctoda.calapan@gmail.com',
+    officers: {
+      president: 'Roberto Alcantara',
+      vicePresident: 'Eduardo Perez',
+      secretary: 'Leticia Cruz-Reyes',
+      treasurer: 'Mario Hernandez',
+    },
+    accreditationStatus: 'Active',
+    accreditationExpiry: 'Dec 31, 2026',
+    accreditationNo: 'CAL-TODA-2024-001',
+    permitNumber: 'MP-2024-001',
+    barangayClearanceFile: { name: 'Barangay_Clearance_2026.pdf', date: 'Jan 10, 2026' },
+    rosterFile: { name: 'TODA_Driver_Roster.pdf', date: 'Jan 15, 2026', count: 0 },
+    isOtpVerified: true,
+    misteepComplaintsCount: 0,
+  });
   const [logoImage, setLogoImage] = useState<string | null>(null);
 
   // Modals & Dialogs
@@ -58,6 +87,33 @@ export const TodaAccountManagementPage: React.FC = () => {
   const [docCategory, setDocCategory] = useState<'Barangay Clearance' | 'Driver Master List'>('Barangay Clearance');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
+  const loadProfile = () => {
+    fetchTodaProfile()
+      .then((p) => {
+        if (p) {
+          setProfile(p);
+          setEditTodaName(p.name);
+          setEditTodaAcronym(p.acronym);
+          setEditRegNum(p.registrationNumber);
+          setEditDateEst(p.dateEstablished);
+          setEditTerminalLoc(p.terminalLocation);
+          setEditBarangay(p.barangay);
+          setEditCoverage(p.serviceCoverageArea);
+          setEditPresident(p.officers.president);
+          setEditVicePresident(p.officers.vicePresident);
+          setEditSecretary(p.officers.secretary);
+          setEditTreasurer(p.officers.treasurer);
+        }
+      })
+      .catch((err) => {
+        console.error('[TodaAccount] Error fetching TODA profile from database:', err);
+      });
+  };
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
   // Logo Change Handler
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -83,7 +139,24 @@ export const TodaAccountManagementPage: React.FC = () => {
   };
 
   // Submit Organizational Profile Edit
-  const handleEditProfileSubmit = () => {
+  const handleEditProfileSubmit = async () => {
+    try {
+      await updateTodaProfile(profile.id, {
+        name: editTodaName,
+        acronym: editTodaAcronym,
+        serviceArea: editCoverage,
+        officers: {
+          president: editPresident,
+          vicePresident: editVicePresident,
+          secretary: editSecretary,
+          treasurer: editTreasurer,
+        },
+      });
+      loadProfile();
+    } catch (err) {
+      console.error('[TodaAccount] Error updating profile in database:', err);
+    }
+
     setProfile((prev) => ({
       ...prev,
       name: editTodaName,
@@ -100,14 +173,6 @@ export const TodaAccountManagementPage: React.FC = () => {
         treasurer: editTreasurer,
       },
     }));
-
-    recordTodaAuditAction({
-      actionType: 'TODA_PROFILE_UPDATED',
-      targetId: profile.id,
-      targetName: editTodaName,
-      details: `Updated TODA organizational details, office location (${editTerminalLoc}), and authorized officer roster.`,
-      category: 'Account',
-    });
 
     setEditProfileModalOpen(false);
   };

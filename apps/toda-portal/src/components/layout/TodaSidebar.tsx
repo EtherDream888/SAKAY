@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Box, Typography, Avatar, IconButton } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -10,13 +10,15 @@ import CampaignIcon from '@mui/icons-material/Campaign';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import SecurityIcon from '@mui/icons-material/Security';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
+import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 
 import appIcon from '@sakay/shared/assets/icons/app-icon.png';
 import logoTextOrange from '@sakay/shared/assets/images/logo-text-orange.png';
 import { MacTooltip } from '../common/MacTooltip';
 import { StatusBadge } from '../common/StatusBadge';
 import { MacCenterModal } from '../admin/MacCenterModal';
-import { CURRENT_TODA_PROFILE, CURRENT_TODA_ADMIN } from '../../mockData/todaData';
+import { TodaProfile } from '../../types/toda';
+import { fetchTodaProfile, fetchDriverApplicants } from '../../services/todaApiService';
 
 interface TodaSidebarProps {
   collapsed: boolean;
@@ -42,6 +44,17 @@ export const TodaSidebar: React.FC<TodaSidebarProps> = ({ collapsed, onToggleCol
   const location = useLocation();
   const navigate = useNavigate();
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [profile, setProfile] = useState<TodaProfile | null>(null);
+  const [applicantCount, setApplicantCount] = useState<number>(0);
+
+  useEffect(() => {
+    fetchTodaProfile().then((p) => {
+      if (p) setProfile(p);
+    });
+    fetchDriverApplicants().then((apps) => {
+      setApplicantCount(apps ? apps.length : 0);
+    });
+  }, []);
 
   const navGroups: NavGroup[] = [
     {
@@ -53,9 +66,9 @@ export const TodaSidebar: React.FC<TodaSidebarProps> = ({ collapsed, onToggleCol
     {
       groupTitle: 'DRIVERS & FLEET',
       items: [
-        // only count applications that still need toda officer manual review
-        { id: 'driver-verification', label: 'Driver Verification', path: '/driver-verification', icon: <AssignmentIcon fontSize="small" />, badge: 2, badgeType: 'orange' },
+        { id: 'driver-verification', label: 'Driver Verification', path: '/driver-verification', icon: <AssignmentIcon fontSize="small" />, badge: applicantCount > 0 ? applicantCount : undefined, badgeType: 'orange' },
         { id: 'drivers', label: 'Driver Membership', path: '/drivers', icon: <PeopleIcon fontSize="small" /> },
+        { id: 'fleet', label: 'Tricycle Fleet', path: '/fleet', icon: <DirectionsCarIcon fontSize="small" /> },
       ],
     },
     {
@@ -436,7 +449,7 @@ export const TodaSidebar: React.FC<TodaSidebarProps> = ({ collapsed, onToggleCol
               transition: 'transform 0.2s ease',
             }}
           >
-            {CURRENT_TODA_ADMIN.name.charAt(0)}
+            T
           </Avatar>
           <Box
             sx={{
@@ -449,10 +462,10 @@ export const TodaSidebar: React.FC<TodaSidebarProps> = ({ collapsed, onToggleCol
             }}
           >
             <Typography sx={{ fontWeight: 700, fontSize: '14px', color: 'var(--mac-text-primary)', lineHeight: 1.2, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              {CURRENT_TODA_ADMIN.name}
+              {profile?.officers.president || 'TODA Officer'}
             </Typography>
             <Typography sx={{ fontSize: '12px', color: 'var(--sakay-orange)', fontWeight: 600, lineHeight: 1.2, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              {CURRENT_TODA_PROFILE.acronym} • {CURRENT_TODA_ADMIN.role}
+              {profile?.acronym || 'TODA'} • President
             </Typography>
           </Box>
         </Box>
@@ -496,14 +509,14 @@ export const TodaSidebar: React.FC<TodaSidebarProps> = ({ collapsed, onToggleCol
                 boxShadow: '0 10px 24px rgba(255, 107, 26, 0.22)',
               }}
             >
-              {CURRENT_TODA_ADMIN.name.charAt(0)}
+              T
             </Avatar>
             <Box>
               <Typography sx={{ fontSize: '20px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
-                {CURRENT_TODA_ADMIN.name}
+                {profile?.officers.president || 'TODA President'}
               </Typography>
               <Typography sx={{ fontSize: '15px', color: 'var(--sakay-orange)', fontWeight: 600, mt: '2px' }}>
-                {CURRENT_TODA_ADMIN.role} — {CURRENT_TODA_PROFILE.name}
+                TODA President — {profile?.name || 'TODA Association'}
               </Typography>
               <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-muted)', mt: '2px' }}>
                 Authorized TODA Officer for SAKAY Platform Dispatch & Roster Oversight
@@ -526,7 +539,7 @@ export const TodaSidebar: React.FC<TodaSidebarProps> = ({ collapsed, onToggleCol
                 TODA Organization
               </Typography>
               <Typography sx={{ fontSize: '15.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                {CURRENT_TODA_PROFILE.name} ({CURRENT_TODA_PROFILE.acronym})
+                {profile?.name || 'Calapan Central TODA'} ({profile?.acronym || 'CCTODA'})
               </Typography>
             </Box>
 
@@ -535,7 +548,7 @@ export const TodaSidebar: React.FC<TodaSidebarProps> = ({ collapsed, onToggleCol
                 Official Email
               </Typography>
               <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                {CURRENT_TODA_ADMIN.email}
+                {profile?.email || 'toda.calapan@gmail.com'}
               </Typography>
             </Box>
 
@@ -544,7 +557,7 @@ export const TodaSidebar: React.FC<TodaSidebarProps> = ({ collapsed, onToggleCol
                 Accreditation Permit Number
               </Typography>
               <Typography sx={{ fontSize: '15px', fontWeight: 600, color: '#1E8E3E' }}>
-                #{CURRENT_TODA_PROFILE.accreditationNo}
+                #{profile?.accreditationNo || 'CAL-TODA-2024-001'}
               </Typography>
             </Box>
 
@@ -553,7 +566,7 @@ export const TodaSidebar: React.FC<TodaSidebarProps> = ({ collapsed, onToggleCol
                 Terminal Jurisdiction
               </Typography>
               <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                {CURRENT_TODA_PROFILE.terminalLocation} ({CURRENT_TODA_PROFILE.barangay})
+                {profile?.terminalLocation || 'Calapan City Corridor'} ({profile?.barangay || 'San Vicente Central'})
               </Typography>
             </Box>
           </Box>

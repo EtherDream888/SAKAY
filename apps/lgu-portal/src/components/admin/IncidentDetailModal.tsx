@@ -191,7 +191,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
             <RouteIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
             <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-              Linked Trip Telemetry Record
+              Linked Trip Details
             </Typography>
           </Box>
 

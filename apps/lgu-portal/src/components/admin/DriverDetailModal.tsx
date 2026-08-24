@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Typography, Avatar, Rating, Button, Chip } from '@mui/material';
+import { Box, Typography, Avatar, Rating, Button, Chip, Snackbar, Alert } from '@mui/material';
 import StarIcon from '@mui/icons-material/Star';
 import PersonIcon from '@mui/icons-material/Person';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
@@ -7,81 +7,144 @@ import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import FlashOnIcon from '@mui/icons-material/FlashOn';
 import ShieldIcon from '@mui/icons-material/Shield';
-import GavelIcon from '@mui/icons-material/Gavel';
 
 import { DriverRecord } from '../../mockData/adminData';
 import { MacCenterModal } from './MacCenterModal';
+import { MacConfirmDialog } from './MacConfirmDialog';
 import { StatusBadge } from '../common/StatusBadge';
 import { ActionButton } from './ActionButton';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
-import { suspendDriver, issueDriverStrike, recordAdminAuditAction } from '../../services/adminApiService';
+import {
+  verifyDriver,
+  suspendDriver,
+  reactivateDriver,
+  issueDriverStrike,
+  recordAdminAuditAction,
+} from '../../services/adminApiService';
 
 interface DriverDetailModalProps {
   open: boolean;
   onClose: () => void;
   driver: DriverRecord | null;
   onStatusChange?: (driverId: string, newStatus: 'Active' | 'Inactive') => void;
+  onDriverUpdated?: (updatedDriver: DriverRecord) => void;
 }
 
-/**
- * ============================================================================
- * DRIVER DETAIL MODAL COMPONENT
- * ============================================================================
- * Purpose:
- *   Displays a driver's full administrative dossier (license, MTOP permit validity,
- *   TODA affiliation, compliance strikes) and provides direct action buttons to
- *   toggle suspensions, send renewal reminders, and issue policy strikes.
- * ============================================================================
- */
 export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
   open,
   onClose,
   driver,
   onStatusChange,
+  onDriverUpdated,
 }) => {
   const [selectedDoc, setSelectedDoc] = useState<{ name: string; type: string } | null>(null);
   const [reminderSent, setReminderSent] = useState(false);
-  const [strikeIssued, setStrikeIssued] = useState(false);
+  const [snackbarMsg, setSnackbarMsg] = useState<string | null>(null);
+
+  // Dialog states
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+  const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
+  const [reactivateDialogOpen, setReactivateDialogOpen] = useState(false);
+  const [strikeDialogOpen, setStrikeDialogOpen] = useState(false);
 
   if (!driver) return null;
 
   const isAccountActive = driver.accountStatus === 'Active';
+  const isVerified = driver.verificationStatus === 'Verified';
 
   /**
-   * Action Handler: Toggles driver status between Active and Inactive/Suspended.
-   * Calls the backend API and commits an audit log entry.
+   * Action Handler: Approve Stage 2 LGU Verification
    */
-  const handleToggleStatus = async () => {
-    const nextStatus = isAccountActive ? 'Inactive' : 'Active';
-    if (onStatusChange) {
-      onStatusChange(driver.id, nextStatus);
+  const handleVerifyConfirm = async () => {
+    try {
+      await verifyDriver(driver.id);
+      setSnackbarMsg(`Driver ${driver.name} successfully verified and accredited.`);
+      const updated: DriverRecord = {
+        ...driver,
+        verificationStatus: 'Verified',
+        lguVerificationStatus: 'Verified',
+        accountStatus: 'Active',
+      };
+      if (onDriverUpdated) onDriverUpdated(updated);
+      if (onStatusChange) onStatusChange(driver.id, 'Active');
+    } catch (err) {
+      console.error('[DriverDetailModal] Verification error:', err);
+      setSnackbarMsg(`Error: ${(err as Error).message}`);
     }
-
-    // Backend API Call for suspension
-    if (nextStatus === 'Inactive') {
-      try {
-        await suspendDriver(driver.id, 'Administrative suspension from LGU driver dossier modal.', 7);
-      } catch (err) {
-        console.warn('[DriverDetailModal] Backend error during suspension:', err);
-      }
-    }
-
-    // Record Action in Immutable Audit Trail
-    recordAdminAuditAction({
-      actionType: nextStatus === 'Inactive' ? 'DRIVER_ACCOUNT_SUSPENDED' : 'DRIVER_ACCOUNT_REACTIVATED',
-      targetId: driver.id,
-      targetName: driver.name,
-      details: `${nextStatus === 'Inactive' ? 'Suspended' : 'Reactivated'} driver access. License: ${driver.licenseNo}, TODA: ${driver.todaName}, Plate: ${driver.vehiclePlate}.`,
-      category: 'User Oversight',
-    });
+    setVerifyDialogOpen(false);
   };
 
   /**
-   * Action Handler: Dispatches MTOP / License renewal reminder alert.
+   * Action Handler: Suspend Driver Account
+   */
+  const handleSuspendConfirm = async (reason?: string) => {
+    const finalReason = reason || 'Administrative policy suspension';
+    try {
+      await suspendDriver(driver.id, finalReason, 7);
+      setSnackbarMsg(`Driver ${driver.name} has been suspended.`);
+      const updated: DriverRecord = {
+        ...driver,
+        accountStatus: 'Inactive',
+        verificationStatus: 'Suspended',
+      };
+      if (onDriverUpdated) onDriverUpdated(updated);
+      if (onStatusChange) onStatusChange(driver.id, 'Inactive');
+    } catch (err) {
+      console.error('[DriverDetailModal] Suspension error:', err);
+      setSnackbarMsg(`Error: ${(err as Error).message}`);
+    }
+    setSuspendDialogOpen(false);
+  };
+
+  /**
+   * Action Handler: Reactivate Driver Account
+   */
+  const handleReactivateConfirm = async () => {
+    try {
+      await reactivateDriver(driver.id);
+      setSnackbarMsg(`Driver ${driver.name} account has been reactivated.`);
+      const updated: DriverRecord = {
+        ...driver,
+        accountStatus: 'Active',
+        verificationStatus: 'Verified',
+      };
+      if (onDriverUpdated) onDriverUpdated(updated);
+      if (onStatusChange) onStatusChange(driver.id, 'Active');
+    } catch (err) {
+      console.error('[DriverDetailModal] Reactivation error:', err);
+      setSnackbarMsg(`Error: ${(err as Error).message}`);
+    }
+    setReactivateDialogOpen(false);
+  };
+
+  /**
+   * Action Handler: Issue Policy Strike
+   */
+  const handleStrikeConfirm = async (reason?: string) => {
+    const finalReason = reason || 'Operational non-compliance violation';
+    try {
+      await issueDriverStrike(driver.id, finalReason, 'Operational');
+      setSnackbarMsg(`Administrative policy strike issued to ${driver.name}.`);
+      const newStrikesCount = driver.strikesCount + 1;
+      const updated: DriverRecord = {
+        ...driver,
+        strikesCount: newStrikesCount,
+        accountStatus: newStrikesCount >= 3 ? 'Inactive' : driver.accountStatus,
+        verificationStatus: newStrikesCount >= 3 ? 'Suspended' : driver.verificationStatus,
+      };
+      if (onDriverUpdated) onDriverUpdated(updated);
+    } catch (err) {
+      console.error('[DriverDetailModal] Strike error:', err);
+      setSnackbarMsg(`Error: ${(err as Error).message}`);
+    }
+    setStrikeDialogOpen(false);
+  };
+
+  /**
+   * Action Handler: Send Renewal Reminder Alert
    */
   const handleSendReminder = () => {
     setReminderSent(true);
-
     recordAdminAuditAction({
       actionType: 'DRIVER_PERMIT_REMINDER_SENT',
       targetId: driver.id,
@@ -89,43 +152,16 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
       details: `Dispatched MTOP and License renewal alert to driver mobile (${driver.phone}).`,
       category: 'Verification',
     });
-
+    setSnackbarMsg(`Renewal alert sent to ${driver.name}.`);
     setTimeout(() => setReminderSent(false), 3000);
   };
 
-  /**
-   * Action Handler: Issues an administrative policy violation strike (+1).
-   */
-  const handleIssueStrike = async () => {
-    setStrikeIssued(true);
-
-    // Backend API Call to increment driver strikes
-    try {
-      await issueDriverStrike(driver.id, 'Operational non-compliance policy strike', 'Operational');
-    } catch (err) {
-      console.warn('[DriverDetailModal] Backend error during strike:', err);
-    }
-
-    // Record Action in Audit Trail
-    recordAdminAuditAction({
-      actionType: 'MANUAL_STRIKE_ISSUED',
-      targetId: driver.id,
-      targetName: driver.name,
-      details: `Issued +1 Administrative Policy Strike to driver for operational non-compliance. Current strikes: ${driver.strikesCount + 1}.`,
-      category: 'User Oversight',
-    });
-
-    setTimeout(() => setStrikeIssued(false), 3000);
-  };
-
-  // Helper for Strike Consequence Level (Rolling 90-Day Window)
+  // Strike level calculation
   const getStrikeLevel = (count: number) => {
-    if (count === 0) return { label: 'Compliant (0 / 10)', color: '#1E8E3E', bg: '#E6F4EA', border: '#A8DADC' };
-    if (count < 3) return { label: `Level 1: Warning Issued (${count} / 10)`, color: '#B06000', bg: '#FEF7E0', border: '#FCE8E6' };
-    if (count < 5) return { label: `Level 2: Administrative Review (${count} / 10)`, color: '#C2410C', bg: '#FFF7ED', border: '#FDBA74' };
-    if (count < 8) return { label: `Level 3: 7-Day Suspension (${count} / 10)`, color: '#DC2626', bg: '#FEE2E2', border: '#FCA5A5' };
-    if (count < 10) return { label: `Level 4: 30-Day Suspension (${count} / 10)`, color: '#B91C1C', bg: '#FEE2E2', border: '#F87171' };
-    return { label: `Level 5: Permanent Deactivation (${count} / 10)`, color: '#7F1D1D', bg: '#FEF2F2', border: '#EF4444' };
+    if (count === 0) return { label: 'Compliant (0 Strikes)', color: '#1E8E3E', bg: '#E6F4EA', border: '#A8DADC' };
+    if (count === 1) return { label: 'Level 1 Warning (1 Strike)', color: '#B06000', bg: '#FEF7E0', border: '#FCE8E6' };
+    if (count === 2) return { label: 'Level 2 Warning (2 Strikes)', color: '#C2410C', bg: '#FFF7ED', border: '#FDBA74' };
+    return { label: `Suspended (${count} Strikes)`, color: '#DC2626', bg: '#FEE2E2', border: '#FCA5A5' };
   };
 
   const strikeLevel = getStrikeLevel(driver.strikesCount);
@@ -137,10 +173,20 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
         onClose={onClose}
         title={driver.name}
         subtitle={`License No: ${driver.licenseNo} • ${driver.todaName}`}
-        badge={<StatusBadge status={driver.accountStatus} />}
-        maxWidth={820}
-        primaryActionLabel={isAccountActive ? 'Suspend Driver' : 'Reactivate Driver'}
-        onPrimaryAction={handleToggleStatus}
+        badge={<StatusBadge status={driver.accountStatus as any} />}
+        maxWidth={840}
+        primaryActionLabel={
+          !isVerified
+            ? 'Approve Stage 2 Verification'
+            : isAccountActive
+            ? 'Suspend Driver'
+            : 'Reactivate Driver'
+        }
+        onPrimaryAction={() => {
+          if (!isVerified) setVerifyDialogOpen(true);
+          else if (isAccountActive) setSuspendDialogOpen(true);
+          else setReactivateDialogOpen(true);
+        }}
       >
         {/* Header Profile Summary Bar */}
         <Box
@@ -186,9 +232,6 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
                 {driver.rating} / 5
               </Typography>
             </Box>
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
-              Based on {driver.ratingCount} passenger ratings
-            </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
               <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: driver.onlineStatus === 'Online' ? '#34A853' : '#9AA0A6' }} />
               <Typography sx={{ fontSize: '13px', fontWeight: 600, color: driver.onlineStatus === 'Online' ? '#1E8E3E' : 'var(--mac-text-muted)' }}>
@@ -198,13 +241,13 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
           </Box>
         </Box>
 
-        {/* Section 1: Strike System & Policy Compliance Log */}
+        {/* Section 1: Strike System & Policy Compliance */}
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
               <FlashOnIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
               <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-                Driver Strike System & Policy Compliance Log (Rolling 90 Days)
+                Policy Strikes & Disciplinary Status
               </Typography>
             </Box>
             <Chip
@@ -223,63 +266,17 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
           </Box>
 
           <Box sx={{ backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px', mb: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                Active Strike Count: <span style={{ color: driver.strikesCount > 0 ? '#DC2626' : '#1E8E3E', fontWeight: 700 }}>{driver.strikesCount} Strike(s)</span>
+                Active Strikes: <span style={{ color: driver.strikesCount > 0 ? '#DC2626' : '#1E8E3E', fontWeight: 700 }}>{driver.strikesCount} Strike(s)</span>
               </Typography>
               <ActionButton
-                label={strikeIssued ? 'Administrative Strike Issued ✓' : '+ Issue Manual Strike'}
+                label="+ Issue Administrative Strike"
                 showArrow={false}
-                onClick={handleIssueStrike}
+                onClick={() => setStrikeDialogOpen(true)}
                 sx={{ height: 32, fontSize: '12.5px' }}
               />
             </Box>
-
-            {driver.strikeHistory && driver.strikeHistory.length > 0 ? (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                {driver.strikeHistory.map((item) => (
-                  <Box
-                    key={item.id}
-                    sx={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      backgroundColor: '#FFFFFF',
-                      padding: '14px 18px',
-                      borderRadius: '10px',
-                      border: '1px solid var(--mac-border-color)',
-                      boxShadow: 'var(--mac-shadow-subtle)',
-                    }}
-                  >
-                    <Box sx={{ pr: 2 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: '4px' }}>
-                        <Chip
-                          label={`+${item.strikesApplied} Strike`}
-                          size="small"
-                          sx={{ fontSize: '11px', fontWeight: 700, backgroundColor: '#FEE2E2', color: '#DC2626', height: 20 }}
-                        />
-                        <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                          {item.reason}
-                        </Typography>
-                      </Box>
-                      <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
-                        Date: {item.date} • Issued by: {item.issuedBy}
-                      </Typography>
-                    </Box>
-
-                    <Chip
-                      label={item.status}
-                      size="small"
-                      sx={{ fontSize: '11.5px', fontWeight: 600, backgroundColor: 'rgba(255, 149, 0, 0.12)', color: '#C25E00', height: 24, flexShrink: 0 }}
-                    />
-                  </Box>
-                ))}
-              </Box>
-            ) : (
-              <Typography sx={{ fontSize: '13.5px', color: '#1E8E3E', fontStyle: 'italic', fontWeight: 500 }}>
-                ✓ Clean Record: No policy strikes recorded against this driver within the current 90-day window.
-              </Typography>
-            )}
           </Box>
         </Box>
 
@@ -288,105 +285,95 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
             <PersonIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
             <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-              Personal Information
+              1. Personal Details
             </Typography>
           </Box>
 
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2.5, backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px' }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px' }}>
             <Box>
               <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Full Name</Typography>
               <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.name}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Age / Date of Birth</Typography>
-              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>42 yrs old • Aug 14, 1984</Typography>
-            </Box>
-            <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Mobile Number</Typography>
+              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Contact Phone</Typography>
               <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.phone}</Typography>
             </Box>
             <Box>
               <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Residential Barangay</Typography>
               <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.barangay}</Typography>
             </Box>
+            <Box>
+              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Account Status</Typography>
+              <StatusBadge status={driver.accountStatus as any} />
+            </Box>
           </Box>
         </Box>
 
-        {/* Section 3: TODA / Membership Information */}
+        {/* Section 3: TODA Affiliation */}
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
             <AccountBalanceIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
             <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-              TODA Membership & Terminal
+              2. TODA Affiliation & Endorsement
             </Typography>
           </Box>
 
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2.5, backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px' }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px' }}>
             <Box>
               <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Affiliated TODA</Typography>
               <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.todaName}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>TODA Endorsement Status</Typography>
-              <StatusBadge status={driver.todaVerificationStatus} />
+              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>TODA Stage 1 Endorsement</Typography>
+              <StatusBadge status={driver.todaVerificationStatus as any} />
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Assigned Terminal</Typography>
-              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>Calapan Main Market Terminal</Typography>
+              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>TODA Membership No.</Typography>
+              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                {driver.mtopNo ? `MEM-${driver.mtopNo}` : 'MEM-2026-01'}
+              </Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Service Area</Typography>
-              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>Poblacion 1–3</Typography>
+              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Assigned Corridor</Typography>
+              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.barangay}</Typography>
             </Box>
           </Box>
         </Box>
 
-        {/* Section 4: Driver & Vehicle Credentials (City Ord. No. 118, Series of 2022) */}
+        {/* Section 4: Vehicle & License Credentials */}
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
             <DirectionsCarIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
             <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-              Driver Credentials & MTOP Franchise (City Ord. No. 118, Series of 2022)
+              3. Vehicle Credentials & MTOP Franchise (City Ord. No. 118)
             </Typography>
           </Box>
 
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2.5, backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px' }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px' }}>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>LTO Driver's License No.</Typography>
+              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Professional Driver's License</Typography>
               <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.licenseNo}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>License Expiration</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.licenseExpiry}</Typography>
-                <StatusBadge status={driver.licenseStatus} />
-              </Box>
+              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>License Expiry</Typography>
+              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.licenseExpiry}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>MTOP Permit No.</Typography>
+              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>MTOP Franchise No.</Typography>
               <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.mtopNo}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>MTOP Expiration</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.mtopExpiry}</Typography>
-                <StatusBadge status={driver.mtopStatus} />
-              </Box>
-            </Box>
-            <Box sx={{ gridColumn: 'span 2' }}>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Registered MTOP Operator</Typography>
-              <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'var(--sakay-orange)' }}>
-                {driver.mtopOperatorName}
-              </Typography>
+              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Tricycle Vehicle Plate</Typography>
+              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.vehiclePlate}</Typography>
             </Box>
           </Box>
 
           <Box sx={{ mt: 2.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FAFAFC', padding: '14px 18px', borderRadius: '10px', border: '1px solid var(--mac-border-color)' }}>
             <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-secondary)' }}>
-              Send Driver's License & MTOP Permit renewal reminder to driver.
+              Send License & Franchise renewal advisory to driver.
             </Typography>
             <ActionButton
-              label={reminderSent ? 'Reminder Sent ✓' : 'Send Renewal Reminder'}
+              label={reminderSent ? 'Alert Sent ✓' : 'Send Renewal Alert'}
               showArrow={false}
               onClick={handleSendReminder}
               sx={{ height: 34, fontSize: '13px' }}
@@ -394,40 +381,15 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
           </Box>
         </Box>
 
-        {/* Section 5: Verification Information */}
-        <Box sx={{ mb: 4 }}>
+        {/* Section 5: Verification Credentials */}
+        <Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
             <VerifiedUserIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
             <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-              LGU Verification Status
+              4. Verification Documents ({driver.documents.length})
             </Typography>
           </Box>
 
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2.5, backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px' }}>
-            <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>TODA Endorsement</Typography>
-              <StatusBadge status={driver.todaVerificationStatus} />
-            </Box>
-            <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>LGU Final Approval</Typography>
-              <StatusBadge status={driver.lguVerificationStatus} />
-            </Box>
-            <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Account Access Status</Typography>
-              <StatusBadge status={driver.accountStatus} />
-            </Box>
-            <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Approval Date</Typography>
-              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>Jan 15, 2026</Typography>
-            </Box>
-          </Box>
-        </Box>
-
-        {/* Section 6: Supporting Verification Documents */}
-        <Box>
-          <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 2, letterSpacing: '0.3px' }}>
-            Submitted Verification Credentials ({driver.documents.length})
-          </Typography>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {driver.documents.map((doc, idx) => (
               <Box
@@ -449,16 +411,66 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
                       {doc.name}
                     </Typography>
                     <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)', mt: '3px' }}>
-                      {doc.type} • Status: <span style={{ fontWeight: 600, color: doc.status === 'Verified' ? '#1E8E3E' : '#B06000' }}>{doc.status}</span>
+                      {doc.type} • Status: <span style={{ fontWeight: 600, color: '#1E8E3E' }}>{doc.status}</span>
                     </Typography>
                   </Box>
                 </Box>
-                <ActionButton label="Inspect File" showArrow={false} onClick={() => setSelectedDoc({ name: doc.name, type: doc.type })} sx={{ height: 34, fontSize: '13px' }} />
+                <ActionButton
+                  label="Inspect File"
+                  showArrow={false}
+                  onClick={() => setSelectedDoc({ name: doc.name, type: doc.type })}
+                  sx={{ height: 34, fontSize: '13px' }}
+                />
               </Box>
             ))}
           </Box>
         </Box>
       </MacCenterModal>
+
+      {/* Confirmation Dialogs */}
+      <MacConfirmDialog
+        open={verifyDialogOpen}
+        onClose={() => setVerifyDialogOpen(false)}
+        title="Approve Stage 2 Driver Verification?"
+        message={`Authorize driver "${driver.name}" (${driver.todaName}) for official franchise operations in Calapan City.`}
+        confirmLabel="Approve Driver"
+        confirmVariant="orange"
+        onConfirm={handleVerifyConfirm}
+      />
+
+      <MacConfirmDialog
+        open={suspendDialogOpen}
+        onClose={() => setSuspendDialogOpen(false)}
+        title="Suspend Driver Account?"
+        message={`Enact an administrative suspension on "${driver.name}". The driver will be barred from accepting booking dispatches.`}
+        confirmLabel="Suspend Driver"
+        confirmVariant="danger"
+        requireReason
+        reasonPlaceholder="Specify mandatory suspension reason..."
+        onConfirm={handleSuspendConfirm}
+      />
+
+      <MacConfirmDialog
+        open={reactivateDialogOpen}
+        onClose={() => setReactivateDialogOpen(false)}
+        title="Reactivate Driver Account?"
+        message={`Reactivate "${driver.name}" to active status. The driver will immediately become eligible to receive ride bookings.`}
+        confirmLabel="Reactivate Account"
+        confirmVariant="orange"
+        onConfirm={handleReactivateConfirm}
+      />
+
+      <MacConfirmDialog
+        open={strikeDialogOpen}
+        onClose={() => setStrikeDialogOpen(false)}
+        title="Issue Administrative Policy Strike?"
+        message={`Issue +1 policy violation strike to "${driver.name}". Note: 3 strikes trigger automated platform suspension.`}
+        confirmLabel="Issue Strike"
+        confirmVariant="danger"
+        requireReason
+        reasonPlaceholder="Specify violation details (e.g. Overcharging, Route Deviation)..."
+        onConfirm={handleStrikeConfirm}
+      />
 
       {/* Document Inspection Popover */}
       {selectedDoc && (
@@ -469,6 +481,18 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
           documentType={selectedDoc.type}
         />
       )}
+
+      {/* Snackbar Alert */}
+      <Snackbar
+        open={Boolean(snackbarMsg)}
+        autoHideDuration={4000}
+        onClose={() => setSnackbarMsg(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbarMsg(null)} severity="info" sx={{ width: '100%' }}>
+          {snackbarMsg}
+        </Alert>
+      </Snackbar>
     </>
   );
 };

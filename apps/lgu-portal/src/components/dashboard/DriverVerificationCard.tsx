@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Button } from '@mui/material';
-import { DRIVER_VERIFICATION_DATA } from '../../mockData/dashboardData';
 
 interface SegmentData {
   label: string;
@@ -10,20 +9,54 @@ interface SegmentData {
   color: string;
 }
 
-export const DriverVerificationCard: React.FC = () => {
+interface DriverVerificationCardProps {
+  data?: {
+    total: number;
+    approved: number;
+    pending: number;
+    rejected: number;
+    suspended: number;
+  };
+}
+
+export const DriverVerificationCard: React.FC<DriverVerificationCardProps> = ({ data }) => {
   const navigate = useNavigate();
   const [hoveredSegment, setHoveredSegment] = useState<SegmentData | null>(null);
 
-  const total = DRIVER_VERIFICATION_DATA.totalDrivers;
+  const total = data?.total || 0;
+  const approved = data?.approved || 0;
+  const pending = data?.pending || 0;
+  const rejected = data?.rejected || 0;
+  const suspended = data?.suspended || 0;
 
   const segments: SegmentData[] = [
-    { label: 'Approved', count: DRIVER_VERIFICATION_DATA.approvedCount, percentage: 69, color: '#34A853' },
-    { label: 'Pending', count: DRIVER_VERIFICATION_DATA.pendingCount, percentage: 19, color: '#FBBC04' },
-    { label: 'Rejected', count: DRIVER_VERIFICATION_DATA.rejectedCount, percentage: 7, color: '#EA4335' },
-    { label: 'Suspended', count: DRIVER_VERIFICATION_DATA.suspendedCount, percentage: 5, color: '#9AA0A6' },
+    {
+      label: 'Approved',
+      count: approved,
+      percentage: total > 0 ? Math.round((approved / total) * 100) : 0,
+      color: '#34A853',
+    },
+    {
+      label: 'Pending',
+      count: pending,
+      percentage: total > 0 ? Math.round((pending / total) * 100) : 0,
+      color: '#FBBC04',
+    },
+    {
+      label: 'Rejected',
+      count: rejected,
+      percentage: total > 0 ? Math.round((rejected / total) * 100) : 0,
+      color: '#EA4335',
+    },
+    {
+      label: 'Suspended',
+      count: suspended,
+      percentage: total > 0 ? Math.round((suspended / total) * 100) : 0,
+      color: '#9AA0A6',
+    },
   ];
 
-  // SVG Donut calculation with generous container bounds to guarantee zero hover clipping
+  // SVG Donut calculation
   const size = 150;
   const strokeWidth = 22;
   const radius = (size - strokeWidth) / 2;
@@ -52,7 +85,7 @@ export const DriverVerificationCard: React.FC = () => {
               Driver Verification Status
             </Typography>
             <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', mt: '3px' }}>
-              Current verification status of registered drivers.
+              Live verification status of registered drivers.
             </Typography>
           </Box>
 
@@ -84,9 +117,9 @@ export const DriverVerificationCard: React.FC = () => {
         </Box>
       </Box>
 
-      {/* Horizontal Layout: Donut on Left, Interactive Legend Stack on Right */}
+      {/* Horizontal Layout: Donut on Left, Legend on Right */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: 1, gap: 3, pt: 1 }}>
-        {/* Left: Donut Chart Surface */}
+        {/* Left: Donut Chart */}
         <Box
           sx={{
             position: 'relative',
@@ -99,35 +132,46 @@ export const DriverVerificationCard: React.FC = () => {
           }}
         >
           <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow: 'visible' }}>
-            {segments.map((seg, idx) => {
-              const strokeDasharray = `${(seg.percentage / 100) * circumference} ${circumference}`;
-              const strokeDashoffset = -cumulativeOffset;
-              cumulativeOffset += (seg.percentage / 100) * circumference;
+            {total === 0 ? (
+              <circle
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                fill="transparent"
+                stroke="#E5E7EB"
+                strokeWidth={strokeWidth}
+              />
+            ) : (
+              segments.map((seg, idx) => {
+                const strokeDasharray = `${(seg.percentage / 100) * circumference} ${circumference}`;
+                const strokeDashoffset = -cumulativeOffset;
+                cumulativeOffset += (seg.percentage / 100) * circumference;
 
-              const isHovered = hoveredSegment?.label === seg.label;
+                const isHovered = hoveredSegment?.label === seg.label;
 
-              return (
-                <circle
-                  key={idx}
-                  cx={size / 2}
-                  cy={size / 2}
-                  r={radius}
-                  fill="transparent"
-                  stroke={seg.color}
-                  strokeWidth={isHovered ? strokeWidth + 5 : strokeWidth}
-                  strokeDasharray={strokeDasharray}
-                  strokeDashoffset={strokeDashoffset}
-                  transform={`rotate(-90 ${size / 2} ${size / 2})`}
-                  style={{
-                    transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                    cursor: 'pointer',
-                    opacity: hoveredSegment && !isHovered ? 0.45 : 1,
-                  }}
-                  onMouseEnter={() => setHoveredSegment(seg)}
-                  onMouseLeave={() => setHoveredSegment(null)}
-                />
-              );
-            })}
+                return (
+                  <circle
+                    key={idx}
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    fill="transparent"
+                    stroke={seg.color}
+                    strokeWidth={isHovered ? strokeWidth + 5 : strokeWidth}
+                    strokeDasharray={strokeDasharray}
+                    strokeDashoffset={strokeDashoffset}
+                    transform={`rotate(-90 ${size / 2} ${size / 2})`}
+                    style={{
+                      transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                      cursor: 'pointer',
+                      opacity: hoveredSegment && !isHovered ? 0.45 : 1,
+                    }}
+                    onMouseEnter={() => setHoveredSegment(seg)}
+                    onMouseLeave={() => setHoveredSegment(null)}
+                  />
+                );
+              })
+            )}
           </svg>
 
           {/* Center Metric Display */}
@@ -162,7 +206,7 @@ export const DriverVerificationCard: React.FC = () => {
           </Box>
         </Box>
 
-        {/* Right: Interactive Legend Vertical Stack */}
+        {/* Right: Legend Stack */}
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
           {segments.map((seg) => {
             const isHovered = hoveredSegment?.label === seg.label;

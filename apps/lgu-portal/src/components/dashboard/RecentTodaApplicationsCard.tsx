@@ -3,9 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Button } from '@mui/material';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import { StatusBadge } from '../common/StatusBadge';
-import { RECENT_TODA_APPLICATIONS } from '../../mockData/dashboardData';
 
-export const RecentTodaApplicationsCard: React.FC = () => {
+interface TodaAppItem {
+  id: string;
+  name: string;
+  barangay: string;
+  submittedDate: string;
+  status: string;
+  representative: string;
+  memberCount: number;
+}
+
+interface RecentTodaApplicationsCardProps {
+  applications?: TodaAppItem[];
+}
+
+export const RecentTodaApplicationsCard: React.FC<RecentTodaApplicationsCardProps> = ({
+  applications = [],
+}) => {
   const navigate = useNavigate();
 
   return (
@@ -48,55 +63,80 @@ export const RecentTodaApplicationsCard: React.FC = () => {
         </Typography>
       </Box>
 
-      {/* List Items */}
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        {RECENT_TODA_APPLICATIONS.map((app) => (
-          <Box
-            key={app.id}
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '12px 16px',
-              borderRadius: 'var(--mac-radius-md)',
-              backgroundColor: '#FAFAFC',
-              border: '1px solid var(--mac-border-subtle)',
-              transition: 'var(--mac-transition-fast)',
-              '&:hover': {
-                backgroundColor: 'var(--mac-canvas-bg)',
-                borderColor: 'var(--mac-border-color)',
-              },
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Box
-                sx={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: '8px',
+      {/* List Items or Empty State */}
+      {applications.length > 0 ? (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {applications.map((app) => (
+            <Box
+              key={app.id}
+              onClick={() => navigate('/toda-applications')}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderRadius: 'var(--mac-radius-md)',
+                backgroundColor: '#FAFAFC',
+                border: '1px solid var(--mac-border-subtle)',
+                transition: 'var(--mac-transition-fast)',
+                cursor: 'pointer',
+                '&:hover': {
                   backgroundColor: 'var(--mac-canvas-bg)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--mac-text-secondary)',
-                }}
-              >
-                <AccountBalanceIcon fontSize="small" />
+                  borderColor: 'var(--mac-border-color)',
+                },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '8px',
+                    backgroundColor: 'var(--mac-canvas-bg)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--mac-text-secondary)',
+                  }}
+                >
+                  <AccountBalanceIcon fontSize="small" />
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)', lineHeight: 1.2 }}>
+                    {app.name}
+                  </Typography>
+                  <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)', lineHeight: 1.2, mt: '3px' }}>
+                    Brgy. {app.barangay} • Submitted {app.submittedDate}
+                  </Typography>
+                </Box>
               </Box>
-              <Box>
-                <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)', lineHeight: 1.2 }}>
-                  {app.name}
-                </Typography>
-                <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)', lineHeight: 1.2, mt: '3px' }}>
-                  Submitted: {app.submittedDate}
-                </Typography>
-              </Box>
-            </Box>
 
-            <StatusBadge status={app.status} />
-          </Box>
-        ))}
-      </Box>
+              <StatusBadge status={app.status as any} />
+            </Box>
+          ))}
+        </Box>
+
+      ) : (
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexGrow: 1,
+            py: 5,
+            gap: 1,
+          }}
+        >
+          <AccountBalanceIcon sx={{ fontSize: 38, color: 'var(--mac-border-color)' }} />
+          <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+            No Pending TODA Applications
+          </Typography>
+          <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', textAlign: 'center', maxWidth: 300 }}>
+            All association applications are currently reviewed and processed.
+          </Typography>
+        </Box>
+      )}
     </Box>
   );
 };

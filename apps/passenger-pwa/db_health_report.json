@@ -1,0 +1,173 @@
+{
+  "network": {
+    "status": 401,
+    "statusText": "Unauthorized",
+    "latencyMs": 708,
+    "ok": false
+  },
+  "auth": {
+    "ok": true,
+    "session": null
+  },
+  "tables": {
+    "toda": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 3,
+      "sampleCount": 3
+    },
+    "lgu_admin": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "toda_admin": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "passenger": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "driver": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "driver_verification": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "fare_matrix": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 1,
+      "sampleCount": 1
+    },
+    "booking": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "dispatch_attempt": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "shared_trip_match": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "cancellation_record": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "gps_log": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "rating": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "incident_report": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "notification": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "announcement": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "analytics_log": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "analytics_report": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    },
+    "audit_log": {
+      "exists": true,
+      "status": "OK",
+      "rowCount": 0,
+      "sampleCount": 0
+    }
+  },
+  "storage": {
+    "ok": true,
+    "buckets": []
+  },
+  "sampleData": {
+    "toda": {
+      "toda_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+      "toda_name": "Calapan Central TODA",
+      "toda_acronym": "CCTODA",
+      "registration_number": "CAL-TODA-2024-001",
+      "date_established": "2012-03-15",
+      "terminal_latitude": 13.4115,
+      "terminal_longitude": 121.1803,
+      "barangay": "San Vicente Central",
+      "service_coverage_area": "Calapan Public Market, City Hall, J.P. Rizal St., San Vicente West",
+      "contact_number": "+63 917 100 2001",
+      "email": "cctoda.calapan@gmail.com",
+      "president_name": "Roberto \"Berting\" Alcantara",
+      "president_contact": "+63 917 555 1001",
+      "vice_president_name": "Eduardo M. Perez",
+      "vice_president_contact": "+63 917 555 1002",
+      "secretary_name": "Leticia Cruz-Reyes",
+      "secretary_contact": "+63 917 555 1003",
+      "treasurer_name": "Mario D. Hernandez",
+      "treasurer_contact": "+63 917 555 1004",
+      "registered_tricycle_count": 24,
+      "active_driver_count": 18,
+      "certificate_number": "CERT-LGU-2026-001",
+      "certificate_expiry": "2026-12-31T23:59:59+00:00",
+      "account_status": "Active",
+      "created_at": "2026-08-19T04:51:40.352159+00:00"
+    },
+    "fare_matrix": {
+      "fare_matrix_id": "f0eebc99-9c0b-4ef8-bb6d-6bb9bd380f01",
+      "base_fare": 15,
+      "base_distance_km": 2,
+      "succeeding_rate": 1,
+      "effective_timestamp": "2022-06-01T00:00:00+00:00",
+      "is_active": true,
+      "configured_by": null,
+      "created_at": "2026-08-19T04:51:40.352159+00:00"
+    }
+  },
+  "issues": [],
+  "recommendations": []
+}

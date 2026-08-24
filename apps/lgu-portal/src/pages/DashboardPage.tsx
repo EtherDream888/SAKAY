@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Box, Typography, Card, CardContent, Button, IconButton } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Typography, Card, CardContent, Button, IconButton, CircularProgress } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
@@ -11,30 +11,61 @@ import CloseIcon from '@mui/icons-material/Close';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import { useNavigate } from 'react-router-dom';
 
-import { SYSTEM_DASHBOARD_KPIS, MOCK_ACCREDITED_TODAS } from '../mockData/adminData';
 import { WelcomeHeader } from '../components/layout/WelcomeHeader';
 import { BookingTrendCard } from '../components/dashboard/BookingTrendCard';
 import { DriverVerificationCard } from '../components/dashboard/DriverVerificationCard';
 import { LiveTripsMapCard } from '../components/dashboard/LiveTripsMapCard';
 import { RecentIncidentReportsCard } from '../components/dashboard/RecentIncidentReportsCard';
+import { RecentTodaApplicationsCard } from '../components/dashboard/RecentTodaApplicationsCard';
+import { fetchDashboardStats, DashboardStats } from '../services/adminApiService';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const kpis = SYSTEM_DASHBOARD_KPIS;
+
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Dismissible alert states
   const [showTodaAlert, setShowTodaAlert] = useState(true);
   const [showOverdueAlert, setShowOverdueAlert] = useState(true);
 
-  // Filter TODAs flagged for supervisory review (3+ confirmed incidents in 60 days)
-  const flaggedTodas = MOCK_ACCREDITED_TODAS.filter((t) => t.flaggedForReview);
+  useEffect(() => {
+    let isMounted = true;
+    fetchDashboardStats()
+      .then((data) => {
+        if (isMounted) {
+          setStats(data);
+        }
+      })
+      .catch((err) => {
+        console.error('[DashboardPage] Failed to fetch live dashboard stats:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const kpis = stats?.kpis || {
+    passengers: { total: 0, active: 0, inactive: 0 },
+    drivers: { total: 0, active: 0, inactive: 0 },
+    todas: { total: 0, pendingReview: 0 },
+    trips: { total: 0, ongoing: 0, allBookings: 0 },
+    verifications: { pending: 0, overdue5Days: 0 },
+    incidents: { open: 0, total: 0 },
+  };
+
+  const flaggedTodas = stats?.flaggedTodas || [];
 
   return (
-    <Box sx={{ maxWidth: 1600, margin: '0 auto' }}>
+    <Box sx={{ maxWidth: 1600, margin: '0 auto', pb: 6 }}>
       {/* 1. Welcome Greeting Text Header */}
       <WelcomeHeader />
 
-      {/* 2. TODA Supervisory Review Banner */}
+      {/* 2. TODA Supervisory Review Banner (Conditional from live DB) */}
       {showTodaAlert && flaggedTodas.length > 0 && (
         <Box
           sx={{
@@ -159,7 +190,7 @@ export const DashboardPage: React.FC = () => {
         </Box>
       )}
 
-      {/* 4. Surface-Level KPI Summary Cards */}
+      {/* 4. Real Live KPI Summary Cards */}
       <Box
         sx={{
           display: 'grid',
@@ -169,7 +200,18 @@ export const DashboardPage: React.FC = () => {
         }}
       >
         {/* Passengers */}
-        <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
+        <Card
+          onClick={() => navigate('/passengers')}
+          sx={{
+            borderRadius: 'var(--mac-radius-lg)',
+            border: '1px solid var(--mac-border-color)',
+            boxShadow: 'var(--mac-shadow-card)',
+            backgroundColor: '#FFFFFF',
+            cursor: 'pointer',
+            transition: 'var(--mac-transition-fast)',
+            '&:hover': { transform: 'translateY(-2px)', borderColor: 'var(--sakay-orange)' },
+          }}
+        >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
@@ -178,7 +220,7 @@ export const DashboardPage: React.FC = () => {
               <PeopleIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
             </Box>
             <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
-              {kpis.passengers.total.toLocaleString()}
+              {isLoading ? <CircularProgress size={20} /> : kpis.passengers.total.toLocaleString()}
             </Typography>
             <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
               <span style={{ fontWeight: 600, color: '#1E8E3E' }}>{kpis.passengers.active} Active</span> • {kpis.passengers.inactive} Inactive
@@ -187,7 +229,18 @@ export const DashboardPage: React.FC = () => {
         </Card>
 
         {/* Drivers */}
-        <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
+        <Card
+          onClick={() => navigate('/drivers')}
+          sx={{
+            borderRadius: 'var(--mac-radius-lg)',
+            border: '1px solid var(--mac-border-color)',
+            boxShadow: 'var(--mac-shadow-card)',
+            backgroundColor: '#FFFFFF',
+            cursor: 'pointer',
+            transition: 'var(--mac-transition-fast)',
+            '&:hover': { transform: 'translateY(-2px)', borderColor: 'var(--sakay-orange)' },
+          }}
+        >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
@@ -196,16 +249,27 @@ export const DashboardPage: React.FC = () => {
               <DirectionsCarIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
             </Box>
             <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
-              {kpis.drivers.total.toLocaleString()}
+              {isLoading ? <CircularProgress size={20} /> : kpis.drivers.total.toLocaleString()}
             </Typography>
             <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
-              <span style={{ fontWeight: 600, color: '#1E8E3E' }}>{kpis.drivers.active} Active</span> • {kpis.drivers.inactive} Inactive
+              <span style={{ fontWeight: 600, color: '#1E8E3E' }}>{kpis.drivers.active} Verified</span> • {kpis.drivers.inactive} Other
             </Typography>
           </CardContent>
         </Card>
 
         {/* Accredited TODAs */}
-        <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
+        <Card
+          onClick={() => navigate('/accredited-todas')}
+          sx={{
+            borderRadius: 'var(--mac-radius-lg)',
+            border: '1px solid var(--mac-border-color)',
+            boxShadow: 'var(--mac-shadow-card)',
+            backgroundColor: '#FFFFFF',
+            cursor: 'pointer',
+            transition: 'var(--mac-transition-fast)',
+            '&:hover': { transform: 'translateY(-2px)', borderColor: 'var(--sakay-orange)' },
+          }}
+        >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
@@ -214,94 +278,126 @@ export const DashboardPage: React.FC = () => {
               <AccountBalanceIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
             </Box>
             <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
-              {kpis.todas.total}
+              {isLoading ? <CircularProgress size={20} /> : kpis.todas.total.toLocaleString()}
             </Typography>
             <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
-              <span style={{ fontWeight: 600, color: '#1E8E3E' }}>{kpis.todas.active} Active</span> • {kpis.todas.suspended} Suspended
+              <span style={{ fontWeight: 600, color: '#1565C0' }}>{kpis.todas.total} Active</span> • {kpis.todas.pendingReview} Pending
             </Typography>
           </CardContent>
         </Card>
 
-        {/* Trip Stats */}
-        <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
+        {/* Completed Trips */}
+        <Card
+          onClick={() => navigate('/live-trips')}
+          sx={{
+            borderRadius: 'var(--mac-radius-lg)',
+            border: '1px solid var(--mac-border-color)',
+            boxShadow: 'var(--mac-shadow-card)',
+            backgroundColor: '#FFFFFF',
+            cursor: 'pointer',
+            transition: 'var(--mac-transition-fast)',
+            '&:hover': { transform: 'translateY(-2px)', borderColor: 'var(--sakay-orange)' },
+          }}
+        >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
-                Trips Stats
+                Completed Trips
               </Typography>
-              <RouteIcon sx={{ color: '#1565C0', fontSize: 20 }} />
+              <RouteIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
             </Box>
             <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
-              {kpis.trips.completed.toLocaleString()}
+              {isLoading ? <CircularProgress size={20} /> : kpis.trips.total.toLocaleString()}
             </Typography>
             <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
-              <span style={{ fontWeight: 600, color: '#1565C0' }}>{kpis.trips.ongoing} Active</span> • {kpis.trips.cancelled} Cancelled
+              <span style={{ fontWeight: 600, color: '#1E8E3E' }}>{kpis.trips.ongoing} In Transit</span> • {kpis.trips.allBookings} Total
             </Typography>
           </CardContent>
         </Card>
 
         {/* Pending Verifications */}
-        <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
+        <Card
+          onClick={() => navigate('/toda-applications')}
+          sx={{
+            borderRadius: 'var(--mac-radius-lg)',
+            border: '1px solid var(--mac-border-color)',
+            boxShadow: 'var(--mac-shadow-card)',
+            backgroundColor: '#FFFFFF',
+            cursor: 'pointer',
+            transition: 'var(--mac-transition-fast)',
+            '&:hover': { transform: 'translateY(-2px)', borderColor: 'var(--sakay-orange)' },
+          }}
+        >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
-                Pending Review
+                Pending Verifications
               </Typography>
-              <AccessTimeIcon sx={{ color: '#B06000', fontSize: 20 }} />
+              <AccessTimeIcon sx={{ color: '#EA580C', fontSize: 20 }} />
             </Box>
-            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--sakay-orange)', mb: 0.5 }}>
-              {kpis.verifications.pendingTodas + kpis.verifications.pendingDrivers}
+            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: '#EA580C', mb: 0.5 }}>
+              {isLoading ? <CircularProgress size={20} /> : kpis.verifications.pending.toLocaleString()}
             </Typography>
             <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
-              {kpis.verifications.pendingTodas} TODAs • {kpis.verifications.pendingDrivers} Drivers
+              {kpis.todas.pendingReview} TODA • {kpis.verifications.pending - kpis.todas.pendingReview} Drivers
             </Typography>
           </CardContent>
         </Card>
 
-        {/* Incident Reports */}
-        <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
+        {/* Open Incidents */}
+        <Card
+          onClick={() => navigate('/incident-reports')}
+          sx={{
+            borderRadius: 'var(--mac-radius-lg)',
+            border: '1px solid var(--mac-border-color)',
+            boxShadow: 'var(--mac-shadow-card)',
+            backgroundColor: '#FFFFFF',
+            cursor: 'pointer',
+            transition: 'var(--mac-transition-fast)',
+            '&:hover': { transform: 'translateY(-2px)', borderColor: 'var(--sakay-orange)' },
+          }}
+        >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
               <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
-                Incidents
+                Open Incidents
               </Typography>
-              <ReportProblemIcon sx={{ color: '#DC2626', fontSize: 20 }} />
+              <ReportProblemIcon sx={{ color: '#D93025', fontSize: 20 }} />
             </Box>
-            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: '#DC2626', mb: 0.5 }}>
-              {kpis.incidents.open} Open
+            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: '#D93025', mb: 0.5 }}>
+              {isLoading ? <CircularProgress size={20} /> : kpis.incidents.open.toLocaleString()}
             </Typography>
             <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
-              <span style={{ fontWeight: 600, color: '#1E8E3E' }}>{kpis.incidents.resolved} Resolved</span>
+              {kpis.incidents.total} Total Complaints
             </Typography>
           </CardContent>
         </Card>
       </Box>
 
-      {/* 5. Main Dashboard Visualizations Grid */}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: { xs: '1fr', lg: '8fr 4fr' },
-          gap: 3,
-          alignItems: 'stretch',
-          mb: 4,
-        }}
-      >
-        <BookingTrendCard />
-        <DriverVerificationCard />
-      </Box>
-
-      {/* 6. Live Trips & Incident Reports Row */}
+      {/* 5. Row 1: Booking Trend Card & Driver Verification Card */}
       <Box
         sx={{
           display: 'grid',
           gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' },
-          gap: 3,
-          alignItems: 'stretch',
+          gap: 3.5,
+          mb: 3.5,
         }}
       >
-        <LiveTripsMapCard />
-        <RecentIncidentReportsCard />
+        <BookingTrendCard />
+        <DriverVerificationCard data={stats?.driverBreakdown} />
+      </Box>
+
+      {/* 6. Row 2: Live Trips Map, Recent TODA Applications & Recent Incident Reports */}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: '1fr 1fr', lg: '1fr 1fr 1fr' },
+          gap: 3.5,
+        }}
+      >
+        <LiveTripsMapCard ongoingTripsCount={kpis.trips.ongoing} />
+        <RecentTodaApplicationsCard applications={stats?.recentApplications} />
+        <RecentIncidentReportsCard reports={stats?.recentIncidents} />
       </Box>
     </Box>
   );

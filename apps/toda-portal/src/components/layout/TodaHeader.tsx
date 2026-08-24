@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography, IconButton, Badge, Button } from '@mui/material';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import VerifiedIcon from '@mui/icons-material/Verified';
 
 import { NotificationPopover } from '../popovers/NotificationPopover';
-import { MOCK_TODA_NOTIFICATIONS, CURRENT_TODA_PROFILE } from '../../mockData/todaData';
 import { NotificationItem } from '../../types/toda';
+import { fetchTodaProfile } from '../../services/todaApiService';
 
 interface TodaHeaderProps {
   pageTitle?: string;
@@ -15,11 +15,18 @@ interface TodaHeaderProps {
 
 export const TodaHeader: React.FC<TodaHeaderProps> = ({
   pageTitle = 'Operations Monitoring',
-  pageSubtitle = 'Real-time overview of Calapan Central TODA terminal and driver fleet',
+  pageSubtitle = 'Real-time overview of TODA terminal and driver fleet',
 }) => {
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState<NotificationItem[]>(MOCK_TODA_NOTIFICATIONS);
+  const [todaName, setTodaName] = useState<string>('Calapan Central TODA');
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notifAnchor, setNotifAnchor] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    fetchTodaProfile().then((p) => {
+      if (p) setTodaName(p.name);
+    });
+  }, []);
 
   const unreadCount = notifications.filter((n) => n.unread).length;
 
@@ -142,7 +149,7 @@ export const TodaHeader: React.FC<TodaHeaderProps> = ({
               overflow: 'hidden',
             }}
           >
-            {CURRENT_TODA_PROFILE.name}
+            {todaName}
           </Typography>
         </Button>
       </Box>

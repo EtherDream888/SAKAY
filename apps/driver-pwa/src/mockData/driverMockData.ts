@@ -183,3 +183,8 @@ export const MOCK_DRIVER_NOTIFICATIONS: DriverNotification[] = [
     unread: false,
   },
 ];
+
+export const CURRENT_DRIVER_PROFILE = INITIAL_DRIVER_PROFILE;
+export const MOCK_DRIVER_TRIPS = MOCK_DRIVER_HISTORY;
+export const MOCK_PENDING_BOOKING_REQUEST = MOCK_DRIVER_HISTORY[0];
+

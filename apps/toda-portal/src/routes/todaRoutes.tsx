@@ -5,10 +5,12 @@ import { TodaLayout } from '../components/layout/TodaLayout';
 import { TodaOperationsPage } from '../pages/TodaOperationsPage';
 import { TodaDriverVerificationPage } from '../pages/TodaDriverVerificationPage';
 import { TodaDriverMembershipPage } from '../pages/TodaDriverMembershipPage';
+import { TodaFleetPage } from '../pages/TodaFleetPage';
 import { TodaAnnouncementsPage } from '../pages/TodaAnnouncementsPage';
 import { TodaReportingPage } from '../pages/TodaReportingPage';
 import { TodaAuditLogsPage } from '../pages/TodaAuditLogsPage';
 import { TodaAccountManagementPage } from '../pages/TodaAccountManagementPage';
+import { TodaRegistrationPage } from '../pages/TodaRegistrationPage';
 
 export const TodaRoutes: React.FC = () => {
   return (
@@ -16,11 +18,14 @@ export const TodaRoutes: React.FC = () => {
       {/* Default redirect to /operations */}
       <Route path="/" element={<Navigate to="/operations" replace />} />
 
+      {/* TODA Registration & Accreditation Submission */}
+      <Route path="/register" element={<TodaRegistrationPage />} />
+
       {/* Operations Monitoring Screen */}
       <Route
         path="/operations"
         element={
-          <TodaLayout pageTitle="Operations Monitoring" pageSubtitle="Real-time overview of Calapan Central TODA terminal and driver fleet">
+          <TodaLayout pageTitle="Operations Monitoring" pageSubtitle="Real-time overview of TODA terminal operations, queue rotation, and active trips">
             <TodaOperationsPage />
           </TodaLayout>
         }
@@ -46,6 +51,16 @@ export const TodaRoutes: React.FC = () => {
         }
       />
 
+      {/* Tricycle Fleet Management */}
+      <Route
+        path="/fleet"
+        element={
+          <TodaLayout pageTitle="Tricycle Fleet Management" pageSubtitle="Manage authorized motorized tricycle units, franchise permits, and unit status">
+            <TodaFleetPage />
+          </TodaLayout>
+        }
+      />
+
       {/* Announcements */}
       <Route
         path="/announcements"
@@ -60,7 +75,7 @@ export const TodaRoutes: React.FC = () => {
       <Route
         path="/reports"
         element={
-          <TodaLayout pageTitle="TODA Reports & Incidents" pageSubtitle="Review TODA trip activity, gross fare ledgers, and driver complaint incidents">
+          <TodaLayout pageTitle="TODA Reports & Incidents" pageSubtitle="Review TODA trip activity, gross fare ledgers, driver complaints, and LGU escalation">
             <TodaReportingPage />
           </TodaLayout>
         }

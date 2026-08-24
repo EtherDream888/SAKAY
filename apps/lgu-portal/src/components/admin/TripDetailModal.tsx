@@ -24,7 +24,7 @@ export const TripDetailModal: React.FC<TripDetailModalProps> = ({ open, onClose,
     <MacCenterModal
       open={open}
       onClose={onClose}
-      title={`Trip Telemetry — ${trip.id}`}
+      title={`Trip Details — ${trip.id}`}
       subtitle={`Booking ID: ${trip.bookingId} • ${trip.todaName}`}
       badge={<StatusBadge status={trip.status === 'Trip Ongoing' ? 'Active' : 'Pending'} />}
       maxWidth={780}

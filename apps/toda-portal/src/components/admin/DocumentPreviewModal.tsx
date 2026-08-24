@@ -98,7 +98,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             Official Compliance Document Verified
           </Typography>
           <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', maxWidth: 440, mb: 3 }}>
-            Document metadata has been verified by Calapan City TODA Administrative Board. Cryptographic checksum matches the original submission archive.
+            Document metadata has been verified by the Calapan City TODA Administrative Board and matches the official submission record.
           </Typography>
 
           <Box sx={{ display: 'flex', gap: 1.5 }}>
