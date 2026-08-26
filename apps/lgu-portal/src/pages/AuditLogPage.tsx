@@ -20,6 +20,7 @@ import { AuditLogRecord } from '../mockData/adminData';
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
 import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
+import { TableEmptyState } from '../components/common/TableEmptyState';
 import { fetchAuditLogs } from '../services/adminApiService';
 
 /**
@@ -258,34 +259,18 @@ export const AuditLogPage: React.FC = () => {
                 );
               })
             ) : (
-              <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-                    <SecurityIcon sx={{ fontSize: '35.3', color: 'var(--mac-border-color)' }} />
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
-                      No activity log records found
-                    </Typography>
-                    <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
-                      {searchQuery || categoryFilter !== 'All'
-                        ? 'No events match your active search filters.'
-                        : 'There are currently no administrative events recorded.'}
-                    </Typography>
-                    <Button
-                      onClick={loadLogs}
-                      startIcon={<RefreshIcon />}
-                      sx={{
-                        mt: 1,
-                        textTransform: 'none',
-                        fontSize: '10.8px',
-                        color: 'var(--sakay-orange)',
-                        fontWeight: 600,
-                      }}
-                    >
-                      Refresh
-                    </Button>
-                  </Box>
-                </TableCell>
-              </TableRow>
+              <TableEmptyState
+                colSpan={6}
+                icon={<SecurityIcon />}
+                title="No activity log records found"
+                description={
+                  searchQuery || categoryFilter !== 'All'
+                    ? 'No events match your active search filters.'
+                    : 'Administrative actions, approvals, and system events will be recorded and appear here.'
+                }
+                onRefresh={loadLogs}
+                isRefreshing={isLoading}
+              />
             )}
           </TableBody>
         </Table>

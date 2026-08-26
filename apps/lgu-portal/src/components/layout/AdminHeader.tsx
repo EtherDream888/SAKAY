@@ -70,7 +70,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         <Typography
           variant="h1"
           sx={{
-            fontSize: '22px', // Compact page header title hierarchy
+            fontSize: '20px',
             fontWeight: 700,
             color: 'var(--mac-text-primary)',
             letterSpacing: '-0.3px',
@@ -82,7 +82,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         {pageSubtitle && (
           <Typography
             sx={{
-              fontSize: '13px',
+              fontSize: '12px',
               fontWeight: 400,
               color: 'var(--mac-text-muted)',
               lineHeight: 1.3,
@@ -154,31 +154,58 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           Tulong
         </Button>
 
-        {/* Compact Header Account Control */}
+        {/* Header Account Profile Control */}
         <Box>
-          <Button
+          <Box
             onClick={(e) => setAccountAnchorEl(e.currentTarget)}
-            endIcon={<KeyboardArrowDownIcon fontSize="small" sx={{ fontSize: 18, color: 'var(--mac-text-muted)' }} />}
             sx={{
               height: 38,
-              padding: '0 14px',
+              padding: '0 12px 0 10px',
               borderRadius: '10px',
               border: '1px solid var(--mac-border-color)',
               backgroundColor: '#FFFFFF',
-              color: 'var(--mac-text-primary)',
-              fontSize: '13.5px',
-              fontWeight: 600,
-              textTransform: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.2,
+              cursor: 'pointer',
               boxShadow: 'var(--mac-shadow-subtle)',
               transition: 'var(--mac-transition-fast)',
+              userSelect: 'none',
               '&:hover': {
                 backgroundColor: 'var(--mac-canvas-bg)',
                 borderColor: 'var(--mac-border-color)',
               },
             }}
           >
-            {adminName}
-          </Button>
+            <Box
+              sx={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                backgroundColor: 'var(--sakay-orange-soft)',
+                color: 'var(--sakay-orange)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '12px',
+                fontWeight: 700,
+                flexShrink: 0,
+              }}
+            >
+              {adminName.charAt(0).toUpperCase()}
+            </Box>
+            <Typography
+              sx={{
+                fontSize: '13.5px',
+                fontWeight: 600,
+                color: 'var(--mac-text-primary)',
+                lineHeight: 1,
+              }}
+            >
+              {adminName}
+            </Typography>
+            <KeyboardArrowDownIcon fontSize="small" sx={{ fontSize: 18, color: 'var(--mac-text-muted)', ml: -0.3 }} />
+          </Box>
 
           {/* Account Popover Card */}
           <Popover

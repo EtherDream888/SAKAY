@@ -25,6 +25,7 @@ import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { IncidentDetailModal } from '../components/admin/IncidentDetailModal';
+import { TableEmptyState } from '../components/common/TableEmptyState';
 import { fetchIncidents, updateIncidentStatus, recordAdminAuditAction } from '../services/adminApiService';
 
 /**
@@ -370,34 +371,18 @@ export const IncidentReportsPage: React.FC = () => {
                 </TableRow>
               ))
             ) : (
-              <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-                    <ReportProblemIcon sx={{ fontSize: '35.3', color: 'var(--mac-border-color)' }} />
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
-                      No incident reports found
-                    </Typography>
-                    <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
-                      {searchQuery || statusFilter !== 'All'
-                        ? 'No reports match your active search or filter criteria.'
-                        : 'There are currently no incident reports recorded.'}
-                    </Typography>
-                    <Button
-                      onClick={loadIncidents}
-                      startIcon={<RefreshIcon />}
-                      sx={{
-                        mt: 1,
-                        textTransform: 'none',
-                        fontSize: '10.8px',
-                        color: 'var(--sakay-orange)',
-                        fontWeight: 600,
-                      }}
-                    >
-                      Refresh
-                    </Button>
-                  </Box>
-                </TableCell>
-              </TableRow>
+              <TableEmptyState
+                colSpan={6}
+                icon={<ReportProblemIcon />}
+                title="No incident reports found"
+                description={
+                  searchQuery || statusFilter !== 'All'
+                    ? 'No reports match your active search or filter criteria.'
+                    : 'Incident reports submitted by passengers or flagged by the system will appear here for review.'
+                }
+                onRefresh={loadIncidents}
+                isRefreshing={isLoading}
+              />
             )}
           </TableBody>
         </Table>

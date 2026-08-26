@@ -324,7 +324,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
                       {/* Nav Label Text */}
                       <Typography
                         sx={{
-                          fontSize: '15px',
+                          fontSize: '13px',
                           fontWeight: isActive ? 700 : 500,
                           letterSpacing: '-0.01em',
                           whiteSpace: 'nowrap',

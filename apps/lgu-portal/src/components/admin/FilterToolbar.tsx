@@ -88,7 +88,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '10px',
                   backgroundColor: '#FAFAFC',
-                  fontSize: '11.6px',
+                  fontSize: '11px',
                   height: 42,
                   border: '1px solid var(--mac-border-color)',
                   transition: 'var(--mac-transition-fast)',
@@ -136,7 +136,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
                 sx={{
                   borderRadius: '10px',
                   backgroundColor: '#FAFAFC',
-                  fontSize: '11.6px',
+                  fontSize: '11px',
                   fontWeight: 500,
                   color: 'var(--mac-text-primary)',
                   height: 42,
@@ -154,7 +154,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
                 }}
               >
                 {filter.options.map((opt) => (
-                  <MenuItem key={opt.value} value={opt.value} sx={{ fontSize: '11.6px' }}>
+                   <MenuItem key={opt.value} value={opt.value} sx={{ fontSize: '11px' }}>
                     {opt.label}
                   </MenuItem>
                 ))}
@@ -175,7 +175,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
                 border: '1px solid var(--mac-border-color)',
                 backgroundColor: '#FAFAFC',
                 color: 'var(--mac-text-secondary)',
-                fontSize: '11.3px',
+                fontSize: '11px',
                 fontWeight: 500,
                 textTransform: 'none',
                 flexShrink: 0,

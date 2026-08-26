@@ -40,8 +40,8 @@ export const WelcomeHeader: React.FC<WelcomeHeaderProps> = ({
         <Typography
           variant="h2"
           sx={{
-            fontSize: '20.8px',
-            fontWeight: 600,
+            fontSize: '20px',
+            fontWeight: 700,
             color: 'var(--mac-text-primary)',
             letterSpacing: '-0.3px',
             lineHeight: 1.2,
@@ -52,9 +52,11 @@ export const WelcomeHeader: React.FC<WelcomeHeaderProps> = ({
         {supportingText && (
           <Typography
             sx={{
-              fontSize: '11.3px',
+              fontSize: '12px',
+              fontWeight: 400,
               color: 'var(--mac-text-muted)',
-              mt: '4px',
+              lineHeight: 1.3,
+              mt: '3px',
             }}
           >
             {supportingText}
@@ -66,17 +68,17 @@ export const WelcomeHeader: React.FC<WelcomeHeaderProps> = ({
         <Box sx={{ position: 'relative', flexShrink: 0, pt: '2px' }}>
           <Button
             onClick={() => setDateOpen(!dateOpen)}
-            startIcon={<CalendarTodayIcon fontSize="small" sx={{ fontSize: '12.8' }} />}
-            endIcon={<KeyboardArrowDownIcon fontSize="small" sx={{ fontSize: '14.4' }} />}
+            startIcon={<CalendarTodayIcon fontSize="small" sx={{ fontSize: 15 }} />}
+            endIcon={<KeyboardArrowDownIcon fontSize="small" sx={{ fontSize: 17 }} />}
             sx={{
-              height: 42,
-              padding: '0 20px',
+              height: 38,
+              padding: '0 16px',
               borderRadius: '10px',
               border: '1px solid var(--mac-border-color)',
               backgroundColor: '#FFFFFF',
               color: 'var(--mac-text-primary)',
-              fontSize: '11.3px',
-              fontWeight: 400,
+              fontSize: '12px',
+              fontWeight: 500,
               textTransform: 'none',
               boxShadow: 'var(--mac-shadow-subtle)',
               transition: 'var(--mac-transition-fast)',

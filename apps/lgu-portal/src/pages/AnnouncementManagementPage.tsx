@@ -33,6 +33,7 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
+import { TableEmptyState } from '../components/common/TableEmptyState';
 import {
   fetchAnnouncements,
   createAnnouncement,
@@ -445,19 +446,26 @@ export const AnnouncementManagementPage: React.FC = () => {
                 );
               })
             ) : (
-              <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-                    <CampaignIcon sx={{ fontSize: 36, color: 'var(--mac-border-color)' }} />
-                    <Typography sx={{ fontSize: '15px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
-                      No announcements yet.
-                    </Typography>
-                    <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
-                      New LGU announcements will appear here when they are published.
-                    </Typography>
-                  </Box>
-                </TableCell>
-              </TableRow>
+              <TableEmptyState
+                colSpan={6}
+                icon={<CampaignIcon />}
+                title="No announcements yet."
+                description={
+                  searchQuery || roleFilter !== 'All' || statusFilter !== 'All'
+                    ? 'No announcements match your search or filter parameters.'
+                    : 'Municipal announcements and broadcast messages will appear here once you publish them.'
+                }
+                onRefresh={async () => {
+                  setIsLoading(true);
+                  try {
+                    const data = await fetchAnnouncements();
+                    setAnnouncements(data || []);
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                isRefreshing={isLoading}
+              />
             )}
           </TableBody>
         </Table>

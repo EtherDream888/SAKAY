@@ -138,7 +138,7 @@ export const LiveTripsMapCard: React.FC<LiveTripsMapCardProps> = ({ ongoingTrips
             }}
           />
           <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-            {ongoingTripsCount > 0 ? `Active Trips (${ongoingTripsCount})` : 'Live Calapan City Transportation Transit Map (0 Active)'}
+            {ongoingTripsCount > 0 ? `Active Trips (${ongoingTripsCount})` : 'No Active Trips'}
           </Typography>
         </Box>
       </Box>

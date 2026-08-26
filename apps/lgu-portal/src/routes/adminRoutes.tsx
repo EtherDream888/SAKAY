@@ -40,7 +40,7 @@ export const AdminRoutes: React.FC = () => {
         path="/dashboard"
         element={
           <ProtectedRoute>
-            <AdminLayout pageTitle="Dashboard" pageSubtitle="Overview of SAKAY operations in Calapan City">
+            <AdminLayout pageTitle="Dashboard" pageSubtitle="Here is your municipal transport operations overview for today.">
               <DashboardPage />
             </AdminLayout>
           </ProtectedRoute>
@@ -154,7 +154,7 @@ export const AdminRoutes: React.FC = () => {
         path="/reports"
         element={
           <ProtectedRoute>
-            <AdminLayout pageTitle="Reports" pageSubtitle="Generate operational and compliance reports">
+            <AdminLayout pageTitle="Reports" pageSubtitle="Generate operational and compliance reports for Calapan City.">
               <ReportsPage />
             </AdminLayout>
           </ProtectedRoute>
@@ -165,7 +165,7 @@ export const AdminRoutes: React.FC = () => {
         path="/analytics"
         element={
           <ProtectedRoute>
-            <AdminLayout pageTitle="Analytics" pageSubtitle="Descriptive transportation performance analytics">
+            <AdminLayout pageTitle="Analytics" pageSubtitle="Descriptive transportation performance analytics and trends.">
               <AnalyticsPage />
             </AdminLayout>
           </ProtectedRoute>
@@ -177,7 +177,7 @@ export const AdminRoutes: React.FC = () => {
         path="/settings"
         element={
           <ProtectedRoute>
-            <AdminLayout pageTitle="Account Management" pageSubtitle="Manage LGU staff administrator profiles, permissions, and credential resets.">
+            <AdminLayout pageTitle="Account Management" pageSubtitle="Manage LGU administrator profile, credentials, and system settings.">
               <AccountManagementPage />
             </AdminLayout>
           </ProtectedRoute>

@@ -420,7 +420,7 @@ export const LoginPage: React.FC = () => {
                   maxWidth: '50%',
                   display: { xs: 'none', md: 'flex' },
                   position: 'relative',
-                  background: 'linear-gradient(135deg, #1C1917 0%, #292524 100%)',
+                  background: 'linear-gradient(135deg, #FAF8F5 0%, #F5F5F7 100%)',
                   overflow: 'hidden',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -434,7 +434,7 @@ export const LoginPage: React.FC = () => {
                     width: '100%',
                     height: '100%',
                     objectFit: 'cover',
-                    opacity: 0.6,
+                    opacity: 0.95,
                   }}
                 />
               </Box>

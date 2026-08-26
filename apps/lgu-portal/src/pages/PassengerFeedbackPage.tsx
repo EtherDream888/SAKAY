@@ -22,6 +22,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
+import { TableEmptyState } from '../components/common/TableEmptyState';
 import { fetchPassengerFeedback, PassengerFeedbackItem } from '../services/adminApiService';
 
 /**
@@ -302,34 +303,18 @@ export const PassengerFeedbackPage: React.FC = () => {
                 </TableRow>
               ))
             ) : (
-              <TableRow>
-                <TableCell colSpan={4} align="center" sx={{ py: 8 }}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-                    <FeedbackIcon sx={{ fontSize: '35.3', color: 'var(--mac-border-color)' }} />
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
-                      No passenger feedback records found
-                    </Typography>
-                    <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
-                      {searchQuery || ratingFilter !== 'All'
-                        ? 'No feedback entries match your search criteria.'
-                        : 'There are currently no passenger feedback or rating records.'}
-                    </Typography>
-                    <Button
-                      onClick={loadFeedback}
-                      startIcon={<RefreshIcon />}
-                      sx={{
-                        mt: 1,
-                        textTransform: 'none',
-                        fontSize: '10.8px',
-                        color: 'var(--sakay-orange)',
-                        fontWeight: 600,
-                      }}
-                    >
-                      Refresh
-                    </Button>
-                  </Box>
-                </TableCell>
-              </TableRow>
+              <TableEmptyState
+                colSpan={4}
+                icon={<FeedbackIcon />}
+                title="No passenger feedback records found"
+                description={
+                  searchQuery || ratingFilter !== 'All'
+                    ? 'No feedback entries match your search criteria.'
+                    : 'Passenger ratings and feedback will appear here once commuters begin submitting reviews after their rides.'
+                }
+                onRefresh={loadFeedback}
+                isRefreshing={isLoading}
+              />
             )}
           </TableBody>
         </Table>

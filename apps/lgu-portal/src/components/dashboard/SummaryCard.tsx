@@ -112,7 +112,7 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({ metric }) => {
         </Box>
         <Typography
           sx={{
-            fontSize: '10.4px',
+            fontSize: '10px',
             fontWeight: 600,
             color: 'var(--mac-text-muted)',
             letterSpacing: '-0.02em',
@@ -125,7 +125,7 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({ metric }) => {
       <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.25, my: 1.25 }}>
         <Typography
           sx={{
-            fontSize: '27.3px',
+            fontSize: '26px',
             fontWeight: 700,
             color: 'var(--mac-text-primary)',
             letterSpacing: '-0.8px',
@@ -140,7 +140,7 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({ metric }) => {
             sx={{
               backgroundColor: 'var(--mac-success-bg)',
               color: 'var(--mac-success-text)',
-              fontSize: '9.6px',
+              fontSize: '9px',
               fontWeight: 700,
               padding: '4px 8px',
               borderRadius: '999px',
@@ -152,7 +152,7 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({ metric }) => {
       </Box>
 
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
-        <Typography sx={{ fontSize: '10.4px', color: 'var(--mac-text-secondary)' }}>
+        <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-secondary)' }}>
           {metric.subtitle}
         </Typography>
         <ChevronRightIcon

@@ -13,11 +13,9 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
-  Button,
 } from '@mui/material';
 import DescriptionIcon from '@mui/icons-material/Description';
 import FolderZipIcon from '@mui/icons-material/FolderZip';
-import RefreshIcon from '@mui/icons-material/Refresh';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 
 import { TodaApplicationRecord } from '../mockData/adminData';
@@ -27,6 +25,7 @@ import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
 import { DocumentPreviewModal } from '../components/admin/DocumentPreviewModal';
+import { TableEmptyState } from '../components/common/TableEmptyState';
 import {
   fetchTodaApplications,
   approveTodaApplication,
@@ -439,34 +438,18 @@ export const TodaApplicationsPage: React.FC = () => {
                 </TableRow>
               ))
             ) : (
-              <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-                    <AccountBalanceIcon sx={{ fontSize: '35.3', color: 'var(--mac-border-color)' }} />
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
-                      No TODA accreditation applications found
-                    </Typography>
-                    <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
-                      {searchQuery || statusFilter !== 'All'
-                        ? 'No records match your active search or filter parameters. Try clearing your filters.'
-                        : 'There are currently no TODA accreditation requests pending.'}
-                    </Typography>
-                    <Button
-                      onClick={loadApplications}
-                      startIcon={<RefreshIcon />}
-                      sx={{
-                        mt: 1,
-                        textTransform: 'none',
-                        fontSize: '10.8px',
-                        color: 'var(--sakay-orange)',
-                        fontWeight: 600,
-                      }}
-                    >
-                      Refresh
-                    </Button>
-                  </Box>
-                </TableCell>
-              </TableRow>
+              <TableEmptyState
+                colSpan={6}
+                icon={<AccountBalanceIcon />}
+                title="No TODA accreditation applications found"
+                description={
+                  searchQuery || statusFilter !== 'All'
+                    ? 'No records match your active search or filter parameters. Try clearing your filters.'
+                    : 'New TODA accreditation applications will appear here once organizations submit their applications.'
+                }
+                onRefresh={loadApplications}
+                isRefreshing={isLoading}
+              />
             )}
           </TableBody>
         </Table>

@@ -22,6 +22,7 @@ import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { TodaDetailModal } from '../components/admin/TodaDetailModal';
+import { TableEmptyState } from '../components/common/TableEmptyState';
 import { fetchAccreditedTodas } from '../services/adminApiService';
 
 /**
@@ -255,34 +256,18 @@ export const AccreditedTodasPage: React.FC = () => {
                 </TableRow>
               ))
             ) : (
-              <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-                    <AccountBalanceIcon sx={{ fontSize: '35.3', color: 'var(--mac-border-color)' }} />
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
-                      No accredited TODAs found
-                    </Typography>
-                    <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
-                      {searchQuery || statusFilter !== 'All'
-                        ? 'No records match your active search or filter parameters.'
-                        : 'There are currently no accredited TODAs registered yet.'}
-                    </Typography>
-                    <Button
-                      onClick={loadTodas}
-                      startIcon={<RefreshIcon />}
-                      sx={{
-                        mt: 1,
-                        textTransform: 'none',
-                        fontSize: '10.8px',
-                        color: 'var(--sakay-orange)',
-                        fontWeight: 600,
-                      }}
-                    >
-                      Refresh
-                    </Button>
-                  </Box>
-                </TableCell>
-              </TableRow>
+              <TableEmptyState
+                colSpan={7}
+                icon={<AccountBalanceIcon />}
+                title="No accredited TODAs found"
+                description={
+                  searchQuery || statusFilter !== 'All'
+                    ? 'No records match your active search or filter parameters.'
+                    : 'Accredited TODA organizations will appear here once they have been approved for municipal accreditation.'
+                }
+                onRefresh={loadTodas}
+                isRefreshing={isLoading}
+              />
             )}
           </TableBody>
         </Table>

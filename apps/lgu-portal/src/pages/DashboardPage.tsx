@@ -214,15 +214,15 @@ export const DashboardPage: React.FC = () => {
         >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '12px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Passengers
               </Typography>
               <PeopleIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
             </Box>
-            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '25px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
               {isLoading ? <CircularProgress size={20} /> : kpis.passengers.total.toLocaleString()}
             </Typography>
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
               <span style={{ fontWeight: 600, color: '#1E8E3E' }}>{kpis.passengers.active} Active</span> • {kpis.passengers.inactive} Inactive
             </Typography>
           </CardContent>
@@ -243,15 +243,15 @@ export const DashboardPage: React.FC = () => {
         >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '12px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Drivers
               </Typography>
               <DirectionsCarIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
             </Box>
-            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '25px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
               {isLoading ? <CircularProgress size={20} /> : kpis.drivers.total.toLocaleString()}
             </Typography>
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
               <span style={{ fontWeight: 600, color: '#1E8E3E' }}>{kpis.drivers.active} Verified</span> • {kpis.drivers.inactive} Other
             </Typography>
           </CardContent>
@@ -272,15 +272,15 @@ export const DashboardPage: React.FC = () => {
         >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '12px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Accredited TODAs
               </Typography>
               <AccountBalanceIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
             </Box>
-            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '25px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
               {isLoading ? <CircularProgress size={20} /> : kpis.todas.total.toLocaleString()}
             </Typography>
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
               <span style={{ fontWeight: 600, color: '#1565C0' }}>{kpis.todas.total} Active</span> • {kpis.todas.pendingReview} Pending
             </Typography>
           </CardContent>
@@ -301,15 +301,15 @@ export const DashboardPage: React.FC = () => {
         >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '12px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Completed Trips
               </Typography>
               <RouteIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
             </Box>
-            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '25px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
               {isLoading ? <CircularProgress size={20} /> : kpis.trips.total.toLocaleString()}
             </Typography>
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
               <span style={{ fontWeight: 600, color: '#1E8E3E' }}>{kpis.trips.ongoing} In Transit</span> • {kpis.trips.allBookings} Total
             </Typography>
           </CardContent>
@@ -330,15 +330,15 @@ export const DashboardPage: React.FC = () => {
         >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '12px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Pending Verifications
               </Typography>
               <AccessTimeIcon sx={{ color: '#EA580C', fontSize: 20 }} />
             </Box>
-            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: '#EA580C', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '25px', fontWeight: 700, color: '#EA580C', mb: 0.5 }}>
               {isLoading ? <CircularProgress size={20} /> : kpis.verifications.pending.toLocaleString()}
             </Typography>
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
               {kpis.todas.pendingReview} TODA • {kpis.verifications.pending - kpis.todas.pendingReview} Drivers
             </Typography>
           </CardContent>
@@ -359,15 +359,15 @@ export const DashboardPage: React.FC = () => {
         >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '12px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Open Incidents
               </Typography>
               <ReportProblemIcon sx={{ color: '#D93025', fontSize: 20 }} />
             </Box>
-            <Typography sx={{ fontSize: '26px', fontWeight: 700, color: '#D93025', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '25px', fontWeight: 700, color: '#D93025', mb: 0.5 }}>
               {isLoading ? <CircularProgress size={20} /> : kpis.incidents.open.toLocaleString()}
             </Typography>
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
               {kpis.incidents.total} Total Complaints
             </Typography>
           </CardContent>
