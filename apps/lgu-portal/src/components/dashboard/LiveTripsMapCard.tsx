@@ -56,9 +56,9 @@ export const LiveTripsMapCard: React.FC<LiveTripsMapCardProps> = ({ ongoingTrips
         overflow: 'hidden',
       }}
     >
-      {/* Header & Subtitle Block */}
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2.5 }}>
-        <Box>
+      {/* Header & Subtitle Block with exactly 8px gap (1 in MUI = 8px) */}
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1, mb: 2.5 }}>
+        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
           <Typography sx={{ fontSize: '17px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
             Live Trips & Fleet Map
           </Typography>
@@ -81,6 +81,8 @@ export const LiveTripsMapCard: React.FC<LiveTripsMapCardProps> = ({ ongoingTrips
             textTransform: 'none',
             border: '1px solid var(--mac-border-color)',
             boxShadow: 'var(--mac-shadow-subtle)',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
             transition: 'var(--mac-transition-fast)',
             '&:hover': {
               backgroundColor: 'var(--sakay-orange-soft)',
@@ -93,16 +95,19 @@ export const LiveTripsMapCard: React.FC<LiveTripsMapCardProps> = ({ ongoingTrips
         </Button>
       </Box>
 
-      {/* Map Surface */}
+      {/* Map Surface with specified Corner Treatment */}
       <Box
         sx={{
           flex: 1,
           minHeight: 230,
           width: '100%',
-          borderRadius: 'var(--mac-radius-md)',
+          borderRadius: '0 0 8px 8px', // Top: square, Bottom: subtle rounding
           overflow: 'hidden',
           position: 'relative',
           border: '1px solid var(--mac-border-subtle)',
+          '& .leaflet-container': {
+            borderRadius: '0 0 8px 8px !important',
+          },
         }}
       >
         <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
@@ -133,7 +138,7 @@ export const LiveTripsMapCard: React.FC<LiveTripsMapCardProps> = ({ ongoingTrips
             }}
           />
           <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-            {ongoingTripsCount > 0 ? `Active Trips (${ongoingTripsCount})` : 'No Active Trips in Transit'}
+            {ongoingTripsCount > 0 ? `Active Trips (${ongoingTripsCount})` : 'Live Calapan City Transportation Transit Map (0 Active)'}
           </Typography>
         </Box>
       </Box>

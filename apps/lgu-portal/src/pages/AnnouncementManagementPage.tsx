@@ -52,7 +52,7 @@ import {
  */
 export const AnnouncementManagementPage: React.FC = () => {
   // State: Broadcast bulletins list and filter options
-  const [announcements, setAnnouncements] = useState<AnnouncementRecord[]>(MOCK_ANNOUNCEMENTS);
+  const [announcements, setAnnouncements] = useState<AnnouncementRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
@@ -81,12 +81,12 @@ export const AnnouncementManagementPage: React.FC = () => {
     let isMounted = true;
     fetchAnnouncements()
       .then((data) => {
-        if (isMounted && data && data.length > 0) {
-          setAnnouncements(data);
+        if (isMounted) {
+          setAnnouncements(data || []);
         }
       })
       .catch((err) => {
-        console.warn('[AnnouncementManagement] Failed to fetch announcements, using fallback:', err);
+        console.warn('[AnnouncementManagement] Failed to fetch announcements:', err);
       })
       .finally(() => {
         if (isMounted) setIsLoading(false);
@@ -267,21 +267,21 @@ export const AnnouncementManagementPage: React.FC = () => {
           mb: 3.5,
         }}
       >
-        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Total Announcements</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>{totalCount}</Typography>
+        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '16px 20px', boxShadow: 'var(--mac-shadow-card)' }}>
+          <Typography sx={{ fontSize: '10.4px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Total Announcements</Typography>
+          <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>{totalCount}</Typography>
         </Box>
-        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Active Broadcasts</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: '#2E7D32' }}>{publishedCount}</Typography>
+        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '16px 20px', boxShadow: 'var(--mac-shadow-card)' }}>
+          <Typography sx={{ fontSize: '10.4px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Active Broadcasts</Typography>
+          <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#2E7D32' }}>{publishedCount}</Typography>
         </Box>
-        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>TODA Scoped Notices</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: '#1565C0' }}>{todaScopedCount}</Typography>
+        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '16px 20px', boxShadow: 'var(--mac-shadow-card)' }}>
+          <Typography sx={{ fontSize: '10.4px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>TODA Scoped Notices</Typography>
+          <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#1565C0' }}>{todaScopedCount}</Typography>
         </Box>
-        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Drafts / Scheduled</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: 'var(--sakay-orange)' }}>{draftCount}</Typography>
+        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '16px 20px', boxShadow: 'var(--mac-shadow-card)' }}>
+          <Typography sx={{ fontSize: '10.4px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Drafts / Scheduled</Typography>
+          <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: 'var(--sakay-orange)' }}>{draftCount}</Typography>
         </Box>
       </Box>
 
@@ -334,7 +334,7 @@ export const AnnouncementManagementPage: React.FC = () => {
             padding: '0 24px',
             borderRadius: 'var(--mac-radius-lg)',
             textTransform: 'none',
-            fontSize: '14px',
+            fontSize: '11.3px',
             fontWeight: 600,
             backgroundColor: 'var(--sakay-orange)',
             color: '#FFFFFF',
@@ -368,12 +368,12 @@ export const AnnouncementManagementPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ANNOUNCEMENT TITLE & MESSAGE</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TARGET AUDIENCE</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TODA / JURISDICTION</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>STATUS</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>CREATED BY & DATE</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACTIONS</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ANNOUNCEMENT TITLE & MESSAGE</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TARGET AUDIENCE</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TODA / JURISDICTION</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>STATUS</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>CREATED BY & DATE</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACTIONS</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -389,12 +389,12 @@ export const AnnouncementManagementPage: React.FC = () => {
                     }}
                   >
                     <TableCell sx={{ py: 2.2, px: 3, maxWidth: 360 }}>
-                      <Typography sx={{ fontWeight: 600, fontSize: '14.5px', color: 'var(--mac-text-primary)' }}>
+                      <Typography sx={{ fontWeight: 600, fontSize: '11.6px', color: 'var(--mac-text-primary)' }}>
                         {ann.title}
                       </Typography>
                       <Typography
                         sx={{
-                          fontSize: '12.5px',
+                          fontSize: '10px',
                           color: 'var(--mac-text-muted)',
                           mt: '4px',
                           overflow: 'hidden',
@@ -410,7 +410,7 @@ export const AnnouncementManagementPage: React.FC = () => {
                         label={ann.target_role === 'All' ? 'All Platform Users' : `${ann.target_role}s`}
                         size="small"
                         sx={{
-                          fontSize: '12px',
+                          fontSize: '9.6px',
                           fontWeight: 600,
                           backgroundColor: roleBadge.bg,
                           color: roleBadge.color,
@@ -418,17 +418,17 @@ export const AnnouncementManagementPage: React.FC = () => {
                         }}
                       />
                     </TableCell>
-                    <TableCell sx={{ fontSize: '13.5px', color: 'var(--mac-text-secondary)', py: 2.2, px: 3 }}>
+                    <TableCell sx={{ fontSize: '10.8px', color: 'var(--mac-text-secondary)', py: 2.2, px: 3 }}>
                       {ann.toda_name || 'City-Wide'}
                     </TableCell>
                     <TableCell sx={{ py: 2.2, px: 3 }}>
                       <StatusBadge status={ann.is_published ? 'Published' : 'Draft'} />
                     </TableCell>
                     <TableCell sx={{ py: 2.2, px: 3 }}>
-                      <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-primary)', fontWeight: 500 }}>
+                      <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-primary)', fontWeight: 500 }}>
                         {ann.created_by_lgu_admin.split('(')[0]}
                       </Typography>
-                      <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mt: '2px' }}>
+                      <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mt: '2px' }}>
                         {ann.created_at}
                       </Typography>
                     </TableCell>
@@ -446,10 +446,16 @@ export const AnnouncementManagementPage: React.FC = () => {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
-                  <Typography sx={{ fontSize: '15px', color: 'var(--mac-text-muted)', fontWeight: 500 }}>
-                    No announcements found matching your filters.
-                  </Typography>
+                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
+                    <CampaignIcon sx={{ fontSize: 36, color: 'var(--mac-border-color)' }} />
+                    <Typography sx={{ fontSize: '15px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+                      No announcements yet.
+                    </Typography>
+                    <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
+                      New LGU announcements will appear here when they are published.
+                    </Typography>
+                  </Box>
                 </TableCell>
               </TableRow>
             )}
@@ -527,7 +533,7 @@ export const AnnouncementManagementPage: React.FC = () => {
               </FormControl>
             ) : (
               <Box sx={{ display: 'flex', alignItems: 'center', backgroundColor: '#F8F9FA', padding: '0 16px', borderRadius: '10px', border: '1px solid var(--mac-border-color)' }}>
-                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>
+                <Typography sx={{ fontSize: '10.4px', color: 'var(--mac-text-muted)' }}>
                   Jurisdiction: <strong>City-Wide (All Sectors)</strong>
                 </Typography>
               </Box>
@@ -535,7 +541,7 @@ export const AnnouncementManagementPage: React.FC = () => {
           </Box>
 
           <Box sx={{ backgroundColor: '#FAFAFC', padding: '16px 20px', borderRadius: '10px', border: '1px solid var(--mac-border-color)' }}>
-            <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)', mb: 1 }}>
+            <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-primary)', mb: 1 }}>
               Broadcast Publishing Schedule
             </Typography>
             <RadioGroup
@@ -573,32 +579,32 @@ export const AnnouncementManagementPage: React.FC = () => {
         >
           <Box sx={{ mb: 3 }}>
             <Box sx={{ backgroundColor: '#FAFAFC', padding: '20px', borderRadius: '12px', border: '1px solid var(--mac-border-color)', mb: 3 }}>
-              <Typography sx={{ fontSize: '14.5px', color: 'var(--mac-text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+              <Typography sx={{ fontSize: '11.6px', color: 'var(--mac-text-primary)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                 "{selectedAnn.message}"
               </Typography>
             </Box>
 
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2, backgroundColor: '#F5F5F7', padding: '18px', borderRadius: '12px', mb: 3 }}>
               <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Target Audience</Typography>
-                <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedAnn.target_role}</Typography>
+                <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Target Audience</Typography>
+                <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedAnn.target_role}</Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>TODA Scope</Typography>
-                <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedAnn.toda_name || 'City-Wide'}</Typography>
+                <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>TODA Scope</Typography>
+                <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedAnn.toda_name || 'City-Wide'}</Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Author / Officer</Typography>
-                <Typography sx={{ fontSize: '14px', fontWeight: 500, color: 'var(--mac-text-primary)' }}>{selectedAnn.created_by_lgu_admin}</Typography>
+                <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Author / Officer</Typography>
+                <Typography sx={{ fontSize: '11.3px', fontWeight: 500, color: 'var(--mac-text-primary)' }}>{selectedAnn.created_by_lgu_admin}</Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Timestamp</Typography>
-                <Typography sx={{ fontSize: '14px', fontWeight: 500, color: 'var(--mac-text-primary)' }}>{selectedAnn.created_at}</Typography>
+                <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Timestamp</Typography>
+                <Typography sx={{ fontSize: '11.3px', fontWeight: 500, color: 'var(--mac-text-primary)' }}>{selectedAnn.created_at}</Typography>
               </Box>
             </Box>
 
             {/* Actions Bar */}
-            <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1.5 }}>
+            <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1.5 }}>
               Publication Controls
             </Typography>
 
@@ -606,10 +612,10 @@ export const AnnouncementManagementPage: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                 {selectedAnn.is_published ? <PublishIcon sx={{ color: '#2E7D32' }} /> : <UnpublishedIcon sx={{ color: '#EA580C' }} />}
                 <Box>
-                  <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                  <Typography sx={{ fontSize: '11.3px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                     {selectedAnn.is_published ? 'Currently Active on Mobile PWAs' : 'Unpublished (Hidden from Users)'}
                   </Typography>
-                  <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+                  <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
                     {selectedAnn.is_published ? 'Commuters and drivers can view this broadcast.' : 'Save changes or publish to make visible.'}
                   </Typography>
                 </Box>
@@ -631,7 +637,7 @@ export const AnnouncementManagementPage: React.FC = () => {
                   startIcon={<EditIcon fontSize="small" />}
                   sx={{
                     height: 34,
-                    fontSize: '12.5px',
+                    fontSize: '10px',
                     textTransform: 'none',
                     fontWeight: 600,
                     borderRadius: '8px',
@@ -650,7 +656,7 @@ export const AnnouncementManagementPage: React.FC = () => {
                   size="small"
                   sx={{
                     height: 34,
-                    fontSize: '12.5px',
+                    fontSize: '10px',
                     textTransform: 'none',
                     fontWeight: 600,
                     borderRadius: '8px',
@@ -670,7 +676,7 @@ export const AnnouncementManagementPage: React.FC = () => {
                   startIcon={<DeleteIcon fontSize="small" />}
                   sx={{
                     height: 34,
-                    fontSize: '12.5px',
+                    fontSize: '10px',
                     textTransform: 'none',
                     fontWeight: 600,
                     borderRadius: '8px',
@@ -699,3 +705,4 @@ export const AnnouncementManagementPage: React.FC = () => {
     </Box>
   );
 };
+

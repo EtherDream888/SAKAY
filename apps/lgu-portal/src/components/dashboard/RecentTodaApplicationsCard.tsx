@@ -36,31 +36,44 @@ export const RecentTodaApplicationsCard: React.FC<RecentTodaApplicationsCardProp
         height: '100%',
       }}
     >
-      {/* Header & Subtitle Block */}
+      {/* Header & Subtitle Block matching Recent Incident Reports */}
       <Box sx={{ mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography sx={{ fontSize: '17px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-            Recent TODA Applications
-          </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <Box>
+            <Typography sx={{ fontSize: '17px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+              Recent TODA Applications
+            </Typography>
+            <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', mt: '3px' }}>
+              Recent TODA accreditation requests.
+            </Typography>
+          </Box>
+
           <Button
             onClick={() => navigate('/toda-applications')}
             size="small"
             sx={{
-              fontSize: '13px',
-              textTransform: 'none',
-              color: 'var(--mac-text-muted)',
+              height: 38,
+              padding: '0 18px',
+              borderRadius: '9px',
+              backgroundColor: '#FFFFFF',
+              color: 'var(--mac-text-primary)',
+              fontSize: '14px',
               fontWeight: 500,
-              padding: 0,
-              minWidth: 'auto',
-              '&:hover': { color: 'var(--sakay-orange)', backgroundColor: 'transparent' },
+              textTransform: 'none',
+              border: '1px solid var(--mac-border-color)',
+              boxShadow: 'var(--mac-shadow-subtle)',
+              transition: 'var(--mac-transition-fast)',
+              flexShrink: 0,
+              '&:hover': {
+                backgroundColor: 'var(--sakay-orange-soft)',
+                color: 'var(--sakay-orange)',
+                borderColor: 'var(--sakay-orange-border)',
+              },
             }}
           >
             View all
           </Button>
         </Box>
-        <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', mt: '3px' }}>
-          Recent TODA accreditation requests.
-        </Typography>
       </Box>
 
       {/* List Items or Empty State */}
@@ -115,8 +128,8 @@ export const RecentTodaApplicationsCard: React.FC<RecentTodaApplicationsCardProp
             </Box>
           ))}
         </Box>
-
       ) : (
+        /* Empty State */
         <Box
           sx={{
             display: 'flex',
@@ -125,15 +138,28 @@ export const RecentTodaApplicationsCard: React.FC<RecentTodaApplicationsCardProp
             justifyContent: 'center',
             flexGrow: 1,
             py: 5,
-            gap: 1,
+            gap: 1.5,
           }}
         >
-          <AccountBalanceIcon sx={{ fontSize: 38, color: 'var(--mac-border-color)' }} />
-          <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-            No Pending TODA Applications
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: '12px',
+              backgroundColor: 'var(--sakay-orange-soft)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--sakay-orange)',
+            }}
+          >
+            <AccountBalanceIcon fontSize="medium" />
+          </Box>
+          <Typography sx={{ fontSize: '15px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+            No TODA applications yet.
           </Typography>
           <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', textAlign: 'center', maxWidth: 300 }}>
-            All association applications are currently reviewed and processed.
+            New TODA applications will appear here after organizations submit their registration.
           </Typography>
         </Box>
       )}

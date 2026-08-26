@@ -112,10 +112,10 @@ export const AnalyticsPage: React.FC = () => {
       {/* 1. Header Toolbar */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3.5, flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography sx={{ fontSize: '20px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+          <Typography sx={{ fontSize: '16px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
             Transportation Operations Analytics
           </Typography>
-          <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', mt: '3px' }}>
+          <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', mt: '3px' }}>
             Descriptive analytics and geospatial demand models for Calapan City
           </Typography>
         </Box>
@@ -142,17 +142,17 @@ export const AnalyticsPage: React.FC = () => {
         <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Trip Fulfillment Rate
               </Typography>
-              <TrendingUpIcon sx={{ color: '#2E7D32', fontSize: 20 }} />
+              <TrendingUpIcon sx={{ color: '#2E7D32', fontSize: '16' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#2E7D32', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#2E7D32', mb: 0.5 }}>
               {summary.totalBookings > 0
                 ? Math.round((summary.completedTrips / summary.totalBookings) * 100)
                 : 100}%
             </Typography>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
               Completed without cancellation
             </Typography>
           </CardContent>
@@ -161,15 +161,15 @@ export const AnalyticsPage: React.FC = () => {
         <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Driver Workforce Utilization
               </Typography>
-              <SpeedIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
+              <SpeedIcon sx={{ color: 'var(--sakay-orange)', fontSize: '16' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: 'var(--sakay-orange)', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: 'var(--sakay-orange)', mb: 0.5 }}>
               {summary.activeDrivers > 0 ? '84%' : '0%'}
             </Typography>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
               Online shift engagement
             </Typography>
           </CardContent>
@@ -178,15 +178,15 @@ export const AnalyticsPage: React.FC = () => {
         <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Ride-Sharing Adoption
               </Typography>
-              <PeopleIcon sx={{ color: '#1565C0', fontSize: 20 }} />
+              <PeopleIcon sx={{ color: '#1565C0', fontSize: '16' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#1565C0', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#1565C0', mb: 0.5 }}>
               38%
             </Typography>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
               Shared rides vs Solo rides
             </Typography>
           </CardContent>
@@ -195,15 +195,15 @@ export const AnalyticsPage: React.FC = () => {
         <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Average Trip Tariff
               </Typography>
-              <TimelineIcon sx={{ color: '#6A1B9A', fontSize: 20 }} />
+              <TimelineIcon sx={{ color: '#6A1B9A', fontSize: '16' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#6A1B9A', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#6A1B9A', mb: 0.5 }}>
               ₱{summary.averageFare > 0 ? summary.averageFare : 15}.00
             </Typography>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
               Calapan tariff benchmark
             </Typography>
           </CardContent>
@@ -222,8 +222,8 @@ export const AnalyticsPage: React.FC = () => {
         }}
       >
         <Box sx={{ p: '16px 20px', borderBottom: '1px solid var(--mac-border-color)', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <MapIcon sx={{ color: 'var(--sakay-orange)', fontSize: 22 }} />
-          <Typography sx={{ fontSize: '15px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+          <MapIcon sx={{ color: 'var(--sakay-orange)', fontSize: '17.6' }} />
+          <Typography sx={{ fontSize: '12px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
             Geospatial Demand Hotspot Map (Calapan City Transit Corridors)
           </Typography>
         </Box>
@@ -232,3 +232,4 @@ export const AnalyticsPage: React.FC = () => {
     </Box>
   );
 };
+

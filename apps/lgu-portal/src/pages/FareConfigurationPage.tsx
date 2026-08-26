@@ -178,7 +178,7 @@ export const FareConfigurationPage: React.FC = () => {
       </Box>
 
       {/* 2. Active Fare Matrix & Derived Formulas Split Grid */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 3, mb: 4, alignItems: 'stretch' }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 3, mb: 4, alignItems: 'start' }}>
         {/* Active Fare Matrix Card */}
         <Card
           sx={{

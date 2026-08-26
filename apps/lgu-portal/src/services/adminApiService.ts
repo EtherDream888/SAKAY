@@ -231,10 +231,59 @@ export async function fetchTodaApplications(): Promise<TodaApplicationRecord[]> 
       return [];
     }
 
-    return data.map((row: any) => {
+    const applications = await Promise.all(data.map(async (row: any) => {
       const isOverdue = row.created_at
         ? Date.now() - new Date(row.created_at).getTime() > 5 * 24 * 60 * 60 * 1000
         : false;
+
+      // Create signed URLs for documents if they exist
+      let bcUrl = null;
+      let adUrl = null;
+      if (row.barangay_clearance_url) {
+        const { data: bcData } = await supabase.storage.from('barangay-clearances').createSignedUrl(row.barangay_clearance_url, 3600);
+        bcUrl = bcData?.signedUrl;
+      }
+      if (row.accredited_drivers_url) {
+        const { data: adData } = await supabase.storage.from('toda-accredited-driver-lists').createSignedUrl(row.accredited_drivers_url, 3600);
+        adUrl = adData?.signedUrl;
+      }
+
+      const docs = [];
+      if (row.barangay_clearance_url) {
+        docs.push({
+          name: `Barangay Clearance (${row.barangay || 'Calapan City'})`,
+          type: row.barangay_clearance_url.toLowerCase().endsWith('.pdf') ? 'PDF Document' : 'Image Verification',
+          date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '2026',
+          url: bcUrl || null,
+          status: 'Under Review',
+        });
+      } else {
+        docs.push({
+          name: `Barangay Clearance (${row.barangay || 'Calapan City'})`,
+          type: 'PDF Document (Official LGU Seal)',
+          date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '2026',
+          url: null,
+          status: 'Verified',
+        });
+      }
+
+      if (row.accredited_drivers_url) {
+        docs.push({
+          name: `Official Driver Master Roster (${row.active_driver_count || row.registered_tricycle_count || 0} Units)`,
+          type: row.accredited_drivers_url.toLowerCase().endsWith('.csv') ? 'CSV Spreadsheet' : 'Excel Spreadsheet',
+          date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '2026',
+          url: adUrl || null,
+          status: 'Under Review',
+        });
+      } else {
+        docs.push({
+          name: `Official Driver Master Roster (${row.active_driver_count || row.registered_tricycle_count || 0} Units)`,
+          type: 'Master Roster Ledger',
+          date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '2026',
+          url: null,
+          status: 'Verified',
+        });
+      }
 
       return {
         id: row.toda_id,
@@ -260,12 +309,13 @@ export async function fetchTodaApplications(): Promise<TodaApplicationRecord[]> 
         submittedDate: row.created_at
           ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
           : 'Recent',
-        status:
+        status: (
           row.account_status === 'Active'
             ? 'Approved'
             : row.account_status === 'Deactivated'
             ? 'Declined'
-            : 'Pending',
+            : 'Pending'
+        ) as 'Approved' | 'Declined' | 'Pending',
         isOverdue5Days: isOverdue && row.account_status !== 'Active',
         officers: {
           president: row.president_name || 'N/A',
@@ -277,42 +327,10 @@ export async function fetchTodaApplications(): Promise<TodaApplicationRecord[]> 
           treasurer: row.treasurer_name || 'N/A',
           treasurerContact: row.treasurer_contact || 'N/A',
         },
-        documents: [
-          {
-            name: `Barangay Clearance (${row.barangay || 'Calapan City'})`,
-            type: 'PDF Document (Official LGU Seal)',
-            date: row.created_at
-              ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-              : '2026',
-            url: null,
-            status: 'Verified',
-          },
-          {
-            name: 'SEC / CDA Certificate of Registration',
-            type: 'Certified True Copy',
-            date: row.date_established || '2024',
-            url: null,
-            status: 'Verified',
-          },
-          {
-            name: `Official Driver Master Roster (${row.active_driver_count || row.registered_tricycle_count || 0} Units)`,
-            type: 'Master Roster Ledger (PDF)',
-            date: row.created_at
-              ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-              : '2026',
-            url: null,
-            status: 'Verified',
-          },
-          {
-            name: "Mayor's Permit & Franchise Clearance",
-            type: 'Official Municipal Permit',
-            date: '2026',
-            url: null,
-            status: 'Verified',
-          },
-        ],
+        documents: docs,
       };
-    });
+    }));
+    return applications;
   } catch (err) {
     console.error('[adminApiService] fetchTodaApplications error:', err);
     return [];
@@ -341,7 +359,7 @@ export async function approveTodaApplication(applicationId: string, remarks?: st
       certificate_number: certNo,
       certificate_expiry: certExpiry,
     })
-    .eq('toda_id', applicationId)
+    .eq('id', applicationId)
     .select()
     .single();
 

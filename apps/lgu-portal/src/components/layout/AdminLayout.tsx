@@ -46,7 +46,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, pageTitle, p
             flex: 1,
             overflowY: 'auto',
             overflowX: 'hidden',
-            padding: { xs: '20px', md: '28px', lg: '32px' },
+            padding: { xs: '16px', md: '22px', lg: '24px' },
             backgroundColor: '#FFF8F2',
           }}
         >
@@ -56,3 +56,4 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children, pageTitle, p
     </Box>
   );
 };
+

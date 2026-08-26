@@ -146,25 +146,25 @@ export const DriverManagementPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 DRIVER & CREDENTIALS
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 TODA AFFILIATION
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 FRANCHISE & PLATE
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 ONLINE SESSION
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 VERIFICATION
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 ACCOUNT STATUS
               </TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 ACTIONS
               </TableCell>
             </TableRow>
@@ -174,7 +174,7 @@ export const DriverManagementPage: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
                   <CircularProgress size={32} sx={{ color: 'var(--sakay-orange)', mb: 1.5 }} />
-                  <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-muted)' }}>
+                  <Typography sx={{ fontSize: '11.3px', color: 'var(--mac-text-muted)' }}>
                     Loading driver records...
                   </Typography>
                 </TableCell>
@@ -196,7 +196,7 @@ export const DriverManagementPage: React.FC = () => {
                           height: 38,
                           backgroundColor: 'var(--sakay-orange-soft)',
                           color: 'var(--sakay-orange)',
-                          fontSize: '14px',
+                          fontSize: '11.3px',
                           fontWeight: 600,
                         }}
                       >
@@ -204,36 +204,36 @@ export const DriverManagementPage: React.FC = () => {
                       </Avatar>
                       <Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <Typography sx={{ fontWeight: 600, fontSize: '14.5px', color: 'var(--mac-text-primary)' }}>
+                          <Typography sx={{ fontWeight: 600, fontSize: '11.6px', color: 'var(--mac-text-primary)' }}>
                             {driver.name}
                           </Typography>
                           {driver.isOverdue5Days && (
                             <Chip
                               label="Overdue >5 Days"
                               size="small"
-                              sx={{ fontSize: '11px', fontWeight: 600, backgroundColor: '#FEE2E2', color: '#DC2626', height: 22 }}
+                              sx={{ fontSize: '8.8px', fontWeight: 600, backgroundColor: '#FEE2E2', color: '#DC2626', height: 22 }}
                             />
                           )}
                         </Box>
-                        <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)', mt: '2px' }}>
+                        <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)', mt: '2px' }}>
                           License: {driver.licenseNo} • Tel: {driver.phone}
                         </Typography>
                       </Box>
                     </Box>
                   </TableCell>
-                  <TableCell sx={{ fontSize: '14px', color: 'var(--mac-text-primary)', py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-primary)' }}>
+                  <TableCell sx={{ fontSize: '11.3px', color: 'var(--mac-text-primary)', py: 2.2, px: 3 }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: '11.3px', color: 'var(--mac-text-primary)' }}>
                       {driver.todaName}
                     </Typography>
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+                    <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
                       Brgy. {driver.barangay}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontSize: '10.8px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                       MTOP: {driver.mtopNo}
                     </Typography>
-                    <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-secondary)', mt: '2px' }}>
+                    <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-secondary)', mt: '2px' }}>
                       Plate: {driver.vehiclePlate}
                     </Typography>
                   </TableCell>
@@ -247,7 +247,7 @@ export const DriverManagementPage: React.FC = () => {
                           backgroundColor: driver.onlineStatus === 'Online' ? '#34A853' : '#9AA0A6',
                         }}
                       />
-                      <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-secondary)' }}>
+                      <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-secondary)' }}>
                         {driver.onlineStatus}
                       </Typography>
                     </Box>
@@ -273,11 +273,11 @@ export const DriverManagementPage: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-                    <DirectionsCarIcon sx={{ fontSize: 44, color: 'var(--mac-border-color)' }} />
-                    <Typography sx={{ fontSize: '15px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
+                    <DirectionsCarIcon sx={{ fontSize: '35.3', color: 'var(--mac-border-color)' }} />
+                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
                       No driver records found
                     </Typography>
-                    <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
+                    <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
                       {searchQuery || verificationFilter !== 'All' || onlineFilter !== 'All'
                         ? 'No records match your active search or filter criteria.'
                         : 'There are currently no driver accounts registered yet.'}
@@ -288,7 +288,7 @@ export const DriverManagementPage: React.FC = () => {
                       sx={{
                         mt: 1,
                         textTransform: 'none',
-                        fontSize: '13.5px',
+                        fontSize: '10.8px',
                         color: 'var(--sakay-orange)',
                         fontWeight: 600,
                       }}
@@ -315,3 +315,5 @@ export const DriverManagementPage: React.FC = () => {
     </Box>
   );
 };
+
+

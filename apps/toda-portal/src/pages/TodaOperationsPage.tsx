@@ -12,6 +12,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Alert,
 } from '@mui/material';
 import ShieldIcon from '@mui/icons-material/Shield';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
@@ -90,7 +91,9 @@ export const TodaOperationsPage: React.FC = () => {
         supportingText={`Operational monitoring and fleet availability for ${profile?.name || 'TODA Association'} (${profile?.acronym || 'TODA'})`}
       />
 
-      {/* 2. Supervisory Standing Banner & Compliance Indicators */}
+
+
+      {/* 3. Supervisory Standing Banner & Compliance Indicators */}
       <Box sx={{ mb: 3.5 }}>
         <Box
           sx={{
@@ -111,7 +114,7 @@ export const TodaOperationsPage: React.FC = () => {
                 Accreditation Status — {profile?.name || 'TODA Association'}
               </Typography>
               <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mt: '2px' }}>
-                Accreditation Permit #{profile?.accreditationNo || 'CAL-TODA-2024-001'} is active.
+                Accreditation Permit #{profile?.accreditationNo || 'CAL-TODA-2024-001'} is {profile?.accreditationStatus === 'Active' ? 'active' : 'currently pending'}.
               </Typography>
             </Box>
           </Box>

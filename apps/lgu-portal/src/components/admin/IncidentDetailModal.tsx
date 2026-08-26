@@ -75,12 +75,12 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
               gap: 2,
             }}
           >
-            <WarningAmberIcon sx={{ color: '#EA580C', fontSize: 24, flexShrink: 0 }} />
+            <WarningAmberIcon sx={{ color: '#EA580C', fontSize: '19.3', flexShrink: 0 }} />
             <Box>
-              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: '#9A3412', mb: '2px' }}>
+              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: '#9A3412', mb: '2px' }}>
                 Supervisory Review Warning: Driver Has {incident.relatedIncidentsCount} Related Complaints
               </Typography>
-              <Typography sx={{ fontSize: '13px', color: '#C2410C' }}>
+              <Typography sx={{ fontSize: '10.4px', color: '#C2410C' }}>
                 Driver {incident.driverName} ({incident.todaName}) has accumulated 3 or more incident reports within the past 30 days.
               </Typography>
             </Box>
@@ -101,19 +101,19 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
           }}
         >
           <Box>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Incident Category</Typography>
-            <Typography sx={{ fontSize: '15px', fontWeight: 700, color: 'var(--sakay-orange)' }}>{incident.category}</Typography>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Incident Category</Typography>
+            <Typography sx={{ fontSize: '12px', fontWeight: 700, color: 'var(--sakay-orange)' }}>{incident.category}</Typography>
           </Box>
           <Box>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Submitted Timestamp</Typography>
-            <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{incident.submittedDate} • {incident.submittedTime}</Typography>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Submitted Timestamp</Typography>
+            <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{incident.submittedDate} • {incident.submittedTime}</Typography>
           </Box>
           <Box>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Reported By</Typography>
-            <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{incident.reportedBy} ({incident.reporterName})</Typography>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Reported By</Typography>
+            <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{incident.reportedBy} ({incident.reporterName})</Typography>
           </Box>
           <Box>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>Current Status</Typography>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Current Status</Typography>
             <StatusBadge status={incident.status} />
           </Box>
         </Box>
@@ -122,7 +122,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
             <DescriptionIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
-            <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+            <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
               Full Written Description
             </Typography>
           </Box>
@@ -135,7 +135,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
               border: '1px solid var(--mac-border-color)',
             }}
           >
-            <Typography sx={{ fontSize: '14.5px', color: 'var(--mac-text-primary)', lineHeight: 1.6 }}>
+            <Typography sx={{ fontSize: '11.6px', color: 'var(--mac-text-primary)', lineHeight: 1.6 }}>
               "{incident.description}"
             </Typography>
           </Box>
@@ -143,7 +143,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
 
         {/* Section 3: Supporting Evidence Attachments */}
         <Box sx={{ mb: 4 }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 2, letterSpacing: '0.3px' }}>
+          <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 2, letterSpacing: '0.3px' }}>
             Submitted Supporting Evidence ({incident.evidenceFiles.length})
           </Typography>
 
@@ -163,23 +163,23 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <DescriptionIcon sx={{ color: 'var(--sakay-orange)', fontSize: 24 }} />
+                    <DescriptionIcon sx={{ color: 'var(--sakay-orange)', fontSize: '19.3' }} />
                     <Box>
-                      <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                      <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                         {file.name}
                       </Typography>
-                      <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)', mt: '2px' }}>
+                      <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)', mt: '2px' }}>
                         Attachment Format: {file.type.toUpperCase()}
                       </Typography>
                     </Box>
                   </Box>
-                  <ActionButton label="View Evidence" showArrow={false} onClick={() => setSelectedDoc(file.name)} sx={{ height: 34, fontSize: '13px' }} />
+                  <ActionButton label="View Evidence" showArrow={false} onClick={() => setSelectedDoc(file.name)} sx={{ height: 34, fontSize: '10.4px' }} />
                 </Box>
               ))}
             </Box>
           ) : (
             <Box sx={{ padding: '16px 20px', backgroundColor: '#F5F5F7', borderRadius: '10px' }}>
-              <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', fontStyle: 'italic' }}>
+              <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', fontStyle: 'italic' }}>
                 No supporting photo or video evidence was attached to this incident report.
               </Typography>
             </Box>
@@ -190,33 +190,33 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
             <RouteIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
-            <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+            <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
               Linked Trip Details
             </Typography>
           </Box>
 
           <Box sx={{ backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography sx={{ fontSize: '15px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+              <Typography sx={{ fontSize: '12px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
                 Trip Ref: {incident.tripId} (Booking {incident.bookingId})
               </Typography>
               {onViewLinkedTrip && (
                 <ActionButton
                   label="View Linked Trip"
                   onClick={() => onViewLinkedTrip(incident.tripId)}
-                  sx={{ height: 32, fontSize: '12.5px' }}
+                  sx={{ height: 32, fontSize: '10px' }}
                 />
               )}
             </Box>
 
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
               <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '3px' }}>Driver</Typography>
-                <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{incident.driverName} ({incident.vehiclePlate})</Typography>
+                <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '3px' }}>Driver</Typography>
+                <Typography sx={{ fontSize: '11.3px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{incident.driverName} ({incident.vehiclePlate})</Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '3px' }}>TODA Affiliation</Typography>
-                <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{incident.todaName}</Typography>
+                <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '3px' }}>TODA Affiliation</Typography>
+                <Typography sx={{ fontSize: '11.3px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{incident.todaName}</Typography>
               </Box>
             </Box>
           </Box>
@@ -227,7 +227,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
           <Box sx={{ mb: 4 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
               <HistoryIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
-              <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+              <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                 Review Timeline & Audit Trail
               </Typography>
             </Box>
@@ -235,12 +235,12 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, backgroundColor: '#F5F5F7', padding: '18px 20px', borderRadius: '12px' }}>
               {incident.statusHistory.map((step, idx) => (
                 <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <CheckCircleIcon sx={{ color: 'var(--sakay-orange)', fontSize: 18 }} />
+                  <CheckCircleIcon sx={{ color: 'var(--sakay-orange)', fontSize: '14.4' }} />
                   <Box>
-                    <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontSize: '10.8px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                       {step.step}
                     </Typography>
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+                    <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
                       {step.timestamp} • {step.actor}
                     </Typography>
                   </Box>
@@ -252,7 +252,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
 
         {/* Section 6: Official Findings & Action Taken */}
         <Box sx={{ mb: 4 }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1.5, letterSpacing: '0.3px' }}>
+          <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1.5, letterSpacing: '0.3px' }}>
             Official LGU Investigation Findings & Action Taken
           </Typography>
           <TextField
@@ -267,7 +267,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
               borderRadius: '10px',
               '& .MuiOutlinedInput-root': {
                 borderRadius: '10px',
-                fontSize: '14px',
+                fontSize: '11.3px',
               },
             }}
           />
@@ -283,7 +283,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
                 padding: '0 20px',
                 borderRadius: '9px',
                 textTransform: 'none',
-                fontSize: '13.5px',
+                fontSize: '10.8px',
                 fontWeight: 600,
                 backgroundColor: '#1565C0',
                 color: '#FFFFFF',
@@ -302,7 +302,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
                 padding: '0 20px',
                 borderRadius: '9px',
                 textTransform: 'none',
-                fontSize: '13.5px',
+                fontSize: '10.8px',
                 fontWeight: 600,
                 borderColor: 'var(--mac-border-color)',
                 color: 'var(--mac-text-secondary)',
@@ -322,7 +322,7 @@ export const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
                 padding: '0 22px',
                 borderRadius: '9px',
                 textTransform: 'none',
-                fontSize: '13.5px',
+                fontSize: '10.8px',
                 fontWeight: 600,
                 backgroundColor: 'var(--sakay-orange)',
                 color: '#FFFFFF',

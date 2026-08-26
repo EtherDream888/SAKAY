@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Box, Typography, Avatar, IconButton, Button } from '@mui/material';
+import { Box, Typography, IconButton } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DashboardIcon from '@mui/icons-material/Dashboard';
@@ -13,20 +13,14 @@ import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import SecurityIcon from '@mui/icons-material/Security';
-import UnfoldMoreIcon from '@mui/icons-material/UnfoldMore';
 import CampaignIcon from '@mui/icons-material/Campaign';
 import StarRateIcon from '@mui/icons-material/StarRate';
 import PaidIcon from '@mui/icons-material/Paid';
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
-import LogoutIcon from '@mui/icons-material/Logout';
 
 import appIcon from '@sakay/shared/assets/icons/app-icon.png';
 import logoTextOrange from '@sakay/shared/assets/images/logo-text-orange.png';
 import { MacTooltip } from '../common/MacTooltip';
-import { StatusBadge } from '../common/StatusBadge';
-import { MacCenterModal } from '../admin/MacCenterModal';
-import { useAuth } from '../../contexts/AuthContext';
-import { CURRENT_ADMIN } from '../../mockData/adminData';
 
 interface AdminSidebarProps {
   collapsed: boolean;
@@ -50,19 +44,6 @@ interface NavGroup {
 export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleCollapse }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const { adminProfile, user, signOut } = useAuth();
-
-  const adminName = adminProfile?.full_name || user?.email || CURRENT_ADMIN.name;
-  const adminRole = adminProfile?.position || 'LGU Administrator';
-  const adminEmail = adminProfile?.email || user?.email || CURRENT_ADMIN.email;
-  const adminId = adminProfile?.admin_id ? `ADM-${adminProfile.admin_id.slice(0, 8).toUpperCase()}` : CURRENT_ADMIN.id;
-
-  const handleSignOut = async () => {
-    setProfileModalOpen(false);
-    await signOut();
-    navigate('/login', { replace: true });
-  };
 
   const navGroups: NavGroup[] = [
     {
@@ -74,7 +55,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
     {
       groupTitle: 'MANAGEMENT',
       items: [
-        { id: 'toda-applications', label: 'TODA Applications', path: '/toda-applications', icon: <AssignmentIcon fontSize="small" />, badge: 12, badgeType: 'orange' },
+        { id: 'toda-applications', label: 'TODA Applications', path: '/toda-applications', icon: <AssignmentIcon fontSize="small" /> },
         { id: 'accredited-todas', label: 'Accredited TODAs', path: '/accredited-todas', icon: <VerifiedUserIcon fontSize="small" /> },
         { id: 'drivers', label: 'Drivers', path: '/drivers', icon: <BadgeIcon fontSize="small" /> },
         { id: 'passengers', label: 'Passengers', path: '/passengers', icon: <PeopleIcon fontSize="small" /> },
@@ -84,8 +65,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
     {
       groupTitle: 'OPERATIONS',
       items: [
-        { id: 'live-trips', label: 'Live Trips', path: '/live-trips', icon: <NavigationIcon fontSize="small" />, badge: '●', badgeType: 'green' },
-        { id: 'incident-reports', label: 'Incident Reports', path: '/incident-reports', icon: <ReportProblemIcon fontSize="small" />, badge: 3, badgeType: 'orange' },
+        { id: 'live-trips', label: 'Live Trips', path: '/live-trips', icon: <NavigationIcon fontSize="small" /> },
+        { id: 'incident-reports', label: 'Incident Reports', path: '/incident-reports', icon: <ReportProblemIcon fontSize="small" /> },
         { id: 'announcements', label: 'Announcements', path: '/announcements', icon: <CampaignIcon fontSize="small" /> },
       ],
     },
@@ -105,7 +86,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
     {
       groupTitle: 'SYSTEM',
       items: [
-        { id: 'settings', label: 'Admin Accounts', path: '/settings', icon: <ManageAccountsIcon fontSize="small" /> },
+        { id: 'settings', label: 'Account Management', path: '/settings', icon: <ManageAccountsIcon fontSize="small" /> },
         { id: 'audit-logs', label: 'Audit Logs', path: '/audit-logs', icon: <SecurityIcon fontSize="small" /> },
       ],
     },
@@ -182,7 +163,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
             width: '100%',
           }}
         >
-          {/* App Icon — FIXED EXACT SAME SIZE (28px x 28px) ALWAYS */}
+          {/* App Icon */}
           <Box
             component="img"
             src={appIcon}
@@ -283,6 +264,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
                   location.pathname === item.path ||
                   (item.path === '/dashboard' && location.pathname === '/');
 
+                const showBadge =
+                  !collapsed &&
+                  item.badge !== undefined &&
+                  item.badge !== 0 &&
+                  item.badge !== '0';
+
                 const navContent = (
                   <Box
                     onClick={() => navigate(item.path)}
@@ -298,7 +285,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
                       flexShrink: 0,
                       margin: collapsed ? '0 auto' : 0,
                       background: isActive
-                        ? 'linear-gradient(135deg, var(--sakay-orange) 0%, #ff8a47 100%)'
+                        ? 'linear-gradient(135deg, var(--sakay-orange) 0%, var(--sakay-orange) 100%)'
                         : 'transparent',
                       color: isActive ? '#FFFFFF' : 'var(--mac-text-primary)',
                       boxShadow: isActive ? '0 10px 24px rgba(255, 107, 26, 0.22)' : 'none',
@@ -306,7 +293,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
                       overflow: 'hidden',
                       '&:hover': {
                         background: isActive
-                          ? 'linear-gradient(135deg, var(--sakay-orange-hover) 0%, #ff8b46 100%)'
+                          ? 'linear-gradient(135deg, var(--sakay-orange-hover) 0%, var(--sakay-orange-hover) 100%)'
                           : 'rgba(17, 24, 39, 0.04)',
                         transform: 'translateX(1px)',
                       },
@@ -352,8 +339,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
                       </Typography>
                     </Box>
 
-                    {/* Nav Item Badge */}
-                    {!collapsed && item.badge !== undefined && (
+                    {/* Nav Item Badge (Only rendered if count > 0) */}
+                    {showBadge && (
                       <Box
                         sx={{
                           backgroundColor:
@@ -400,205 +387,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
           </Box>
         ))}
       </Box>
-
-      {/* Footer Profile Box */}
-      <Box
-        onClick={() => setProfileModalOpen(true)}
-        sx={{
-          height: 68,
-          flexShrink: 0,
-          borderTop: '1px solid var(--mac-border-color)',
-          padding: collapsed ? 0 : '0 14px 0 12px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'space-between',
-          background: 'rgba(250,250,252,0.74)',
-          overflow: 'hidden',
-          transition: 'all 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)',
-          width: '100%',
-          cursor: 'pointer',
-          '&:hover': {
-            backgroundColor: 'var(--sakay-orange-soft)',
-            '& .MuiAvatar-root': {
-              transform: 'scale(1.06)',
-            },
-          },
-        }}
-      >
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: collapsed ? 'center' : 'flex-start',
-            width: '100%',
-            overflow: 'hidden',
-          }}
-        >
-          <Avatar
-            sx={{
-              width: 36,
-              height: 36,
-              background: 'linear-gradient(135deg, var(--sakay-orange) 0%, #ff8a47 100%)',
-              fontSize: '14px',
-              fontWeight: 700,
-              boxShadow: '0 10px 18px rgba(255, 107, 26, 0.18)',
-              flexShrink: 0,
-              transition: 'transform 0.2s ease',
-            }}
-          >
-            {adminName.charAt(0).toUpperCase()}
-          </Avatar>
-          <Box
-            sx={{
-              maxWidth: collapsed ? 0 : 180,
-              opacity: collapsed ? 0 : 1,
-              marginLeft: collapsed ? 0 : '10px',
-              overflow: 'hidden',
-              whiteSpace: 'nowrap',
-              transition: 'opacity 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), max-width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), margin-left 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)',
-            }}
-          >
-            <Typography sx={{ fontWeight: 700, fontSize: '14px', color: 'var(--mac-text-primary)', lineHeight: 1.2, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              {adminName}
-            </Typography>
-            <Typography sx={{ fontSize: '12px', color: 'var(--sakay-orange)', fontWeight: 600, lineHeight: 1.2, textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              {adminRole}
-            </Typography>
-          </Box>
-        </Box>
-        {!collapsed && (
-          <UnfoldMoreIcon
-            fontSize="small"
-            sx={{
-              color: 'var(--mac-text-muted)',
-              opacity: collapsed ? 0 : 1,
-              transition: 'opacity 0.2s ease',
-            }}
-          />
-        )}
-      </Box>
-
-      {/* Admin Profile Details macOS Centered Modal */}
-      <MacCenterModal
-        open={profileModalOpen}
-        onClose={() => setProfileModalOpen(false)}
-        title="LGU Administrator Profile"
-        subtitle="Active session credentials & role permissions for Calapan City LGU"
-        badge={<StatusBadge status="Active" />}
-        maxWidth={580}
-        primaryActionLabel="Manage Admin Accounts"
-        onPrimaryAction={() => {
-          setProfileModalOpen(false);
-          navigate('/settings');
-        }}
-        secondaryActionLabel="Close"
-        onSecondaryAction={() => setProfileModalOpen(false)}
-      >
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 2.5,
-              backgroundColor: '#FAFAFC',
-              padding: '20px',
-              borderRadius: '12px',
-              border: '1px solid var(--mac-border-color)',
-            }}
-          >
-            <Avatar
-              sx={{
-                width: 56,
-                height: 56,
-                background: 'linear-gradient(135deg, var(--sakay-orange) 0%, #ff8a47 100%)',
-                fontSize: '22px',
-                fontWeight: 700,
-                boxShadow: '0 10px 24px rgba(255, 107, 26, 0.22)',
-              }}
-            >
-              {adminName.charAt(0).toUpperCase()}
-            </Avatar>
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography sx={{ fontSize: '18px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
-                {adminName}
-              </Typography>
-              <Typography sx={{ fontSize: '13.5px', color: 'var(--sakay-orange)', fontWeight: 600, mt: '2px' }}>
-                {adminRole}
-              </Typography>
-              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mt: '2px' }}>
-                Calapan City Local Government Unit Transport Oversight
-              </Typography>
-            </Box>
-          </Box>
-
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(2, 1fr)',
-              gap: 2,
-              backgroundColor: '#F5F5F7',
-              padding: '18px 20px',
-              borderRadius: '12px',
-            }}
-          >
-            <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>
-                Administrator ID
-              </Typography>
-              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                {adminId}
-              </Typography>
-            </Box>
-
-            <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>
-                Official Municipal Email
-              </Typography>
-              <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                {adminEmail}
-              </Typography>
-            </Box>
-
-            <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>
-                Assigned Jurisdiction
-              </Typography>
-              <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                Calapan City (All Barangays)
-              </Typography>
-            </Box>
-
-            <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mb: '4px' }}>
-                Security Access Tier
-              </Typography>
-              <Typography sx={{ fontSize: '14px', fontWeight: 600, color: '#2E7D32' }}>
-                Tier 1 (LGU Executive Officer)
-              </Typography>
-            </Box>
-          </Box>
-
-          {/* Dedicated Sign Out Button */}
-          <Box sx={{ pt: 1, display: 'flex', justifyContent: 'flex-end' }}>
-            <Button
-              variant="outlined"
-              color="error"
-              onClick={handleSignOut}
-              startIcon={<LogoutIcon fontSize="small" />}
-              sx={{
-                borderRadius: '10px',
-                textTransform: 'none',
-                fontWeight: 600,
-                fontSize: '13.5px',
-                px: 2.5,
-                py: 1,
-              }}
-            >
-              Sign Out of LGU Portal
-            </Button>
-          </Box>
-        </Box>
-      </MacCenterModal>
     </Box>
   );
 };

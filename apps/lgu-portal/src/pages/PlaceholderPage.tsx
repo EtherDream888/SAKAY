@@ -43,14 +43,14 @@ export const PlaceholderPage: React.FC<PlaceholderPageProps> = ({ title, subtitl
           mb: 2.5,
         }}
       >
-        <ConstructionIcon sx={{ fontSize: 32 }} />
+        <ConstructionIcon sx={{ fontSize: '25.6' }} />
       </Box>
 
-      <Typography variant="h4" sx={{ fontWeight: 700, fontSize: '24px', color: 'var(--mac-text-primary)', mb: 1 }}>
+      <Typography variant="h4" sx={{ fontWeight: 700, fontSize: '19.3px', color: 'var(--mac-text-primary)', mb: 1 }}>
         {title}
       </Typography>
 
-      <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-secondary)', mb: 3, maxWidth: 460 }}>
+      <Typography sx={{ fontSize: '11.3px', color: 'var(--mac-text-secondary)', mb: 3, maxWidth: 460 }}>
         {subtitle}
       </Typography>
 
@@ -58,7 +58,7 @@ export const PlaceholderPage: React.FC<PlaceholderPageProps> = ({ title, subtitl
         sx={{
           backgroundColor: 'var(--mac-warning-bg)',
           color: 'var(--mac-warning-text)',
-          fontSize: '12px',
+          fontSize: '9.6px',
           fontWeight: 600,
           padding: '6px 16px',
           borderRadius: '12px',
@@ -77,7 +77,7 @@ export const PlaceholderPage: React.FC<PlaceholderPageProps> = ({ title, subtitl
           borderRadius: '8px',
           backgroundColor: 'var(--sakay-orange)',
           color: '#FFFFFF',
-          fontSize: '13px',
+          fontSize: '10.4px',
           fontWeight: 600,
           textTransform: 'none',
           '&:hover': {
@@ -90,3 +90,4 @@ export const PlaceholderPage: React.FC<PlaceholderPageProps> = ({ title, subtitl
     </Box>
   );
 };
+

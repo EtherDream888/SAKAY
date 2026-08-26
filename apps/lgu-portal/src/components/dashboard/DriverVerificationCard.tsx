@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Button } from '@mui/material';
+import BadgeIcon from '@mui/icons-material/Badge';
 
 interface SegmentData {
   label: string;
@@ -56,7 +57,6 @@ export const DriverVerificationCard: React.FC<DriverVerificationCardProps> = ({ 
     },
   ];
 
-  // SVG Donut calculation
   const size = 150;
   const strokeWidth = 22;
   const radius = (size - strokeWidth) / 2;
@@ -77,7 +77,7 @@ export const DriverVerificationCard: React.FC<DriverVerificationCardProps> = ({ 
         height: '100%',
       }}
     >
-      {/* Header & Subtitle Block */}
+      {/* Header Block */}
       <Box sx={{ mb: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <Box>
@@ -117,36 +117,24 @@ export const DriverVerificationCard: React.FC<DriverVerificationCardProps> = ({ 
         </Box>
       </Box>
 
-      {/* Horizontal Layout: Donut on Left, Legend on Right */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: 1, gap: 3, pt: 1 }}>
-        {/* Left: Donut Chart */}
-        <Box
-          sx={{
-            position: 'relative',
-            width: 165,
-            height: 165,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow: 'visible' }}>
-            {total === 0 ? (
-              <circle
-                cx={size / 2}
-                cy={size / 2}
-                r={radius}
-                fill="transparent"
-                stroke="#E5E7EB"
-                strokeWidth={strokeWidth}
-              />
-            ) : (
-              segments.map((seg, idx) => {
+      {total > 0 ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flex: 1, gap: 3, pt: 1 }}>
+          <Box
+            sx={{
+              position: 'relative',
+              width: 165,
+              height: 165,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow: 'visible' }}>
+              {segments.map((seg, idx) => {
                 const strokeDasharray = `${(seg.percentage / 100) * circumference} ${circumference}`;
                 const strokeDashoffset = -cumulativeOffset;
                 cumulativeOffset += (seg.percentage / 100) * circumference;
-
                 const isHovered = hoveredSegment?.label === seg.label;
 
                 return (
@@ -170,101 +158,133 @@ export const DriverVerificationCard: React.FC<DriverVerificationCardProps> = ({ 
                     onMouseLeave={() => setHoveredSegment(null)}
                   />
                 );
-              })
-            )}
-          </svg>
+              })}
+            </svg>
 
-          {/* Center Metric Display */}
-          <Box
-            sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              pointerEvents: 'none',
-            }}
-          >
-            <Typography
+            <Box
               sx={{
-                fontSize: '26px',
-                fontWeight: 700,
-                color: hoveredSegment ? hoveredSegment.color : 'var(--mac-text-primary)',
-                lineHeight: 1,
-                transition: 'var(--mac-transition-fast)',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'none',
               }}
             >
-              {hoveredSegment ? hoveredSegment.count : total}
-            </Typography>
-            <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', fontWeight: 500, mt: '3px' }}>
-              {hoveredSegment ? hoveredSegment.label : 'Total Drivers'}
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* Right: Legend Stack */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-          {segments.map((seg) => {
-            const isHovered = hoveredSegment?.label === seg.label;
-
-            return (
-              <Box
-                key={seg.label}
-                onMouseEnter={() => setHoveredSegment(seg)}
-                onMouseLeave={() => setHoveredSegment(null)}
+              <Typography
                 sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '6px 10px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  backgroundColor: isHovered ? 'var(--mac-canvas-bg)' : 'transparent',
-                  border: isHovered ? '1px solid var(--mac-border-color)' : '1px solid transparent',
+                  fontSize: '26px',
+                  fontWeight: 700,
+                  color: hoveredSegment ? hoveredSegment.color : 'var(--mac-text-primary)',
+                  lineHeight: 1,
                   transition: 'var(--mac-transition-fast)',
-                  transform: isHovered ? 'translateX(3px)' : 'none',
                 }}
               >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
-                  <Box
-                    sx={{
-                      width: isHovered ? 11 : 9,
-                      height: isHovered ? 11 : 9,
-                      borderRadius: '50%',
-                      backgroundColor: seg.color,
-                      flexShrink: 0,
-                      transition: 'var(--mac-transition-fast)',
-                    }}
-                  />
+                {hoveredSegment ? hoveredSegment.count : total}
+              </Typography>
+              <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', fontWeight: 500, mt: '3px' }}>
+                {hoveredSegment ? hoveredSegment.label : 'Total Drivers'}
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+            {segments.map((seg) => {
+              const isHovered = hoveredSegment?.label === seg.label;
+
+              return (
+                <Box
+                  key={seg.label}
+                  onMouseEnter={() => setHoveredSegment(seg)}
+                  onMouseLeave={() => setHoveredSegment(null)}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '6px 10px',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    backgroundColor: isHovered ? 'var(--mac-canvas-bg)' : 'transparent',
+                    border: isHovered ? '1px solid var(--mac-border-color)' : '1px solid transparent',
+                    transition: 'var(--mac-transition-fast)',
+                    transform: isHovered ? 'translateX(3px)' : 'none',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                    <Box
+                      sx={{
+                        width: isHovered ? 11 : 9,
+                        height: isHovered ? 11 : 9,
+                        borderRadius: '50%',
+                        backgroundColor: seg.color,
+                        flexShrink: 0,
+                        transition: 'var(--mac-transition-fast)',
+                      }}
+                    />
+                    <Typography
+                      sx={{
+                        fontSize: '13.5px',
+                        color: isHovered ? 'var(--mac-text-primary)' : 'var(--mac-text-secondary)',
+                        fontWeight: isHovered ? 600 : 500,
+                      }}
+                    >
+                      {seg.label}
+                    </Typography>
+                  </Box>
                   <Typography
                     sx={{
                       fontSize: '13.5px',
-                      color: isHovered ? 'var(--mac-text-primary)' : 'var(--mac-text-secondary)',
-                      fontWeight: isHovered ? 600 : 500,
+                      fontWeight: isHovered ? 700 : 600,
+                      color: isHovered ? seg.color : 'var(--mac-text-primary)',
                     }}
                   >
-                    {seg.label}
+                    {seg.count}{' '}
+                    <span style={{ color: 'var(--mac-text-muted)', fontWeight: 400 }}>({seg.percentage}%)</span>
                   </Typography>
                 </Box>
-                <Typography
-                  sx={{
-                    fontSize: '13.5px',
-                    fontWeight: isHovered ? 700 : 600,
-                    color: isHovered ? seg.color : 'var(--mac-text-primary)',
-                  }}
-                >
-                  {seg.count}{' '}
-                  <span style={{ color: 'var(--mac-text-muted)', fontWeight: 400 }}>({seg.percentage}%)</span>
-                </Typography>
-              </Box>
-            );
-          })}
+              );
+            })}
+          </Box>
         </Box>
-      </Box>
+      ) : (
+        /* Empty State */
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexGrow: 1,
+            py: 5,
+            gap: 1.5,
+          }}
+        >
+          <Box
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: '12px',
+              backgroundColor: 'var(--sakay-orange-soft)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--sakay-orange)',
+            }}
+          >
+            <BadgeIcon fontSize="medium" />
+          </Box>
+          <Typography sx={{ fontSize: '15px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+            No driver verification requests yet.
+          </Typography>
+          <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', textAlign: 'center', maxWidth: 320 }}>
+            Driver verification activity will appear here once accredited TODAs begin registering drivers.
+          </Typography>
+        </Box>
+      )}
     </Box>
   );
 };

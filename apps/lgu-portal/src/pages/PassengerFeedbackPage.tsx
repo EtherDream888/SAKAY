@@ -116,15 +116,15 @@ export const PassengerFeedbackPage: React.FC = () => {
         <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Overall Commuter Rating
               </Typography>
-              <StarIcon sx={{ color: '#FBBC04', fontSize: 22 }} />
+              <StarIcon sx={{ color: '#FBBC04', fontSize: '17.6' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
               ⭐ {avgRating} / 5.0
             </Typography>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
               From {totalReviews} passenger evaluations
             </Typography>
           </CardContent>
@@ -133,15 +133,15 @@ export const PassengerFeedbackPage: React.FC = () => {
         <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 5-Star Commendations
               </Typography>
-              <StarIcon sx={{ color: '#2E7D32', fontSize: 22 }} />
+              <StarIcon sx={{ color: '#2E7D32', fontSize: '17.6' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#2E7D32', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#2E7D32', mb: 0.5 }}>
               {fiveStarCount}
             </Typography>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
               Excellent driver reviews
             </Typography>
           </CardContent>
@@ -150,15 +150,15 @@ export const PassengerFeedbackPage: React.FC = () => {
         <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Critical Complaints
               </Typography>
-              <WarningAmberIcon sx={{ color: '#DC2626', fontSize: 22 }} />
+              <WarningAmberIcon sx={{ color: '#DC2626', fontSize: '17.6' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#DC2626', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#DC2626', mb: 0.5 }}>
               {complaintsCount}
             </Typography>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
               Low ratings (&le;2 stars) for review
             </Typography>
           </CardContent>
@@ -167,15 +167,15 @@ export const PassengerFeedbackPage: React.FC = () => {
         <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Total Feedback Records
               </Typography>
-              <FeedbackIcon sx={{ color: 'var(--sakay-orange)', fontSize: 22 }} />
+              <FeedbackIcon sx={{ color: 'var(--sakay-orange)', fontSize: '17.6' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: 'var(--sakay-orange)', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: 'var(--sakay-orange)', mb: 0.5 }}>
               {totalReviews}
             </Typography>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
               Total passenger reviews
             </Typography>
           </CardContent>
@@ -225,16 +225,16 @@ export const PassengerFeedbackPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 PASSENGER & DATE
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 EVALUATED DRIVER & TODA
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 RATING & CATEGORY
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 PASSENGER FEEDBACK COMMENT
               </TableCell>
             </TableRow>
@@ -244,7 +244,7 @@ export const PassengerFeedbackPage: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={4} align="center" sx={{ py: 8 }}>
                   <CircularProgress size={32} sx={{ color: 'var(--sakay-orange)', mb: 1.5 }} />
-                  <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-muted)' }}>
+                  <Typography sx={{ fontSize: '11.3px', color: 'var(--mac-text-muted)' }}>
                     Loading passenger feedback...
                   </Typography>
                 </TableCell>
@@ -259,25 +259,25 @@ export const PassengerFeedbackPage: React.FC = () => {
                   }}
                 >
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontWeight: 600, fontSize: '14.5px', color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: '11.6px', color: 'var(--mac-text-primary)' }}>
                       {item.passengerName}
                     </Typography>
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mt: '2px' }}>
+                    <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mt: '2px' }}>
                       {item.createdAt}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: '11.3px', color: 'var(--mac-text-primary)' }}>
                       {item.driverName}
                     </Typography>
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+                    <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
                       {item.todaName}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Rating value={item.ratingValue} readOnly size="small" />
-                      <Typography sx={{ fontSize: '13px', fontWeight: 700 }}>
+                      <Typography sx={{ fontSize: '10.4px', fontWeight: 700 }}>
                         {item.ratingValue}.0
                       </Typography>
                     </Box>
@@ -285,16 +285,16 @@ export const PassengerFeedbackPage: React.FC = () => {
                       <Chip
                         label={item.category}
                         size="small"
-                        sx={{ fontSize: '11px', fontWeight: 600, height: 22 }}
+                        sx={{ fontSize: '8.8px', fontWeight: 600, height: 22 }}
                       />
                     </Box>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-primary)', fontStyle: 'italic' }}>
+                    <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-primary)', fontStyle: 'italic' }}>
                       "{item.comment}"
                     </Typography>
                     {item.isComplaint && (
-                      <Typography sx={{ fontSize: '11.5px', color: '#DC2626', fontWeight: 700, mt: '4px' }}>
+                      <Typography sx={{ fontSize: '9.3px', color: '#DC2626', fontWeight: 700, mt: '4px' }}>
                         ⚠️ Flagged for Triage Officer Attention
                       </Typography>
                     )}
@@ -305,11 +305,11 @@ export const PassengerFeedbackPage: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={4} align="center" sx={{ py: 8 }}>
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-                    <FeedbackIcon sx={{ fontSize: 44, color: 'var(--mac-border-color)' }} />
-                    <Typography sx={{ fontSize: '15px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
+                    <FeedbackIcon sx={{ fontSize: '35.3', color: 'var(--mac-border-color)' }} />
+                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
                       No passenger feedback records found
                     </Typography>
-                    <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
+                    <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
                       {searchQuery || ratingFilter !== 'All'
                         ? 'No feedback entries match your search criteria.'
                         : 'There are currently no passenger feedback or rating records.'}
@@ -320,7 +320,7 @@ export const PassengerFeedbackPage: React.FC = () => {
                       sx={{
                         mt: 1,
                         textTransform: 'none',
-                        fontSize: '13.5px',
+                        fontSize: '10.8px',
                         color: 'var(--sakay-orange)',
                         fontWeight: 600,
                       }}
@@ -337,3 +337,4 @@ export const PassengerFeedbackPage: React.FC = () => {
     </Box>
   );
 };
+

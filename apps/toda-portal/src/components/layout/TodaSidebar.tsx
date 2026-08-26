@@ -32,6 +32,7 @@ interface NavItem {
   icon: React.ReactNode;
   badge?: number | string;
   badgeType?: 'orange' | 'green';
+  disabled?: boolean;
 }
 
 interface NavGroup {
@@ -66,22 +67,22 @@ export const TodaSidebar: React.FC<TodaSidebarProps> = ({ collapsed, onToggleCol
     {
       groupTitle: 'DRIVERS & FLEET',
       items: [
-        { id: 'driver-verification', label: 'Driver Verification', path: '/driver-verification', icon: <AssignmentIcon fontSize="small" />, badge: applicantCount > 0 ? applicantCount : undefined, badgeType: 'orange' },
-        { id: 'drivers', label: 'Driver Membership', path: '/drivers', icon: <PeopleIcon fontSize="small" /> },
-        { id: 'fleet', label: 'Tricycle Fleet', path: '/fleet', icon: <DirectionsCarIcon fontSize="small" /> },
+        { id: 'driver-verification', label: 'Driver Verification', path: '/driver-verification', icon: <AssignmentIcon fontSize="small" />, badge: applicantCount > 0 ? applicantCount : undefined, badgeType: 'orange', disabled: profile?.accreditationStatus === 'Pending Verification' },
+        { id: 'drivers', label: 'Driver Membership', path: '/drivers', icon: <PeopleIcon fontSize="small" />, disabled: profile?.accreditationStatus === 'Pending Verification' },
+        { id: 'fleet', label: 'Tricycle Fleet', path: '/fleet', icon: <DirectionsCarIcon fontSize="small" />, disabled: profile?.accreditationStatus === 'Pending Verification' },
       ],
     },
     {
       groupTitle: 'COMMUNICATIONS',
       items: [
-        { id: 'announcements', label: 'Announcements', path: '/announcements', icon: <CampaignIcon fontSize="small" /> },
+        { id: 'announcements', label: 'Announcements', path: '/announcements', icon: <CampaignIcon fontSize="small" />, disabled: profile?.accreditationStatus === 'Pending Verification' },
       ],
     },
     {
       groupTitle: 'PERFORMANCE & AUDIT',
       items: [
-        { id: 'reports', label: 'TODA Reports & Incidents', path: '/reports', icon: <AssessmentIcon fontSize="small" /> },
-        { id: 'audit-logs', label: 'Audit Logs', path: '/audit-logs', icon: <SecurityIcon fontSize="small" /> },
+        { id: 'reports', label: 'TODA Reports & Incidents', path: '/reports', icon: <AssessmentIcon fontSize="small" />, disabled: profile?.accreditationStatus === 'Pending Verification' },
+        { id: 'audit-logs', label: 'Audit Logs', path: '/audit-logs', icon: <SecurityIcon fontSize="small" />, disabled: profile?.accreditationStatus === 'Pending Verification' },
       ],
     },
     {
@@ -288,7 +289,7 @@ export const TodaSidebar: React.FC<TodaSidebarProps> = ({ collapsed, onToggleCol
 
                 const navContent = (
                   <Box
-                    onClick={() => navigate(item.path)}
+                    onClick={() => { if (!item.disabled) navigate(item.path); }}
                     sx={{
                       display: 'flex',
                       alignItems: 'center',
@@ -297,21 +298,22 @@ export const TodaSidebar: React.FC<TodaSidebarProps> = ({ collapsed, onToggleCol
                       height: collapsed ? 44 : 46,
                       borderRadius: '12px',
                       padding: collapsed ? 0 : '0 12px 0 12px',
-                      cursor: 'pointer',
+                      cursor: item.disabled ? 'not-allowed' : 'pointer',
                       flexShrink: 0,
                       margin: collapsed ? '0 auto' : 0,
                       background: isActive
                         ? 'linear-gradient(135deg, var(--sakay-orange) 0%, #ff8a47 100%)'
                         : 'transparent',
-                      color: isActive ? '#FFFFFF' : 'var(--mac-text-primary)',
+                      color: isActive ? '#FFFFFF' : item.disabled ? 'var(--mac-text-muted)' : 'var(--mac-text-primary)',
                       boxShadow: isActive ? '0 10px 24px rgba(255, 107, 26, 0.22)' : 'none',
                       transition: 'all 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)',
                       overflow: 'hidden',
+                      opacity: item.disabled ? 0.5 : 1,
                       '&:hover': {
                         background: isActive
                           ? 'linear-gradient(135deg, var(--sakay-orange-hover) 0%, #ff8b46 100%)'
-                          : 'rgba(17, 24, 39, 0.04)',
-                        transform: 'translateX(1px)',
+                          : item.disabled ? 'transparent' : 'rgba(17, 24, 39, 0.04)',
+                        transform: item.disabled ? 'none' : 'translateX(1px)',
                       },
                     }}
                   >

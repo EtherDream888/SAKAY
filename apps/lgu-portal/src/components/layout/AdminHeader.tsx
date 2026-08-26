@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, IconButton, Badge, Menu, MenuItem } from '@mui/material';
+import { Box, Typography, Button, IconButton, Badge, Popover } from '@mui/material';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import LogoutIcon from '@mui/icons-material/Logout';
 
 import { NotificationPopover } from '../popovers/NotificationPopover';
 import { MOCK_NOTIFICATIONS } from '../../mockData/dashboardData';
-import { CURRENT_ADMIN, MOCK_LGU_ADMINS } from '../../mockData/adminData';
-import { NotificationItem, LguAdminRole } from '../../types/admin';
+import { CURRENT_ADMIN } from '../../mockData/adminData';
+import { NotificationItem } from '../../types/admin';
 import { useAuth } from '../../contexts/AuthContext';
+import { LogoutConfirmModal } from '../admin/LogoutConfirmModal';
 
 interface AdminHeaderProps {
   pageTitle?: string;
@@ -23,29 +24,20 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   pageSubtitle = 'Overview of SAKAY operations in Calapan City',
 }) => {
   const navigate = useNavigate();
-  const { adminProfile, signOut } = useAuth();
+  const { adminProfile, user, signOut } = useAuth();
   const [notifications, setNotifications] = useState<NotificationItem[]>(MOCK_NOTIFICATIONS);
   const [notifOpen, setNotifOpen] = useState(false);
 
-  // Dev-only Role Switcher State (gated strictly to import.meta.env.DEV)
-  const [currentRole, setCurrentRole] = useState<LguAdminRole>(
-    (adminProfile?.position as LguAdminRole) || CURRENT_ADMIN.role
-  );
-  const [roleAnchorEl, setRoleAnchorEl] = useState<null | HTMLElement>(null);
+  // Account Popover State
+  const [accountAnchorEl, setAccountAnchorEl] = useState<null | HTMLElement>(null);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 
-  const handleRoleChange = (newRole: LguAdminRole) => {
-    CURRENT_ADMIN.role = newRole;
-    const matchingAdmin = MOCK_LGU_ADMINS.find((a) => a.role === newRole);
-    if (matchingAdmin) {
-      CURRENT_ADMIN.name = matchingAdmin.name;
-      CURRENT_ADMIN.email = matchingAdmin.email;
-      CURRENT_ADMIN.id = matchingAdmin.id;
-    }
-    setCurrentRole(newRole);
-    setRoleAnchorEl(null);
-  };
+  const adminName = adminProfile?.full_name || 'City Administrator';
+  const adminEmail = adminProfile?.email || user?.email || 'admin@gmail.com';
 
-  const handleSignOut = async () => {
+  const handleSignOutConfirm = async () => {
+    setLogoutModalOpen(false);
+    setAccountAnchorEl(null);
     await signOut();
     navigate('/login', { replace: true });
   };
@@ -73,15 +65,15 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         padding: '0 36px',
       }}
     >
-      {/* Left: Primary Page Title & Subtitle inside Sticky Header */}
+      {/* Left: Primary Page Title & Subtitle */}
       <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <Typography
           variant="h1"
           sx={{
-            fontSize: '28px',
-            fontWeight: 600,
+            fontSize: '22px', // Compact page header title hierarchy
+            fontWeight: 700,
             color: 'var(--mac-text-primary)',
-            letterSpacing: '-0.4px',
+            letterSpacing: '-0.3px',
             lineHeight: 1.2,
           }}
         >
@@ -90,11 +82,11 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         {pageSubtitle && (
           <Typography
             sx={{
-              fontSize: '14.5px',
+              fontSize: '13px',
               fontWeight: 400,
               color: 'var(--mac-text-muted)',
               lineHeight: 1.3,
-              mt: '3px',
+              mt: '2px',
             }}
           >
             {pageSubtitle}
@@ -110,8 +102,8 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             size="small"
             onClick={() => setNotifOpen(!notifOpen)}
             sx={{
-              width: 42,
-              height: 42,
+              width: 38,
+              height: 38,
               borderRadius: '10px',
               border: '1px solid var(--mac-border-color)',
               backgroundColor: '#FFFFFF',
@@ -125,7 +117,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             }}
           >
             <Badge badgeContent={unreadCount} color="error" variant="dot">
-              <NotificationsNoneIcon fontSize="small" sx={{ fontSize: 20 }} />
+              <NotificationsNoneIcon fontSize="small" sx={{ fontSize: 19 }} />
             </Badge>
           </IconButton>
           <NotificationPopover
@@ -136,97 +128,19 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           />
         </Box>
 
-        {/* Dev-only Role Switcher (Visible strictly in development mode) */}
-        {import.meta.env.DEV && (
-          <Box>
-            <Button
-              onClick={(e) => setRoleAnchorEl(e.currentTarget)}
-              startIcon={<AdminPanelSettingsIcon fontSize="small" sx={{ fontSize: 18, color: 'var(--sakay-orange)' }} />}
-              endIcon={<KeyboardArrowDownIcon fontSize="small" sx={{ fontSize: 18 }} />}
-              sx={{
-                height: 42,
-                padding: '0 16px',
-                borderRadius: '10px',
-                border: '1px solid var(--mac-border-color)',
-                backgroundColor: '#FFFFFF',
-                color: 'var(--mac-text-primary)',
-                fontSize: '13.5px',
-                fontWeight: 500,
-                textTransform: 'none',
-                boxShadow: 'var(--mac-shadow-subtle)',
-                transition: 'var(--mac-transition-fast)',
-                '&:hover': {
-                  backgroundColor: 'var(--sakay-orange-soft)',
-                  color: 'var(--sakay-orange)',
-                  borderColor: 'var(--sakay-orange-border)',
-                },
-              }}
-            >
-              Dev Role: <strong style={{ marginLeft: 4, color: 'var(--sakay-orange)' }}>{currentRole}</strong>
-            </Button>
-
-            <Menu
-              anchorEl={roleAnchorEl}
-              open={Boolean(roleAnchorEl)}
-              onClose={() => setRoleAnchorEl(null)}
-              slotProps={{
-                paper: {
-                  sx: {
-                    borderRadius: '12px',
-                    border: '1px solid var(--mac-border-color)',
-                    boxShadow: 'var(--mac-shadow-popover)',
-                    mt: 1,
-                    minWidth: 240,
-                  },
-                },
-              }}
-            >
-              <Box sx={{ px: 2, py: 1, borderBottom: '1px solid var(--mac-border-color)' }}>
-                <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
-                  Simulate Admin Role [Dev Preview]
-                </Typography>
-              </Box>
-              {(
-                [
-                  'Super Administrator',
-                  'Verifier',
-                  'Incident Officer',
-                  'Fare Administrator',
-                  'Analytics Viewer',
-                ] as LguAdminRole[]
-              ).map((role) => (
-                <MenuItem
-                  key={role}
-                  selected={currentRole === role}
-                  onClick={() => handleRoleChange(role)}
-                  sx={{
-                    fontSize: '13.5px',
-                    fontWeight: currentRole === role ? 600 : 400,
-                    color: currentRole === role ? 'var(--sakay-orange)' : 'var(--mac-text-primary)',
-                    py: 1,
-                    px: 2,
-                  }}
-                >
-                  {role}
-                </MenuItem>
-              ))}
-            </Menu>
-          </Box>
-        )}
-
         {/* Tulong Action Button */}
         <Button
           onClick={() => navigate('/tulong')}
-          startIcon={<HelpOutlineOutlinedIcon fontSize="small" sx={{ fontSize: 18 }} />}
+          startIcon={<HelpOutlineOutlinedIcon fontSize="small" sx={{ fontSize: 17 }} />}
           sx={{
-            height: 42,
-            padding: '0 20px',
+            height: 38,
+            padding: '0 16px',
             borderRadius: '10px',
             border: '1px solid var(--mac-border-color)',
             backgroundColor: '#FFFFFF',
             color: 'var(--mac-text-primary)',
-            fontSize: '14px',
-            fontWeight: 400,
+            fontSize: '13.5px',
+            fontWeight: 500,
             textTransform: 'none',
             boxShadow: 'var(--mac-shadow-subtle)',
             transition: 'var(--mac-transition-fast)',
@@ -240,28 +154,130 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
           Tulong
         </Button>
 
-        {/* Header Sign Out Action */}
-        <IconButton
-          onClick={handleSignOut}
-          title="Sign Out"
-          sx={{
-            width: 42,
-            height: 42,
-            borderRadius: '10px',
-            border: '1px solid var(--mac-border-color)',
-            backgroundColor: '#FFFFFF',
-            color: '#DC2626',
-            transition: 'var(--mac-transition-fast)',
-            '&:hover': {
-              backgroundColor: '#FEF2F2',
-              borderColor: '#FCA5A5',
-              color: '#B91C1C',
-            },
-          }}
-        >
-          <LogoutIcon fontSize="small" sx={{ fontSize: 20 }} />
-        </IconButton>
+        {/* Compact Header Account Control */}
+        <Box>
+          <Button
+            onClick={(e) => setAccountAnchorEl(e.currentTarget)}
+            endIcon={<KeyboardArrowDownIcon fontSize="small" sx={{ fontSize: 18, color: 'var(--mac-text-muted)' }} />}
+            sx={{
+              height: 38,
+              padding: '0 14px',
+              borderRadius: '10px',
+              border: '1px solid var(--mac-border-color)',
+              backgroundColor: '#FFFFFF',
+              color: 'var(--mac-text-primary)',
+              fontSize: '13.5px',
+              fontWeight: 600,
+              textTransform: 'none',
+              boxShadow: 'var(--mac-shadow-subtle)',
+              transition: 'var(--mac-transition-fast)',
+              '&:hover': {
+                backgroundColor: 'var(--mac-canvas-bg)',
+                borderColor: 'var(--mac-border-color)',
+              },
+            }}
+          >
+            {adminName}
+          </Button>
+
+          {/* Account Popover Card */}
+          <Popover
+            open={Boolean(accountAnchorEl)}
+            anchorEl={accountAnchorEl}
+            onClose={() => setAccountAnchorEl(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            slotProps={{
+              paper: {
+                sx: {
+                  borderRadius: '14px',
+                  border: '1px solid var(--mac-border-color)',
+                  boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
+                  mt: 1,
+                  width: 260,
+                  padding: '16px',
+                  backgroundColor: '#FFFFFF',
+                },
+              },
+            }}
+          >
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Box>
+                <Typography sx={{ fontSize: '15px', fontWeight: 700, color: 'var(--mac-text-primary)', lineHeight: 1.2 }}>
+                  {adminName}
+                </Typography>
+                <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--sakay-orange)', mt: '2px' }}>
+                  LGU Admin
+                </Typography>
+                <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)', mt: '2px', wordBreak: 'break-all' }}>
+                  {adminEmail}
+                </Typography>
+              </Box>
+
+              <Box sx={{ borderTop: '1px solid var(--mac-border-color)', pt: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  onClick={() => {
+                    setAccountAnchorEl(null);
+                    navigate('/settings');
+                  }}
+                  startIcon={<ManageAccountsIcon fontSize="small" />}
+                  sx={{
+                    borderRadius: '8px',
+                    borderColor: 'var(--mac-border-color)',
+                    color: 'var(--mac-text-primary)',
+                    textTransform: 'none',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    justifyContent: 'flex-start',
+                    py: 0.8,
+                    '&:hover': {
+                      backgroundColor: 'var(--sakay-orange-soft)',
+                      borderColor: 'var(--sakay-orange-border)',
+                      color: 'var(--sakay-orange)',
+                    },
+                  }}
+                >
+                  Manage Account
+                </Button>
+
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="error"
+                  onClick={() => {
+                    setAccountAnchorEl(null);
+                    setLogoutModalOpen(true);
+                  }}
+                  startIcon={<LogoutIcon fontSize="small" />}
+                  sx={{
+                    borderRadius: '8px',
+                    textTransform: 'none',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    justifyContent: 'flex-start',
+                    py: 0.8,
+                    color: '#DC2626',
+                    '&:hover': {
+                      backgroundColor: '#FEF2F2',
+                    },
+                  }}
+                >
+                  Log Out
+                </Button>
+              </Box>
+            </Box>
+          </Popover>
+        </Box>
       </Box>
+
+      {/* Logout Confirmation Modal */}
+      <LogoutConfirmModal
+        open={logoutModalOpen}
+        onClose={() => setLogoutModalOpen(false)}
+        onConfirm={handleSignOutConfirm}
+      />
     </Box>
   );
 };

@@ -146,34 +146,34 @@ export const TodaDetailModal: React.FC<TodaDetailModalProps> = ({ open, onClose,
       >
         {/* Section 1: TODA Information Grid */}
         <Box sx={{ mb: 3.5 }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1.5, letterSpacing: '0.3px' }}>
+          <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1.5, letterSpacing: '0.3px' }}>
             1. TODA Accreditation & Contact Information
           </Typography>
 
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' }, gap: 2, backgroundColor: '#F5F5F7', padding: '18px', borderRadius: '12px' }}>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Representative</Typography>
-              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{toda.representative}</Typography>
+              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Representative</Typography>
+              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{toda.representative}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Contact Number</Typography>
-              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{toda.phone}</Typography>
+              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Contact Number</Typography>
+              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{toda.phone}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Email Address</Typography>
-              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{toda.email || 'N/A'}</Typography>
+              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Email Address</Typography>
+              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{toda.email || 'N/A'}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Service Coverage Area</Typography>
-              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{toda.serviceZone || toda.barangay}</Typography>
+              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Service Coverage Area</Typography>
+              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{toda.serviceZone || toda.barangay}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Registered Drivers</Typography>
-              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--sakay-orange)' }}>{toda.registeredDrivers} Drivers</Typography>
+              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Registered Drivers</Typography>
+              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--sakay-orange)' }}>{toda.registeredDrivers} Drivers</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Accreditation Expiry</Typography>
-              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{toda.expiryDate}</Typography>
+              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Accreditation Expiry</Typography>
+              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{toda.expiryDate}</Typography>
             </Box>
           </Box>
         </Box>
@@ -182,7 +182,7 @@ export const TodaDetailModal: React.FC<TodaDetailModalProps> = ({ open, onClose,
         <Box sx={{ mb: 3.5 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
             <MapIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
-            <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+            <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
               2. Service Zone & Operational Boundary
             </Typography>
           </Box>
@@ -204,7 +204,7 @@ export const TodaDetailModal: React.FC<TodaDetailModalProps> = ({ open, onClose,
 
         {/* Section 3: Official Records & Permits */}
         <Box sx={{ mb: 3.5 }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1.5, letterSpacing: '0.3px' }}>
+          <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1.5, letterSpacing: '0.3px' }}>
             3. Registration & Accreditation Documents ({officialDocs.length})
           </Typography>
 
@@ -224,12 +224,12 @@ export const TodaDetailModal: React.FC<TodaDetailModalProps> = ({ open, onClose,
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <DescriptionIcon sx={{ color: 'var(--sakay-orange)', fontSize: 24 }} />
+                  <DescriptionIcon sx={{ color: 'var(--sakay-orange)', fontSize: '19.3' }} />
                   <Box>
-                    <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                       {doc.name}
                     </Typography>
-                    <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)', mt: '2px' }}>
+                    <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)', mt: '2px' }}>
                       {doc.type} • Validated
                     </Typography>
                   </Box>
@@ -238,7 +238,7 @@ export const TodaDetailModal: React.FC<TodaDetailModalProps> = ({ open, onClose,
                   label="View Document"
                   showArrow={false}
                   onClick={() => setSelectedDoc({ name: doc.name, type: doc.type })}
-                  sx={{ height: 34, fontSize: '13px' }}
+                  sx={{ height: 34, fontSize: '10.4px' }}
                 />
               </Box>
             ))}
@@ -250,12 +250,12 @@ export const TodaDetailModal: React.FC<TodaDetailModalProps> = ({ open, onClose,
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <PeopleIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
-              <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+              <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                 4. Affiliated Tricycle Drivers ({totalDrivers})
               </Typography>
             </Box>
             {totalDrivers > 0 && (
-              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', fontWeight: 500 }}>
+              <Typography sx={{ fontSize: '10.4px', color: 'var(--mac-text-muted)', fontWeight: 500 }}>
                 Showing {startIndex + 1}–{endIndex} of {totalDrivers} drivers
               </Typography>
             )}
@@ -269,12 +269,12 @@ export const TodaDetailModal: React.FC<TodaDetailModalProps> = ({ open, onClose,
             <Table size="small">
               <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '13px', py: 1.5 }}>DRIVER NAME</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '13px', py: 1.5 }}>PLATE NO.</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '13px', py: 1.5 }}>ONLINE STATUS</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '13px', py: 1.5 }}>VERIFICATION</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '13px', py: 1.5 }}>ACCOUNT</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13px', py: 1.5 }}>ACTIONS</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', py: 1.5 }}>DRIVER NAME</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', py: 1.5 }}>PLATE NO.</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', py: 1.5 }}>ONLINE STATUS</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', py: 1.5 }}>VERIFICATION</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', py: 1.5 }}>ACCOUNT</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600, fontSize: '10.4px', py: 1.5 }}>ACTIONS</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -282,7 +282,7 @@ export const TodaDetailModal: React.FC<TodaDetailModalProps> = ({ open, onClose,
                   <TableRow>
                     <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                       <CircularProgress size={24} sx={{ color: 'var(--sakay-orange)', mb: 1 }} />
-                      <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>
+                      <Typography sx={{ fontSize: '10.4px', color: 'var(--mac-text-muted)' }}>
                         Loading driver records...
                       </Typography>
                     </TableCell>
@@ -300,21 +300,21 @@ export const TodaDetailModal: React.FC<TodaDetailModalProps> = ({ open, onClose,
                     >
                       <TableCell sx={{ py: 1.5 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <Avatar sx={{ width: 28, height: 28, fontSize: '12px', backgroundColor: 'var(--sakay-orange-soft)', color: 'var(--sakay-orange)' }}>
+                          <Avatar sx={{ width: 28, height: 28, fontSize: '9.6px', backgroundColor: 'var(--sakay-orange-soft)', color: 'var(--sakay-orange)' }}>
                             {drv.name.charAt(0)}
                           </Avatar>
-                          <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                          <Typography sx={{ fontSize: '10.8px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                             {drv.name}
                           </Typography>
                         </Box>
                       </TableCell>
-                      <TableCell sx={{ fontSize: '13px', color: 'var(--mac-text-secondary)', py: 1.5 }}>
+                      <TableCell sx={{ fontSize: '10.4px', color: 'var(--mac-text-secondary)', py: 1.5 }}>
                         {drv.vehiclePlate}
                       </TableCell>
                       <TableCell sx={{ py: 1.5 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Box sx={{ width: 7, height: 7, borderRadius: '50%', backgroundColor: drv.onlineStatus === 'Online' ? '#34A853' : '#9AA0A6' }} />
-                          <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-secondary)' }}>
+                          <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-secondary)' }}>
                             {drv.onlineStatus}
                           </Typography>
                         </Box>
@@ -333,7 +333,7 @@ export const TodaDetailModal: React.FC<TodaDetailModalProps> = ({ open, onClose,
                             e.stopPropagation();
                             setSelectedDriver(drv);
                           }}
-                          sx={{ height: 28, fontSize: '12px' }}
+                          sx={{ height: 28, fontSize: '9.6px' }}
                         />
                       </TableCell>
                     </TableRow>
@@ -341,7 +341,7 @@ export const TodaDetailModal: React.FC<TodaDetailModalProps> = ({ open, onClose,
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                      <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)' }}>
+                      <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)' }}>
                         No registered drivers currently affiliated with this TODA.
                       </Typography>
                     </TableCell>

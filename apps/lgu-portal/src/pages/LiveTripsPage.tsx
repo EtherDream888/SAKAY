@@ -205,15 +205,15 @@ export const LiveTripsPage: React.FC = () => {
         >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Active & Ongoing Trips
               </Typography>
-              <NavigationIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
+              <NavigationIcon sx={{ color: 'var(--sakay-orange)', fontSize: '16' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
               {activeTrips.length}
             </Typography>
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)' }}>
               Currently in transit in Calapan
             </Typography>
           </CardContent>
@@ -232,15 +232,15 @@ export const LiveTripsPage: React.FC = () => {
         >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Completed Trips
               </Typography>
-              <CheckCircleIcon sx={{ color: '#2E7D32', fontSize: 20 }} />
+              <CheckCircleIcon sx={{ color: '#2E7D32', fontSize: '16' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#2E7D32', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#2E7D32', mb: 0.5 }}>
               {completedTrips.length}
             </Typography>
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)' }}>
               Safely fulfilled ride bookings
             </Typography>
           </CardContent>
@@ -259,15 +259,15 @@ export const LiveTripsPage: React.FC = () => {
         >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Cancelled Bookings
               </Typography>
-              <CancelIcon sx={{ color: '#DC2626', fontSize: 20 }} />
+              <CancelIcon sx={{ color: '#DC2626', fontSize: '16' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#DC2626', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#DC2626', mb: 0.5 }}>
               {cancelledTrips.length}
             </Typography>
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)' }}>
               Cancelled by passenger/driver
             </Typography>
           </CardContent>
@@ -286,15 +286,15 @@ export const LiveTripsPage: React.FC = () => {
         >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Total Bookings
               </Typography>
-              <RouteIcon sx={{ color: '#1565C0', fontSize: 20 }} />
+              <RouteIcon sx={{ color: '#1565C0', fontSize: '16' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#1565C0', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#1565C0', mb: 0.5 }}>
               {bookings.length}
             </Typography>
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)' }}>
               All lifetime system bookings
             </Typography>
           </CardContent>
@@ -314,8 +314,8 @@ export const LiveTripsPage: React.FC = () => {
       >
         <Box sx={{ p: '14px 20px', borderBottom: '1px solid var(--mac-border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <NavigationIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
-            <Typography sx={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+            <NavigationIcon sx={{ color: 'var(--sakay-orange)', fontSize: '16' }} />
+            <Typography sx={{ fontSize: '11.6px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
               Live Calapan City Transportation Transit Map ({activeTrips.length} Active)
             </Typography>
           </Box>
@@ -323,7 +323,7 @@ export const LiveTripsPage: React.FC = () => {
             onClick={loadTrips}
             startIcon={<RefreshIcon />}
             size="small"
-            sx={{ textTransform: 'none', fontSize: '12.5px', color: 'var(--sakay-orange)', fontWeight: 600 }}
+            sx={{ textTransform: 'none', fontSize: '10px', color: 'var(--sakay-orange)', fontWeight: 600 }}
           >
             Live Refresh
           </Button>
@@ -338,7 +338,7 @@ export const LiveTripsPage: React.FC = () => {
           onChange={(_, val) => setActiveTab(val)}
           sx={{
             '& .MuiTabs-indicator': { backgroundColor: 'var(--sakay-orange)', height: 3 },
-            '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: '14px' },
+            '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: '11.3px' },
             '& .Mui-selected': { color: 'var(--sakay-orange) !important' },
           }}
         >
@@ -383,22 +383,22 @@ export const LiveTripsPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 TRIP ID & CORRIDOR
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 DRIVER & UNIT
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 PASSENGER
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 TYPE & FARE
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 STATUS
               </TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 ACTIONS
               </TableCell>
             </TableRow>
@@ -408,7 +408,7 @@ export const LiveTripsPage: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
                   <CircularProgress size={32} sx={{ color: 'var(--sakay-orange)', mb: 1.5 }} />
-                  <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-muted)' }}>
+                  <Typography sx={{ fontSize: '11.3px', color: 'var(--mac-text-muted)' }}>
                     Loading trip records...
                   </Typography>
                 </TableCell>
@@ -423,34 +423,34 @@ export const LiveTripsPage: React.FC = () => {
                   }}
                 >
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '11.6px', color: 'var(--mac-text-primary)' }}>
                       {trip.id}
                     </Typography>
-                    <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)', mt: '3px' }}>
+                    <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)', mt: '3px' }}>
                       {trip.pickupArea} → {trip.destinationArea}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontSize: '11.3px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                       {trip.driverName}
                     </Typography>
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+                    <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
                       {trip.todaName} • {trip.vehiclePlate}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontSize: '11.3px', color: 'var(--mac-text-primary)' }}>
                       {trip.passengerName}
                     </Typography>
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+                    <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
                       {trip.passengerPhone}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--sakay-orange)' }}>
+                    <Typography sx={{ fontSize: '11.6px', fontWeight: 700, color: 'var(--sakay-orange)' }}>
                       ₱{trip.estimatedFare}.00
                     </Typography>
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+                    <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
                       {trip.tripType} • {trip.distanceKm} km
                     </Typography>
                   </TableCell>
@@ -472,11 +472,11 @@ export const LiveTripsPage: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-                    <NavigationIcon sx={{ fontSize: 44, color: 'var(--mac-border-color)' }} />
-                    <Typography sx={{ fontSize: '15px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
+                    <NavigationIcon sx={{ fontSize: '35.3', color: 'var(--mac-border-color)' }} />
+                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
                       No {activeTab.toLowerCase()} trips found
                     </Typography>
-                    <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
+                    <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
                       {searchQuery || todaFilter !== 'All'
                         ? 'No records match your active search filter.'
                         : `There are currently no ${activeTab.toLowerCase()} trips recorded.`}
@@ -487,7 +487,7 @@ export const LiveTripsPage: React.FC = () => {
                       sx={{
                         mt: 1,
                         textTransform: 'none',
-                        fontSize: '13.5px',
+                        fontSize: '10.8px',
                         color: 'var(--sakay-orange)',
                         fontWeight: 600,
                       }}
@@ -513,3 +513,4 @@ export const LiveTripsPage: React.FC = () => {
     </Box>
   );
 };
+

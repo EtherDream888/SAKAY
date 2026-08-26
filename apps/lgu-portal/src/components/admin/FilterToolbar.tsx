@@ -78,7 +78,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
                 input: {
                   startAdornment: (
                     <InputAdornment position="start">
-                      <SearchIcon fontSize="small" sx={{ color: 'var(--mac-text-muted)', fontSize: 18 }} />
+                      <SearchIcon fontSize="small" sx={{ color: 'var(--mac-text-muted)', fontSize: '14.4' }} />
                     </InputAdornment>
                   ),
                 },
@@ -88,7 +88,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '10px',
                   backgroundColor: '#FAFAFC',
-                  fontSize: '14.5px',
+                  fontSize: '11.6px',
                   height: 42,
                   border: '1px solid var(--mac-border-color)',
                   transition: 'var(--mac-transition-fast)',
@@ -136,7 +136,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
                 sx={{
                   borderRadius: '10px',
                   backgroundColor: '#FAFAFC',
-                  fontSize: '14.5px',
+                  fontSize: '11.6px',
                   fontWeight: 500,
                   color: 'var(--mac-text-primary)',
                   height: 42,
@@ -154,7 +154,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
                 }}
               >
                 {filter.options.map((opt) => (
-                  <MenuItem key={opt.value} value={opt.value} sx={{ fontSize: '14.5px' }}>
+                  <MenuItem key={opt.value} value={opt.value} sx={{ fontSize: '11.6px' }}>
                     {opt.label}
                   </MenuItem>
                 ))}
@@ -167,7 +167,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
             <Button
               size="small"
               onClick={onResetFilters}
-              startIcon={<RestartAltIcon fontSize="small" sx={{ fontSize: 18 }} />}
+              startIcon={<RestartAltIcon fontSize="small" sx={{ fontSize: '14.4' }} />}
               sx={{
                 height: 42,
                 padding: '0 16px',
@@ -175,7 +175,7 @@ export const FilterToolbar: React.FC<FilterToolbarProps> = ({
                 border: '1px solid var(--mac-border-color)',
                 backgroundColor: '#FAFAFC',
                 color: 'var(--mac-text-secondary)',
-                fontSize: '14px',
+                fontSize: '11.3px',
                 fontWeight: 500,
                 textTransform: 'none',
                 flexShrink: 0,

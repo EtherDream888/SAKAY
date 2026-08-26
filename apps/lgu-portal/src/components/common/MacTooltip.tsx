@@ -29,7 +29,7 @@ export const MacTooltip: React.FC<MacTooltipProps> = ({ title, children, disable
             transform: 'translateY(-50%)',
             backgroundColor: 'rgba(28, 28, 30, 0.92)',
             color: '#FFFFFF',
-            fontSize: '12px',
+            fontSize: '9.6px',
             fontWeight: 500,
             padding: '6px 10px',
             borderRadius: '8px',

@@ -81,7 +81,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, sx, ...props }
       variant="outlined"
       sx={{
         height: '24px',
-        fontSize: '12px',
+        fontSize: '9.6px',
         fontWeight: 600,
         borderRadius: '6px',
         borderWidth: '1px',

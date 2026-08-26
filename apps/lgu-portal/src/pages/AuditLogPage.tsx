@@ -107,21 +107,21 @@ export const AuditLogPage: React.FC = () => {
           mb: 3.5,
         }}
       >
-        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Total Audit Trail Events</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>{totalLogs}</Typography>
+        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '16px 20px', boxShadow: 'var(--mac-shadow-card)' }}>
+          <Typography sx={{ fontSize: '10.4px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Total Audit Trail Events</Typography>
+          <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>{totalLogs}</Typography>
         </Box>
-        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Accreditation & Verifications</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: '#1565C0' }}>{verificationLogs}</Typography>
+        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '16px 20px', boxShadow: 'var(--mac-shadow-card)' }}>
+          <Typography sx={{ fontSize: '10.4px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Accreditation & Verifications</Typography>
+          <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#1565C0' }}>{verificationLogs}</Typography>
         </Box>
-        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Policy Strikes & Suspensions</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: '#C62828' }}>{userOversightLogs}</Typography>
+        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '16px 20px', boxShadow: 'var(--mac-shadow-card)' }}>
+          <Typography sx={{ fontSize: '10.4px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Policy Strikes & Suspensions</Typography>
+          <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#C62828' }}>{userOversightLogs}</Typography>
         </Box>
-        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Fare & System Actions</Typography>
-          <Typography sx={{ fontSize: '32px', fontWeight: 700, color: '#2E7D32' }}>{systemRateLogs}</Typography>
+        <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '16px 20px', boxShadow: 'var(--mac-shadow-card)' }}>
+          <Typography sx={{ fontSize: '10.4px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Fare & System Actions</Typography>
+          <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#2E7D32' }}>{systemRateLogs}</Typography>
         </Box>
       </Box>
 
@@ -160,12 +160,12 @@ export const AuditLogPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TIMESTAMP & ID</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACTOR</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACTION EVENT</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>CATEGORY</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>AUDIT DETAILS</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACTIONS</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TIMESTAMP & ID</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACTOR</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACTION EVENT</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>CATEGORY</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>AUDIT DETAILS</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACTIONS</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -173,7 +173,7 @@ export const AuditLogPage: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
                   <CircularProgress size={32} sx={{ color: 'var(--sakay-orange)', mb: 1.5 }} />
-                  <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-muted)' }}>
+                  <Typography sx={{ fontSize: '11.3px', color: 'var(--mac-text-muted)' }}>
                     Loading activity logs...
                   </Typography>
                 </TableCell>
@@ -190,18 +190,18 @@ export const AuditLogPage: React.FC = () => {
                     }}
                   >
                     <TableCell sx={{ py: 2, px: 3 }}>
-                      <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                      <Typography sx={{ fontSize: '10.8px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                         {log.timestamp}
                       </Typography>
-                      <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)', fontFamily: 'monospace', mt: '2px' }}>
+                      <Typography sx={{ fontSize: '9.3px', color: 'var(--mac-text-muted)', fontFamily: 'monospace', mt: '2px' }}>
                         {log.id.slice(0, 16)}...
                       </Typography>
                     </TableCell>
                     <TableCell sx={{ py: 2, px: 3 }}>
-                      <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                      <Typography sx={{ fontSize: '11.3px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                         {log.actor_name}
                       </Typography>
-                      <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+                      <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
                         {log.actor_role}
                       </Typography>
                     </TableCell>
@@ -210,7 +210,7 @@ export const AuditLogPage: React.FC = () => {
                         label={log.action_type}
                         size="small"
                         sx={{
-                          fontSize: '11.5px',
+                          fontSize: '9.3px',
                           fontWeight: 700,
                           backgroundColor: '#F5F5F7',
                           color: 'var(--mac-text-primary)',
@@ -224,7 +224,7 @@ export const AuditLogPage: React.FC = () => {
                         label={log.category}
                         size="small"
                         sx={{
-                          fontSize: '11.5px',
+                          fontSize: '9.3px',
                           fontWeight: 600,
                           backgroundColor: badgeStyle.bg,
                           color: badgeStyle.color,
@@ -236,7 +236,7 @@ export const AuditLogPage: React.FC = () => {
                     <TableCell sx={{ py: 2, px: 3, maxWidth: 380 }}>
                       <Typography
                         sx={{
-                          fontSize: '13.5px',
+                          fontSize: '10.8px',
                           color: 'var(--mac-text-secondary)',
                           whiteSpace: 'nowrap',
                           overflow: 'hidden',
@@ -251,7 +251,7 @@ export const AuditLogPage: React.FC = () => {
                         label="View Event"
                         showArrow={false}
                         onClick={() => setSelectedLog(log)}
-                        sx={{ height: 32, fontSize: '12.5px' }}
+                        sx={{ height: 32, fontSize: '10px' }}
                       />
                     </TableCell>
                   </TableRow>
@@ -261,11 +261,11 @@ export const AuditLogPage: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-                    <SecurityIcon sx={{ fontSize: 44, color: 'var(--mac-border-color)' }} />
-                    <Typography sx={{ fontSize: '15px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
+                    <SecurityIcon sx={{ fontSize: '35.3', color: 'var(--mac-border-color)' }} />
+                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
                       No activity log records found
                     </Typography>
-                    <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
+                    <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
                       {searchQuery || categoryFilter !== 'All'
                         ? 'No events match your active search filters.'
                         : 'There are currently no administrative events recorded.'}
@@ -276,7 +276,7 @@ export const AuditLogPage: React.FC = () => {
                       sx={{
                         mt: 1,
                         textTransform: 'none',
-                        fontSize: '13.5px',
+                        fontSize: '10.8px',
                         color: 'var(--sakay-orange)',
                         fontWeight: 600,
                       }}
@@ -303,26 +303,26 @@ export const AuditLogPage: React.FC = () => {
         >
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px' }}>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Action Type</Typography>
-              <Typography sx={{ fontSize: '15px', fontWeight: 700, fontFamily: 'monospace', color: 'var(--sakay-orange)' }}>
+              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Action Type</Typography>
+              <Typography sx={{ fontSize: '12px', fontWeight: 700, fontFamily: 'monospace', color: 'var(--sakay-orange)' }}>
                 {selectedLog.action_type}
               </Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Acting Officer</Typography>
-              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Acting Officer</Typography>
+              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                 {selectedLog.actor_name} ({selectedLog.actor_role})
               </Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Timestamp</Typography>
-              <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Timestamp</Typography>
+              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                 {selectedLog.timestamp}
               </Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>Event Details & System Remarks</Typography>
-              <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-primary)', mt: '4px', lineHeight: 1.5 }}>
+              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Event Details & System Remarks</Typography>
+              <Typography sx={{ fontSize: '11.3px', color: 'var(--mac-text-primary)', mt: '4px', lineHeight: 1.5 }}>
                 {selectedLog.details}
               </Typography>
             </Box>
@@ -332,3 +332,4 @@ export const AuditLogPage: React.FC = () => {
     </Box>
   );
 };
+

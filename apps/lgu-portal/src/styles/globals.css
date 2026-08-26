@@ -1,3 +1,4 @@
+@import '@fontsource/mona-sans';
 @import './macOS-theme.css';
 
 * {
@@ -96,3 +97,4 @@ body {
   pointer-events: none;
   z-index: 1000;
 }
+

@@ -77,13 +77,13 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
       >
         <Box sx={{ pr: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: subtitle ? '4px' : 0 }}>
-            <Typography sx={{ fontSize: '20px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+            <Typography sx={{ fontSize: '16px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
               {title}
             </Typography>
             {badge}
           </Box>
           {subtitle && (
-            <Typography sx={{ fontSize: '14.5px', color: 'var(--mac-text-muted)', fontWeight: 400 }}>
+            <Typography sx={{ fontSize: '11.6px', color: 'var(--mac-text-muted)', fontWeight: 400 }}>
               {subtitle}
             </Typography>
           )}
@@ -101,7 +101,7 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
             },
           }}
         >
-          <CloseIcon fontSize="small" sx={{ fontSize: 18 }} />
+          <CloseIcon fontSize="small" sx={{ fontSize: '14.4' }} />
         </IconButton>
       </DialogTitle>
 
@@ -130,7 +130,7 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
                 borderRadius: '8px',
                 borderColor: 'var(--mac-border-color)',
                 color: 'var(--mac-text-secondary)',
-                fontSize: '14.5px',
+                fontSize: '11.6px',
                 fontWeight: 500,
                 textTransform: 'none',
                 backgroundColor: '#FFFFFF',
@@ -154,7 +154,7 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
                 height: 40,
                 padding: '0 22px',
                 borderRadius: '8px',
-                fontSize: '14.5px',
+                fontSize: '11.6px',
                 fontWeight: 600,
                 textTransform: 'none',
                 backgroundColor:

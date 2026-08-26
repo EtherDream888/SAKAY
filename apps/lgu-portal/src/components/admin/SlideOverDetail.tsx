@@ -58,13 +58,13 @@ export const SlideOverDetail: React.FC<SlideOverDetailProps> = ({
       >
         <Box sx={{ pr: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: '4px' }}>
-            <Typography sx={{ fontSize: '20px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+            <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
               {title}
             </Typography>
             {badge}
           </Box>
           {subtitle && (
-            <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)' }}>
               {subtitle}
             </Typography>
           )}
@@ -111,7 +111,7 @@ export const SlideOverDetail: React.FC<SlideOverDetailProps> = ({
                 padding: '0 20px',
                 borderRadius: '9px',
                 textTransform: 'none',
-                fontSize: '14px',
+                fontSize: '11.3px',
                 fontWeight: 500,
                 borderColor: '#FCA5A5',
                 color: '#DC2626',
@@ -131,7 +131,7 @@ export const SlideOverDetail: React.FC<SlideOverDetailProps> = ({
                 padding: '0 20px',
                 borderRadius: '9px',
                 textTransform: 'none',
-                fontSize: '14px',
+                fontSize: '11.3px',
                 fontWeight: 600,
                 backgroundColor: 'var(--sakay-orange)',
                 color: '#FFFFFF',

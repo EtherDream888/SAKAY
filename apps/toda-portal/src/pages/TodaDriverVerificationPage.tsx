@@ -20,6 +20,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import InboxIcon from '@mui/icons-material/Inbox';
 import VerifiedIcon from '@mui/icons-material/Verified';
+import ShieldIcon from '@mui/icons-material/Shield';
 
 import { DriverApplicant } from '../types/toda';
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
@@ -42,6 +43,8 @@ export const TodaDriverVerificationPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [rosterFilter, setRosterFilter] = useState('All');
+  
+  const [todaStatus, setTodaStatus] = useState<string>('Active');
 
   // Selected Applicant for Review Modal
   const [selectedApplicant, setSelectedApplicant] = useState<DriverApplicant | null>(null);
@@ -58,6 +61,12 @@ export const TodaDriverVerificationPage: React.FC = () => {
 
   const loadApplicants = () => {
     setIsLoading(true);
+    import('../services/todaApiService').then(({ fetchTodaProfile }) => {
+      fetchTodaProfile().then(profile => {
+        if (profile) setTodaStatus(profile.accreditationStatus);
+      });
+    });
+
     Promise.all([fetchDriverApplicants(), fetchTodaDrivers()])
       .then(([apps, drvs]) => {
         setApplicants(apps || []);
@@ -196,6 +205,30 @@ export const TodaDriverVerificationPage: React.FC = () => {
 
   return (
     <Box sx={{ maxWidth: 1600, margin: '0 auto', pb: 6 }}>
+      {todaStatus === 'Pending Verification' && (
+        <Box sx={{ mb: 3.5, backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', borderRadius: 'var(--mac-radius-lg)', padding: '18px 24px', display: 'flex', alignItems: 'center', gap: 2 }}>
+          <WarningAmberIcon sx={{ color: '#DC2626', fontSize: 26, flexShrink: 0 }} />
+          <Box>
+            <Typography sx={{ fontSize: '15px', fontWeight: 700, color: '#991B1B', mb: '3px' }}>
+              Pending TODA LGU Accreditation
+            </Typography>
+            <Typography sx={{ fontSize: '13.5px', color: '#B91C1C', lineHeight: 1.4 }}>
+              Your TODA organization is currently under review by the City Transport Office. Driver endorsement tools and membership management features are temporarily locked until your application is approved.
+            </Typography>
+          </Box>
+        </Box>
+      )}
+
+      {todaStatus === 'Pending Verification' ? (
+        <Box sx={{ mt: 2, textAlign: 'center', p: 6, backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)' }}>
+          <ShieldIcon sx={{ fontSize: 48, color: '#D1D5DB', mb: 2 }} />
+          <Typography variant="h6" sx={{ fontWeight: 600, color: 'var(--mac-text-primary)' }}>Feature Unavailable</Typography>
+          <Typography sx={{ color: 'var(--mac-text-secondary)', mt: 1, maxWidth: 500, mx: 'auto' }}>
+            This feature will become available once your TODA has been approved and accredited by the LGU.
+          </Typography>
+        </Box>
+      ) : (
+        <>
       {/* 1. 3-Day Operational Governance Banner (Simplified Non-Technical Language) */}
       <Box
         sx={{
@@ -428,6 +461,7 @@ export const TodaDriverVerificationPage: React.FC = () => {
                       size="small"
                       startIcon={<VisibilityIcon fontSize="small" />}
                       onClick={() => handleOpenReview(app)}
+                      disabled={todaStatus === 'Pending Verification'}
                       sx={{
                         height: 34,
                         px: 2,
@@ -444,6 +478,11 @@ export const TodaDriverVerificationPage: React.FC = () => {
                           color: '#FFFFFF',
                           borderColor: 'var(--sakay-orange)',
                         },
+                        '&.Mui-disabled': {
+                          borderColor: '#E5E5EA',
+                          color: '#C7C7CC',
+                          backgroundColor: '#F2F2F7',
+                        }
                       }}
                     >
                       {app.todaStageStatus === 'Endorsed to LGU' ? 'View Details' : 'Screen Application'}
@@ -583,6 +622,8 @@ export const TodaDriverVerificationPage: React.FC = () => {
           documentName={`Tricycle_Unit_Inspection_${selectedApplicant.vehiclePlate}.png`}
           documentType="image"
         />
+      )}
+      </>
       )}
     </Box>
   );

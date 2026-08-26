@@ -121,10 +121,10 @@ export const ReportsPage: React.FC = () => {
       {/* 1. Header Toolbar with Export Action */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3.5, flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography sx={{ fontSize: '20px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+          <Typography sx={{ fontSize: '16px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
             Official Municipal Transportation Reports
           </Typography>
-          <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', mt: '3px' }}>
+          <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', mt: '3px' }}>
             Comprehensive reporting for tricycle public transit operations in Calapan City
           </Typography>
         </Box>
@@ -161,13 +161,13 @@ export const ReportsPage: React.FC = () => {
       >
         <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
           <CardContent sx={{ p: '20px 22px !important' }}>
-            <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1 }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1 }}>
               Total Completed Trips
             </Typography>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#2E7D32', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#2E7D32', mb: 0.5 }}>
               {summary.completedTrips}
             </Typography>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
               Out of {summary.totalBookings} total bookings
             </Typography>
           </CardContent>
@@ -175,13 +175,13 @@ export const ReportsPage: React.FC = () => {
 
         <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
           <CardContent sx={{ p: '20px 22px !important' }}>
-            <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1 }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1 }}>
               Gross Municipal Fares
             </Typography>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: 'var(--sakay-orange)', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: 'var(--sakay-orange)', mb: 0.5 }}>
               ₱{summary.totalRevenue.toLocaleString()}
             </Typography>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
               Average ₱{summary.averageFare}.00 / trip
             </Typography>
           </CardContent>
@@ -189,13 +189,13 @@ export const ReportsPage: React.FC = () => {
 
         <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
           <CardContent sx={{ p: '20px 22px !important' }}>
-            <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1 }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1 }}>
               Active Driver Workforce
             </Typography>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#1565C0', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#1565C0', mb: 0.5 }}>
               {summary.activeDrivers}
             </Typography>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
               Verified drivers across TODAs
             </Typography>
           </CardContent>
@@ -203,13 +203,13 @@ export const ReportsPage: React.FC = () => {
 
         <Card sx={{ borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', boxShadow: 'var(--mac-shadow-card)', backgroundColor: '#FFFFFF' }}>
           <CardContent sx={{ p: '20px 22px !important' }}>
-            <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1 }}>
+            <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1 }}>
               Accredited TODAs
             </Typography>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
               {summary.accreditedTodas}
             </Typography>
-            <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
               Authorized transport associations
             </Typography>
           </CardContent>
@@ -223,7 +223,7 @@ export const ReportsPage: React.FC = () => {
           onChange={(_, val) => setActiveReportTab(val)}
           sx={{
             '& .MuiTabs-indicator': { backgroundColor: 'var(--sakay-orange)', height: 3 },
-            '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: '14px', minHeight: 48 },
+            '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: '11.3px', minHeight: 48 },
             '& .Mui-selected': { color: 'var(--sakay-orange) !important' },
           }}
         >
@@ -239,7 +239,7 @@ export const ReportsPage: React.FC = () => {
       {isLoading ? (
         <Box sx={{ textAlign: 'center', py: 8 }}>
           <CircularProgress size={32} sx={{ color: 'var(--sakay-orange)', mb: 1.5 }} />
-          <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-muted)' }}>
+          <Typography sx={{ fontSize: '11.3px', color: 'var(--mac-text-muted)' }}>
             Generating report...
           </Typography>
         </Box>
@@ -258,7 +258,7 @@ export const ReportsPage: React.FC = () => {
           {/* Tab 1: Booking Reports */}
           {activeReportTab === 'Bookings' && (
             <Box>
-              <Typography sx={{ fontSize: '16px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 2 }}>
+              <Typography sx={{ fontSize: '12.8px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 2 }}>
                 Booking Performance & Tariff Revenue Audit
               </Typography>
               <TableContainer>
@@ -305,7 +305,7 @@ export const ReportsPage: React.FC = () => {
           {/* Tab 2: Driver Utilization */}
           {activeReportTab === 'Drivers' && (
             <Box>
-              <Typography sx={{ fontSize: '16px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 2 }}>
+              <Typography sx={{ fontSize: '12.8px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 2 }}>
                 Driver Utilization & Service Reliability Report ({reportsData?.driverUtilization.length || 0} Registered Drivers)
               </Typography>
               <TableContainer>
@@ -348,7 +348,7 @@ export const ReportsPage: React.FC = () => {
           {/* Tab 3: TODA Performance */}
           {activeReportTab === 'TODA' && (
             <Box>
-              <Typography sx={{ fontSize: '16px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 2 }}>
+              <Typography sx={{ fontSize: '12.8px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 2 }}>
                 Accredited TODA Association Operational Performance
               </Typography>
               <TableContainer>
@@ -389,13 +389,13 @@ export const ReportsPage: React.FC = () => {
           {/* Tab 4: Peak Hours */}
           {activeReportTab === 'PeakHours' && (
             <Box>
-              <Typography sx={{ fontSize: '16px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 2 }}>
+              <Typography sx={{ fontSize: '12.8px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 2 }}>
                 Peak Travel Hours Analysis (Calapan City Transit Demand)
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
                 {reportsData && reportsData.peakHourDistribution.map((h, idx) => (
                   <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Typography sx={{ width: 100, fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-secondary)' }}>
+                    <Typography sx={{ width: 100, fontSize: '10.8px', fontWeight: 600, color: 'var(--mac-text-secondary)' }}>
                       {h.hour}
                     </Typography>
                     <Box sx={{ flex: 1 }}>
@@ -413,7 +413,7 @@ export const ReportsPage: React.FC = () => {
                         }}
                       />
                     </Box>
-                    <Typography sx={{ width: 80, fontSize: '13.5px', fontWeight: 700, textAlign: 'right', color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ width: 80, fontSize: '10.8px', fontWeight: 700, textAlign: 'right', color: 'var(--mac-text-primary)' }}>
                       {h.count} Trips
                     </Typography>
                   </Box>
@@ -425,7 +425,7 @@ export const ReportsPage: React.FC = () => {
           {/* Tab 5: Barangay Demand */}
           {activeReportTab === 'Barangay' && (
             <Box>
-              <Typography sx={{ fontSize: '16px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 2 }}>
+              <Typography sx={{ fontSize: '12.8px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 2 }}>
                 Barangay Pickup & Service Zone Utilization Density
               </Typography>
               <TableContainer>
@@ -449,7 +449,7 @@ export const ReportsPage: React.FC = () => {
                               value={b.percentage || 10}
                               sx={{ flex: 1, height: 8, borderRadius: 4, '& .MuiLinearProgress-bar': { backgroundColor: '#1565C0' } }}
                             />
-                            <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-secondary)', width: 45 }}>
+                            <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-secondary)', width: 45 }}>
                               {b.percentage}%
                             </Typography>
                           </Box>
@@ -466,3 +466,4 @@ export const ReportsPage: React.FC = () => {
     </Box>
   );
 };
+

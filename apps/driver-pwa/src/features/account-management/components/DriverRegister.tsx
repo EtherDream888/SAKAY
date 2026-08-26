@@ -157,7 +157,7 @@ export const DriverRegister: React.FC = () => {
             onChange={(e) => setSelectedToda(e.target.value)}
             sx={{ borderRadius: '14px', backgroundColor: '#F8FAFC' }}
           >
-            {ACCREDITED_TODAS.map((toda) => (
+            {ACCREDITED_TODAS.filter((toda: any) => toda.status !== 'Pending Approval' && toda.status !== 'Pending Verification').map((toda) => (
               <MenuItem key={toda.id} value={toda.id}>
                 {toda.name} ({toda.acronym})
               </MenuItem>

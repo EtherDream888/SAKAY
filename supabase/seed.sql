@@ -210,3 +210,86 @@ INSERT INTO public.audit_log (
     'TODA_ACCREDITATION_CONFIRMED',
     'Confirmed municipal accreditation for CCTODA (CAL-TODA-2024-001) with 24 authorized units.'
 );
+-- ============================================================================
+-- SEED LGU ADMIN ACCOUNT (TESTING)
+-- ============================================================================
+-- Purpose:
+-- This script safely inserts the temporary LGU administrator account (admin@gmail.com / admin123)
+-- directly into the Supabase Auth schema (`auth.users`) and the `public.lgu_admin` profile table.
+-- It uses `pgcrypto` to hash the password properly for Supabase GoTrue authentication.
+
+DO $$
+DECLARE
+    v_user_id UUID := gen_random_uuid();
+    v_email VARCHAR := 'admin@gmail.com';
+    v_password VARCHAR := 'admin123';
+    v_existing_id UUID;
+BEGIN
+    -- Check if the user already exists in auth.users
+    SELECT id INTO v_existing_id FROM auth.users WHERE email = v_email;
+
+    IF v_existing_id IS NULL THEN
+        -- Insert into auth.users using pgcrypto for password hashing
+        INSERT INTO auth.users (
+            id,
+            instance_id,
+            email,
+            encrypted_password,
+            email_confirmed_at,
+            raw_app_meta_data,
+            raw_user_meta_data,
+            created_at,
+            updated_at,
+            role,
+            is_super_admin
+        ) VALUES (
+            v_user_id,
+            '00000000-0000-0000-0000-000000000000',
+            v_email,
+            crypt(v_password, gen_salt('bf')),
+            now(),
+            '{"provider":"email","providers":["email"]}',
+            '{"role":"lgu_admin","full_name":"City Administrator"}',
+            now(),
+            now(),
+            'authenticated',
+            false
+        );
+        
+        -- Insert identity for the user
+        INSERT INTO auth.identities (
+            id,
+            user_id,
+            provider_id,
+            identity_data,
+            provider,
+            created_at,
+            updated_at
+        ) VALUES (
+            v_user_id,
+            v_user_id,
+            v_user_id::text,
+            json_build_object('sub', v_user_id::text, 'email', v_email),
+            'email',
+            now()
+        );
+    ELSE
+        -- Update password and ensure email is confirmed if user already exists
+        UPDATE auth.users
+        SET encrypted_password = crypt(v_password, gen_salt('bf')),
+            email_confirmed_at = COALESCE(email_confirmed_at, now()),
+            raw_user_meta_data = '{"role":"lgu_admin","full_name":"City Administrator"}'
+        WHERE id = v_existing_id;
+        
+        v_user_id := v_existing_id;
+    END IF;
+
+    -- Insert or update into public.lgu_admin
+    INSERT INTO public.lgu_admin (auth_user_id, email, full_name, role, account_status)
+    VALUES (v_user_id, v_email, 'City Administrator', 'Super Admin', 'Active')
+    ON CONFLICT (auth_user_id) DO UPDATE
+    SET account_status = 'Active';
+
+    RAISE NOTICE 'Seed completed for %', v_email;
+END $$;
+

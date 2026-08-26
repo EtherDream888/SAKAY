@@ -9,7 +9,7 @@ interface AuthContextType {
   adminProfile: LguAdminProfile | null;
   loading: boolean;
   error: string | null;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string; role?: 'lgu_admin' | 'toda_admin' }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -155,8 +155,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [fetchAdminProfile]);
 
   // Sign In with email and password
-  const signIn = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+  const signIn = async (email: string, password: string): Promise<{ success: boolean; error?: string; role?: 'lgu_admin' | 'toda_admin' }> => {
     try {
+      console.log(`[LGU AUTH] signInWithPassword started`);
       setLoading(true);
       setError(null);
 
@@ -166,10 +167,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       });
 
       if (signInError) {
-        setError(signInError.message);
+        console.log(`[LGU AUTH] auth error:`, signInError);
+        console.log(`[LGU AUTH] auth error code:`, (signInError as any).code);
+        console.log(`[LGU AUTH] auth error message:`, signInError.message);
+        
+        let safeErrorMsg = signInError.message;
+        if (!safeErrorMsg || safeErrorMsg === '{}' || (typeof safeErrorMsg === 'object')) {
+          safeErrorMsg = 'Unable to sign in right now. Please try again.';
+        }
+        
+        setError(safeErrorMsg);
         setLoading(false);
-        return { success: false, error: signInError.message };
+        return { success: false, error: safeErrorMsg };
       }
+
+      console.log(`[LGU AUTH] auth error: null`);
+      console.log(`[LGU AUTH] session received:`, !!data.session);
+      console.log(`[LGU AUTH] user id:`, data.user?.id);
 
       if (!data.user) {
         const msg = 'Login failed: No user returned from authentication service.';
@@ -179,32 +193,81 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       // Fetch LGU Admin profile record
-      const profile = await fetchAdminProfile(data.user);
+      console.log(`[LGU AUTH] fetching lgu_admin profile:`, data.user.id);
+      let profile = null;
+      try {
+        profile = await fetchAdminProfile(data.user);
+        console.log(`[LGU AUTH] profile query error: null`);
+      } catch (profileErr: any) {
+        console.log(`[LGU AUTH] profile query error:`, profileErr.message || profileErr);
+        throw profileErr; // Let the outer catch handle it
+      }
+      
+      console.log(`[LGU AUTH] profile:`, profile ? 'found' : 'not found');
 
-      if (!profile) {
-        // User exists in auth.users, but is not in public.lgu_admin
-        await supabase.auth.signOut();
-        const msg = 'Access Denied: Your account does not have LGU Administrator privileges.';
-        setError(msg);
+      if (profile) {
+        console.log(`[LGU AUTH] account status:`, profile.account_status);
+        console.log(`[LGU AUTH] position:`, profile.position);
+        
+        if (profile.account_status !== 'Active') {
+           console.log(`[LGU AUTH] redirect decision: rejected (inactive)`);
+        } else {
+           console.log(`[LGU AUTH] redirect decision: allowed (lgu_dashboard)`);
+        }
+        
+        setSession(data.session);
+        setUser(data.user);
+        setAdminProfile(profile);
         setLoading(false);
-        return { success: false, error: msg };
+
+        // Record last login
+        await supabase
+          .from('lgu_admin')
+          .update({ last_login: new Date().toISOString() })
+          .eq('auth_user_id', data.user.id);
+
+        return { success: true, role: 'lgu_admin' };
+      }
+      
+      // If not LGU Admin, check TODA Admin
+      const { data: todaProfile, error: todaError } = await supabase
+        .from('toda_admin')
+        .select('*')
+        .eq('auth_user_id', data.user.id)
+        .maybeSingle();
+        
+      if (todaProfile && !todaError) {
+        if (todaProfile.account_status === 'Suspended') {
+          await supabase.auth.signOut();
+          const msg = 'Your TODA administrator account is suspended. Please contact the City Transport Office.';
+          setError(msg);
+          setLoading(false);
+          return { success: false, error: msg };
+        }
+        
+        // Let them log in, return toda_admin so the login page can redirect
+        // Note: we don't set adminProfile here because AuthContext type is strictly LguAdminProfile
+        setLoading(false);
+        return { success: true, role: 'toda_admin' };
       }
 
-      setSession(data.session);
-      setUser(data.user);
-      setAdminProfile(profile);
+      // Neither LGU nor TODA Admin
+      await supabase.auth.signOut();
+      const msg = 'Access Denied: Your account does not have Administrator privileges.';
+      console.log(`[LGU AUTH] redirect decision: rejected (no profile)`);
+      setError(msg);
       setLoading(false);
+      return { success: false, error: msg };
 
-      // Record last login
-      await supabase
-        .from('lgu_admin')
-        .update({ last_login: new Date().toISOString() })
-        .eq('auth_user_id', data.user.id);
-
-      return { success: true };
     } catch (err: any) {
       console.error('Sign in exception:', err);
-      const msg = err.message || 'An unexpected error occurred during login.';
+      console.log(`[LGU AUTH] redirect decision: rejected (exception)`);
+      
+      let msg = err.message || 'An unexpected error occurred during login.';
+      if (msg === '{}' || (typeof msg === 'object')) {
+        msg = 'Unable to sign in right now. Please try again.';
+      }
+      
       setError(msg);
       setLoading(false);
       return { success: false, error: msg };

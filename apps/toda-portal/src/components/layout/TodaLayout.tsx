@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
-import { Box } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Alert, Typography } from '@mui/material';
 import { Outlet } from 'react-router-dom';
 import { TodaHeader } from './TodaHeader';
 import { TodaSidebar } from './TodaSidebar';
+import { fetchTodaProfile } from '../../services/todaApiService';
+import { TodaProfile } from '../../types/toda';
 
 interface TodaLayoutProps {
   children?: React.ReactNode;
@@ -16,6 +18,13 @@ export const TodaLayout: React.FC<TodaLayoutProps> = ({
   pageSubtitle,
 }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [profile, setProfile] = useState<TodaProfile | null>(null);
+
+  useEffect(() => {
+    fetchTodaProfile().then(p => {
+      if (p) setProfile(p);
+    });
+  }, []);
 
   return (
     <Box
@@ -55,9 +64,20 @@ export const TodaLayout: React.FC<TodaLayoutProps> = ({
             backgroundColor: '#FFF8F2',
           }}
         >
+          {profile?.accreditationStatus === 'Pending Verification' && (
+            <Box sx={{ mb: 3.5 }}>
+              <Alert severity="warning" sx={{ borderRadius: 'var(--mac-radius-lg)', boxShadow: 'var(--mac-shadow-card)', '& .MuiAlert-message': { width: '100%' } }}>
+                <Typography sx={{ fontWeight: 600, color: '#9a6b00', mb: 0.5 }}>Pending Accreditation</Typography>
+                <Typography sx={{ fontSize: '14px', color: '#664d03' }}>
+                  Your TODA application is currently being reviewed by the LGU. You can access your account while waiting for approval, but some TODA features will remain unavailable until your application is approved and accredited.
+                </Typography>
+              </Alert>
+            </Box>
+          )}
           {children || <Outlet />}
         </Box>
       </Box>
     </Box>
   );
 };
+

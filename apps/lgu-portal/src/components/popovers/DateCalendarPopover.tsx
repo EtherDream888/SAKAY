@@ -81,7 +81,7 @@ export const DateCalendarPopover: React.FC<DateCalendarPopoverProps> = ({
     >
       {/* Month & Year Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-primary)' }}>
+        <Typography sx={{ fontWeight: 600, fontSize: '11.3px', color: 'var(--mac-text-primary)' }}>
           {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
         </Typography>
         <Box sx={{ display: 'flex', gap: '4px' }}>
@@ -97,7 +97,7 @@ export const DateCalendarPopover: React.FC<DateCalendarPopoverProps> = ({
       {/* Weekday Grid */}
       <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', mb: 1 }}>
         {daysOfWeek.map((day) => (
-          <Typography key={day} sx={{ fontSize: '11px', fontWeight: 600, color: 'var(--mac-text-muted)' }}>
+          <Typography key={day} sx={{ fontSize: '8.8px', fontWeight: 600, color: 'var(--mac-text-muted)' }}>
             {day}
           </Typography>
         ))}
@@ -124,7 +124,7 @@ export const DateCalendarPopover: React.FC<DateCalendarPopoverProps> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '12.5px',
+                fontSize: '10px',
                 fontWeight: isSelected ? 600 : 450,
                 borderRadius: '50%',
                 cursor: 'pointer',

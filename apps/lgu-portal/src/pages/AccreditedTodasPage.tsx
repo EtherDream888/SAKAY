@@ -138,25 +138,25 @@ export const AccreditedTodasPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 TODA NAME & ACRONYM
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 REPRESENTATIVE
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 SERVICE ZONE (BARANGAY)
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 BARANGAY CLEARANCE
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 AUTHORIZED FLEET
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 STATUS
               </TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 ACTIONS
               </TableCell>
             </TableRow>
@@ -166,7 +166,7 @@ export const AccreditedTodasPage: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
                   <CircularProgress size={32} sx={{ color: 'var(--sakay-orange)', mb: 1.5 }} />
-                  <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-muted)' }}>
+                  <Typography sx={{ fontSize: '11.3px', color: 'var(--mac-text-muted)' }}>
                     Loading accredited TODAs from municipal registry...
                   </Typography>
                 </TableCell>
@@ -182,23 +182,23 @@ export const AccreditedTodasPage: React.FC = () => {
                 >
                   <TableCell sx={{ py: 2.2, px: 3 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Typography sx={{ fontWeight: 600, fontSize: '14.5px', color: 'var(--mac-text-primary)' }}>
+                      <Typography sx={{ fontWeight: 600, fontSize: '11.6px', color: 'var(--mac-text-primary)' }}>
                         {toda.name}
                       </Typography>
                       {toda.acronym && (
                         <Chip
                           label={toda.acronym}
                           size="small"
-                          sx={{ fontSize: '11px', fontWeight: 600, backgroundColor: 'rgba(255, 107, 26, 0.1)', color: 'var(--sakay-orange)', height: 22 }}
+                          sx={{ fontSize: '8.8px', fontWeight: 600, backgroundColor: 'rgba(255, 107, 26, 0.1)', color: 'var(--sakay-orange)', height: 22 }}
                         />
                       )}
                       {toda.flaggedForReview && (
                         <Chip
-                          icon={<WarningAmberIcon style={{ fontSize: 14, color: '#EA580C' }} />}
+                          icon={<WarningAmberIcon style={{ fontSize: '11.3', color: '#EA580C' }} />}
                           label={`Flagged (${toda.confirmedIncidents} Incidents)`}
                           size="small"
                           sx={{
-                            fontSize: '11px',
+                            fontSize: '8.8px',
                             fontWeight: 600,
                             backgroundColor: '#FFF7ED',
                             color: '#EA580C',
@@ -208,20 +208,20 @@ export const AccreditedTodasPage: React.FC = () => {
                         />
                       )}
                     </Box>
-                    <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)', mt: '3px' }}>
+                    <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)', mt: '3px' }}>
                       Permit / Cert: {toda.accreditationNo}
                     </Typography>
                   </TableCell>
-                  <TableCell sx={{ fontSize: '14px', color: 'var(--mac-text-primary)', py: 2.2, px: 3 }}>
+                  <TableCell sx={{ fontSize: '11.3px', color: 'var(--mac-text-primary)', py: 2.2, px: 3 }}>
                     {toda.representative}
                   </TableCell>
-                  <TableCell sx={{ fontSize: '14px', color: 'var(--mac-text-secondary)', py: 2.2, px: 3 }}>
+                  <TableCell sx={{ fontSize: '11.3px', color: 'var(--mac-text-secondary)', py: 2.2, px: 3 }}>
                     {toda.barangay}
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
                     <Typography
                       sx={{
-                        fontSize: '13.5px',
+                        fontSize: '10.8px',
                         fontWeight: 600,
                         color:
                           toda.clearanceStatus === 'Expired'
@@ -237,7 +237,7 @@ export const AccreditedTodasPage: React.FC = () => {
                       <StatusBadge status={toda.clearanceStatus as any} />
                     </Box>
                   </TableCell>
-                  <TableCell sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)', py: 2.2, px: 3 }}>
+                  <TableCell sx={{ fontSize: '11.3px', fontWeight: 600, color: 'var(--mac-text-primary)', py: 2.2, px: 3 }}>
                     {toda.registeredDrivers} Drivers
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
@@ -258,11 +258,11 @@ export const AccreditedTodasPage: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-                    <AccountBalanceIcon sx={{ fontSize: 44, color: 'var(--mac-border-color)' }} />
-                    <Typography sx={{ fontSize: '15px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
+                    <AccountBalanceIcon sx={{ fontSize: '35.3', color: 'var(--mac-border-color)' }} />
+                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
                       No accredited TODAs found
                     </Typography>
-                    <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
+                    <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
                       {searchQuery || statusFilter !== 'All'
                         ? 'No records match your active search or filter parameters.'
                         : 'There are currently no accredited TODAs registered yet.'}
@@ -273,7 +273,7 @@ export const AccreditedTodasPage: React.FC = () => {
                       sx={{
                         mt: 1,
                         textTransform: 'none',
-                        fontSize: '13.5px',
+                        fontSize: '10.8px',
                         color: 'var(--sakay-orange)',
                         fontWeight: 600,
                       }}
@@ -299,3 +299,5 @@ export const AccreditedTodasPage: React.FC = () => {
     </Box>
   );
 };
+
+

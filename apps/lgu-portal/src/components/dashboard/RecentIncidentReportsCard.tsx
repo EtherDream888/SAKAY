@@ -31,14 +31,14 @@ export const RecentIncidentReportsCard: React.FC<RecentIncidentReportsCardProps>
     switch (type) {
       case 'overcharging':
       case 'fare':
-        return <AttachMoneyIcon sx={{ color: '#D93025', fontSize: 18 }} />;
+        return <AttachMoneyIcon sx={{ color: '#D93025', fontSize: '14.4' }} />;
       case 'misconduct':
       case 'behavior':
-        return <GavelIcon sx={{ color: '#F9AB00', fontSize: 18 }} />;
+        return <GavelIcon sx={{ color: '#F9AB00', fontSize: '14.4' }} />;
       case 'route':
       case 'safety':
       default:
-        return <ReportProblemIcon sx={{ color: '#D93025', fontSize: 18 }} />;
+        return <ReportProblemIcon sx={{ color: '#D93025', fontSize: '14.4' }} />;
     }
   };
 
@@ -73,10 +73,10 @@ export const RecentIncidentReportsCard: React.FC<RecentIncidentReportsCardProps>
       <CardContent sx={{ padding: '24px !important', flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
           <Box>
-            <Typography sx={{ fontSize: '17px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+            <Typography sx={{ fontSize: '13.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
               Recent Incident Reports
             </Typography>
-            <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', mt: '2px' }}>
+            <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', mt: '2px' }}>
               Passenger complaints requiring LGU officer review.
             </Typography>
           </Box>
@@ -90,7 +90,7 @@ export const RecentIncidentReportsCard: React.FC<RecentIncidentReportsCardProps>
               borderRadius: '9px',
               backgroundColor: '#FFFFFF',
               color: 'var(--mac-text-primary)',
-              fontSize: '14px',
+              fontSize: '11.3px',
               fontWeight: 500,
               textTransform: 'none',
               border: '1px solid var(--mac-border-color)',
@@ -152,10 +152,10 @@ export const RecentIncidentReportsCard: React.FC<RecentIncidentReportsCardProps>
                     {getIncidentIcon(report.iconType)}
                   </Box>
                   <Box>
-                    <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)', lineHeight: 1.2 }}>
+                    <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)', lineHeight: 1.2 }}>
                       {report.category}
                     </Typography>
-                    <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)', lineHeight: 1.2, mt: '3px' }}>
+                    <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)', lineHeight: 1.2, mt: '3px' }}>
                       {report.timestamp}
                     </Typography>
                   </Box>
@@ -166,7 +166,7 @@ export const RecentIncidentReportsCard: React.FC<RecentIncidentReportsCardProps>
                   <ChevronRightIcon
                     className="incident-chevron"
                     sx={{
-                      fontSize: 20,
+                      fontSize: '16',
                       color: 'var(--mac-text-muted)',
                       opacity: 0.6,
                       transition: 'var(--mac-transition-fast)',
@@ -188,12 +188,12 @@ export const RecentIncidentReportsCard: React.FC<RecentIncidentReportsCardProps>
               gap: 1,
             }}
           >
-            <CheckCircleIcon sx={{ fontSize: 38, color: '#34A853', opacity: 0.8 }} />
-            <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+            <CheckCircleIcon sx={{ fontSize: '30.4', color: '#34A853', opacity: 0.8 }} />
+            <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
               No Active Incident Reports
             </Typography>
 
-            <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', textAlign: 'center', maxWidth: 300 }}>
+            <Typography sx={{ fontSize: '10.4px', color: 'var(--mac-text-muted)', textAlign: 'center', maxWidth: 300 }}>
               There are currently no passenger complaints or incident reports recorded.
             </Typography>
           </Box>

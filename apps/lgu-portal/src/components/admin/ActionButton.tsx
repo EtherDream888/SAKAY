@@ -19,12 +19,12 @@ export const ActionButton: React.FC<ActionButtonProps> = ({
   return (
     <Button
       onClick={onClick}
-      endIcon={showArrow ? <ArrowForwardIcon className="action-arrow" sx={{ fontSize: 16, transition: 'transform 0.15s ease' }} /> : undefined}
+      endIcon={showArrow ? <ArrowForwardIcon className="action-arrow" sx={{ fontSize: '12.8', transition: 'transform 0.15s ease' }} /> : undefined}
       sx={{
         height: 36,
         padding: '0 16px',
         borderRadius: '9px',
-        fontSize: '13.5px',
+        fontSize: '10.8px',
         fontWeight: 500,
         textTransform: 'none',
         backgroundColor: active ? 'var(--sakay-orange-soft)' : '#FFFFFF',

@@ -40,15 +40,15 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
             borderRadius: '20px',
           }}
         >
-          <LocalPoliceOutlinedIcon sx={{ color: '#FF6B00', fontSize: 20 }} />
-          <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#FFD580', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          <LocalPoliceOutlinedIcon sx={{ color: '#FF6B00', fontSize: '16' }} />
+          <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: '#FFD580', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             SAKAY LGU Portal
           </Typography>
         </Box>
 
         <CircularProgress size={36} thickness={4} sx={{ color: '#FF6B00' }} />
 
-        <Typography sx={{ fontSize: '14px', color: '#94A3B8', fontWeight: 400 }}>
+        <Typography sx={{ fontSize: '11.3px', color: '#94A3B8', fontWeight: 400 }}>
           Verifying administrator credentials...
         </Typography>
       </Box>

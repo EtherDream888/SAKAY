@@ -151,15 +151,15 @@ export const IncidentReportsPage: React.FC = () => {
         >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Pending Review
               </Typography>
-              <ReportProblemIcon sx={{ color: 'var(--sakay-orange)', fontSize: 20 }} />
+              <ReportProblemIcon sx={{ color: 'var(--sakay-orange)', fontSize: '16' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.5 }}>
               {pendingCount}
             </Typography>
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)' }}>
               Awaiting initial LGU triage
             </Typography>
           </CardContent>
@@ -177,15 +177,15 @@ export const IncidentReportsPage: React.FC = () => {
         >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Under Investigation
               </Typography>
-              <HourglassEmptyIcon sx={{ color: '#1565C0', fontSize: 20 }} />
+              <HourglassEmptyIcon sx={{ color: '#1565C0', fontSize: '16' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#1565C0', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#1565C0', mb: 0.5 }}>
               {investigationCount}
             </Typography>
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)' }}>
               Assigned to LGU triage officer
             </Typography>
           </CardContent>
@@ -203,15 +203,15 @@ export const IncidentReportsPage: React.FC = () => {
         >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Resolved Reports
               </Typography>
-              <CheckCircleIcon sx={{ color: '#2E7D32', fontSize: 20 }} />
+              <CheckCircleIcon sx={{ color: '#2E7D32', fontSize: '16' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#2E7D32', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#2E7D32', mb: 0.5 }}>
               {resolvedCount}
             </Typography>
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)' }}>
               Sanctions or waivers finalized
             </Typography>
           </CardContent>
@@ -229,15 +229,15 @@ export const IncidentReportsPage: React.FC = () => {
         >
           <CardContent sx={{ p: '20px 22px !important' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-              <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Dismissed
               </Typography>
-              <CancelIcon sx={{ color: '#757575', fontSize: 20 }} />
+              <CancelIcon sx={{ color: '#757575', fontSize: '16' }} />
             </Box>
-            <Typography sx={{ fontSize: '28px', fontWeight: 700, color: '#757575', mb: 0.5 }}>
+            <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#757575', mb: 0.5 }}>
               {dismissedCount}
             </Typography>
-            <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+            <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)' }}>
               Unfounded or duplicate reports
             </Typography>
           </CardContent>
@@ -287,22 +287,22 @@ export const IncidentReportsPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 INCIDENT ID & CATEGORY
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 REPORTED ENTITY / DRIVER
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 COMPLAINANT
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 SUBMITTED DATE
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 STATUS
               </TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 ACTIONS
               </TableCell>
             </TableRow>
@@ -312,7 +312,7 @@ export const IncidentReportsPage: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
                   <CircularProgress size={32} sx={{ color: 'var(--sakay-orange)', mb: 1.5 }} />
-                  <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-muted)' }}>
+                  <Typography sx={{ fontSize: '11.3px', color: 'var(--mac-text-muted)' }}>
                     Loading incident reports...
                   </Typography>
                 </TableCell>
@@ -327,31 +327,31 @@ export const IncidentReportsPage: React.FC = () => {
                   }}
                 >
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontWeight: 700, fontSize: '14.5px', color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontWeight: 700, fontSize: '11.6px', color: 'var(--mac-text-primary)' }}>
                       {inc.id}
                     </Typography>
-                    <Typography sx={{ fontSize: '12.5px', color: 'var(--sakay-orange)', fontWeight: 600, mt: '3px' }}>
+                    <Typography sx={{ fontSize: '10px', color: 'var(--sakay-orange)', fontWeight: 600, mt: '3px' }}>
                       {inc.category}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontSize: '11.3px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                       {inc.driverName}
                     </Typography>
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+                    <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
                       {inc.todaName}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontSize: '11.3px', color: 'var(--mac-text-primary)' }}>
                       {inc.reporterName} ({inc.reportedBy})
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-primary)' }}>
                       {inc.submittedDate}
                     </Typography>
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+                    <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
                       {inc.submittedTime}
                     </Typography>
                   </TableCell>
@@ -373,11 +373,11 @@ export const IncidentReportsPage: React.FC = () => {
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
                   <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5 }}>
-                    <ReportProblemIcon sx={{ fontSize: 44, color: 'var(--mac-border-color)' }} />
-                    <Typography sx={{ fontSize: '15px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
+                    <ReportProblemIcon sx={{ fontSize: '35.3', color: 'var(--mac-border-color)' }} />
+                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-primary)', fontWeight: 600 }}>
                       No incident reports found
                     </Typography>
-                    <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
+                    <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', maxWidth: 420 }}>
                       {searchQuery || statusFilter !== 'All'
                         ? 'No reports match your active search or filter criteria.'
                         : 'There are currently no incident reports recorded.'}
@@ -388,7 +388,7 @@ export const IncidentReportsPage: React.FC = () => {
                       sx={{
                         mt: 1,
                         textTransform: 'none',
-                        fontSize: '13.5px',
+                        fontSize: '10.8px',
                         color: 'var(--sakay-orange)',
                         fontWeight: 600,
                       }}
@@ -415,3 +415,4 @@ export const IncidentReportsPage: React.FC = () => {
     </Box>
   );
 };
+
