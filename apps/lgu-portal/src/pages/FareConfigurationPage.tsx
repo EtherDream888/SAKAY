@@ -41,25 +41,24 @@ import { fetchFareMatrices, createFareMatrix, recordAdminAuditAction } from '../
  */
 export const FareConfigurationPage: React.FC = () => {
   // State: Historical and currently enacted fare matrix records
-  const [fareHistory, setFareHistory] = useState<FareMatrixRecord[]>(MOCK_FARE_MATRIX_HISTORY);
+  const [fareHistory, setFareHistory] = useState<FareMatrixRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [updateModalOpen, setUpdateModalOpen] = useState<boolean>(false);
   const [selectedVersion, setSelectedVersion] = useState<FareMatrixRecord | null>(null);
 
   /**
    * Effect: Fetch live fare matrices from the backend server on initial component load.
-   * If the backend server is offline, it gracefully uses the fallback mock data.
    */
   useEffect(() => {
     let isMounted = true;
     fetchFareMatrices()
       .then((data) => {
-        if (isMounted && data && data.length > 0) {
-          setFareHistory(data);
+        if (isMounted) {
+          setFareHistory(data || []);
         }
       })
       .catch((err) => {
-        console.warn('[FareConfiguration] Failed to fetch fare matrix, using fallback:', err);
+        console.warn('[FareConfiguration] Failed to fetch fare matrix:', err);
       })
       .finally(() => {
         if (isMounted) setIsLoading(false);

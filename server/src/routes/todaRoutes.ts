@@ -188,6 +188,113 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // ============================================================================
+// 3.1. SUBMIT TODA REGISTRATION APPLICATION
+// ============================================================================
+router.post('/register', async (req: Request, res: Response) => {
+  try {
+    const {
+      toda_name,
+      toda_acronym,
+      registration_number,
+      date_established,
+      active_drivers,
+      registered_tricycles,
+      terminal_location,
+      barangay,
+      service_coverage_area,
+      president_name,
+      email,
+      contact_number,
+      barangay_clearance_url,
+      accredited_drivers_url,
+      auth_user_id,
+    } = req.body;
+
+    if (!toda_name || !president_name || !contact_number) {
+      return res.status(400).json({
+        success: false,
+        error: 'Required fields: toda_name, president_name, contact_number',
+      });
+    }
+
+    if (supabase) {
+      // 1. Insert into public.toda
+      const { data: todaData, error: todaErr } = await supabase
+        .from('toda')
+        .insert([
+          {
+            toda_name: toda_name.trim(),
+            toda_acronym: toda_acronym ? toda_acronym.trim() : toda_name.slice(0, 4).toUpperCase(),
+            registration_number: registration_number || `REG-${Date.now()}`,
+            date_established: date_established || '2024-01-01',
+            active_driver_count: parseInt(active_drivers) || 1,
+            registered_tricycle_count: parseInt(registered_tricycles) || 1,
+            terminal_latitude: 13.4117,
+            terminal_longitude: 121.1803,
+            barangay: barangay || 'San Vicente Central',
+            service_coverage_area: service_coverage_area || terminal_location || 'Calapan City',
+            president_name: president_name.trim(),
+            president_contact: contact_number,
+            account_status: 'Pending Verification',
+            barangay_clearance_url: barangay_clearance_url || null,
+            accredited_drivers_url: accredited_drivers_url || null,
+          },
+        ])
+        .select()
+        .single();
+
+      if (todaErr) {
+        console.error('[todaRoutes] /register tutta todaErr:', todaErr);
+        throw todaErr;
+      }
+
+      // 2. Link toda_admin if auth_user_id or email is provided
+      if (todaData && auth_user_id) {
+        try {
+          await supabase.from('toda_admin').insert([
+            {
+              auth_user_id,
+              toda_id: todaData.toda_id,
+              full_name: president_name.trim(),
+              email: email ? email.trim() : null,
+              contact_number,
+              account_status: 'Active',
+            },
+          ]);
+        } catch (adminErr) {
+          console.warn('[todaRoutes] /register toda_admin insert notice:', adminErr);
+        }
+      }
+
+      // 3. Write Audit Log
+      try {
+        await supabase.from('audit_log').insert([
+          {
+            action_type: 'TODA_REGISTRATION_SUBMITTED',
+            target_id: todaData?.toda_id,
+            details: `Submitted new TODA accreditation application for '${toda_name}' in Brgy. ${barangay || 'San Vicente Central'}.`,
+            performed_at: new Date().toISOString(),
+          },
+        ]);
+      } catch (auditErr) {
+        console.warn('[todaRoutes] Audit log notice:', auditErr);
+      }
+
+      return res.json({
+        success: true,
+        message: 'TODA application submitted successfully.',
+        data: todaData,
+      });
+    }
+
+    return res.json({ success: true, message: 'Local mode: TODA recorded.' });
+  } catch (err: any) {
+    console.error('[todaRoutes] /register error:', err);
+    return res.status(500).json({ success: false, error: err.message || 'Failed to register TODA.' });
+  }
+});
+
+// ============================================================================
 // 4. APPROVE TODA APPLICATION
 // ============================================================================
 router.post('/:id/approve', async (req: Request, res: Response) => {

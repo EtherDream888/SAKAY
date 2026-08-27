@@ -13,10 +13,25 @@ AS $$
 DECLARE
     v_status VARCHAR;
 BEGIN
-    SELECT account_status INTO v_status FROM public.toda WHERE id = target_toda_id;
+    SELECT account_status INTO v_status FROM public.toda WHERE toda_id = target_toda_id;
     RETURN (v_status = 'Active');
 END;
 $$;
+
+-- Helper to check if the current user is an active TODA admin
+CREATE OR REPLACE FUNCTION public.is_toda_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+    IF auth.uid() IS NULL THEN
+        RETURN FALSE;
+    END IF;
+    RETURN EXISTS (
+        SELECT 1 FROM public.toda_admin 
+        WHERE auth_user_id = auth.uid() 
+        AND account_status = 'Active'
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 -- Note: We must drop any existing open driver insertion policy if we want to restrict it.
 -- The previous migration `20260819121500_fix_security_and_rls.sql` might have added a permissive policy for TODA admins.

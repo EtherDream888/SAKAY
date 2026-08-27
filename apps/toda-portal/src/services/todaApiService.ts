@@ -99,15 +99,10 @@ export async function updateTodaProfile(
   const updatePayload: any = {};
   if (profileData.name) updatePayload.toda_name = profileData.name;
   if (profileData.acronym) updatePayload.toda_acronym = profileData.acronym;
-  if (profileData.contactPhone) updatePayload.contact_number = profileData.contactPhone;
-  if (profileData.contactEmail) updatePayload.email = profileData.contactEmail;
+  if (profileData.contactPhone) updatePayload.president_contact = profileData.contactPhone;
   if (profileData.serviceArea) updatePayload.service_coverage_area = profileData.serviceArea;
-
-  if (profileData.officers) {
-    if (profileData.officers.president) updatePayload.president_name = profileData.officers.president;
-    if (profileData.officers.vicePresident) updatePayload.vice_president_name = profileData.officers.vicePresident;
-    if (profileData.officers.secretary) updatePayload.secretary_name = profileData.officers.secretary;
-    if (profileData.officers.treasurer) updatePayload.treasurer_name = profileData.officers.treasurer;
+  if (profileData.officers && profileData.officers.president) {
+    updatePayload.president_name = profileData.officers.president;
   }
 
   const { data, error } = await supabase
@@ -122,7 +117,7 @@ export async function updateTodaProfile(
   await recordTodaAuditAction({
     actionType: 'TODA_PROFILE_UPDATED',
     targetId: todaId,
-    details: `Updated association contact info and officers roster for '${data?.toda_name || todaId}'.`,
+    details: `Updated association contact info for '${data?.toda_name || todaId}'.`,
   });
 
   return { success: true, data };
@@ -146,18 +141,16 @@ export async function registerToda(payload: {
   const insertPayload = {
     toda_name: payload.todaName,
     toda_acronym: payload.todaAcronym,
+    registration_number: `REG-${Math.floor(1000 + Math.random() * 9000)}`,
     barangay: payload.barangay,
-    date_established: payload.dateEstablished,
+    date_established: payload.dateEstablished || '2024-01-01',
     service_coverage_area: payload.serviceCoverageArea,
-    contact_number: payload.presidentContact,
     president_name: payload.presidentName,
     president_contact: payload.presidentContact,
-    vice_president_name: payload.vicePresidentName || 'N/A',
-    vice_president_contact: payload.vicePresidentContact || 'N/A',
-    secretary_name: payload.secretaryName || 'N/A',
-    secretary_contact: payload.secretaryContact || 'N/A',
-    treasurer_name: payload.treasurerName || 'N/A',
-    treasurer_contact: payload.treasurerContact || 'N/A',
+    active_driver_count: 1,
+    registered_tricycle_count: 1,
+    terminal_latitude: 13.4117,
+    terminal_longitude: 121.1803,
     account_status: 'Pending Verification',
   };
 

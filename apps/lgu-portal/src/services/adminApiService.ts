@@ -359,7 +359,7 @@ export async function approveTodaApplication(applicationId: string, remarks?: st
       certificate_number: certNo,
       certificate_expiry: certExpiry,
     })
-    .eq('id', applicationId)
+    .eq('toda_id', applicationId)
     .select()
     .single();
 

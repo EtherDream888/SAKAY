@@ -27,7 +27,7 @@ import UnpublishedIcon from '@mui/icons-material/Unpublished';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
-import { MOCK_ANNOUNCEMENTS, AnnouncementRecord, MOCK_ACCREDITED_TODAS, CURRENT_ADMIN } from '../mockData/adminData';
+import { AnnouncementRecord, AccreditedTodaRecord, CURRENT_ADMIN } from '../mockData/adminData';
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
@@ -36,6 +36,7 @@ import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
 import { TableEmptyState } from '../components/common/TableEmptyState';
 import {
   fetchAnnouncements,
+  fetchAccreditedTodas,
   createAnnouncement,
   deleteAnnouncement,
   recordAdminAuditAction,
@@ -54,6 +55,7 @@ import {
 export const AnnouncementManagementPage: React.FC = () => {
   // State: Broadcast bulletins list and filter options
   const [announcements, setAnnouncements] = useState<AnnouncementRecord[]>([]);
+  const [todasList, setTodasList] = useState<AccreditedTodaRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
@@ -76,18 +78,19 @@ export const AnnouncementManagementPage: React.FC = () => {
   const [formScheduledDate, setFormScheduledDate] = useState('May 25, 2026');
 
   /**
-   * Effect: Fetch live municipal announcements on initial mount.
+   * Effect: Fetch live municipal announcements and accredited TODAs on initial mount.
    */
   useEffect(() => {
     let isMounted = true;
-    fetchAnnouncements()
-      .then((data) => {
+    Promise.all([fetchAnnouncements(), fetchAccreditedTodas()])
+      .then(([annData, todaData]) => {
         if (isMounted) {
-          setAnnouncements(data || []);
+          setAnnouncements(annData || []);
+          setTodasList(todaData || []);
         }
       })
       .catch((err) => {
-        console.warn('[AnnouncementManagement] Failed to fetch announcements:', err);
+        console.warn('[AnnouncementManagement] Failed to fetch data:', err);
       })
       .finally(() => {
         if (isMounted) setIsLoading(false);
@@ -158,7 +161,7 @@ export const AnnouncementManagementPage: React.FC = () => {
 
     let todaName: string | null = null;
     if (formTodaId !== 'all-todas' && formRole !== 'All') {
-      const todaMatch = MOCK_ACCREDITED_TODAS.find((t) => t.id === formTodaId);
+      const todaMatch = todasList.find((t) => t.id === formTodaId);
       todaName = todaMatch ? todaMatch.name : 'Selected TODA';
     } else {
       todaName = formRole === 'All' ? 'All City TODAs & Commuters' : `All ${formRole}s`;
@@ -532,7 +535,7 @@ export const AnnouncementManagementPage: React.FC = () => {
                   sx={{ borderRadius: '10px' }}
                 >
                   <MenuItem value="all-todas">All City TODAs (City-Wide)</MenuItem>
-                  {MOCK_ACCREDITED_TODAS.map((toda) => (
+                  {todasList.map((toda) => (
                     <MenuItem key={toda.id} value={toda.id}>
                       {toda.name} ({toda.barangay})
                     </MenuItem>
