@@ -293,3 +293,128 @@ BEGIN
     RAISE NOTICE 'Seed completed for %', v_email;
 END $$;
 
+-- ============================================================================
+-- SEED TODA ASSOCIATION ADMINISTRATORS (ACRONYM-BASED LOGINS)
+-- ============================================================================
+-- Purpose:
+-- Provisions seeded TODA association administrator accounts mapped to their
+-- confirmed TODA Acronyms using internal synthetic email addresses.
+
+DO $$
+DECLARE
+    rec RECORD;
+    v_user_id UUID;
+    v_existing_id UUID;
+    toda_seeds jsonb := '[
+        {
+            "acronym": "cctoda",
+            "toda_id": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+            "full_name": "Roberto \"Berting\" Alcantara (President)",
+            "contact": "+63 917 555 1001",
+            "password": "Password123!"
+        },
+        {
+            "acronym": "bltoda",
+            "toda_id": "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12",
+            "full_name": "Arnaldo V. Mendoza (President)",
+            "contact": "+63 918 555 2001",
+            "password": "Password123!"
+        },
+        {
+            "acronym": "svtoda",
+            "toda_id": "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13",
+            "full_name": "Nestor G. Villanueva (President)",
+            "contact": "+63 919 555 3001",
+            "password": "Password123!"
+        },
+        {
+            "acronym": "lptoda",
+            "toda_id": "09e2b9cd-c91f-42ea-8687-dad76819898a",
+            "full_name": "Ricardo \"Cardo\" Dalisay (President)",
+            "contact": "+63 960 693 8525",
+            "password": "Password123!"
+        }
+    ]'::jsonb;
+    v_email VARCHAR;
+BEGIN
+    FOR rec IN SELECT * FROM jsonb_to_recordset(toda_seeds) AS x(
+        acronym text,
+        toda_id uuid,
+        full_name text,
+        contact text,
+        password text
+    )
+    LOOP
+        v_email := lower(rec.acronym) || '@toda.sakay.internal';
+        v_user_id := gen_random_uuid();
+
+        SELECT id INTO v_existing_id FROM auth.users WHERE email = v_email;
+
+        IF v_existing_id IS NULL THEN
+            INSERT INTO auth.users (
+                id,
+                instance_id,
+                email,
+                encrypted_password,
+                email_confirmed_at,
+                raw_app_meta_data,
+                raw_user_meta_data,
+                created_at,
+                updated_at,
+                role,
+                is_super_admin
+            ) VALUES (
+                v_user_id,
+                '00000000-0000-0000-0000-000000000000',
+                v_email,
+                crypt(rec.password, gen_salt('bf')),
+                now(),
+                '{"provider":"email","providers":["email"]}',
+                json_build_object('role', 'toda_admin', 'full_name', rec.full_name, 'toda_acronym', upper(rec.acronym)),
+                now(),
+                now(),
+                'authenticated',
+                false
+            );
+
+            INSERT INTO auth.identities (
+                id,
+                user_id,
+                provider_id,
+                identity_data,
+                provider,
+                created_at,
+                updated_at
+            ) VALUES (
+                v_user_id,
+                v_user_id,
+                v_user_id::text,
+                json_build_object('sub', v_user_id::text, 'email', v_email),
+                'email',
+                now()
+            );
+        ELSE
+            UPDATE auth.users
+            SET encrypted_password = crypt(rec.password, gen_salt('bf')),
+                email_confirmed_at = COALESCE(email_confirmed_at, now()),
+                raw_user_meta_data = json_build_object('role', 'toda_admin', 'full_name', rec.full_name, 'toda_acronym', upper(rec.acronym))
+            WHERE id = v_existing_id;
+
+            v_user_id := v_existing_id;
+        END IF;
+
+        INSERT INTO public.toda_admin (auth_user_id, toda_id, full_name, email, contact_number, account_status)
+        VALUES (v_user_id, rec.toda_id, rec.full_name, v_email, rec.contact, 'Active')
+        ON CONFLICT (auth_user_id) DO UPDATE
+        SET toda_id = rec.toda_id,
+            full_name = rec.full_name,
+            email = v_email,
+            contact_number = rec.contact,
+            account_status = 'Active';
+
+        RAISE NOTICE 'Seed completed for TODA Admin % (%)', upper(rec.acronym), v_email;
+    END LOOP;
+END $$;
+
+
+

@@ -55,25 +55,23 @@ export async function fetchTodaProfile(todaId: string = DEFAULT_TODA_ID): Promis
       id: data.toda_id,
       name: data.toda_name,
       acronym: data.toda_acronym || 'TODA',
-      registrationNumber: data.registration_number || 'CAL-TODA-2024-001',
+      registrationNumber: data.toda_acronym || 'TODA',
       dateEstablished: data.date_established || '2024-01-01',
       terminalLocation: data.service_coverage_area || 'Calapan City Terminal',
       barangay: data.barangay || 'Calapan City',
       serviceCoverageArea: data.service_coverage_area || 'Calapan City Corridor',
-      contactNumber: data.contact_number || '+63 917 000 0000',
-      email: data.email || 'toda.calapan@gmail.com',
+      contactNumber: data.president_contact || data.contact_number || '+63 917 000 0000',
+      email: data.email || `${(data.toda_acronym || 'toda').toLowerCase()}@toda.sakay.internal`,
       officers: {
         president: data.president_name || 'Association President',
         vicePresident: data.vice_president_name || 'N/A',
         secretary: data.secretary_name || 'N/A',
         treasurer: data.treasurer_name || 'N/A',
       },
-      accreditationStatus: data.account_status === 'Active' ? 'Active' : 'Pending Verification',
-      accreditationExpiry: data.certificate_expiry
-        ? new Date(data.certificate_expiry).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-        : 'Dec 31, 2026',
-      accreditationNo: data.certificate_number || data.registration_number || 'CAL-TODA-2024-001',
-      permitNumber: data.registration_number || 'MP-2024-001',
+      accreditationStatus: (data.toda_status || data.account_status) === 'Active' ? 'Active' : 'Pending Verification',
+      accreditationExpiry: 'Dec 31, 2026',
+      accreditationNo: data.toda_acronym || 'TODA',
+      permitNumber: data.toda_acronym || 'TODA',
       barangayClearanceFile: { name: 'Barangay_Clearance.pdf', date: 'Jan 10, 2026' },
       rosterFile: { name: 'TODA_Driver_Roster.pdf', date: 'Jan 15, 2026', count: driverCount || 0 },
       isOtpVerified: true,
@@ -123,6 +121,85 @@ export async function updateTodaProfile(
   return { success: true, data };
 }
 
+export async function checkAcronymAvailability(acronym: string): Promise<boolean> {
+  if (!acronym.trim()) return true;
+  try {
+    const cleanAcronym = acronym.trim().toUpperCase();
+    const { data, error } = await supabase
+      .from('toda')
+      .select('toda_id, toda_acronym')
+      .ilike('toda_acronym', cleanAcronym)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('[todaApiService] checkAcronymAvailability warning:', error);
+      return true;
+    }
+
+    return !data;
+  } catch (err) {
+    console.error('[todaApiService] checkAcronymAvailability error:', err);
+    return true;
+  }
+}
+
+export async function uploadTodaDocument(
+  file: File,
+  bucket: 'barangay-clearances' | 'toda-accredited-driver-lists' | 'toda-bylaws'
+): Promise<{ url: string; fileName: string; path: string; sizeBytes: number }> {
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'pdf';
+  const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const path = `${Date.now()}_${cleanName}`;
+
+  let targetBucket: string = bucket;
+  if (bucket === 'toda-accredited-driver-lists' || ['csv', 'xlsx', 'xls'].includes(ext)) {
+    targetBucket = 'toda-accredited-driver-lists';
+  } else if (bucket === 'toda-bylaws') {
+    targetBucket = 'toda-bylaws';
+  } else {
+    targetBucket = 'barangay-clearances';
+  }
+
+  // Attempt upload to targetBucket, with fallback to barangay-clearances if bucket is not yet provisioned
+  try {
+    const { data, error } = await supabase.storage
+      .from(targetBucket)
+      .upload(path, file, {
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (error) throw error;
+    const { data: publicUrlData } = supabase.storage.from(targetBucket).getPublicUrl(data.path);
+    return {
+      url: publicUrlData.publicUrl,
+      fileName: file.name,
+      path: data.path,
+      sizeBytes: file.size,
+    };
+  } catch (err: any) {
+    if (targetBucket === 'toda-bylaws') {
+      const { data: fbData, error: fbErr } = await supabase.storage
+        .from('barangay-clearances')
+        .upload(path, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+      if (!fbErr && fbData) {
+        const { data: fbUrl } = supabase.storage.from('barangay-clearances').getPublicUrl(fbData.path);
+        return {
+          url: fbUrl.publicUrl,
+          fileName: file.name,
+          path: fbData.path,
+          sizeBytes: file.size,
+        };
+      }
+    }
+    console.error(`[todaApiService] Error uploading to ${targetBucket}:`, err);
+    throw new Error(err.message || `Failed to upload ${file.name}`);
+  }
+}
+
 export async function registerToda(payload: {
   todaName: string;
   todaAcronym: string;
@@ -137,47 +214,186 @@ export async function registerToda(payload: {
   secretaryContact?: string;
   treasurerName?: string;
   treasurerContact?: string;
+  officeEmail?: string;
+  password?: string;
+  barangayClearanceUrl?: string;
+  accreditedDriversUrl?: string;
+  bylawsUrl?: string;
+  registeredTricycleCount?: number;
+  terminalLatitude?: number | null;
+  terminalLongitude?: number | null;
 }) {
-  const insertPayload = {
-    toda_name: payload.todaName,
-    toda_acronym: payload.todaAcronym,
-    registration_number: `REG-${Math.floor(1000 + Math.random() * 9000)}`,
+  const cleanAcronym = payload.todaAcronym.trim().toUpperCase();
+
+  // 1. Check uniqueness of Acronym
+  const isAvailable = await checkAcronymAvailability(cleanAcronym);
+  if (!isAvailable) {
+    throw new Error(`The TODA Acronym '${cleanAcronym}' is already registered. Please choose a unique acronym or contact the LGU Transport Board.`);
+  }
+
+  const syntheticEmail = `${cleanAcronym.toLowerCase()}@toda.sakay.internal`;
+
+  // 2. Insert TODA association record
+  let insertPayload: Record<string, any> = {
+    toda_name: payload.todaName.trim(),
+    toda_acronym: cleanAcronym,
     barangay: payload.barangay,
-    date_established: payload.dateEstablished || '2024-01-01',
-    service_coverage_area: payload.serviceCoverageArea,
-    president_name: payload.presidentName,
-    president_contact: payload.presidentContact,
-    active_driver_count: 1,
-    registered_tricycle_count: 1,
-    terminal_latitude: 13.4117,
-    terminal_longitude: 121.1803,
-    account_status: 'Pending Verification',
+    date_established: payload.dateEstablished || new Date().toISOString().split('T')[0],
+    service_coverage_area: payload.serviceCoverageArea.trim(),
+    president_name: payload.presidentName.trim(),
+    president_contact: payload.presidentContact.trim(),
+    vice_president_name: payload.vicePresidentName?.trim() || null,
+    vice_president_contact: payload.vicePresidentContact?.trim() || null,
+    secretary_name: payload.secretaryName?.trim() || null,
+    secretary_contact: payload.secretaryContact?.trim() || null,
+    treasurer_name: payload.treasurerName?.trim() || null,
+    treasurer_contact: payload.treasurerContact?.trim() || null,
+    barangay_clearance_url: payload.barangayClearanceUrl || null,
+    accredited_drivers_url: payload.accreditedDriversUrl || null,
+    bylaws_url: payload.bylawsUrl || null,
+    active_driver_count: 0,
+    registered_tricycle_count: payload.registeredTricycleCount !== undefined ? payload.registeredTricycleCount : 0,
+    terminal_latitude: payload.terminalLatitude !== undefined && payload.terminalLatitude !== null ? payload.terminalLatitude : 13.4115,
+    terminal_longitude: payload.terminalLongitude !== undefined && payload.terminalLongitude !== null ? payload.terminalLongitude : 121.1803,
+    toda_status: 'Pending Verification',
   };
 
-  const { data, error } = await supabase.from('toda').insert([insertPayload]).select().single();
-  if (error) throw error;
+  let todaData: any = null;
+  let todaError: any = null;
+
+  for (let attempt = 0; attempt < 15; attempt++) {
+    const res = await supabase
+      .from('toda')
+      .insert([insertPayload])
+      .select()
+      .single();
+
+    if (!res.error) {
+      todaData = res.data;
+      todaError = null;
+      break;
+    }
+
+    todaError = res.error;
+    const errMsg = (res.error.message || '') + ' ' + (res.error.details || '');
+    const match = errMsg.match(/Could not find the '([^']+)' column/i) || errMsg.match(/column [^.]*\.?([a-zA-Z0-9_]+) does not exist/i);
+    if (match && match[1] && match[1] in insertPayload) {
+      console.warn(`[todaApiService] Database schema missing column '${match[1]}', retrying insert without it...`);
+      delete insertPayload[match[1]];
+    } else {
+      break;
+    }
+  }
+
+  if (todaError) throw todaError;
+
+  // 3. Create or link auth user for the TODA Admin using synthetic email
+  let authUserId: string | null = null;
+  if (payload.password) {
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: syntheticEmail,
+        password: payload.password,
+        options: {
+          data: {
+            role: 'toda_admin',
+            full_name: payload.presidentName.trim(),
+            toda_acronym: cleanAcronym,
+            toda_id: todaData.toda_id,
+            contact_number: payload.presidentContact.trim(),
+            office_email: payload.officeEmail || null,
+          },
+        },
+      });
+
+      if (!authError && authData.user) {
+        authUserId = authData.user.id;
+      } else if (authError) {
+        console.warn('[todaApiService] Auth sign-up warning, attempting login recovery:', authError.message);
+        // If user already registered, try signing in to recover user id
+        const { data: loginData } = await supabase.auth.signInWithPassword({
+          email: syntheticEmail,
+          password: payload.password,
+        });
+        if (loginData?.user) {
+          authUserId = loginData.user.id;
+        }
+      }
+    } catch (authErr) {
+      console.warn('[todaApiService] Auth sign-up exception:', authErr);
+    }
+  }
+
+  // 4. Create toda_admin record
+  if (authUserId) {
+    try {
+      let adminPayload: Record<string, any> = {
+        auth_user_id: authUserId,
+        toda_id: todaData.toda_id,
+        full_name: payload.presidentName.trim(),
+        email: syntheticEmail,
+        toda_acronym: cleanAcronym,
+        contact_number: payload.presidentContact.trim(),
+        account_status: 'Active',
+      };
+
+      for (let attempt = 0; attempt < 5; attempt++) {
+        const adminRes = await supabase.from('toda_admin').upsert([adminPayload], { onConflict: 'auth_user_id' });
+        if (!adminRes.error) break;
+        const errMsg = (adminRes.error.message || '') + ' ' + (adminRes.error.details || '');
+        const match = errMsg.match(/Could not find the '([^']+)' column/i) || errMsg.match(/column [^.]*\.?([a-zA-Z0-9_]+) does not exist/i);
+        if (match && match[1] && match[1] in adminPayload) {
+          delete adminPayload[match[1]];
+        } else {
+          console.warn('[todaApiService] toda_admin upsert note:', adminRes.error.message);
+          break;
+        }
+      }
+    } catch (adminErr) {
+      console.warn('[todaApiService] toda_admin profile insert note:', adminErr);
+    }
+  }
 
   await recordTodaAuditAction({
     actionType: 'TODA_REGISTRATION_SUBMITTED',
-    targetId: data?.toda_id,
-    details: `Submitted new TODA accreditation application for '${payload.todaName}' (${payload.todaAcronym}).`,
+    targetId: todaData.toda_id,
+    details: `Submitted new TODA accreditation application for '${payload.todaName}' (${cleanAcronym}).`,
   });
 
-  return { success: true, data };
+  // Explicitly sign out of any temporary session created by signUp so the user logs in manually
+  try {
+    await supabase.auth.signOut();
+  } catch {}
+
+  return { success: true, data: todaData, syntheticEmail, acronym: cleanAcronym };
 }
 
 export async function resubmitTodaApplication(todaId: string, updatedData: any) {
-  const { data, error } = await supabase
+  let updatePayload = {
+    ...updatedData,
+    toda_status: 'Pending Verification',
+  };
+
+  let res = await supabase
     .from('toda')
-    .update({
-      ...updatedData,
-      account_status: 'Pending Verification',
-    })
+    .update(updatePayload)
     .eq('toda_id', todaId)
     .select()
     .single();
 
-  if (error) throw error;
+  if (res.error && res.error.message?.includes('toda_status')) {
+    delete (updatePayload as any).toda_status;
+    (updatePayload as any).account_status = 'Pending Verification';
+    res = await supabase
+      .from('toda')
+      .update(updatePayload)
+      .eq('toda_id', todaId)
+      .select()
+      .single();
+  }
+
+  if (res.error) throw res.error;
+  const data = res.data;
 
   await recordTodaAuditAction({
     actionType: 'TODA_APPLICATION_RESUBMITTED',
@@ -187,6 +403,7 @@ export async function resubmitTodaApplication(todaId: string, updatedData: any) 
 
   return { success: true, data };
 }
+
 
 // ============================================================================
 // 2. DRIVER MANAGEMENT & SCREENING

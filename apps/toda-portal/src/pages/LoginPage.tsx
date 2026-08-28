@@ -21,7 +21,6 @@ import appIconDriver from '@sakay/shared/assets/icons/app-icon-driver.png';
 import logoTextOrange from '@sakay/shared/assets/images/logo-text-orange.png';
 import splashBg from '@sakay/shared/assets/images/splash-bg.png';
 import { useAuth } from '../contexts/AuthContext';
-import { TodaRegistrationFlow } from '../components/auth/TodaRegistrationFlow';
 
 const inputStyles = {
   '& .MuiOutlinedInput-root': {
@@ -71,46 +70,42 @@ export const LoginPage: React.FC = () => {
   const location = useLocation();
   const { signIn, error: authError, loading: authLoading } = useAuth();
 
-  const [mode, setMode] = useState<'signin' | 'signup_toda'>('signin');
-  const [email, setEmail] = useState('');
+  const [acronym, setAcronym] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authSuccessLoading, setAuthSuccessLoading] = useState(false);
-  const [scrollTop, setScrollTop] = useState(0);
 
   const [localError, setLocalError] = useState<string | null>(null);
   const [localSuccess, setLocalSuccess] = useState<string | null>(null);
 
-  const fromLocation = (location.state as any)?.from?.pathname || '/dashboard';
+  const fromLocation = (location.state as any)?.from?.pathname || '/operations';
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
     setLocalSuccess(null);
 
-    if (!email.trim() || !password) {
-      setLocalError('Please enter your email and password.');
+    const cleanAcronym = acronym.replace(/\s+/g, '').trim().toUpperCase();
+
+    if (!cleanAcronym || !password) {
+      setLocalError('Please enter your TODA Acronym and password.');
       return;
     }
 
     try {
       setIsSubmitting(true);
       window.localStorage.setItem('sakay_remember_me', rememberMe.toString());
-      const res = await signIn(email, password);
+      const res = await signIn(cleanAcronym, password);
 
       if (res.success) {
         setAuthSuccessLoading(true);
         setTimeout(() => {
-          if (res.role === 'toda_admin') {
-            window.location.href = window.location.hostname === 'localhost' ? 'http://localhost:5175/operations' : '/toda/';
-          } else {
-            navigate(fromLocation, { replace: true });
-          }
-        }, 2200);
+          navigate(fromLocation, { replace: true });
+        }, 1800);
       } else {
-        setLocalError('Incorrect email or password. Please check your details and try again.');
+        setLocalError(res.error || 'Incorrect TODA Acronym or password. Please check your credentials and try again.');
       }
     } catch (err: any) {
       setLocalError(err.message || 'An unexpected error occurred during sign in.');
@@ -136,8 +131,7 @@ export const LoginPage: React.FC = () => {
     }
   }, [localError, activeAuthError, localSuccess]);
 
-  const displayError = localError || (mode === 'signin' ? activeAuthError : null);
-  const isEmailInvalid = email.length > 0 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const displayError = localError || activeAuthError;
 
   const handleCloseSnackbar = () => {
     setLocalError(null);
@@ -160,7 +154,7 @@ export const LoginPage: React.FC = () => {
         backgroundColor: '#FAFAF9',
       }}
     >
-      {/* Centering wrapper without zoom/scale transform */}
+      {/* Centering wrapper */}
       <Box
         sx={{
           m: 'auto',
@@ -199,24 +193,22 @@ export const LoginPage: React.FC = () => {
               flexDirection: 'row',
               overflow: 'hidden',
               transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-              height: { xs: 'auto', md: mode === 'signin' ? '560px' : '680px' },
-              minHeight: { xs: '100vh', md: mode === 'signin' ? '560px' : '680px' },
+              height: { xs: 'auto', md: '560px' },
+              minHeight: { xs: '100vh', md: '560px' },
               maxHeight: '95vh',
             }}
           >
             {/* Left Form Pane */}
             <Box
-              onScroll={(e) => setScrollTop((e.target as HTMLDivElement).scrollTop)}
               sx={{
-                flex: mode === 'signup_toda' ? '1 1 100%' : '1 1 50%',
-                maxWidth: mode === 'signup_toda' ? '100%' : { xs: '100%', md: '50%' },
-                transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                flex: '1 1 50%',
+                maxWidth: { xs: '100%', md: '50%' },
                 display: 'flex',
                 flexDirection: 'column',
                 overflowY: { xs: 'visible', md: 'hidden' },
                 overflowX: 'hidden',
                 position: 'relative',
-                justifyContent: mode === 'signin' ? 'center' : 'flex-start',
+                justifyContent: 'center',
               }}
             >
               {/* Inner Padding Container */}
@@ -227,77 +219,45 @@ export const LoginPage: React.FC = () => {
                   width: '100%',
                   flexGrow: 1,
                   boxSizing: 'border-box',
-                  px: { xs: 3, sm: mode === 'signup_toda' ? 6 : 6 },
-                  py: { xs: 5, sm: mode === 'signup_toda' ? 6 : 8 },
+                  px: { xs: 3, sm: 6 },
+                  py: { xs: 5, sm: 8 },
                 }}
               >
                 {!authSuccessLoading && (
                   <Box
                     sx={{
                       display: 'flex',
-                      flexDirection: mode === 'signin' ? 'column' : 'row',
-                      alignItems: mode === 'signin' ? 'center' : 'flex-start',
-                      justifyContent: mode === 'signin' ? 'center' : 'space-between',
-                      textAlign: mode === 'signin' ? 'center' : 'left',
-                      position: mode === 'signup_toda' ? 'sticky' : 'static',
-                      top: 0,
-                      zIndex: 10,
-                      background:
-                        mode === 'signup_toda' && scrollTop > 10
-                          ? 'linear-gradient(to bottom, rgba(255,255,255,1) 40%, rgba(255,255,255,0.85) 75%, rgba(255,255,255,0) 100%)'
-                          : 'transparent',
-                      backdropFilter: mode === 'signup_toda' && scrollTop > 10 ? 'blur(8px)' : 'none',
-                      mx: { xs: -3, sm: -6 },
-                      px: { xs: 3, sm: 6 },
-                      pt: { xs: 5, sm: mode === 'signup_toda' ? 6 : 8 },
-                      pb: 4,
-                      mt: { xs: -5, sm: mode === 'signup_toda' ? -6 : -8 },
-                      transition: 'all 0.3s ease',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      textAlign: 'center',
+                      mb: 3.5,
                     }}
                   >
                     <Box
                       sx={{
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: mode === 'signin' ? 'center' : 'flex-end',
+                        justifyContent: 'center',
                         gap: 1.5,
-                        mb: mode === 'signup_toda' && scrollTop > 10 ? 1 : mode === 'signin' ? 3.5 : 0,
-                        transition: 'all 0.3s ease',
-                        transform: mode === 'signup_toda' && scrollTop > 10 ? 'scale(0.85)' : 'scale(1)',
-                        transformOrigin: mode === 'signin' ? 'top center' : 'top right',
-                        order: mode === 'signin' ? 1 : 2,
+                        mb: 3,
                       }}
                     >
                       <Box component="img" src={appIconDriver} alt="App Icon" sx={{ height: 32, objectFit: 'contain' }} />
                       <Box component="img" src={logoTextOrange} alt="SAKAY" sx={{ height: 22, objectFit: 'contain' }} />
                     </Box>
 
-                    {mode === 'signin' && (
-                      <Box sx={{ mt: -1.5, mb: 1, order: 2 }}>
-                        <Typography variant="h1" sx={{ fontSize: '22px', fontWeight: 700, color: '#1D1D1F', letterSpacing: '-0.5px', mb: 0.5 }}>
-                          Welcome back
-                        </Typography>
-                        <Typography sx={{ fontSize: '13px', color: '#86868B', fontWeight: 400 }}>
-                          Login to your administrator account to continue
-                        </Typography>
-                      </Box>
-                    )}
-
-                    {mode === 'signup_toda' && (
-                      <Box sx={{ mt: 0, mb: 1, order: 1 }}>
-                        <Typography variant="h1" sx={{ fontSize: '22px', fontWeight: 700, color: '#1D1D1F', letterSpacing: '-0.5px', mb: 0.5 }}>
-                          TODA Application
-                        </Typography>
-                        <Typography sx={{ fontSize: '13px', color: '#86868B', fontWeight: 400 }}>
-                          Register your TODA organization and apply for accreditation.
-                        </Typography>
-                      </Box>
-                    )}
+                    <Typography variant="h1" sx={{ fontSize: '22px', fontWeight: 700, color: '#1D1D1F', letterSpacing: '-0.5px', mb: 0.5 }}>
+                      Welcome back
+                    </Typography>
+                    <Typography sx={{ fontSize: '13px', color: '#86868B', fontWeight: 400 }}>
+                      Login to your administrator account to continue
+                    </Typography>
                   </Box>
                 )}
 
                 {/* Sign In Form */}
-                {mode === 'signin' && !authSuccessLoading && (
+                {!authSuccessLoading && (
                   <Fade in={true} timeout={400}>
                     <Box
                       component="form"
@@ -307,21 +267,13 @@ export const LoginPage: React.FC = () => {
                     >
                       <TextField
                         fullWidth
-                        label="Email"
-                        type="email"
+                        label="TODA Acronym"
+                        placeholder="e.g. CCTODA"
                         variant="outlined"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        value={acronym}
+                        onChange={(e) => setAcronym(e.target.value.replace(/\s+/g, '').toUpperCase())}
                         disabled={isSubmitting || authLoading}
-                        autoComplete="email"
                         autoFocus
-                        error={isEmailInvalid}
-                        helperText={isEmailInvalid ? 'Please enter a valid email address.' : ' '}
-                        slotProps={{
-                          formHelperText: {
-                            sx: { mx: 0, mt: 0.5, fontSize: '12px', height: isEmailInvalid ? 'auto' : 0, opacity: isEmailInvalid ? 1 : 0, transition: 'opacity 0.3s' },
-                          },
-                        }}
                         sx={inputStyles}
                       />
 
@@ -365,14 +317,10 @@ export const LoginPage: React.FC = () => {
 
                       <Box sx={{ mt: 1, textAlign: 'center' }}>
                         <Typography sx={{ fontSize: '13px', color: '#86868B', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 0.5 }}>
-                          Want to register a TODA?
+                          Want to register a new TODA?
                           <Box
                             component="span"
-                            onClick={() => {
-                              setLocalError(null);
-                              setLocalSuccess(null);
-                              setMode('signup_toda');
-                            }}
+                            onClick={() => navigate('/register')}
                             sx={{
                               fontWeight: 700,
                               color: '#FF6B00',
@@ -388,15 +336,6 @@ export const LoginPage: React.FC = () => {
                   </Fade>
                 )}
 
-                {/* TODA Registration Form */}
-                {mode === 'signup_toda' && !authSuccessLoading && (
-                  <Fade in={true} timeout={400}>
-                    <Box sx={{ width: '100%', display: 'flex', flexGrow: 1, flexDirection: 'column' }}>
-                      <TodaRegistrationFlow onBackToLogin={() => setMode('signin')} />
-                    </Box>
-                  </Fade>
-                )}
-
                 {/* Successful Login Loading Screen */}
                 {authSuccessLoading && (
                   <Fade in={true} timeout={600}>
@@ -404,7 +343,7 @@ export const LoginPage: React.FC = () => {
                       <Box component="img" src={logoTextOrange} alt="SAKAY" sx={{ height: 28, mb: 4, objectFit: 'contain' }} />
                       <CircularProgress size={28} sx={{ color: '#FF6B00', mb: 2 }} />
                       <Typography sx={{ fontSize: '14px', color: '#86868B', fontWeight: 500 }}>
-                        Signing into SAKAY LGU Portal...
+                        Signing into SAKAY TODA Portal...
                       </Typography>
                     </Box>
                   </Fade>
@@ -413,37 +352,35 @@ export const LoginPage: React.FC = () => {
             </Box>
 
             {/* Right Graphic Hero Pane */}
-            {mode === 'signin' && (
+            <Box
+              sx={{
+                flex: '1 1 50%',
+                maxWidth: '50%',
+                display: { xs: 'none', md: 'flex' },
+                position: 'relative',
+                background: 'linear-gradient(135deg, #FAF8F5 0%, #F5F5F7 100%)',
+                overflow: 'hidden',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <Box
+                component="img"
+                src={splashBg}
+                alt="SAKAY Background"
                 sx={{
-                  flex: '1 1 50%',
-                  maxWidth: '50%',
-                  display: { xs: 'none', md: 'flex' },
-                  position: 'relative',
-                  background: 'linear-gradient(135deg, #FAF8F5 0%, #F5F5F7 100%)',
-                  overflow: 'hidden',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  opacity: 0.95,
                 }}
-              >
-                <Box
-                  component="img"
-                  src={splashBg}
-                  alt="SAKAY Background"
-                  sx={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    opacity: 0.95,
-                  }}
-                />
-              </Box>
-            )}
+              />
+            </Box>
           </Paper>
         </Box>
 
         {/* External Terms Text */}
-        {mode === 'signin' && !authSuccessLoading && (
+        {!authSuccessLoading && (
           <Fade in={true} timeout={800}>
             <Typography sx={{ mt: 3, textAlign: 'center', fontSize: '13px', color: '#86868B' }}>
               By clicking continue, you agree to our{' '}

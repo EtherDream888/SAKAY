@@ -4,7 +4,6 @@ export interface Toda {
   toda_id: string;
   toda_name: string;
   toda_acronym?: string;
-  registration_number: string;
   date_established?: string;
   terminal_latitude?: number;
   terminal_longitude?: number;
@@ -20,11 +19,13 @@ export interface Toda {
   secretary_contact?: string;
   treasurer_name?: string;
   treasurer_contact?: string;
+  barangay_clearance_url?: string;
+  accredited_drivers_url?: string;
+  bylaws_url?: string;
   registered_tricycle_count: number;
   active_driver_count: number;
-  certificate_number?: string;
-  certificate_expiry?: string;
-  account_status: 'Pending Verification' | 'Active' | 'Suspended' | 'Deactivated';
+  toda_status: 'Pending Verification' | 'Active' | 'Suspended' | 'Deactivated';
+  account_status?: 'Pending Verification' | 'Active' | 'Suspended' | 'Deactivated';
   created_at: string;
 }
 

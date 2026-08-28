@@ -1,12 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, IconButton, Badge, Button } from '@mui/material';
+import { Box, Typography, IconButton, Badge, Button, Popover } from '@mui/material';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
 import VerifiedIcon from '@mui/icons-material/Verified';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
+import LogoutIcon from '@mui/icons-material/Logout';
 
 import { NotificationPopover } from '../popovers/NotificationPopover';
 import { NotificationItem } from '../../types/toda';
 import { fetchTodaProfile } from '../../services/todaApiService';
+import { useAuth } from '../../contexts/AuthContext';
+import { LogoutConfirmModal } from '../admin/LogoutConfirmModal';
 
 interface TodaHeaderProps {
   pageTitle?: string;
@@ -18,15 +23,31 @@ export const TodaHeader: React.FC<TodaHeaderProps> = ({
   pageSubtitle = 'Real-time overview of TODA terminal and driver fleet',
 }) => {
   const navigate = useNavigate();
+  const { todaAdminProfile, user, signOut } = useAuth();
   const [todaName, setTodaName] = useState<string>('Calapan Central TODA');
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notifAnchor, setNotifAnchor] = useState<HTMLElement | null>(null);
+
+  // Account Popover & Logout State
+  const [accountAnchorEl, setAccountAnchorEl] = useState<null | HTMLElement>(null);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 
   useEffect(() => {
     fetchTodaProfile().then((p) => {
       if (p) setTodaName(p.name);
     });
   }, []);
+
+  const adminName = todaAdminProfile?.full_name || 'TODA Administrator';
+  const adminEmail = todaAdminProfile?.email || user?.email || 'toda.admin@gmail.com';
+  const associationName = todaAdminProfile?.toda?.toda_name || todaName;
+
+  const handleSignOutConfirm = async () => {
+    setLogoutModalOpen(false);
+    setAccountAnchorEl(null);
+    await signOut();
+    navigate('/login', { replace: true });
+  };
 
   const unreadCount = notifications.filter((n) => n.unread).length;
 
@@ -56,10 +77,10 @@ export const TodaHeader: React.FC<TodaHeaderProps> = ({
         <Typography
           variant="h1"
           sx={{
-            fontSize: '30px',
-            fontWeight: 600,
+            fontSize: '20px',
+            fontWeight: 700,
             color: 'var(--mac-text-primary)',
-            letterSpacing: '-0.4px',
+            letterSpacing: '-0.3px',
             lineHeight: 1.2,
           }}
         >
@@ -68,11 +89,11 @@ export const TodaHeader: React.FC<TodaHeaderProps> = ({
         {pageSubtitle && (
           <Typography
             sx={{
-              fontSize: '15px',
+              fontSize: '12px',
               fontWeight: 400,
               color: 'var(--mac-text-muted)',
               lineHeight: 1.3,
-              mt: '3px',
+              mt: '2px',
             }}
           >
             {pageSubtitle}
@@ -80,7 +101,7 @@ export const TodaHeader: React.FC<TodaHeaderProps> = ({
         )}
       </Box>
 
-      {/* Right Controls: Notifications & TODA Organization Navigation Chip */}
+      {/* Right Controls: Notifications, TODA Chip & Account Menu */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, position: 'relative' }}>
         {/* Notifications Icon Button */}
         <Box sx={{ position: 'relative' }}>
@@ -88,8 +109,8 @@ export const TodaHeader: React.FC<TodaHeaderProps> = ({
             size="small"
             onClick={(e) => setNotifAnchor(e.currentTarget)}
             sx={{
-              width: 44,
-              height: 44,
+              width: 38,
+              height: 38,
               borderRadius: '10px',
               border: '1px solid var(--mac-border-color)',
               backgroundColor: '#FFFFFF',
@@ -103,7 +124,7 @@ export const TodaHeader: React.FC<TodaHeaderProps> = ({
             }}
           >
             <Badge badgeContent={unreadCount} color="error" variant="dot">
-              <NotificationsNoneIcon fontSize="small" sx={{ fontSize: 22 }} />
+              <NotificationsNoneIcon fontSize="small" sx={{ fontSize: 19 }} />
             </Badge>
           </IconButton>
           <NotificationPopover
@@ -115,23 +136,23 @@ export const TodaHeader: React.FC<TodaHeaderProps> = ({
           />
         </Box>
 
-        {/* TODA Organization Navigation Chip (Direct Redirect to /account) */}
+        {/* TODA Organization Navigation Chip */}
         <Button
           onClick={() => navigate('/account')}
-          startIcon={<VerifiedIcon fontSize="small" sx={{ fontSize: 18, color: '#1E8E3E' }} />}
+          startIcon={<VerifiedIcon fontSize="small" sx={{ fontSize: 16, color: '#1E8E3E' }} />}
           sx={{
-            height: 44,
-            padding: '0 18px',
+            height: 38,
+            padding: '0 16px',
             borderRadius: '10px',
             border: '1px solid var(--mac-border-color)',
             backgroundColor: '#FFFFFF',
             color: 'var(--mac-text-primary)',
-            fontSize: '14.5px',
+            fontSize: '13.5px',
             fontWeight: 600,
             textTransform: 'none',
             boxShadow: 'var(--mac-shadow-subtle)',
             transition: 'var(--mac-transition-fast)',
-            maxWidth: 260,
+            maxWidth: 240,
             '&:hover': {
               backgroundColor: 'var(--sakay-orange-soft)',
               color: 'var(--sakay-orange)',
@@ -141,7 +162,7 @@ export const TodaHeader: React.FC<TodaHeaderProps> = ({
         >
           <Typography
             sx={{
-              fontSize: '14.5px',
+              fontSize: '13.5px',
               fontWeight: 600,
               color: 'inherit',
               textOverflow: 'ellipsis',
@@ -149,10 +170,161 @@ export const TodaHeader: React.FC<TodaHeaderProps> = ({
               overflow: 'hidden',
             }}
           >
-            {todaName}
+            {associationName}
           </Typography>
         </Button>
+
+        {/* Header Account Profile Control */}
+        <Box>
+          <Box
+            onClick={(e) => setAccountAnchorEl(e.currentTarget)}
+            sx={{
+              height: 38,
+              padding: '0 12px 0 10px',
+              borderRadius: '10px',
+              border: '1px solid var(--mac-border-color)',
+              backgroundColor: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.2,
+              cursor: 'pointer',
+              boxShadow: 'var(--mac-shadow-subtle)',
+              transition: 'var(--mac-transition-fast)',
+              userSelect: 'none',
+              '&:hover': {
+                backgroundColor: 'var(--mac-canvas-bg)',
+                borderColor: 'var(--mac-border-color)',
+              },
+            }}
+          >
+            <Box
+              sx={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                backgroundColor: 'var(--sakay-orange-soft)',
+                color: 'var(--sakay-orange)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '12px',
+                fontWeight: 700,
+                flexShrink: 0,
+              }}
+            >
+              {adminName.charAt(0).toUpperCase()}
+            </Box>
+            <Typography
+              sx={{
+                fontSize: '13.5px',
+                fontWeight: 600,
+                color: 'var(--mac-text-primary)',
+                lineHeight: 1,
+              }}
+            >
+              {adminName}
+            </Typography>
+            <KeyboardArrowDownIcon fontSize="small" sx={{ fontSize: 18, color: 'var(--mac-text-muted)', ml: -0.3 }} />
+          </Box>
+
+          {/* Account Popover Card */}
+          <Popover
+            open={Boolean(accountAnchorEl)}
+            anchorEl={accountAnchorEl}
+            onClose={() => setAccountAnchorEl(null)}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            slotProps={{
+              paper: {
+                sx: {
+                  borderRadius: '14px',
+                  border: '1px solid var(--mac-border-color)',
+                  boxShadow: '0 12px 32px rgba(0,0,0,0.12)',
+                  mt: 1,
+                  width: 260,
+                  padding: '16px',
+                  backgroundColor: '#FFFFFF',
+                },
+              },
+            }}
+          >
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <Box>
+                <Typography sx={{ fontSize: '15px', fontWeight: 700, color: 'var(--mac-text-primary)', lineHeight: 1.2 }}>
+                  {adminName}
+                </Typography>
+                <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--sakay-orange)', mt: '2px' }}>
+                  TODA Admin
+                </Typography>
+                <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)', mt: '2px', wordBreak: 'break-all' }}>
+                  {adminEmail}
+                </Typography>
+              </Box>
+
+              <Box sx={{ borderTop: '1px solid var(--mac-border-color)', pt: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  onClick={() => {
+                    setAccountAnchorEl(null);
+                    navigate('/account');
+                  }}
+                  startIcon={<ManageAccountsIcon fontSize="small" />}
+                  sx={{
+                    borderRadius: '8px',
+                    borderColor: 'var(--mac-border-color)',
+                    color: 'var(--mac-text-primary)',
+                    textTransform: 'none',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    justifyContent: 'flex-start',
+                    py: 0.8,
+                    '&:hover': {
+                      backgroundColor: 'var(--sakay-orange-soft)',
+                      borderColor: 'var(--sakay-orange-border)',
+                      color: 'var(--sakay-orange)',
+                    },
+                  }}
+                >
+                  Manage Account
+                </Button>
+
+                <Button
+                  fullWidth
+                  variant="text"
+                  color="error"
+                  onClick={() => {
+                    setAccountAnchorEl(null);
+                    setLogoutModalOpen(true);
+                  }}
+                  startIcon={<LogoutIcon fontSize="small" />}
+                  sx={{
+                    borderRadius: '8px',
+                    textTransform: 'none',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    justifyContent: 'flex-start',
+                    py: 0.8,
+                    color: '#DC2626',
+                    '&:hover': {
+                      backgroundColor: '#FEF2F2',
+                    },
+                  }}
+                >
+                  Log Out
+                </Button>
+              </Box>
+            </Box>
+          </Popover>
+        </Box>
       </Box>
+
+      {/* Logout Confirmation Modal */}
+      <LogoutConfirmModal
+        open={logoutModalOpen}
+        onClose={() => setLogoutModalOpen(false)}
+        onConfirm={handleSignOutConfirm}
+      />
     </Box>
   );
 };

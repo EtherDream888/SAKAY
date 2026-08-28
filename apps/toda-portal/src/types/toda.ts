@@ -195,3 +195,27 @@ export interface NotificationItem {
   type?: string;
   description?: string;
 }
+
+export interface TodaAdminProfile {
+  admin_id: string;
+  auth_user_id: string;
+  toda_id: string;
+  full_name: string;
+  email: string;
+  toda_acronym?: string;
+  contact_number?: string;
+  account_status: 'Active' | 'Suspended';
+  created_at?: string;
+  toda?: {
+    toda_id: string;
+    toda_name: string;
+    toda_acronym?: string;
+    account_status?: 'Pending Verification' | 'Active' | 'Suspended' | 'Deactivated';
+    toda_status?: string;
+    barangay?: string;
+    service_coverage_area?: string;
+    president_name?: string;
+    contact_number?: string;
+  };
+}
+
