@@ -702,13 +702,13 @@ export const TodaRegistrationFlow: React.FC<TodaRegistrationFlowProps> = ({ onBa
                 label="Barangay Clearance" 
                 sublabel="Issued specifically for TODA accreditation purposes"
                 file={docs.barangayClearance}
-                accept=".jpg,.jpeg,.png,.webp"
-                acceptedText="JPG, PNG, or WebP"
+                accept=".jpg,.jpeg,.png"
+                acceptedText="JPG or PNG"
                 maxSizeText="Max 5 MB"
                 onFileSelect={(f: File) => {
-                  const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+                  const allowed = ['image/jpeg', 'image/png'];
                   if (!allowed.includes(f.type)) {
-                    setErrorMsg('Please upload an image file (JPG, PNG, or WebP).');
+                    setErrorMsg('Please upload an image file (JPG or PNG).');
                     return;
                   }
                   if (f.size > 5 * 1024 * 1024) {
@@ -721,7 +721,7 @@ export const TodaRegistrationFlow: React.FC<TodaRegistrationFlowProps> = ({ onBa
               />
               
               <DocumentUploadBox 
-                label="List of Accredited Drivers" 
+                label="Driver Roster" 
                 sublabel="Required columns: Driver Full Name, Driver's License Number, License Expiration Date, Franchise Number, Plate Number, Driver Status"
                 file={docs.driverList}
                 accept=".csv,.xlsx"

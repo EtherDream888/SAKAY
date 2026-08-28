@@ -539,7 +539,7 @@ export const TodaRegistrationPage: React.FC = () => {
       emptyRequiredErrors.push({ id: 'field-clearanceDoc', message: 'Barangay Clearance is required.' });
     }
     if (!rosterDoc.url && !rosterDoc.file) {
-      emptyRequiredErrors.push({ id: 'field-rosterDoc', message: 'Master Driver Roster & Unit Ledger is required.' });
+      emptyRequiredErrors.push({ id: 'field-rosterDoc', message: 'Driver Roster is required.' });
     }
     if (!bylawsDoc.url && !bylawsDoc.file) {
       emptyRequiredErrors.push({ id: 'field-bylawsDoc', message: 'Internal Bylaws is required.' });
@@ -1099,7 +1099,7 @@ export const TodaRegistrationPage: React.FC = () => {
                   type="file"
                   ref={clearanceInputRef}
                   style={{ display: 'none' }}
-                  accept=".pdf,.png,.jpg,.jpeg,.webp"
+                  accept=".pdf,.png,.jpg,.jpeg"
                   onChange={(e) => handleFileUpload(e, 'barangay-clearances', setClearanceDoc)}
                 />
                 <Paper
@@ -1213,7 +1213,7 @@ export const TodaRegistrationPage: React.FC = () => {
                   </Box>
                 </Paper>
 
-                {/* 2. Master Driver Roster */}
+                {/* 2. Driver Roster */}
                 <input
                   type="file"
                   ref={rosterInputRef}
@@ -1241,7 +1241,7 @@ export const TodaRegistrationPage: React.FC = () => {
                     <InsertDriveFileOutlinedIcon sx={{ color: hasAttemptedSubmit && !rosterDoc.url ? '#DC2626' : (rosterDoc.url ? '#16A34A' : '#64748B'), fontSize: 24 }} />
                     <Box>
                       <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                        Master Driver Roster & Unit Ledger *
+                        Driver Roster *
                       </Typography>
                       {rosterDoc.fileName ? (
                         <Typography sx={{ fontSize: '12px', color: '#16A34A', fontWeight: 500 }}>
@@ -1273,7 +1273,7 @@ export const TodaRegistrationPage: React.FC = () => {
                           size="small"
                           variant="outlined"
                           startIcon={<VisibilityOutlinedIcon sx={{ fontSize: 15 }} />}
-                          onClick={() => openReviewModal('Master Driver Roster & Unit Ledger', rosterDoc)}
+                          onClick={() => openReviewModal('Driver Roster', rosterDoc)}
                           sx={{
                             textTransform: 'none',
                             borderColor: '#CBD5E1',
@@ -1337,7 +1337,7 @@ export const TodaRegistrationPage: React.FC = () => {
                   type="file"
                   ref={bylawsInputRef}
                   style={{ display: 'none' }}
-                  accept=".pdf,.png,.jpg,.jpeg,.webp"
+                  accept=".pdf,.png,.jpg,.jpeg"
                   onChange={(e) => handleFileUpload(e, 'toda-bylaws', setBylawsDoc)}
                 />
                 <Paper
@@ -1372,7 +1372,7 @@ export const TodaRegistrationPage: React.FC = () => {
                         </Typography>
                       ) : (
                         <Typography sx={{ fontSize: '11.5px', color: '#94A3B8' }}>
-                          PDF, PNG, JPG, or WEBP (Max 10MB)
+                          PDF, PNG, or JPG (Max 10MB)
                         </Typography>
                       )}
                       {bylawsDoc.uploadError && (

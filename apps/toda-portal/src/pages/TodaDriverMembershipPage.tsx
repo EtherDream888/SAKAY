@@ -269,7 +269,7 @@ export const TodaDriverMembershipPage: React.FC = () => {
             }}
           >
             <Box sx={{ backgroundColor: '#FFFFFF', borderRadius: 'var(--mac-radius-lg)', border: '1px solid var(--mac-border-color)', padding: '20px 24px', boxShadow: 'var(--mac-shadow-card)' }}>
-              <Typography sx={{ fontSize: '14px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Roster Driver Roster</Typography>
+              <Typography sx={{ fontSize: '14px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>Driver Roster</Typography>
               <Typography sx={{ fontSize: '34px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>{totalCount}</Typography>
             </Box>
 

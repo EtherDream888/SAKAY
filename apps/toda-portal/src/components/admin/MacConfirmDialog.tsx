@@ -143,14 +143,16 @@ export const MacConfirmDialog: React.FC<MacConfirmDialogProps> = ({
             height: 38,
             padding: '0 16px',
             borderRadius: '8px',
-            borderColor: 'var(--mac-border-color)',
-            color: 'var(--mac-text-secondary)',
+            border: '1.5px solid #94A3B8',
+            color: '#334155',
             fontSize: '13.5px',
-            fontWeight: 500,
+            fontWeight: 600,
             textTransform: 'none',
+            backgroundColor: '#FFFFFF',
             '&:hover': {
-              backgroundColor: 'var(--mac-canvas-bg)',
-              borderColor: 'var(--mac-text-muted)',
+              backgroundColor: '#F1F5F9',
+              borderColor: '#64748B',
+              color: '#0F172A',
             },
           }}
         >

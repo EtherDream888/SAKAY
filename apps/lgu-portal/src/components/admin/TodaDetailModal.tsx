@@ -130,7 +130,7 @@ export const TodaDetailModal: React.FC<TodaDetailModalProps> = ({ open, onClose,
   const officialDocs = [
     { name: `Official Barangay Clearance (${toda.barangay})`, type: 'LGU Barangay Certification', date: toda.accreditedDate || '2024' },
     { name: 'SEC / CDA Registration Certificate', type: 'Certified True Copy', date: toda.accreditedDate || '2024' },
-    { name: `Master Driver Roster (${toda.registeredDrivers} Units)`, type: 'Accredited Roster PDF', date: toda.accreditedDate || '2024' },
+    { name: `Driver Roster (${toda.registeredDrivers} Units)`, type: 'Accredited Roster PDF', date: toda.accreditedDate || '2024' },
     { name: "Mayor's Permit & Franchise Clearance", type: 'City Franchise Permit', date: toda.accreditedDate || '2024' },
   ];
 

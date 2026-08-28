@@ -111,9 +111,34 @@ export const TodaAccountManagementPage: React.FC = () => {
   const [editTreasurerContact, setEditTreasurerContact] = useState('');
 
   // Document Upload Form State (Real File Picker)
-  const [docCategory, setDocCategory] = useState<'Barangay Clearance' | 'Driver Master List' | 'TODA Bylaws'>('Barangay Clearance');
+  const [docCategory, setDocCategory] = useState<'Barangay Clearance' | 'Driver Roster' | 'Internal Bylaws'>('Barangay Clearance');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+
+  const getCategoryFileSupport = () => {
+    switch (docCategory) {
+      case 'Barangay Clearance':
+        return {
+          accept: '.pdf,.png,.jpg,.jpeg',
+          text: 'Supports PDF, PNG, or JPG (Max 10MB)',
+        };
+      case 'Driver Roster':
+        return {
+          accept: '.csv,.xlsx,.xls,.pdf',
+          text: 'Supports CSV, Excel, or PDF (Max 10MB)',
+        };
+      case 'Internal Bylaws':
+        return {
+          accept: '.pdf,.png,.jpg,.jpeg',
+          text: 'Supports PDF, PNG, or JPG (Max 10MB)',
+        };
+      default:
+        return {
+          accept: '.pdf,.png,.jpg,.jpeg',
+          text: 'Supports PDF, PNG, or JPG (Max 10MB)',
+        };
+    }
+  };
 
   const populateFormFields = (p: TodaProfile) => {
     setEditTodaName(p.name || '');
@@ -177,7 +202,13 @@ export const TodaAccountManagementPage: React.FC = () => {
   // File Picker Handler for Document Renewal
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size exceeds the 10MB limit. Please upload a file smaller than 10MB.');
+        e.target.value = '';
+        return;
+      }
+      setSelectedFile(file);
     }
   };
 
@@ -236,7 +267,7 @@ export const TodaAccountManagementPage: React.FC = () => {
       const targetBucket =
         docCategory === 'Barangay Clearance'
           ? 'barangay-clearances'
-          : docCategory === 'Driver Master List'
+          : docCategory === 'Driver Roster'
           ? 'toda-accredited-driver-lists'
           : 'toda-bylaws';
 
@@ -476,7 +507,7 @@ export const TodaAccountManagementPage: React.FC = () => {
                   {profile.officers?.president || 'N/A'}
                 </Typography>
                 {profile.officers?.presidentContact && (
-                  <Typography sx={{ fontSize: '12.5px', color: 'var(--sakay-orange)', fontWeight: 500 }}>
+                  <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
                     {profile.officers.presidentContact}
                   </Typography>
                 )}
@@ -610,7 +641,7 @@ export const TodaAccountManagementPage: React.FC = () => {
                 </Button>
               </Box>
 
-              {/* Document 2: Master Driver Roster */}
+              {/* Document 2: Driver Roster */}
               <Box
                 sx={{
                   display: 'flex',
@@ -626,7 +657,7 @@ export const TodaAccountManagementPage: React.FC = () => {
                   <DescriptionIcon sx={{ color: '#1565C0', fontSize: 22 }} />
                   <Box>
                     <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                      Accredited Master Driver Roster
+                      Driver Roster
                     </Typography>
                     <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>
                       {profile.rosterFile.name} • {profile.rosterFile.count} Accredited Members
@@ -640,7 +671,7 @@ export const TodaAccountManagementPage: React.FC = () => {
                   onClick={() =>
                     setReviewModalState({
                       open: true,
-                      title: 'Accredited Master Driver Roster',
+                      title: 'Driver Roster',
                       fileName: profile.rosterFile.name,
                       fileUrl: profile.rosterFile.url || '',
                     })
@@ -921,14 +952,17 @@ export const TodaAccountManagementPage: React.FC = () => {
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
           <FormControl fullWidth size="small">
-            <InputLabel id="doc-category-label" sx={{ fontSize: '15px', color: 'var(--mac-text-secondary)' }}>
-              Document Category
+            <InputLabel id="doc-select-label" sx={{ fontSize: '15px', color: 'var(--mac-text-secondary)' }}>
+              Document
             </InputLabel>
             <Select
-              labelId="doc-category-label"
-              label="Document Category"
+              labelId="doc-select-label"
+              label="Document"
               value={docCategory}
-              onChange={(e) => setDocCategory(e.target.value as any)}
+              onChange={(e) => {
+                setDocCategory(e.target.value as any);
+                setSelectedFile(null);
+              }}
               sx={{
                 borderRadius: '10px',
                 backgroundColor: '#FFFFFF',
@@ -941,13 +975,13 @@ export const TodaAccountManagementPage: React.FC = () => {
               }}
             >
               <MenuItem value="Barangay Clearance" sx={{ fontSize: '15px', py: 1.2 }}>
-                Annual Barangay Clearance for Accreditation
+                Barangay Clearance
               </MenuItem>
-              <MenuItem value="Driver Master List" sx={{ fontSize: '15px', py: 1.2 }}>
-                Updated Accredited Driver Master Roster
+              <MenuItem value="Driver Roster" sx={{ fontSize: '15px', py: 1.2 }}>
+                Driver Roster
               </MenuItem>
-              <MenuItem value="TODA Bylaws" sx={{ fontSize: '15px', py: 1.2 }}>
-                Internal TODA Bylaws & Constitution
+              <MenuItem value="Internal Bylaws" sx={{ fontSize: '15px', py: 1.2 }}>
+                Internal Bylaws
               </MenuItem>
             </Select>
           </FormControl>
@@ -980,7 +1014,7 @@ export const TodaAccountManagementPage: React.FC = () => {
               <input
                 type="file"
                 hidden
-                accept=".pdf,.doc,.docx,.png,.jpg,.xlsx,.csv"
+                accept={getCategoryFileSupport().accept}
                 onChange={handleFileSelect}
               />
               <UploadFileIcon sx={{ fontSize: 40, color: 'var(--sakay-orange)', mb: 1 }} />
@@ -990,7 +1024,7 @@ export const TodaAccountManagementPage: React.FC = () => {
               <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mt: 0.5 }}>
                 {selectedFile
                   ? `${(selectedFile.size / 1024).toFixed(1)} KB • Ready for upload`
-                  : 'Supports PDF, XLSX, CSV, PNG, JPG (Max 25MB)'}
+                  : getCategoryFileSupport().text}
               </Typography>
             </Box>
 

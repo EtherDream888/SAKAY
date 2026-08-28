@@ -545,7 +545,7 @@ export const TodaApplicationsPage: React.FC = () => {
                     {selectedApp.officers.president || 'N/A'}
                   </Typography>
                   {selectedApp.officers.presidentContact && (
-                    <Typography sx={{ fontSize: '11.5px', color: 'var(--sakay-orange)', fontWeight: 500 }}>
+                    <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)' }}>
                       {selectedApp.officers.presidentContact}
                     </Typography>
                   )}

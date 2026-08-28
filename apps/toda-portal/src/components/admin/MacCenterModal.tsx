@@ -129,16 +129,16 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
                 height: 40,
                 padding: '0 20px',
                 borderRadius: '8px',
-                borderColor: 'var(--mac-border-color)',
-                color: 'var(--mac-text-secondary)',
+                border: '1.5px solid #94A3B8',
+                color: '#334155',
                 fontSize: '14.5px',
-                fontWeight: 500,
+                fontWeight: 600,
                 textTransform: 'none',
                 backgroundColor: '#FFFFFF',
                 '&:hover': {
-                  backgroundColor: 'var(--mac-canvas-bg)',
-                  borderColor: 'var(--mac-text-muted)',
-                  color: 'var(--mac-text-primary)',
+                  backgroundColor: '#F1F5F9',
+                  borderColor: '#64748B',
+                  color: '#0F172A',
                 },
               }}
             >

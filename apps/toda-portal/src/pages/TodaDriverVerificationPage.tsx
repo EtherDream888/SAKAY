@@ -545,7 +545,7 @@ export const TodaDriverVerificationPage: React.FC = () => {
                 }
                 label={
                   <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                    Verify membership against active TODA Master Driver Roster
+                    Verify membership against active TODA Driver Roster
                   </Typography>
                 }
               />

@@ -131,16 +131,17 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
                 height: 40,
                 padding: '0 20px',
                 borderRadius: '8px',
-                borderColor: secondaryActionColor === 'error' ? '#FECACA' : 'var(--mac-border-color)',
-                color: secondaryActionColor === 'error' ? '#DC2626' : 'var(--mac-text-secondary)',
+                border: '1.5px solid',
+                borderColor: secondaryActionColor === 'error' ? '#EF4444' : '#94A3B8',
+                color: secondaryActionColor === 'error' ? '#DC2626' : '#334155',
                 fontSize: '11.6px',
                 fontWeight: 600,
                 textTransform: 'none',
                 backgroundColor: secondaryActionColor === 'error' ? '#FEF2F2' : '#FFFFFF',
                 '&:hover': {
-                  backgroundColor: secondaryActionColor === 'error' ? '#FEE2E2' : 'var(--mac-canvas-bg)',
-                  borderColor: secondaryActionColor === 'error' ? '#DC2626' : 'var(--mac-text-muted)',
-                  color: secondaryActionColor === 'error' ? '#B91C1C' : 'var(--mac-text-primary)',
+                  backgroundColor: secondaryActionColor === 'error' ? '#FEE2E2' : '#F1F5F9',
+                  borderColor: secondaryActionColor === 'error' ? '#DC2626' : '#64748B',
+                  color: secondaryActionColor === 'error' ? '#B91C1C' : '#0F172A',
                 },
               }}
             >
