@@ -23,6 +23,7 @@ interface MacCenterModalProps {
   primaryActionColor?: 'primary' | 'error' | 'success' | 'warning';
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
+  secondaryActionColor?: 'inherit' | 'error' | 'primary';
   maxWidth?: number | string;
 }
 
@@ -38,6 +39,7 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
   primaryActionColor = 'primary',
   secondaryActionLabel = 'Close',
   onSecondaryAction,
+  secondaryActionColor = 'inherit',
   maxWidth = 720,
 }) => {
   return (
@@ -47,8 +49,9 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
       slotProps={{
         backdrop: {
           sx: {
-            backgroundColor: 'rgba(0, 0, 0, 0.42)',
-            backdropFilter: 'blur(4px)',
+            backgroundColor: 'rgba(0, 0, 0, 0.45)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
           },
         },
         paper: {
@@ -128,16 +131,16 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
                 height: 40,
                 padding: '0 20px',
                 borderRadius: '8px',
-                borderColor: 'var(--mac-border-color)',
-                color: 'var(--mac-text-secondary)',
+                borderColor: secondaryActionColor === 'error' ? '#FECACA' : 'var(--mac-border-color)',
+                color: secondaryActionColor === 'error' ? '#DC2626' : 'var(--mac-text-secondary)',
                 fontSize: '11.6px',
-                fontWeight: 500,
+                fontWeight: 600,
                 textTransform: 'none',
-                backgroundColor: '#FFFFFF',
+                backgroundColor: secondaryActionColor === 'error' ? '#FEF2F2' : '#FFFFFF',
                 '&:hover': {
-                  backgroundColor: 'var(--mac-canvas-bg)',
-                  borderColor: 'var(--mac-text-muted)',
-                  color: 'var(--mac-text-primary)',
+                  backgroundColor: secondaryActionColor === 'error' ? '#FEE2E2' : 'var(--mac-canvas-bg)',
+                  borderColor: secondaryActionColor === 'error' ? '#DC2626' : 'var(--mac-text-muted)',
+                  color: secondaryActionColor === 'error' ? '#B91C1C' : 'var(--mac-text-primary)',
                 },
               }}
             >

@@ -239,6 +239,62 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
 // 2. TODA APPLICATIONS SERVICES (Live Supabase public.toda)
 // ============================================================================
 
+function extractStoragePath(bucket: string, rawVal?: string | null): string | null {
+  if (!rawVal) return null;
+  const str = String(rawVal).trim();
+  if (!str) return null;
+
+  if (str.includes(`/${bucket}/`)) {
+    return decodeURIComponent(str.split(`/${bucket}/`)[1].split('?')[0]);
+  }
+  if (str.includes('/storage/v1/object/public/')) {
+    const after = decodeURIComponent(str.split('/storage/v1/object/public/')[1].split('?')[0]);
+    if (after.startsWith(`${bucket}/`)) {
+      return after.slice(bucket.length + 1);
+    }
+    return after;
+  }
+  return str;
+}
+
+async function resolveStorageDocUrl(bucket: string, rawVal?: string | null): Promise<string | null> {
+  if (!rawVal) return null;
+  const str = String(rawVal).trim();
+  if (!str) return null;
+
+  const path = extractStoragePath(bucket, str);
+  if (!path) return str.startsWith('http') ? str : null;
+
+  try {
+    const { data: signedData, error: sErr } = await supabase.storage.from(bucket).createSignedUrl(path, 86400);
+    if (!sErr && signedData?.signedUrl) {
+      return signedData.signedUrl;
+    }
+  } catch {}
+
+  try {
+    const { data: pubData } = supabase.storage.from(bucket).getPublicUrl(path);
+    if (pubData?.publicUrl) {
+      return pubData.publicUrl;
+    }
+  } catch {}
+
+  return str.startsWith('http') ? str : null;
+}
+
+function extractActualFilename(rawUrlOrPath?: string | null, fallback = 'Document'): string {
+  if (!rawUrlOrPath) return fallback;
+  try {
+    const clean = rawUrlOrPath.split('?')[0].split('#')[0];
+    const rawName = decodeURIComponent(clean.split('/').pop() || '');
+    if (!rawName) return fallback;
+    const stripped = rawName.replace(/^\d{10,15}_/, '');
+    return stripped || rawName;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function fetchTodaApplications(): Promise<TodaApplicationRecord[]> {
   try {
     const { data, error } = await supabase
@@ -255,50 +311,52 @@ export async function fetchTodaApplications(): Promise<TodaApplicationRecord[]> 
         ? Date.now() - new Date(row.created_at).getTime() > 5 * 24 * 60 * 60 * 1000
         : false;
 
-      // Create signed URLs for documents if they exist
-      let bcUrl = null;
-      let adUrl = null;
-      let blUrl = null;
-      if (row.barangay_clearance_url) {
-        const { data: bcData } = await supabase.storage.from('barangay-clearances').createSignedUrl(row.barangay_clearance_url, 3600);
-        bcUrl = bcData?.signedUrl;
-      }
-      if (row.accredited_drivers_url) {
-        const { data: adData } = await supabase.storage.from('toda-accredited-driver-lists').createSignedUrl(row.accredited_drivers_url, 3600);
-        adUrl = adData?.signedUrl;
-      }
-      if (row.bylaws_url) {
-        const { data: blData } = await supabase.storage.from('toda-bylaws').createSignedUrl(row.bylaws_url, 3600);
-        blUrl = blData?.signedUrl;
-      }
+      // Resolve signed or direct public URLs for documents
+      const bcUrl = row.barangay_clearance_url?.startsWith('http')
+        ? row.barangay_clearance_url
+        : await resolveStorageDocUrl('barangay-clearances', row.barangay_clearance_url);
+
+      const adUrl = row.accredited_drivers_url?.startsWith('http')
+        ? row.accredited_drivers_url
+        : await resolveStorageDocUrl('toda-accredited-driver-lists', row.accredited_drivers_url);
+
+      const blUrl = row.bylaws_url?.startsWith('http')
+        ? row.bylaws_url
+        : await resolveStorageDocUrl('toda-bylaws', row.bylaws_url);
 
       const docs = [];
-      if (row.barangay_clearance_url) {
+      if (row.barangay_clearance_url || bcUrl) {
+        const fileLink = bcUrl || row.barangay_clearance_url;
+        const actualName = extractActualFilename(row.barangay_clearance_url || bcUrl, 'Barangay_Clearance.pdf');
         docs.push({
-          name: `Barangay Clearance (${row.barangay || 'Calapan City'})`,
-          type: row.barangay_clearance_url.toLowerCase().endsWith('.pdf') ? 'PDF Document' : 'Image Verification',
+          name: actualName,
+          type: (fileLink || '').toLowerCase().includes('.pdf') ? 'PDF Document' : 'Image Verification',
           date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Submitted',
-          url: bcUrl || null,
+          url: fileLink,
           status: 'Submitted',
         });
       }
 
-      if (row.accredited_drivers_url) {
+      if (row.accredited_drivers_url || adUrl) {
+        const fileLink = adUrl || row.accredited_drivers_url;
+        const actualName = extractActualFilename(row.accredited_drivers_url || adUrl, 'Driver_Roster.xlsx');
         docs.push({
-          name: `Official Driver Master Roster (${row.registered_tricycle_count || row.active_driver_count || 0} Drivers)`,
-          type: row.accredited_drivers_url.toLowerCase().endsWith('.csv') ? 'CSV Spreadsheet' : 'Excel Spreadsheet',
+          name: actualName,
+          type: (fileLink || '').toLowerCase().includes('.csv') ? 'CSV Spreadsheet' : 'Excel Spreadsheet',
           date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Submitted',
-          url: adUrl || null,
+          url: fileLink,
           status: 'Submitted',
         });
       }
 
-      if (row.bylaws_url) {
+      if (row.bylaws_url || blUrl) {
+        const fileLink = blUrl || row.bylaws_url;
+        const actualName = extractActualFilename(row.bylaws_url || blUrl, 'Internal_Bylaws.pdf');
         docs.push({
-          name: 'Internal TODA Bylaws',
-          type: row.bylaws_url.toLowerCase().endsWith('.pdf') ? 'PDF Document' : 'Document Attachment',
+          name: actualName,
+          type: (fileLink || '').toLowerCase().includes('.pdf') ? 'PDF Document' : 'Document Attachment',
           date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Submitted',
-          url: blUrl || null,
+          url: fileLink,
           status: 'Submitted',
         });
       }

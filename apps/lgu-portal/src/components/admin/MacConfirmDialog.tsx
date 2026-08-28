@@ -39,7 +39,8 @@ export const MacConfirmDialog: React.FC<MacConfirmDialogProps> = ({
         backdrop: {
           sx: {
             backgroundColor: 'rgba(0, 0, 0, 0.45)',
-            backdropFilter: 'blur(4px)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
           },
         },
         paper: {

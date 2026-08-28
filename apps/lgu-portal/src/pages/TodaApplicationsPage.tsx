@@ -13,10 +13,16 @@ import {
   CircularProgress,
   Alert,
   Snackbar,
+  Button,
+  Divider,
 } from '@mui/material';
 import DescriptionIcon from '@mui/icons-material/Description';
-import FolderZipIcon from '@mui/icons-material/FolderZip';
+import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
+import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 
 import { TodaApplicationRecord } from '../mockData/adminData';
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
@@ -24,7 +30,7 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
-import { DocumentPreviewModal } from '../components/admin/DocumentPreviewModal';
+import { DocumentReviewModal } from '../components/modals/DocumentReviewModal';
 import { TableEmptyState } from '../components/common/TableEmptyState';
 import {
   fetchTodaApplications,
@@ -34,25 +40,31 @@ import {
   recordAdminAuditAction,
 } from '../services/adminApiService';
 
-/**
- * ============================================================================
- * TODA APPLICATIONS MANAGEMENT PAGE
- * ============================================================================
- * Purpose:
- *   Official LGU administrative interface for reviewing, approving,
- *   returning for correction, and rejecting TODA accreditation applications.
- *   Connected 100% directly to the live Supabase PostgreSQL database.
- * ============================================================================
- */
+const formatDisplayDate = (dateStr?: string | null): string => {
+  if (!dateStr) return 'N/A';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+};
+
 export const TodaApplicationsPage: React.FC = () => {
-  // State: Real database records
   const [applications, setApplications] = useState<TodaApplicationRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [dateFilter, setDateFilter] = useState('All');
   const [reminderSent, setReminderSent] = useState<string | null>(null);
-  const [selectedDoc, setSelectedDoc] = useState<{ name: string; type: string; url?: string | null } | null>(null);
+
+  // Document Review Modal (Spreadsheet Parser, PDF & Image Viewer with blurred backdrop)
+  const [reviewDoc, setReviewDoc] = useState<{
+    name: string;
+    type: string;
+    url?: string | null;
+  } | null>(null);
 
   // Notification Snackbar
   const [snackbarMessage, setSnackbarMessage] = useState<string | null>(null);
@@ -60,14 +72,14 @@ export const TodaApplicationsPage: React.FC = () => {
   // Selected Application for Review Modal
   const [selectedApp, setSelectedApp] = useState<TodaApplicationRecord | null>(null);
 
+  // Specific document target for correction
+  const [targetCorrectionDoc, setTargetCorrectionDoc] = useState<{ name: string; type: string } | null>(null);
+
   // Confirmation Dialog States
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [resubmissionDialogOpen, setResubmissionDialogOpen] = useState(false);
 
-  /**
-   * Load TODA applications from Supabase database
-   */
   const loadApplications = async () => {
     setIsLoading(true);
     try {
@@ -84,7 +96,6 @@ export const TodaApplicationsPage: React.FC = () => {
     loadApplications();
   }, []);
 
-  // Filter logic: Search query across name, acronym, representative, barangay, or ID
   const filteredApps = applications.filter((app) => {
     const q = searchQuery.toLowerCase();
     const matchesSearch =
@@ -99,7 +110,6 @@ export const TodaApplicationsPage: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  // Summary counts for KPI header cards
   const pendingCount = applications.filter((a) => a.status === 'Pending').length;
   const underReviewCount = applications.filter((a) => a.status === 'Under Review').length;
   const approvedCount = applications.filter((a) => a.status === 'Approved').length;
@@ -122,9 +132,6 @@ export const TodaApplicationsPage: React.FC = () => {
     { label: 'This Month', value: 'This Month' },
   ];
 
-  /**
-   * Action Handler: Approve TODA Application
-   */
   const handleApproveConfirm = async () => {
     if (!selectedApp) return;
 
@@ -143,13 +150,12 @@ export const TodaApplicationsPage: React.FC = () => {
     setApproveDialogOpen(false);
   };
 
-  /**
-   * Action Handler: Return Application for Correction
-   */
   const handleResubmissionConfirm = async (reason?: string) => {
     if (!selectedApp) return;
 
-    const correctionReason = reason || 'Please resubmit updated Barangay Clearance and Officer Roster.';
+    const filePrefix = targetCorrectionDoc ? `[${targetCorrectionDoc.name}] ` : '';
+    const correctionReason = `${filePrefix}${reason || 'Document requires correction or resubmission.'}`;
+
     try {
       await returnTodaApplicationForCorrection(selectedApp.id, correctionReason);
       setSnackbarMessage(`Application returned for correction: ${selectedApp.name}.`);
@@ -168,12 +174,10 @@ export const TodaApplicationsPage: React.FC = () => {
       setSnackbarMessage(`Error: ${(err as Error).message}`);
     }
 
+    setTargetCorrectionDoc(null);
     setResubmissionDialogOpen(false);
   };
 
-  /**
-   * Action Handler: Reject TODA Application
-   */
   const handleRejectConfirm = async (reason?: string) => {
     if (!selectedApp) return;
 
@@ -197,9 +201,6 @@ export const TodaApplicationsPage: React.FC = () => {
     setRejectDialogOpen(false);
   };
 
-  /**
-   * Action Handler: Send Barangay Clearance Reminder
-   */
   const handleSendReminder = (todaId: string) => {
     setReminderSent(todaId);
 
@@ -221,7 +222,7 @@ export const TodaApplicationsPage: React.FC = () => {
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' },
+          gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' },
           gap: 2.5,
           mb: 3.5,
         }}
@@ -231,72 +232,87 @@ export const TodaApplicationsPage: React.FC = () => {
             backgroundColor: '#FFFFFF',
             borderRadius: 'var(--mac-radius-lg)',
             border: '1px solid var(--mac-border-color)',
-            padding: '16px 20px',
             boxShadow: 'var(--mac-shadow-card)',
+            padding: '24px',
           }}
         >
-          <Typography sx={{ fontSize: '10.4px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>
+          <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
             Pending Applications
           </Typography>
-          <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: 'var(--sakay-orange)' }}>
-            {pendingCount}
+          <Typography sx={{ fontSize: '24px', fontWeight: 700, color: 'var(--mac-text-primary)', mt: 1 }}>
+            {isLoading ? <CircularProgress size={24} sx={{ color: 'var(--sakay-orange)' }} /> : pendingCount}
+          </Typography>
+          <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', mt: 0.5 }}>
+            Awaiting initial LGU review
           </Typography>
         </Box>
+
         <Box
           sx={{
             backgroundColor: '#FFFFFF',
             borderRadius: 'var(--mac-radius-lg)',
             border: '1px solid var(--mac-border-color)',
-            padding: '16px 20px',
             boxShadow: 'var(--mac-shadow-card)',
+            padding: '24px',
           }}
         >
-          <Typography sx={{ fontSize: '10.4px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>
+          <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
             Under Review
           </Typography>
-          <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#1565C0' }}>
-            {underReviewCount}
+          <Typography sx={{ fontSize: '24px', fontWeight: 700, color: '#1565C0', mt: 1 }}>
+            {isLoading ? <CircularProgress size={24} sx={{ color: '#1565C0' }} /> : underReviewCount}
+          </Typography>
+          <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', mt: 0.5 }}>
+            Background and document verification
           </Typography>
         </Box>
+
         <Box
           sx={{
             backgroundColor: '#FFFFFF',
             borderRadius: 'var(--mac-radius-lg)',
             border: '1px solid var(--mac-border-color)',
-            padding: '16px 20px',
             boxShadow: 'var(--mac-shadow-card)',
+            padding: '24px',
           }}
         >
-          <Typography sx={{ fontSize: '10.4px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>
-            Approved Accreditation
+          <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+            Accredited TODAs
           </Typography>
-          <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#2E7D32' }}>
-            {approvedCount}
+          <Typography sx={{ fontSize: '24px', fontWeight: 700, color: '#1E8E3E', mt: 1 }}>
+            {isLoading ? <CircularProgress size={24} sx={{ color: '#1E8E3E' }} /> : approvedCount}
+          </Typography>
+          <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', mt: 0.5 }}>
+            Approved and operational
           </Typography>
         </Box>
+
         <Box
           sx={{
             backgroundColor: '#FFFFFF',
             borderRadius: 'var(--mac-radius-lg)',
             border: '1px solid var(--mac-border-color)',
-            padding: '16px 20px',
             boxShadow: 'var(--mac-shadow-card)',
+            padding: '24px',
           }}
         >
-          <Typography sx={{ fontSize: '10.4px', fontWeight: 500, color: 'var(--mac-text-muted)', mb: 1 }}>
-            Declined / Resubmission
+          <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+            Needs Correction
           </Typography>
-          <Typography sx={{ fontSize: '22.4px', fontWeight: 700, color: '#C62828' }}>
-            {declinedCount}
+          <Typography sx={{ fontSize: '24px', fontWeight: 700, color: 'var(--sakay-orange)', mt: 1 }}>
+            {isLoading ? <CircularProgress size={24} sx={{ color: 'var(--sakay-orange)' }} /> : declinedCount}
+          </Typography>
+          <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', mt: 0.5 }}>
+            Returned for missing documents
           </Typography>
         </Box>
       </Box>
 
-      {/* 2. Filter Toolbar */}
+      {/* 2. Search and Filtering Controls */}
       <FilterToolbar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        searchPlaceholder="Search by TODA name, acronym, representative, or barangay..."
+        searchPlaceholder="Search TODA name, acronym, representative, or barangay..."
         selectFilters={[
           {
             id: 'status',
@@ -307,7 +323,7 @@ export const TodaApplicationsPage: React.FC = () => {
           },
           {
             id: 'date',
-            label: 'Submission Date',
+            label: 'Date',
             value: dateFilter,
             options: dateOptions,
             onChange: setDateFilter,
@@ -320,7 +336,7 @@ export const TodaApplicationsPage: React.FC = () => {
         }}
       />
 
-      {/* 3. Administrative Table */}
+      {/* 3. Primary Data Table */}
       <TableContainer
         component={Paper}
         elevation={0}
@@ -342,9 +358,6 @@ export const TodaApplicationsPage: React.FC = () => {
                 Representative
               </TableCell>
               <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
-                Barangay Clearance
-              </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 Date Submitted
               </TableCell>
               <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
@@ -358,7 +371,7 @@ export const TodaApplicationsPage: React.FC = () => {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                <TableCell colSpan={5} align="center" sx={{ py: 8 }}>
                   <CircularProgress size={32} sx={{ color: 'var(--sakay-orange)', mb: 1.5 }} />
                   <Typography sx={{ fontSize: '11.3px', color: 'var(--mac-text-muted)' }}>
                     Loading TODA applications...
@@ -374,58 +387,41 @@ export const TodaApplicationsPage: React.FC = () => {
                     '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' },
                   }}
                 >
+                  {/* TODA Name & Acronym only */}
                   <TableCell sx={{ py: 2.2, px: 3 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Typography sx={{ fontWeight: 600, fontSize: '11.6px', color: 'var(--mac-text-primary)' }}>
+                      <Typography sx={{ fontWeight: 600, fontSize: '12.5px', color: 'var(--mac-text-primary)' }}>
                         {app.name}
                       </Typography>
                       {app.acronym && (
                         <Chip
                           label={app.acronym}
                           size="small"
-                          sx={{ fontSize: '8.8px', fontWeight: 600, backgroundColor: 'rgba(255, 107, 26, 0.1)', color: 'var(--sakay-orange)', height: 22 }}
+                          sx={{ fontSize: '10px', fontWeight: 600, backgroundColor: 'rgba(255, 107, 26, 0.1)', color: 'var(--sakay-orange)', height: 22 }}
                         />
                       )}
                       {app.isOverdue5Days && (
                         <Chip
                           label="Overdue >5 Days"
                           size="small"
-                          sx={{ fontSize: '8.8px', fontWeight: 600, backgroundColor: '#FEE2E2', color: '#DC2626', height: 22 }}
+                          sx={{ fontSize: '9px', fontWeight: 600, backgroundColor: '#FEE2E2', color: '#DC2626', height: 22 }}
                         />
                       )}
                     </Box>
-                    <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)', mt: '4px' }}>
-                      ID: {app.id.substring(0, 13)}... • {app.memberCount} Drivers • Brgy. {app.barangay}
-                    </Typography>
                   </TableCell>
-                  <TableCell sx={{ fontSize: '11.3px', color: 'var(--mac-text-primary)', py: 2.2, px: 3 }}>
+
+                  <TableCell sx={{ fontSize: '12px', color: 'var(--mac-text-primary)', py: 2.2, px: 3 }}>
                     {app.representative}
                   </TableCell>
-                  <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      <Typography
-                        sx={{
-                          fontSize: '10.8px',
-                          fontWeight: 600,
-                          color:
-                            app.clearanceStatus === 'Expired'
-                              ? '#DC2626'
-                              : app.clearanceStatus === 'Expiring Soon'
-                              ? '#EA580C'
-                              : 'var(--mac-text-primary)',
-                        }}
-                      >
-                        Expires: {app.barangayClearanceExpiry}
-                      </Typography>
-                      <StatusBadge status={app.clearanceStatus} />
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{ fontSize: '11.3px', color: 'var(--mac-text-secondary)', py: 2.2, px: 3 }}>
+
+                  <TableCell sx={{ fontSize: '12px', color: 'var(--mac-text-secondary)', py: 2.2, px: 3 }}>
                     {app.submittedDate}
                   </TableCell>
+
                   <TableCell sx={{ py: 2.2, px: 3 }}>
                     <StatusBadge status={app.status} />
                   </TableCell>
+
                   <TableCell align="right" sx={{ py: 2.2, px: 3 }}>
                     <ActionButton
                       label="Review"
@@ -439,7 +435,7 @@ export const TodaApplicationsPage: React.FC = () => {
               ))
             ) : (
               <TableEmptyState
-                colSpan={6}
+                colSpan={5}
                 icon={<AccountBalanceIcon />}
                 title="No TODA accreditation applications found"
                 description={
@@ -448,239 +444,304 @@ export const TodaApplicationsPage: React.FC = () => {
                     : 'New TODA accreditation applications will appear here once organizations submit their applications.'
                 }
                 onRefresh={loadApplications}
-                isRefreshing={isLoading}
               />
             )}
           </TableBody>
         </Table>
       </TableContainer>
 
-      {/* 4. Centered Review Modal (Review Submitted Information & Documents) */}
+      {/* 4. Official Accreditation Review Modal */}
       {selectedApp && (
         <MacCenterModal
           open={Boolean(selectedApp)}
           onClose={() => setSelectedApp(null)}
-          title={`Review TODA Application — ${selectedApp.name}`}
-          subtitle={`Application ID: ${selectedApp.id}`}
+          title="TODA Accreditation Application Review"
+          subtitle={`Submitted association records and compliance files for ${selectedApp.name}`}
           badge={<StatusBadge status={selectedApp.status} />}
-          primaryActionLabel={selectedApp.status !== 'Approved' ? 'Approve Accreditation' : undefined}
-          onPrimaryAction={() => setApproveDialogOpen(true)}
-          secondaryActionLabel={selectedApp.status !== 'Declined' ? 'Decline Application' : undefined}
+          maxWidth={820}
+          primaryActionLabel={selectedApp.status === 'Approved' ? undefined : 'Approve & Issue Accreditation'}
+          onPrimaryAction={selectedApp.status === 'Approved' ? undefined : () => setApproveDialogOpen(true)}
+          secondaryActionLabel="Decline Application"
           onSecondaryAction={() => setRejectDialogOpen(true)}
+          secondaryActionColor="error"
         >
-          {/* Section 1: Overview & Organization Information */}
-          <Box sx={{ mb: 4 }}>
-            <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 2 }}>
-              1. Submitted Organization & Office Information
+          {/* Section 1: Organization Information (Matches TODA Registration Layout) */}
+          <Box sx={{ mb: 3.5 }}>
+            <Typography sx={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--sakay-orange)', textTransform: 'uppercase', mb: 2, letterSpacing: '0.5px' }}>
+              1. Organization Information
             </Typography>
             <Box
               sx={{
                 display: 'grid',
                 gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
                 gap: 2.5,
-                backgroundColor: '#F5F5F7',
+                backgroundColor: '#F8FAFC',
                 padding: '20px',
                 borderRadius: '12px',
-              }}
-            >
-              <Box>
-                <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>TODA Official Name</Typography>
-                <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                  {selectedApp.name} {selectedApp.acronym ? `(${selectedApp.acronym})` : ''}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Registration / Ordinance No.</Typography>
-                <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                  {selectedApp.registrationNumber || 'Pending Issuance'}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Primary Contact Phone</Typography>
-                <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedApp.phone}</Typography>
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Contact Email Address</Typography>
-                <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                  {selectedApp.email || 'N/A'}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Operating Barangay</Typography>
-                <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedApp.barangay}</Typography>
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Terminal Location / Corridor</Typography>
-                <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                  {selectedApp.terminalLocation || 'Calapan City Corridor'}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Active Driver & Tricycle Count</Typography>
-                <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                  {selectedApp.memberCount} Authorized Drivers
-                </Typography>
-              </Box>
-              <Box>
-                <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Barangay Clearance Expiry</Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                    {selectedApp.barangayClearanceExpiry}
-                  </Typography>
-                  <StatusBadge status={selectedApp.clearanceStatus} />
-                </Box>
-              </Box>
-            </Box>
-
-            {/* Section 1.1: Authorized Officers */}
-            {selectedApp.officers && (
-              <Box sx={{ mt: 2.5 }}>
-                <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1.5 }}>
-                  Authorized Officers
-                </Typography>
-                <Box
-                  sx={{
-                    display: 'grid',
-                    gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
-                    gap: 1.5,
-                    backgroundColor: '#FAFAFC',
-                    padding: '16px',
-                    borderRadius: '10px',
-                    border: '1px solid var(--mac-border-color)',
-                  }}
-                >
-                  <Box>
-                    <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>President</Typography>
-                    <Typography sx={{ fontSize: '10.8px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                      {selectedApp.officers.president} ({selectedApp.officers.presidentContact})
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Vice President</Typography>
-                    <Typography sx={{ fontSize: '10.8px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                      {selectedApp.officers.vicePresident} ({selectedApp.officers.vicePresidentContact})
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Secretary</Typography>
-                    <Typography sx={{ fontSize: '10.8px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                      {selectedApp.officers.secretary} ({selectedApp.officers.secretaryContact})
-                    </Typography>
-                  </Box>
-                  <Box>
-                    <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>Treasurer</Typography>
-                    <Typography sx={{ fontSize: '10.8px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                      {selectedApp.officers.treasurer} ({selectedApp.officers.treasurerContact})
-                    </Typography>
-                  </Box>
-                </Box>
-              </Box>
-            )}
-
-            {/* Clearance Renewal Reminder Tool */}
-            <Box
-              sx={{
-                mt: 2.5,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                backgroundColor: '#FAFAFC',
-                padding: '14px 18px',
-                borderRadius: '10px',
                 border: '1px solid var(--mac-border-color)',
               }}
             >
-              <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-secondary)' }}>
-                Send automated Barangay Clearance renewal advisory to TODA representative.
-              </Typography>
-              <ActionButton
-                label={reminderSent === selectedApp.id ? 'Reminder Sent ✓' : 'Send Reminder'}
-                showArrow={false}
-                onClick={() => handleSendReminder(selectedApp.id)}
-                sx={{ height: 34, fontSize: '10.4px' }}
-              />
+              <Box>
+                <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '4px' }}>Official Association / TODA Name</Typography>
+                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                  {selectedApp.name}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '4px' }}>TODA Acronym</Typography>
+                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                  {selectedApp.acronym || 'N/A'}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '4px' }}>Operating Barangay</Typography>
+                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                  {selectedApp.barangay}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '4px' }}>Date Established</Typography>
+                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                  {formatDisplayDate(selectedApp.dateEstablished)}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '4px' }}>Terminal Location</Typography>
+                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                  {selectedApp.terminalLocation || 'Calapan City Terminal'}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '4px' }}>Terminal Coordinates</Typography>
+                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                  {selectedApp.terminalLatitude && selectedApp.terminalLongitude
+                    ? `${selectedApp.terminalLatitude}, ${selectedApp.terminalLongitude}`
+                    : 'None specified'}
+                </Typography>
+              </Box>
             </Box>
           </Box>
 
-          {/* Section 2: Resubmission / Correction Reason Notice */}
-          {selectedApp.resubmissionReason && (
-            <Box sx={{ mb: 4, backgroundColor: '#FFF7ED', border: '1px solid #FDBA74', padding: '16px 20px', borderRadius: '12px' }}>
-              <Typography sx={{ fontSize: '10.8px', fontWeight: 600, color: '#EA580C', mb: '4px' }}>
-                Correction / Resubmission Notice Logged:
+          {/* Section 2: Executive Officers */}
+          {selectedApp.officers && (
+            <Box sx={{ mb: 3.5 }}>
+              <Typography sx={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--sakay-orange)', textTransform: 'uppercase', mb: 2, letterSpacing: '0.5px' }}>
+                2. Executive Officers
               </Typography>
-              <Typography sx={{ fontSize: '11.3px', color: '#9A3412' }}>{selectedApp.resubmissionReason}</Typography>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                  gap: 2,
+                  backgroundColor: '#F8FAFC',
+                  padding: '18px 20px',
+                  borderRadius: '12px',
+                  border: '1px solid var(--mac-border-color)',
+                }}
+              >
+                <Box>
+                  <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '3px' }}>President</Typography>
+                  <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    {selectedApp.officers.president || 'N/A'}
+                  </Typography>
+                  {selectedApp.officers.presidentContact && (
+                    <Typography sx={{ fontSize: '11.5px', color: 'var(--sakay-orange)', fontWeight: 500 }}>
+                      {selectedApp.officers.presidentContact}
+                    </Typography>
+                  )}
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '3px' }}>Vice President</Typography>
+                  <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    {selectedApp.officers.vicePresident || 'N/A'}
+                  </Typography>
+                  {selectedApp.officers.vicePresidentContact && (
+                    <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)' }}>
+                      {selectedApp.officers.vicePresidentContact}
+                    </Typography>
+                  )}
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '3px' }}>Secretary</Typography>
+                  <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    {selectedApp.officers.secretary || 'N/A'}
+                  </Typography>
+                  {selectedApp.officers.secretaryContact && (
+                    <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)' }}>
+                      {selectedApp.officers.secretaryContact}
+                    </Typography>
+                  )}
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '3px' }}>Treasurer</Typography>
+                  <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    {selectedApp.officers.treasurer || 'N/A'}
+                  </Typography>
+                  {selectedApp.officers.treasurerContact && (
+                    <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)' }}>
+                      {selectedApp.officers.treasurerContact}
+                    </Typography>
+                  )}
+                </Box>
+              </Box>
             </Box>
           )}
 
-          {/* Section 3: Official Submitted Documents Review */}
-          <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-              <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
-                2. Submitted Accreditation Documents ({selectedApp.documents.length})
-              </Typography>
-              <ActionButton
-                label="Return for Correction"
-                showArrow={false}
-                onClick={() => setResubmissionDialogOpen(true)}
-                sx={{ height: 32, fontSize: '10px' }}
-              />
-            </Box>
+          {/* Section 3: Required Documents with Per-File Return for Correction */}
+          <Box sx={{ mb: 3.5 }}>
+            <Typography sx={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--sakay-orange)', textTransform: 'uppercase', mb: 2, letterSpacing: '0.5px' }}>
+              3. Required Documents ({selectedApp.documents.length})
+            </Typography>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              {selectedApp.documents.map((doc, idx) => (
-                <Box
-                  key={idx}
-                  sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '14px 18px',
-                    borderRadius: '10px',
-                    border: '1px solid var(--mac-border-color)',
-                    backgroundColor: '#FFFFFF',
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    {doc.type.includes('ZIP') ? (
-                      <FolderZipIcon sx={{ color: '#1565C0', fontSize: '19.3' }} />
-                    ) : (
-                      <DescriptionIcon sx={{ color: 'var(--sakay-orange)', fontSize: '19.3' }} />
-                    )}
-                    <Box>
-                      <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)', lineHeight: 1.2 }}>
-                        {doc.name}
-                      </Typography>
-                      <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)', mt: '3px' }}>
-                        {doc.type} • Uploaded {doc.date}
-                      </Typography>
+              {selectedApp.documents.map((doc, idx) => {
+                const isRoster = doc.name.toLowerCase().includes('roster') || doc.type.toLowerCase().includes('spreadsheet') || doc.type.toLowerCase().includes('csv') || doc.type.toLowerCase().includes('excel');
+                const isPdf = doc.type.toLowerCase().includes('pdf');
+
+                return (
+                  <Box
+                    key={idx}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 2,
+                      padding: '16px 20px',
+                      borderRadius: '12px',
+                      border: '1px solid var(--mac-border-color)',
+                      backgroundColor: '#FFFFFF',
+                      boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      {isRoster ? (
+                        <TableChartOutlinedIcon sx={{ color: '#16A34A', fontSize: 28 }} />
+                      ) : isPdf ? (
+                        <PictureAsPdfOutlinedIcon sx={{ color: '#DC2626', fontSize: 28 }} />
+                      ) : (
+                        <DescriptionIcon sx={{ color: 'var(--sakay-orange)', fontSize: 28 }} />
+                      )}
+                      <Box>
+                        <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)', lineHeight: 1.2 }}>
+                          {doc.name}
+                        </Typography>
+                        <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mt: '3px' }}>
+                          {doc.type} • Uploaded {doc.date}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    {/* Actions per file container */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<VisibilityIcon fontSize="small" />}
+                        onClick={() => setReviewDoc({ name: doc.name, type: doc.type, url: doc.url })}
+                        sx={{
+                          height: 32,
+                          px: 1.75,
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          textTransform: 'none',
+                          color: 'var(--sakay-orange)',
+                          borderColor: 'var(--sakay-orange-border)',
+                          backgroundColor: 'var(--sakay-orange-soft)',
+                          borderRadius: '8px',
+                          '&:hover': {
+                            backgroundColor: 'rgba(255, 107, 26, 0.16)',
+                            borderColor: 'var(--sakay-orange)',
+                          },
+                        }}
+                      >
+                        View
+                      </Button>
+
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<AssignmentReturnIcon fontSize="small" />}
+                        onClick={() => {
+                          setTargetCorrectionDoc(doc);
+                          setResubmissionDialogOpen(true);
+                        }}
+                        sx={{
+                          height: 32,
+                          px: 1.75,
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          textTransform: 'none',
+                          color: '#DC2626',
+                          borderColor: '#FECACA',
+                          backgroundColor: '#FEF2F2',
+                          borderRadius: '8px',
+                          '&:hover': {
+                            backgroundColor: '#FEE2E2',
+                            borderColor: '#DC2626',
+                          },
+                        }}
+                      >
+                        Return for Correction
+                      </Button>
                     </Box>
                   </Box>
-
-                  <Chip
-                    label="View Document"
-                    size="small"
-                    onClick={() => setSelectedDoc({ name: doc.name, type: doc.type, url: doc.url })}
-                    sx={{ fontSize: '10px', cursor: 'pointer', backgroundColor: 'var(--mac-canvas-bg)', height: 28 }}
-                  />
-                </Box>
-              ))}
+                );
+              })}
             </Box>
+          </Box>
+
+          {/* Resubmission Reason Notice if already logged */}
+          {selectedApp.resubmissionReason && (
+            <Box sx={{ mb: 3, backgroundColor: '#FFF7ED', border: '1px solid #FDBA74', padding: '16px 20px', borderRadius: '12px' }}>
+              <Typography sx={{ fontSize: '11.5px', fontWeight: 600, color: '#EA580C', mb: '4px' }}>
+                Correction / Resubmission Notice Logged:
+              </Typography>
+              <Typography sx={{ fontSize: '12px', color: '#9A3412' }}>{selectedApp.resubmissionReason}</Typography>
+            </Box>
+          )}
+
+          {/* Section 4: Automated Clearance Renewal Advisory Banner (Placed at the very bottom) */}
+          <Divider sx={{ my: 2.5, borderColor: 'var(--mac-border-color)' }} />
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: '#F8FAFC',
+              padding: '16px 20px',
+              borderRadius: '12px',
+              border: '1px solid var(--mac-border-color)',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <NotificationsActiveIcon sx={{ color: 'var(--sakay-orange)', fontSize: 22 }} />
+              <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-secondary)', fontWeight: 500 }}>
+                Send automated Barangay Clearance renewal advisory to TODA representative.
+              </Typography>
+            </Box>
+            <ActionButton
+              label={reminderSent === selectedApp.id ? 'Advisory Sent ✓' : 'Send Advisory'}
+              showArrow={false}
+              onClick={() => handleSendReminder(selectedApp.id)}
+              sx={{ height: 34, fontSize: '11.5px' }}
+            />
           </Box>
         </MacCenterModal>
       )}
 
-      {/* Document Inspection Popover Modal */}
-      {selectedDoc && (
-        <DocumentPreviewModal
-          open={Boolean(selectedDoc)}
-          onClose={() => setSelectedDoc(null)}
-          documentName={selectedDoc.name}
-          documentType={selectedDoc.type}
-          url={selectedDoc.url}
+      {/* Document Review Modal (Identical to TODA Registration Review with blurred backdrop) */}
+      {reviewDoc && (
+        <DocumentReviewModal
+          open={Boolean(reviewDoc)}
+          onClose={() => setReviewDoc(null)}
+          documentTitle={reviewDoc.name}
+          fileName={reviewDoc.name}
+          fileUrl={reviewDoc.url || null}
         />
       )}
 
-      {/* 5. Approve Confirmation Dialog */}
+      {/* Approve Confirmation Dialog */}
       {selectedApp && (
         <MacConfirmDialog
           open={approveDialogOpen}
@@ -693,29 +754,44 @@ export const TodaApplicationsPage: React.FC = () => {
         />
       )}
 
-      {/* 6. Return Application for Correction Dialog */}
+      {/* Return for Correction Dialog (Per-File or General) */}
       {selectedApp && (
         <MacConfirmDialog
           open={resubmissionDialogOpen}
-          onClose={() => setResubmissionDialogOpen(false)}
-          title="Return Application for Correction?"
-          message={`Return application for "${selectedApp.name}" under Correction Required status. Specify the required adjustments for the TODA leadership.`}
-          confirmLabel="Return for Correction"
+          onClose={() => {
+            setTargetCorrectionDoc(null);
+            setResubmissionDialogOpen(false);
+          }}
+          title={
+            targetCorrectionDoc
+              ? `Return ${targetCorrectionDoc.name} for Correction?`
+              : 'Return Application for Correction?'
+          }
+          message={
+            targetCorrectionDoc
+              ? `Specify the corrections required for "${targetCorrectionDoc.name}". The TODA representative will be notified to re-upload this file.`
+              : `Return application for "${selectedApp.name}" under Correction Required status. Specify the required adjustments for the TODA leadership.`
+          }
+          confirmLabel="Send Return Notice"
           confirmVariant="orange"
           requireReason
-          reasonPlaceholder="Specify missing or expired documents (e.g. Please upload updated 2026 Barangay Clearance from Barangay San Vicente)..."
+          reasonPlaceholder={
+            targetCorrectionDoc
+              ? `Specify issue with ${targetCorrectionDoc.name} (e.g. Document is expired, please upload current 2026 certification)...`
+              : 'Specify missing or invalid documents (e.g. Please upload updated 2026 Barangay Clearance)...'
+          }
           onConfirm={handleResubmissionConfirm}
         />
       )}
 
-      {/* 7. Reject Confirmation Dialog */}
+      {/* Reject Confirmation Dialog */}
       {selectedApp && (
         <MacConfirmDialog
           open={rejectDialogOpen}
           onClose={() => setRejectDialogOpen(false)}
           title="Decline TODA Accreditation?"
           message={`Are you sure you want to permanently decline the accreditation request for "${selectedApp.name}"?`}
-          confirmLabel="Reject Application"
+          confirmLabel="Decline Application"
           confirmVariant="danger"
           requireReason
           reasonPlaceholder="Specify mandatory reason for rejection..."
@@ -737,5 +813,3 @@ export const TodaApplicationsPage: React.FC = () => {
     </Box>
   );
 };
-
-
