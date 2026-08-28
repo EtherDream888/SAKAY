@@ -324,12 +324,12 @@ export const TodaDriverMembershipPage: React.FC = () => {
             <Table>
               <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>DRIVER MEMBER</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>FRANCHISE & PLATE</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>SERVICE ZONE</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>STRIKES RECORD</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACCOUNT STATUS</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3, width: 220, whiteSpace: 'nowrap' }}>GOVERNANCE ACTIONS</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Driver Member</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Franchise & Plate</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Service Zone</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Strikes Record</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Account Status</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3, width: 220, whiteSpace: 'nowrap' }}>Governance Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -457,12 +457,12 @@ export const TodaDriverMembershipPage: React.FC = () => {
           <Table>
             <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
               <TableRow>
-                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>DRIVER</TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>INCIDENT CATEGORY</TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>SUBMITTED EVIDENCE</TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>APPEAL DATE</TableCell>
-                <TableCell sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>STATUS</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600, fontSize: '14px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACTIONS</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Driver</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Incident Category</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Submitted Evidence</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Appeal Date</TableCell>
+                <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Status</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

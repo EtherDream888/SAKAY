@@ -240,13 +240,13 @@ export const PassengerManagementPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '9.2px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>PASSENGER</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '9.2px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>PHONE / EMAIL</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '9.2px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>VERIFICATION</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '9.2px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>BOOKINGS</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '9.2px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>POLICY STRIKES</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '9.2px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACCOUNT STATUS</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '9.2px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACTIONS</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Passenger</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Phone / Email</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Verification</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Bookings</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Policy Strikes</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Account Status</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>

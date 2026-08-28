@@ -17,6 +17,7 @@ import {
   TodaAnnouncement,
   TodaAuditLog,
 } from '../types/toda';
+import { parseDriverRoster } from '../utils/rosterParser';
 
 export const DEFAULT_TODA_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 
@@ -24,23 +25,51 @@ export const DEFAULT_TODA_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 // 1. TODA PROFILE & REGISTRATION
 // ============================================================================
 
-export async function fetchTodaProfile(todaId: string = DEFAULT_TODA_ID): Promise<TodaProfile | null> {
+export async function fetchTodaProfile(todaId?: string): Promise<TodaProfile | null> {
   try {
-    let { data, error } = await supabase
-      .from('toda')
-      .select('*')
-      .eq('toda_id', todaId)
-      .maybeSingle();
+    let data: any = null;
 
-    // If default toda_id is not found, fetch the first available active TODA
-    if (!data) {
-      const { data: firstToda } = await supabase
+    if (todaId && todaId !== DEFAULT_TODA_ID) {
+      const { data: directToda } = await supabase
         .from('toda')
         .select('*')
-        .order('created_at', { ascending: true })
+        .eq('toda_id', todaId)
+        .maybeSingle();
+      data = directToda;
+    }
+
+    // If not found, resolve from current authenticated session
+    if (!data) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: adminRecord } = await supabase
+          .from('toda_admin')
+          .select('toda_id, toda:toda_id(*)')
+          .eq('auth_user_id', user.id)
+          .maybeSingle();
+
+        if (adminRecord?.toda) {
+          data = adminRecord.toda;
+        } else if (adminRecord?.toda_id) {
+          const { data: matchedToda } = await supabase
+            .from('toda')
+            .select('*')
+            .eq('toda_id', adminRecord.toda_id)
+            .maybeSingle();
+          data = matchedToda;
+        }
+      }
+    }
+
+    // Fallback to most recently registered TODA in database
+    if (!data) {
+      const { data: latestToda } = await supabase
+        .from('toda')
+        .select('*')
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
-      data = firstToda;
+      data = latestToda;
     }
 
     if (!data) return null;
@@ -57,23 +86,43 @@ export async function fetchTodaProfile(todaId: string = DEFAULT_TODA_ID): Promis
       acronym: data.toda_acronym || 'TODA',
       registrationNumber: data.toda_acronym || 'TODA',
       dateEstablished: data.date_established || '2024-01-01',
-      terminalLocation: data.service_coverage_area || 'Calapan City Terminal',
+      terminalLocation: data.terminal_location || data.service_coverage_area || 'Calapan City Terminal',
+      terminalLatitude: data.terminal_latitude || null,
+      terminalLongitude: data.terminal_longitude || null,
       barangay: data.barangay || 'Calapan City',
       serviceCoverageArea: data.service_coverage_area || 'Calapan City Corridor',
       contactNumber: data.president_contact || data.contact_number || '+63 917 000 0000',
       email: data.email || `${(data.toda_acronym || 'toda').toLowerCase()}@toda.sakay.internal`,
       officers: {
         president: data.president_name || 'Association President',
+        presidentContact: data.president_contact || '',
         vicePresident: data.vice_president_name || 'N/A',
+        vicePresidentContact: data.vice_president_contact || '',
         secretary: data.secretary_name || 'N/A',
+        secretaryContact: data.secretary_contact || '',
         treasurer: data.treasurer_name || 'N/A',
+        treasurerContact: data.treasurer_contact || '',
       },
       accreditationStatus: (data.toda_status || data.account_status) === 'Active' ? 'Active' : 'Pending Verification',
-      accreditationExpiry: 'Dec 31, 2026',
-      accreditationNo: data.toda_acronym || 'TODA',
+      accreditationExpiry: data.certificate_expiry ? new Date(data.certificate_expiry).toLocaleDateString('en-US') : 'Dec 31, 2026',
+      accreditationNo: data.certificate_number || data.toda_acronym || 'TODA',
       permitNumber: data.toda_acronym || 'TODA',
-      barangayClearanceFile: { name: 'Barangay_Clearance.pdf', date: 'Jan 10, 2026' },
-      rosterFile: { name: 'TODA_Driver_Roster.pdf', date: 'Jan 15, 2026', count: driverCount || 0 },
+      barangayClearanceFile: {
+        name: data.barangay_clearance_url ? data.barangay_clearance_url.split('/').pop()?.split('?')[0] || 'Barangay_Clearance.pdf' : 'Barangay_Clearance.pdf',
+        date: data.created_at ? new Date(data.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Jan 10, 2026',
+        url: data.barangay_clearance_url,
+      },
+      rosterFile: {
+        name: data.accredited_drivers_url ? data.accredited_drivers_url.split('/').pop()?.split('?')[0] || 'TODA_Driver_Roster.xlsx' : 'TODA_Driver_Roster.xlsx',
+        date: data.created_at ? new Date(data.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Jan 15, 2026',
+        count: data.registered_tricycle_count || driverCount || 0,
+        url: data.accredited_drivers_url,
+      },
+      bylawsFile: {
+        name: data.bylaws_url ? data.bylaws_url.split('/').pop()?.split('?')[0] || 'TODA_Bylaws.pdf' : 'TODA_Bylaws.pdf',
+        date: data.created_at ? new Date(data.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Jan 15, 2026',
+        url: data.bylaws_url,
+      },
       isOtpVerified: true,
       misteepComplaintsCount: 0,
     };
@@ -88,6 +137,11 @@ export async function updateTodaProfile(
   profileData: Partial<{
     name: string;
     acronym: string;
+    barangay: string;
+    dateEstablished: string;
+    terminalLocation: string;
+    terminalLatitude?: number | null;
+    terminalLongitude?: number | null;
     contactPhone: string;
     contactEmail: string;
     serviceArea: string;
@@ -97,10 +151,22 @@ export async function updateTodaProfile(
   const updatePayload: any = {};
   if (profileData.name) updatePayload.toda_name = profileData.name;
   if (profileData.acronym) updatePayload.toda_acronym = profileData.acronym;
+  if (profileData.barangay) updatePayload.barangay = profileData.barangay;
+  if (profileData.dateEstablished) updatePayload.date_established = profileData.dateEstablished;
+  if (profileData.terminalLocation) updatePayload.terminal_location = profileData.terminalLocation;
+  if (profileData.terminalLatitude !== undefined) updatePayload.terminal_latitude = profileData.terminalLatitude;
+  if (profileData.terminalLongitude !== undefined) updatePayload.terminal_longitude = profileData.terminalLongitude;
   if (profileData.contactPhone) updatePayload.president_contact = profileData.contactPhone;
   if (profileData.serviceArea) updatePayload.service_coverage_area = profileData.serviceArea;
-  if (profileData.officers && profileData.officers.president) {
-    updatePayload.president_name = profileData.officers.president;
+  if (profileData.officers) {
+    if (profileData.officers.president !== undefined) updatePayload.president_name = profileData.officers.president;
+    if (profileData.officers.presidentContact !== undefined) updatePayload.president_contact = profileData.officers.presidentContact;
+    if (profileData.officers.vicePresident !== undefined) updatePayload.vice_president_name = profileData.officers.vicePresident;
+    if (profileData.officers.vicePresidentContact !== undefined) updatePayload.vice_president_contact = profileData.officers.vicePresidentContact;
+    if (profileData.officers.secretary !== undefined) updatePayload.secretary_name = profileData.officers.secretary;
+    if (profileData.officers.secretaryContact !== undefined) updatePayload.secretary_contact = profileData.officers.secretaryContact;
+    if (profileData.officers.treasurer !== undefined) updatePayload.treasurer_name = profileData.officers.treasurer;
+    if (profileData.officers.treasurerContact !== undefined) updatePayload.treasurer_contact = profileData.officers.treasurerContact;
   }
 
   const { data, error } = await supabase
@@ -409,33 +475,202 @@ export async function resubmitTodaApplication(todaId: string, updatedData: any) 
 // 2. DRIVER MANAGEMENT & SCREENING
 // ============================================================================
 
-export async function fetchTodaDrivers(todaId: string = DEFAULT_TODA_ID): Promise<TodaDriverMember[]> {
+export async function fetchTodaDrivers(todaId?: string): Promise<TodaDriverMember[]> {
   try {
-    const { data, error } = await supabase
-      .from('driver')
-      .select('*')
-      .eq('toda_id', todaId)
-      .order('created_at', { ascending: false });
+    // 1. Resolve target TODA record
+    let todaRecord: any = null;
+    if (todaId && todaId !== DEFAULT_TODA_ID) {
+      const { data: directToda } = await supabase
+        .from('toda')
+        .select('*')
+        .eq('toda_id', todaId)
+        .maybeSingle();
+      todaRecord = directToda;
+    }
 
-    if (error || !data || data.length === 0) return [];
+    if (!todaRecord) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: adminRecord } = await supabase
+          .from('toda_admin')
+          .select('toda_id, toda:toda_id(*)')
+          .eq('auth_user_id', user.id)
+          .maybeSingle();
 
-    return data.map((d: any, idx: number) => ({
-      id: d.driver_id,
-      membershipNo: `MEM-${String(idx + 1).padStart(3, '0')}`,
-      name: d.full_name,
-      phone: d.contact_number,
-      vehiclePlate: d.plate_number || 'MV-101',
-      franchiseNo: d.franchise_number || 'MTOP-2024-001',
-      licenseNo: d.license_number || 'L01-99-123456',
-      serviceZone: d.barangay_service_area || 'Calapan City',
-      todaVerificationStatus: 'Verified',
-      lguVerificationStatus: d.account_status === 'Verified' ? 'Verified' : 'Pending',
-      accountStatus: d.account_status === 'Suspended' ? 'TODA Suspended' : 'Active',
-      strikesCount: 0,
-      rating: Number(d.weighted_average_rating) || 5.0,
-      totalTrips: 0,
-      joinedDate: d.created_at ? new Date(d.created_at).toLocaleDateString('en-US') : '2026',
-    }));
+        if (adminRecord?.toda) {
+          todaRecord = adminRecord.toda;
+        } else if (adminRecord?.toda_id) {
+          const { data: matchedToda } = await supabase
+            .from('toda')
+            .select('*')
+            .eq('toda_id', adminRecord.toda_id)
+            .maybeSingle();
+          todaRecord = matchedToda;
+        }
+      }
+    }
+
+    if (!todaRecord) {
+      const { data: latestToda } = await supabase
+        .from('toda')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      todaRecord = latestToda;
+    }
+
+    const currentTodaId = todaRecord?.toda_id;
+
+    // 2. Fetch all drivers currently registered in the database for this TODA
+    const { data: registeredDrivers } = currentTodaId
+      ? await supabase.from('driver').select('*').eq('toda_id', currentTodaId).order('created_at', { ascending: false })
+      : { data: [] };
+
+    const driverList = registeredDrivers || [];
+
+    // 3. If an accredited driver roster file was uploaded, parse and render from the submitted document
+    if (todaRecord?.accredited_drivers_url) {
+      try {
+        const rawUrl = todaRecord.accredited_drivers_url;
+        let arrayBuffer: ArrayBuffer | null = null;
+
+        // Clean storage path
+        let storagePath = rawUrl;
+        if (rawUrl.includes('toda-accredited-driver-lists/')) {
+          storagePath = decodeURIComponent(rawUrl.split('toda-accredited-driver-lists/')[1].split('?')[0]);
+        } else if (rawUrl.startsWith('http')) {
+          try {
+            const urlObj = new URL(rawUrl);
+            const parts = urlObj.pathname.split('/');
+            const bucketIndex = parts.indexOf('toda-accredited-driver-lists');
+            if (bucketIndex !== -1 && bucketIndex < parts.length - 1) {
+              storagePath = decodeURIComponent(parts.slice(bucketIndex + 1).join('/'));
+            }
+          } catch {}
+        }
+
+        // Attempt 1: Direct authenticated download via Supabase Storage
+        try {
+          const { data: blob, error: dlErr } = await supabase.storage
+            .from('toda-accredited-driver-lists')
+            .download(storagePath);
+
+          if (!dlErr && blob) {
+            arrayBuffer = await blob.arrayBuffer();
+          }
+        } catch (dlErr) {
+          console.warn('[todaApiService] Storage download attempt 1:', dlErr);
+        }
+
+        // Attempt 2: Signed URL download
+        if (!arrayBuffer) {
+          try {
+            const { data: signedData } = await supabase.storage
+              .from('toda-accredited-driver-lists')
+              .createSignedUrl(storagePath, 3600);
+
+            if (signedData?.signedUrl) {
+              const res = await fetch(signedData.signedUrl);
+              if (res.ok) {
+                arrayBuffer = await res.arrayBuffer();
+              }
+            }
+          } catch (signedErr) {
+            console.warn('[todaApiService] Signed URL attempt 2:', signedErr);
+          }
+        }
+
+        // Attempt 3: Direct fetch on raw URL if HTTP
+        if (!arrayBuffer && rawUrl.startsWith('http')) {
+          try {
+            const res = await fetch(rawUrl);
+            if (res.ok) {
+              arrayBuffer = await res.arrayBuffer();
+            }
+          } catch (fetchErr) {
+            console.warn('[todaApiService] Direct fetch attempt 3:', fetchErr);
+          }
+        }
+
+        if (arrayBuffer) {
+          const parsed = await parseDriverRoster(arrayBuffer);
+          if (parsed && parsed.rows && parsed.rows.length > 0) {
+            return parsed.rows.map((row, idx) => {
+              const cleanName = (row.name || '').trim().toLowerCase();
+              const cleanFranchise = (row.franchiseNumber || '').trim().toLowerCase();
+
+              // Correlate strictly with registered driver account by franchise number
+              const matchedDriver = driverList.find((d: any) => {
+                const dFranchise = (d.franchise_number || d.plate_number || '').trim().toLowerCase();
+                return Boolean(cleanFranchise && dFranchise === cleanFranchise);
+              });
+
+              let accountStatus: string = 'Not Registered';
+              if (matchedDriver) {
+                const rawStatus = matchedDriver.account_status;
+                if (rawStatus === 'Suspended') {
+                  accountStatus = 'TODA Suspended';
+                } else if (rawStatus === 'Active' || rawStatus === 'Verified') {
+                  accountStatus = 'Active';
+                } else if (rawStatus === 'Deactivated') {
+                  accountStatus = 'LGU Deactivated';
+                } else if (rawStatus === 'Pending' || rawStatus === 'Pending Verification') {
+                  accountStatus = 'Pending Verification';
+                } else {
+                  accountStatus = rawStatus || 'Active';
+                }
+              } else {
+                accountStatus = 'Not Registered';
+              }
+
+              return {
+                id: matchedDriver?.driver_id || `roster-${idx + 1}`,
+                membershipNo: `MEM-${String(idx + 1).padStart(3, '0')}`,
+                name: row.name || `Driver #${idx + 1}`,
+                phone: matchedDriver?.contact_number || '',
+                vehiclePlate: matchedDriver?.plate_number || row.franchiseNumber || 'N/A',
+                franchiseNo: row.franchiseNumber || matchedDriver?.franchise_number || 'N/A',
+                licenseNo: matchedDriver?.license_number || '',
+                serviceZone: todaRecord?.service_coverage_area || todaRecord?.barangay || 'Calapan City',
+                todaVerificationStatus: 'Verified',
+                lguVerificationStatus: matchedDriver?.account_status === 'Verified' ? 'Verified' : 'Pending',
+                accountStatus: accountStatus as TodaDriverMember['accountStatus'],
+                strikesCount: 0,
+                rating: Number(matchedDriver?.weighted_average_rating) || 5.0,
+                totalTrips: 0,
+                joinedDate: todaRecord?.created_at ? new Date(todaRecord.created_at).toLocaleDateString('en-US') : 'Recent',
+              };
+            });
+          }
+        }
+      } catch (rosterParseErr) {
+        console.warn('[todaApiService] Could not parse uploaded roster file, falling back to driver table:', rosterParseErr);
+      }
+    }
+
+    // 4. Fallback to registered driver table accounts
+    if (driverList.length > 0) {
+      return driverList.map((d: any, idx: number) => ({
+        id: d.driver_id,
+        membershipNo: `MEM-${String(idx + 1).padStart(3, '0')}`,
+        name: d.full_name,
+        phone: d.contact_number,
+        vehiclePlate: d.plate_number || 'N/A',
+        franchiseNo: d.franchise_number || d.plate_number || 'N/A',
+        licenseNo: d.license_number || '',
+        serviceZone: d.barangay_service_area || todaRecord?.barangay || 'Calapan City',
+        todaVerificationStatus: 'Verified',
+        lguVerificationStatus: d.account_status === 'Verified' ? 'Verified' : 'Pending',
+        accountStatus: d.account_status === 'Suspended' ? 'TODA Suspended' : (d.account_status as any) || 'Active',
+        strikesCount: 0,
+        rating: Number(d.weighted_average_rating) || 5.0,
+        totalTrips: 0,
+        joinedDate: d.created_at ? new Date(d.created_at).toLocaleDateString('en-US') : 'Recent',
+      }));
+    }
+
+    return [];
   } catch (err) {
     console.error('[todaApiService] fetchTodaDrivers error:', err);
     return [];

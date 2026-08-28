@@ -44,15 +44,21 @@ export interface TodaProfile {
   dateEstablished: string;
   terminalLocation: string;
   pendingTerminalLocation?: string | null;
+  terminalLatitude?: number | null;
+  terminalLongitude?: number | null;
   barangay: string;
   serviceCoverageArea: string;
   contactNumber: string;
   email: string;
   officers: {
     president: string;
+    presidentContact?: string;
     vicePresident: string;
+    vicePresidentContact?: string;
     secretary: string;
+    secretaryContact?: string;
     treasurer: string;
+    treasurerContact?: string;
   };
   accreditationStatus: 'Active' | 'Pending Verification' | 'Suspended' | 'Deactivated';
   accreditationExpiry: string;
@@ -60,6 +66,7 @@ export interface TodaProfile {
   permitNumber: string;
   barangayClearanceFile: { name: string; date: string; url?: string };
   rosterFile: { name: string; date: string; count: number; url?: string };
+  bylawsFile?: { name: string; date: string; url?: string };
   isOtpVerified: boolean;
   misteepComplaintsCount: number;
 }
@@ -98,7 +105,7 @@ export interface TodaDriverMember {
   serviceZone: string;
   todaVerificationStatus: 'Verified' | 'Endorsed' | 'Pending';
   lguVerificationStatus: 'Verified' | 'Pending' | 'Suspended';
-  accountStatus: 'Active' | 'TODA Suspended' | 'LGU Deactivated' | 'Suspension Review' | 'Reactivation Review';
+  accountStatus: 'Active' | 'TODA Suspended' | 'LGU Deactivated' | 'Suspension Review' | 'Reactivation Review' | 'Not Registered' | 'Unregistered' | 'Pending Verification' | 'Pending Review';
   suspensionReason?: string;
   suspendedAt?: string;
   strikesCount: number;

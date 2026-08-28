@@ -59,10 +59,13 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, label, sx, ...
       case 'Unpublished':
       case 'Draft':
       case 'Cancelled':
+      case 'Not Registered':
+      case 'Unregistered':
+      case 'Roster Only':
         return {
-          backgroundColor: 'rgba(142, 142, 147, 0.12)',
-          color: '#5F6368',
-          borderColor: 'rgba(142, 142, 147, 0.3)',
+          backgroundColor: 'rgba(100, 116, 139, 0.12)',
+          color: '#475569',
+          borderColor: 'rgba(100, 116, 139, 0.3)',
         };
       case 'Rejected':
       case 'Declined':

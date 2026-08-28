@@ -263,12 +263,12 @@ export const TodaAnnouncementsPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ANNOUNCEMENT TITLE</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>CATEGORY</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TARGET RECIPIENTS</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>CREATED BY & DATE</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>STATUS</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3, width: 140 }}>ACTIONS</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Announcement Title</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Category</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Target Recipients</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Created By & Date</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Status</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3, width: 140 }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>

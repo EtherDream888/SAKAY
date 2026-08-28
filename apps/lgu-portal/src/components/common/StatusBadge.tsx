@@ -3,11 +3,11 @@ import { Chip, ChipProps } from '@mui/material';
 import { StatusType } from '../../types/admin';
 
 interface StatusBadgeProps extends Omit<ChipProps, 'color'> {
-  status: StatusType;
+  status: StatusType | string;
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, sx, ...props }) => {
-  const getStatusStyles = (status: StatusType) => {
+  const getStatusStyles = (status: StatusType | string) => {
     switch (status) {
       case 'Approved':
       case 'Active':
@@ -45,11 +45,15 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, sx, ...props }
       case 'Dismissed':
       case 'Unpublished':
       case 'Draft':
+      case 'Cancelled':
+      case 'Not Registered':
+      case 'Unregistered':
+      case 'Roster Only':
       case 'Superseded':
         return {
-          backgroundColor: 'rgba(142, 142, 147, 0.12)',
-          color: '#5F6368',
-          borderColor: 'rgba(142, 142, 147, 0.3)',
+          backgroundColor: 'rgba(100, 116, 139, 0.12)',
+          color: '#475569',
+          borderColor: 'rgba(100, 116, 139, 0.3)',
         };
       case 'Rejected':
       case 'Declined':

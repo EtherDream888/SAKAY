@@ -29,6 +29,7 @@ import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
 import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
 import { parseDriverRoster, DriverRosterRow } from '../../utils/rosterParser';
+import { supabase } from '../../services/supabaseClient';
 
 interface DocumentReviewModalProps {
   open: boolean;
@@ -75,9 +76,24 @@ export const DocumentReviewModal: React.FC<DocumentReviewModalProps> = ({
     setError(null);
 
     try {
-      const source = fileObj || fileUrl;
+      let source: any = fileObj || fileUrl;
       if (!source) {
         throw new Error('No document data available to preview.');
+      }
+
+      if (typeof source === 'string' && !source.startsWith('blob:') && !source.startsWith('data:')) {
+        let storagePath = source;
+        if (source.includes('toda-accredited-driver-lists/')) {
+          storagePath = decodeURIComponent(source.split('toda-accredited-driver-lists/')[1].split('?')[0]);
+        }
+        try {
+          const { data: blob, error: dlErr } = await supabase.storage
+            .from('toda-accredited-driver-lists')
+            .download(storagePath);
+          if (!dlErr && blob) {
+            source = await blob.arrayBuffer();
+          }
+        } catch {}
       }
 
       const { rows } = await parseDriverRoster(source);

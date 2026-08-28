@@ -22,6 +22,10 @@ export type StatusType =
   | 'Published'
   | 'Unpublished'
   | 'Draft'
+  | 'Cancelled'
+  | 'Not Registered'
+  | 'Unregistered'
+  | 'Roster Only'
   | 'Superseded';
 
 export type LguAdminRole =

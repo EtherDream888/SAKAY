@@ -27,7 +27,7 @@ import UnpublishedIcon from '@mui/icons-material/Unpublished';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
-import { AnnouncementRecord, AccreditedTodaRecord, CURRENT_ADMIN } from '../mockData/adminData';
+import { AnnouncementRecord, AccreditedTodaRecord } from '../mockData/adminData';
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
@@ -41,6 +41,7 @@ import {
   deleteAnnouncement,
   recordAdminAuditAction,
 } from '../services/adminApiService';
+import { useAuth } from '../contexts/AuthContext';
 
 /**
  * ============================================================================
@@ -53,6 +54,10 @@ import {
  * ============================================================================
  */
 export const AnnouncementManagementPage: React.FC = () => {
+  const { adminProfile, user } = useAuth();
+  const currentAdminName = adminProfile?.full_name || 'City Administrator';
+  const currentAdminRole = adminProfile?.position || 'LGU Transport Officer';
+
   // State: Broadcast bulletins list and filter options
   const [announcements, setAnnouncements] = useState<AnnouncementRecord[]>([]);
   const [todasList, setTodasList] = useState<AccreditedTodaRecord[]>([]);
@@ -179,7 +184,7 @@ export const AnnouncementManagementPage: React.FC = () => {
       is_published: formTiming === 'Immediate',
       publish_timing: formTiming,
       scheduled_date: formTiming === 'Scheduled' ? formScheduledDate : undefined,
-      created_by_lgu_admin: `${CURRENT_ADMIN.name} (${CURRENT_ADMIN.role})`,
+      created_by_lgu_admin: `${currentAdminName} (${currentAdminRole})`,
       created_at: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) + ' • ' + new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
     };
 
@@ -372,12 +377,12 @@ export const AnnouncementManagementPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ANNOUNCEMENT TITLE & MESSAGE</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TARGET AUDIENCE</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TODA / JURISDICTION</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>STATUS</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>CREATED BY & DATE</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '10.4px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>ACTIONS</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Announcement Title & Message</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Target Audience</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>TODA / Jurisdiction</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Status</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Created By & Date</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>

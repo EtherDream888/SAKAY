@@ -84,16 +84,14 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
       driversVerified,
       driversPending,
       driversSuspended,
-      todasActive,
-      todasPending,
+      todasRes,
       bookingsTotal,
       bookingsCompleted,
       bookingsOngoing,
       incidentsTotal,
       incidentsOpen,
       recentIncidentsRes,
-      recentTodasRes,
-      overdueTodasRes,
+      incidentReportsRes,
     ] = await Promise.all([
       supabase.from('passenger').select('*', { count: 'exact', head: true }),
       supabase.from('passenger').select('*', { count: 'exact', head: true }).eq('account_status', 'Active'),
@@ -101,16 +99,14 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
       supabase.from('driver').select('*', { count: 'exact', head: true }).eq('account_status', 'Verified'),
       supabase.from('driver').select('*', { count: 'exact', head: true }).eq('account_status', 'Pending Verification'),
       supabase.from('driver').select('*', { count: 'exact', head: true }).eq('account_status', 'Suspended'),
-      supabase.from('toda').select('*', { count: 'exact', head: true }).eq('account_status', 'Active'),
-      supabase.from('toda').select('*', { count: 'exact', head: true }).neq('account_status', 'Active'),
+      supabase.from('toda').select('*').order('created_at', { ascending: false }),
       supabase.from('booking').select('*', { count: 'exact', head: true }),
       supabase.from('booking').select('*', { count: 'exact', head: true }).eq('booking_status', 'Completed'),
       supabase.from('booking').select('*', { count: 'exact', head: true }).in('booking_status', ['Driver Assigned', 'Driver En Route', 'Driver Arrived', 'Trip Ongoing']),
       supabase.from('incident_report').select('*', { count: 'exact', head: true }),
       supabase.from('incident_report').select('*', { count: 'exact', head: true }).neq('status', 'Resolved'),
       supabase.from('incident_report').select('*').order('created_at', { ascending: false }).limit(5),
-      supabase.from('toda').select('*').order('created_at', { ascending: false }).limit(5),
-      supabase.from('toda').select('*', { count: 'exact', head: true }).neq('account_status', 'Active').lt('created_at', new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()),
+      supabase.from('incident_report').select('reported_toda_id, status'),
     ]);
 
     const totalP = passengersTotal.count || 0;
@@ -119,14 +115,17 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
     const verifiedD = driversVerified.count || 0;
     const pendingD = driversPending.count || 0;
     const suspendedD = driversSuspended.count || 0;
-    const activeT = todasActive.count || 0;
-    const pendingT = todasPending.count || 0;
+
+    const allTodas = todasRes.data || [];
+    const activeTodas = allTodas.filter((t: any) => (t.toda_status || t.account_status) === 'Active');
+    const pendingTodas = allTodas.filter((t: any) => (t.toda_status || t.account_status) !== 'Active');
+    const overdueTodas = pendingTodas.filter((t: any) => t.created_at && (Date.now() - new Date(t.created_at).getTime() > 5 * 24 * 60 * 60 * 1000));
+
     const totalB = bookingsTotal.count || 0;
     const completedB = bookingsCompleted.count || 0;
     const ongoingB = bookingsOngoing.count || 0;
     const totalI = incidentsTotal.count || 0;
     const openI = incidentsOpen.count || 0;
-    const overdueCount = overdueTodasRes.count || 0;
 
     const recentIncidents = (recentIncidentsRes.data || []).map((inc: any) => ({
       id: inc.incident_id,
@@ -144,17 +143,37 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
         : 'safety',
     }));
 
-    const recentApplications = (recentTodasRes.data || []).map((toda: any) => ({
+    const recentApplications = allTodas.slice(0, 5).map((toda: any) => ({
       id: toda.toda_id,
       name: toda.toda_name,
       barangay: toda.barangay || 'Calapan City',
       submittedDate: toda.created_at
         ? new Date(toda.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
         : 'Recent',
-      status: toda.account_status === 'Active' ? 'Approved' : toda.account_status === 'Deactivated' ? 'Declined' : 'Pending',
+      status: (toda.toda_status || toda.account_status) === 'Active' ? 'Approved' : (toda.toda_status || toda.account_status) === 'Deactivated' ? 'Declined' : 'Pending',
       representative: toda.president_name || 'TODA Officer',
-      memberCount: toda.active_driver_count || toda.registered_tricycle_count || 0,
+      memberCount: toda.registered_tricycle_count || toda.active_driver_count || 0,
     }));
+
+    // Check for flagged TODAs with 3+ confirmed incidents
+    const todaIncidentsMap: Record<string, number> = {};
+    (incidentReportsRes.data || []).forEach((inc: any) => {
+      if (inc.reported_toda_id) {
+        todaIncidentsMap[inc.reported_toda_id] = (todaIncidentsMap[inc.reported_toda_id] || 0) + 1;
+      }
+    });
+
+    const flaggedTodas: Array<{ id: string; name: string; incidentCount: number }> = [];
+    allTodas.forEach((t: any) => {
+      const count = todaIncidentsMap[t.toda_id] || 0;
+      if (count >= 3) {
+        flaggedTodas.push({
+          id: t.toda_id,
+          name: t.toda_name,
+          incidentCount: count,
+        });
+      }
+    });
 
     return {
       kpis: {
@@ -169,8 +188,8 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
           inactive: Math.max(0, totalD - verifiedD),
         },
         todas: {
-          total: activeT,
-          pendingReview: pendingT,
+          total: activeTodas.length,
+          pendingReview: pendingTodas.length,
         },
         trips: {
           total: completedB,
@@ -178,8 +197,8 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
           allBookings: totalB,
         },
         verifications: {
-          pending: pendingD + pendingT,
-          overdue5Days: overdueCount,
+          pending: pendingD + pendingTodas.length,
+          overdue5Days: overdueTodas.length,
         },
         incidents: {
           open: openI,
@@ -195,7 +214,7 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
       },
       recentIncidents,
       recentApplications,
-      flaggedTodas: [],
+      flaggedTodas,
     };
   } catch (err) {
     console.error('[adminApiService] fetchDashboardStats error:', err);
@@ -239,6 +258,7 @@ export async function fetchTodaApplications(): Promise<TodaApplicationRecord[]> 
       // Create signed URLs for documents if they exist
       let bcUrl = null;
       let adUrl = null;
+      let blUrl = null;
       if (row.barangay_clearance_url) {
         const { data: bcData } = await supabase.storage.from('barangay-clearances').createSignedUrl(row.barangay_clearance_url, 3600);
         bcUrl = bcData?.signedUrl;
@@ -247,76 +267,78 @@ export async function fetchTodaApplications(): Promise<TodaApplicationRecord[]> 
         const { data: adData } = await supabase.storage.from('toda-accredited-driver-lists').createSignedUrl(row.accredited_drivers_url, 3600);
         adUrl = adData?.signedUrl;
       }
+      if (row.bylaws_url) {
+        const { data: blData } = await supabase.storage.from('toda-bylaws').createSignedUrl(row.bylaws_url, 3600);
+        blUrl = blData?.signedUrl;
+      }
 
       const docs = [];
       if (row.barangay_clearance_url) {
         docs.push({
           name: `Barangay Clearance (${row.barangay || 'Calapan City'})`,
           type: row.barangay_clearance_url.toLowerCase().endsWith('.pdf') ? 'PDF Document' : 'Image Verification',
-          date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '2026',
+          date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Submitted',
           url: bcUrl || null,
-          status: 'Under Review',
-        });
-      } else {
-        docs.push({
-          name: `Barangay Clearance (${row.barangay || 'Calapan City'})`,
-          type: 'PDF Document (Official LGU Seal)',
-          date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '2026',
-          url: null,
-          status: 'Verified',
+          status: 'Submitted',
         });
       }
 
       if (row.accredited_drivers_url) {
         docs.push({
-          name: `Official Driver Master Roster (${row.active_driver_count || row.registered_tricycle_count || 0} Units)`,
+          name: `Official Driver Master Roster (${row.registered_tricycle_count || row.active_driver_count || 0} Drivers)`,
           type: row.accredited_drivers_url.toLowerCase().endsWith('.csv') ? 'CSV Spreadsheet' : 'Excel Spreadsheet',
-          date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '2026',
+          date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Submitted',
           url: adUrl || null,
-          status: 'Under Review',
-        });
-      } else {
-        docs.push({
-          name: `Official Driver Master Roster (${row.active_driver_count || row.registered_tricycle_count || 0} Units)`,
-          type: 'Master Roster Ledger',
-          date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '2026',
-          url: null,
-          status: 'Verified',
+          status: 'Submitted',
         });
       }
+
+      if (row.bylaws_url) {
+        docs.push({
+          name: 'Internal TODA Bylaws',
+          type: row.bylaws_url.toLowerCase().endsWith('.pdf') ? 'PDF Document' : 'Document Attachment',
+          date: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Submitted',
+          url: blUrl || null,
+          status: 'Submitted',
+        });
+      }
+
+      const currentStatus = row.toda_status || row.account_status || 'Pending';
+      const normalizedStatus =
+        currentStatus === 'Active'
+          ? 'Approved'
+          : currentStatus === 'Deactivated'
+          ? 'Declined'
+          : currentStatus === 'Resubmission Required'
+          ? 'Resubmission Required'
+          : 'Pending';
 
       return {
         id: row.toda_id,
         name: row.toda_name,
         acronym: row.toda_acronym || '',
-        registrationNumber: row.registration_number,
+        registrationNumber: row.registration_number || '',
         dateEstablished: row.date_established || '',
         representative: row.president_name || 'Designated Representative',
-        phone: row.contact_number || row.president_contact || '+63 900 000 0000',
+        phone: row.contact_number || row.president_contact || '',
         email: row.email || '',
         barangay: row.barangay || 'Calapan City',
-        terminalLocation: row.service_coverage_area || 'Calapan City Terminal',
+        terminalLocation: row.terminal_location || row.service_coverage_area || 'Calapan City Terminal',
         terminalLatitude: row.terminal_latitude || 13.4115,
         terminalLongitude: row.terminal_longitude || 121.1803,
         serviceCoverageArea: row.service_coverage_area || '',
-        memberCount: row.active_driver_count || row.registered_tricycle_count || 0,
+        memberCount: row.registered_tricycle_count || row.active_driver_count || 0,
         registeredTricycleCount: row.registered_tricycle_count || 0,
         activeDriverCount: row.active_driver_count || 0,
         barangayClearanceExpiry: row.certificate_expiry
           ? new Date(row.certificate_expiry).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-          : 'Dec 31, 2026',
-        clearanceStatus: (row.account_status === 'Active' ? 'Valid' : 'Under Review') as 'Valid' | 'Under Review',
+          : '',
+        clearanceStatus: (normalizedStatus === 'Approved' ? 'Valid' : 'Under Review') as 'Valid' | 'Under Review',
         submittedDate: row.created_at
           ? new Date(row.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
           : 'Recent',
-        status: (
-          row.account_status === 'Active'
-            ? 'Approved'
-            : row.account_status === 'Deactivated'
-            ? 'Declined'
-            : 'Pending'
-        ) as 'Approved' | 'Declined' | 'Pending',
-        isOverdue5Days: isOverdue && row.account_status !== 'Active',
+        status: normalizedStatus as 'Approved' | 'Declined' | 'Pending',
+        isOverdue5Days: isOverdue && normalizedStatus !== 'Approved',
         officers: {
           president: row.president_name || 'N/A',
           presidentContact: row.president_contact || row.contact_number || 'N/A',
@@ -338,54 +360,72 @@ export async function fetchTodaApplications(): Promise<TodaApplicationRecord[]> 
 }
 
 export async function approveTodaApplication(applicationId: string, remarks?: string) {
-  const certNo = `CERT-LGU-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
-  const certExpiry = new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString();
+  let updatePayload: Record<string, any> = {
+    toda_status: 'Active',
+    account_status: 'Active',
+  };
 
-  try {
-    const res = await fetch(`${API_BASE_URL}/admin/todas/${applicationId}/approve`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ certificate_number: certNo, remarks }),
-    });
-    if (res.ok) return await res.json();
-  } catch {
-    // Direct Supabase fallback
+  let updatedData: any = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data, error } = await supabase
+      .from('toda')
+      .update(updatePayload)
+      .eq('toda_id', applicationId)
+      .select()
+      .maybeSingle();
+
+    if (!error) {
+      updatedData = data;
+      break;
+    }
+
+    const errMsg = (error.message || '') + ' ' + (error.details || '');
+    const match = errMsg.match(/Could not find the '([^']+)' column/i) || errMsg.match(/column [^.]*\.?([a-zA-Z0-9_]+) does not exist/i);
+    if (match && match[1] && match[1] in updatePayload) {
+      delete updatePayload[match[1]];
+    } else {
+      console.warn('[adminApiService] approveToda error:', error.message);
+      break;
+    }
   }
 
-  const { data, error } = await supabase
-    .from('toda')
-    .update({
-      account_status: 'Active',
-      certificate_number: certNo,
-      certificate_expiry: certExpiry,
-    })
-    .eq('toda_id', applicationId)
-    .select()
-    .single();
-
-  if (error) throw error;
+  // Update associated toda_admin accounts to Active
+  try {
+    await supabase.from('toda_admin').update({ account_status: 'Active' }).eq('toda_id', applicationId);
+  } catch {}
 
   await recordAdminAuditAction({
     actionType: 'TODA_ACCREDITATION_APPROVED',
     targetId: applicationId,
-    targetName: data?.toda_name || applicationId,
-    details: `Approved municipal accreditation for '${data?.toda_name || applicationId}'. Issued Certificate ${certNo}. ${remarks ? 'Remarks: ' + remarks : ''}`,
+    targetName: updatedData?.toda_name || applicationId,
+    details: `Approved municipal accreditation for '${updatedData?.toda_name || applicationId}'. ${remarks ? 'Remarks: ' + remarks : ''}`,
     category: 'Verification',
   });
 
-  return { success: true, data };
+  return { success: true, data: updatedData };
 }
 
 export async function returnTodaApplicationForCorrection(applicationId: string, reason: string) {
-  try {
-    const res = await fetch(`${API_BASE_URL}/admin/todas/${applicationId}/return-correction`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason }),
-    });
-    if (res.ok) return await res.json();
-  } catch {
-    // Direct Supabase fallback
+  let updatePayload: Record<string, any> = {
+    toda_status: 'Resubmission Required',
+    account_status: 'Resubmission Required',
+  };
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { error } = await supabase
+      .from('toda')
+      .update(updatePayload)
+      .eq('toda_id', applicationId);
+
+    if (!error) break;
+
+    const errMsg = (error.message || '') + ' ' + (error.details || '');
+    const match = errMsg.match(/Could not find the '([^']+)' column/i) || errMsg.match(/column [^.]*\.?([a-zA-Z0-9_]+) does not exist/i);
+    if (match && match[1] && match[1] in updatePayload) {
+      delete updatePayload[match[1]];
+    } else {
+      break;
+    }
   }
 
   await recordAdminAuditAction({
@@ -400,35 +440,43 @@ export async function returnTodaApplicationForCorrection(applicationId: string, 
 }
 
 export async function rejectTodaApplication(applicationId: string, reason: string) {
-  try {
-    const res = await fetch(`${API_BASE_URL}/admin/todas/${applicationId}/reject`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reason }),
-    });
-    if (res.ok) return await res.json();
-  } catch {
-    // Direct Supabase fallback
+  let updatePayload: Record<string, any> = {
+    toda_status: 'Deactivated',
+    account_status: 'Deactivated',
+  };
+
+  let updatedData: any = null;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const { data, error } = await supabase
+      .from('toda')
+      .update(updatePayload)
+      .eq('toda_id', applicationId)
+      .select()
+      .maybeSingle();
+
+    if (!error) {
+      updatedData = data;
+      break;
+    }
+
+    const errMsg = (error.message || '') + ' ' + (error.details || '');
+    const match = errMsg.match(/Could not find the '([^']+)' column/i) || errMsg.match(/column [^.]*\.?([a-zA-Z0-9_]+) does not exist/i);
+    if (match && match[1] && match[1] in updatePayload) {
+      delete updatePayload[match[1]];
+    } else {
+      break;
+    }
   }
-
-  const { data, error } = await supabase
-    .from('toda')
-    .update({ account_status: 'Deactivated' })
-    .eq('toda_id', applicationId)
-    .select()
-    .single();
-
-  if (error) throw error;
 
   await recordAdminAuditAction({
     actionType: 'TODA_APPLICATION_REJECTED',
     targetId: applicationId,
-    targetName: data?.toda_name || applicationId,
-    details: `Permanently declined accreditation application for '${data?.toda_name || applicationId}'. Reason: ${reason}`,
+    targetName: updatedData?.toda_name || applicationId,
+    details: `Permanently declined accreditation application for '${updatedData?.toda_name || applicationId}'. Reason: ${reason}`,
     category: 'Verification',
   });
 
-  return { success: true, data };
+  return { success: true, data: updatedData };
 }
 
 export const declineTodaApplication = rejectTodaApplication;
@@ -442,27 +490,27 @@ export async function fetchAccreditedTodas(): Promise<AccreditedTodaRecord[]> {
     const { data, error } = await supabase
       .from('toda')
       .select('*')
-      .eq('account_status', 'Active')
       .order('toda_name', { ascending: true });
 
     if (error || !data) return [];
 
-    return data.map((row: any) => ({
+    const activeTodas = data.filter((row: any) => (row.toda_status || row.account_status) === 'Active');
+
+    return activeTodas.map((row: any) => ({
       id: row.toda_id,
       name: row.toda_name,
       acronym: row.toda_acronym || '',
       representative: row.president_name || 'Designated Representative',
-      phone: row.contact_number || row.president_contact || '+63 900 000 0000',
+      phone: row.contact_number || row.president_contact || '',
       email: row.email || '',
       barangay: row.barangay || 'Calapan City',
       serviceZone: row.service_coverage_area || row.barangay || 'Calapan City',
-      registeredDrivers: row.active_driver_count || row.registered_tricycle_count || 0,
-      status: row.account_status as 'Active' | 'Suspended' | 'Inactive',
+      registeredDrivers: row.registered_tricycle_count || row.active_driver_count || 0,
+      status: 'Active',
       accreditationNo: row.registration_number || row.certificate_number || 'N/A',
-
-      accreditedDate: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US') : '2024',
-      expiryDate: row.certificate_expiry ? new Date(row.certificate_expiry).toLocaleDateString('en-US') : '2026',
-      barangayClearanceExpiry: 'Dec 31, 2026',
+      accreditedDate: row.created_at ? new Date(row.created_at).toLocaleDateString('en-US') : '',
+      expiryDate: row.certificate_expiry ? new Date(row.certificate_expiry).toLocaleDateString('en-US') : '',
+      barangayClearanceExpiry: '',
       clearanceStatus: 'Valid',
       confirmedIncidents: 0,
       flaggedForReview: false,
@@ -1172,12 +1220,12 @@ export async function fetchOperationalReports(): Promise<OperationalReportsData>
     const [bookingsRes, driversRes, todasRes] = await Promise.all([
       supabase.from('booking').select('*, driver:driver_id(full_name, toda:toda_id(toda_name))'),
       supabase.from('driver').select('*, toda:toda_id(toda_name)'),
-      supabase.from('toda').select('*').eq('account_status', 'Active'),
+      supabase.from('toda').select('*'),
     ]);
 
     const bookings = bookingsRes.data || [];
     const drivers = driversRes.data || [];
-    const todas = todasRes.data || [];
+    const todas = (todasRes.data || []).filter((t: any) => (t.toda_status || t.account_status) === 'Active');
 
     const completed = bookings.filter((b) => b.booking_status === 'Completed');
     const cancelled = bookings.filter((b) => (b.booking_status || '').includes('Cancelled'));
@@ -1245,19 +1293,23 @@ export async function fetchOperationalReports(): Promise<OperationalReportsData>
         activeDrivers: drivers.filter((d) => d.account_status === 'Verified').length,
         accreditedTodas: todas.length,
       },
-      peakHourDistribution,
-      barangayDemand: barangayDemand.length > 0 ? barangayDemand : [
-        { barangay: 'San Vicente Central', count: 0, percentage: 0 },
-        { barangay: 'Lumangbayan', count: 0, percentage: 0 },
-        { barangay: 'Balite', count: 0, percentage: 0 },
-      ],
+      peakHourDistribution: bookings.length > 0 ? peakHourDistribution : [],
+      barangayDemand: bookings.length > 0 ? barangayDemand : [],
       todaPerformance,
       driverUtilization,
     };
   } catch (err) {
     console.error('[adminApiService] fetchOperationalReports error:', err);
     return {
-      summary: { totalBookings: 0, completedTrips: 0, cancelledTrips: 0, totalRevenue: 0, averageFare: 0, activeDrivers: 0, accreditedTodas: 0 },
+      summary: {
+        totalBookings: 0,
+        completedTrips: 0,
+        cancelledTrips: 0,
+        totalRevenue: 0,
+        averageFare: 0,
+        activeDrivers: 0,
+        accreditedTodas: 0,
+      },
       peakHourDistribution: [],
       barangayDemand: [],
       todaPerformance: [],

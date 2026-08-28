@@ -27,8 +27,12 @@ import {
 } from '../services/todaApiService';
 import { WelcomeHeader } from '../components/layout/WelcomeHeader';
 import { StatusBadge } from '../components/common/StatusBadge';
+import { useAuth } from '../contexts/AuthContext';
 
 export const TodaOperationsPage: React.FC = () => {
+  const { todaAdminProfile } = useAuth();
+  const targetTodaId = todaAdminProfile?.toda_id;
+
   const [profile, setProfile] = useState<TodaProfile | null>(null);
   const [drivers, setDrivers] = useState<TodaDriverMember[]>([]);
   const [bookings, setBookings] = useState<TodaBooking[]>([]);
@@ -41,9 +45,9 @@ export const TodaOperationsPage: React.FC = () => {
     setIsLoading(true);
     try {
       const [prof, drvs, trips] = await Promise.all([
-        fetchTodaProfile(),
-        fetchTodaDrivers(),
-        fetchTodaOperationsTrips(),
+        fetchTodaProfile(targetTodaId),
+        fetchTodaDrivers(targetTodaId),
+        fetchTodaOperationsTrips(targetTodaId),
       ]);
 
       if (prof) setProfile(prof);
@@ -77,7 +81,7 @@ export const TodaOperationsPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [targetTodaId]);
 
   const totalDrivers = drivers.length;
   const activeDrivers = drivers.filter((d) => d.accountStatus === 'Active').length;
@@ -199,7 +203,7 @@ export const TodaOperationsPage: React.FC = () => {
       </Box>
 
       {/* 5. Driver Roster & Active Trips Tables */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3, mb: 3.5 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3, mb: 3.5, alignItems: 'flex-start' }}>
         {/* Affiliated Drivers Card */}
         <Box
           sx={{
@@ -232,23 +236,22 @@ export const TodaOperationsPage: React.FC = () => {
             <Table size="small">
               <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>DRIVER NAME</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>PLATE</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>ZONE</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>STATUS</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>Driver Name</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>Franchise Number</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>Status</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
                       <CircularProgress size={24} sx={{ color: 'var(--sakay-orange)', mb: 1 }} />
                       <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>Loading drivers...</Typography>
                     </TableCell>
                   </TableRow>
                 ) : drivers.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={3} align="center" sx={{ py: 4 }}>
                       <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-muted)' }}>
                         No registered drivers currently affiliated with this TODA.
                       </Typography>
@@ -257,10 +260,24 @@ export const TodaOperationsPage: React.FC = () => {
                 ) : (
                   drivers.map((d) => (
                     <TableRow key={d.id} sx={{ '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' } }}>
-                      <TableCell sx={{ py: 1.5, px: 2, fontWeight: 600, fontSize: '13px' }}>{d.name}</TableCell>
-                      <TableCell sx={{ py: 1.5, px: 2, fontSize: '13px', color: 'var(--mac-text-secondary)' }}>{d.vehiclePlate}</TableCell>
-                      <TableCell sx={{ py: 1.5, px: 2, fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>{d.serviceZone}</TableCell>
-                      <TableCell align="right" sx={{ py: 1.5, px: 2 }}>
+                      <TableCell sx={{ py: 1.5, px: 2, fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-primary)' }}>
+                        {d.name}
+                      </TableCell>
+                      <TableCell sx={{ py: 1.5, px: 2, fontSize: '13px' }}>
+                        <Chip
+                          label={d.franchiseNo || 'N/A'}
+                          size="small"
+                          sx={{
+                            backgroundColor: 'var(--sakay-orange-soft)',
+                            color: 'var(--sakay-orange)',
+                            fontWeight: 600,
+                            fontSize: '12px',
+                            height: '24px',
+                            borderRadius: '6px',
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ py: 1.5, px: 2 }}>
                         <StatusBadge status={d.accountStatus} />
                       </TableCell>
                     </TableRow>
@@ -303,10 +320,10 @@ export const TodaOperationsPage: React.FC = () => {
             <Table size="small">
               <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>TRIP CODE</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>DRIVER & PLATE</TableCell>
-                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>MODE</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>STATUS</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>Trip Code</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>Driver & Plate</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>Mode</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>Status</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -334,7 +351,7 @@ export const TodaOperationsPage: React.FC = () => {
                         <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)' }}>{bkg.vehiclePlate}</Typography>
                       </TableCell>
                       <TableCell sx={{ py: 1.5, px: 2, fontSize: '12.5px' }}>{bkg.tripMode}</TableCell>
-                      <TableCell align="right" sx={{ py: 1.5, px: 2 }}>
+                      <TableCell sx={{ py: 1.5, px: 2 }}>
                         <StatusBadge status={bkg.status} />
                       </TableCell>
                     </TableRow>

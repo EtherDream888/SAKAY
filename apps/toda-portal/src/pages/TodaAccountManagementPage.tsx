@@ -6,13 +6,15 @@ import {
   Button,
   TextField,
   Chip,
-  Divider,
   Avatar,
   Select,
   MenuItem,
   FormControl,
   InputLabel,
   IconButton,
+  CircularProgress,
+  Divider,
+  Paper,
 } from '@mui/material';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import BusinessIcon from '@mui/icons-material/Business';
@@ -24,95 +26,134 @@ import ShieldIcon from '@mui/icons-material/Shield';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
 
 import { TodaProfile } from '../types/toda';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
-import { DocumentPreviewModal } from '../components/admin/DocumentPreviewModal';
+import { DocumentReviewModal } from '../components/modals/DocumentReviewModal';
 import {
   fetchTodaProfile,
   updateTodaProfile,
   recordTodaAuditAction,
+  uploadTodaDocument,
 } from '../services/todaApiService';
+import { useAuth } from '../contexts/AuthContext';
+
+const CALAPAN_BARANGAYS = [
+  'Balingayan', 'Balite', 'Baruyan', 'Batino', 'Bayanan I', 'Bayanan II', 'Biga', 'Bondoc', 'Bucayao', 'Buhuan',
+  'Bulusan', 'Calero', 'Camansihan', 'Camilmil', 'Canubing I', 'Canubing II', 'Comunal', 'Guinobatan', 'Gulod',
+  'Gutad', 'Ibaba East', 'Ibaba West', 'Ilaya', 'Lalud', 'Lazareto', 'Lumangbayan', 'Mahlabang', 'Malad',
+  'Malamig', 'Managpi', 'Masipit', 'Navotas', 'Pachoca', 'Palhi', 'Panggalaan', 'Parang', 'Patas', 'Personas',
+  'Puting Tubig', 'San Antonio', 'San Vicente Central', 'San Vicente East', 'San Vicente North', 'San Vicente South',
+  'San Vicente West', 'Sapul', 'Silonay', 'Sta. Cruz', 'Sta. Isabel', 'Sta. Maria Village', 'Suqui', 'Tawiran', 'Tibag', 'Wawa'
+].sort();
+
+const formatPhoneNumber = (value: string): string => {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 4)} ${digits.slice(4)}`;
+  return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7, 11)}`;
+};
+
+const formatDisplayDate = (dateStr?: string | null): string => {
+  if (!dateStr) return 'N/A';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  } catch {
+    return dateStr;
+  }
+};
 
 export const TodaAccountManagementPage: React.FC = () => {
-  const [profile, setProfile] = useState<TodaProfile>({
-    id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
-    name: 'Calapan Central TODA',
-    acronym: 'CCTODA',
-    registrationNumber: 'CAL-TODA-2024-001',
-    dateEstablished: '2024-01-01',
-    terminalLocation: 'Calapan City Terminal',
-    barangay: 'San Vicente Central',
-    serviceCoverageArea: 'Calapan City Corridor',
-    contactNumber: '+63 917 100 2001',
-    email: 'cctoda.calapan@gmail.com',
-    officers: {
-      president: 'Roberto Alcantara',
-      vicePresident: 'Eduardo Perez',
-      secretary: 'Leticia Cruz-Reyes',
-      treasurer: 'Mario Hernandez',
-    },
-    accreditationStatus: 'Active',
-    accreditationExpiry: 'Dec 31, 2026',
-    accreditationNo: 'CAL-TODA-2024-001',
-    permitNumber: 'MP-2024-001',
-    barangayClearanceFile: { name: 'Barangay_Clearance_2026.pdf', date: 'Jan 10, 2026' },
-    rosterFile: { name: 'TODA_Driver_Roster.pdf', date: 'Jan 15, 2026', count: 0 },
-    isOtpVerified: true,
-    misteepComplaintsCount: 0,
-  });
+  const { todaAdminProfile } = useAuth();
+  const targetTodaId = todaAdminProfile?.toda_id;
+
+  const [profile, setProfile] = useState<TodaProfile | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [logoImage, setLogoImage] = useState<string | null>(null);
 
   // Modals & Dialogs
   const [editProfileModalOpen, setEditProfileModalOpen] = useState(false);
   const [uploadDocModalOpen, setUploadDocModalOpen] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState<{ name: string; type: string } | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Document Review Modal State (Identical to TodaRegistrationPage review display)
+  const [reviewModalState, setReviewModalState] = useState<{
+    open: boolean;
+    title: string;
+    fileName: string;
+    fileUrl: string;
+  }>({
+    open: false,
+    title: '',
+    fileName: '',
+    fileUrl: '',
+  });
 
   // Organizational Profile Form State
-  const [editTodaName, setEditTodaName] = useState(profile.name);
-  const [editTodaAcronym, setEditTodaAcronym] = useState(profile.acronym);
-  const [editRegNum, setEditRegNum] = useState(profile.registrationNumber);
-  const [editDateEst, setEditDateEst] = useState(profile.dateEstablished);
-  const [editTerminalLoc, setEditTerminalLoc] = useState(profile.terminalLocation);
-  const [editBarangay, setEditBarangay] = useState(profile.barangay);
-  const [editCoverage, setEditCoverage] = useState(profile.serviceCoverageArea);
+  const [editTodaName, setEditTodaName] = useState('');
+  const [editTodaAcronym, setEditTodaAcronym] = useState('');
+  const [editBarangay, setEditBarangay] = useState('');
+  const [editDateEst, setEditDateEst] = useState('');
+  const [editTerminalLoc, setEditTerminalLoc] = useState('');
+  const [editTerminalCoordinates, setEditTerminalCoordinates] = useState('');
 
   // Officers Form State
-  const [editPresident, setEditPresident] = useState(profile.officers.president);
-  const [editVicePresident, setEditVicePresident] = useState(profile.officers.vicePresident);
-  const [editSecretary, setEditSecretary] = useState(profile.officers.secretary);
-  const [editTreasurer, setEditTreasurer] = useState(profile.officers.treasurer);
+  const [editPresident, setEditPresident] = useState('');
+  const [editPresidentContact, setEditPresidentContact] = useState('');
+  const [editVicePresident, setEditVicePresident] = useState('');
+  const [editVicePresidentContact, setEditVicePresidentContact] = useState('');
+  const [editSecretary, setEditSecretary] = useState('');
+  const [editSecretaryContact, setEditSecretaryContact] = useState('');
+  const [editTreasurer, setEditTreasurer] = useState('');
+  const [editTreasurerContact, setEditTreasurerContact] = useState('');
 
   // Document Upload Form State (Real File Picker)
-  const [docCategory, setDocCategory] = useState<'Barangay Clearance' | 'Driver Master List'>('Barangay Clearance');
+  const [docCategory, setDocCategory] = useState<'Barangay Clearance' | 'Driver Master List' | 'TODA Bylaws'>('Barangay Clearance');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
 
-  const loadProfile = () => {
-    fetchTodaProfile()
-      .then((p) => {
-        if (p) {
-          setProfile(p);
-          setEditTodaName(p.name);
-          setEditTodaAcronym(p.acronym);
-          setEditRegNum(p.registrationNumber);
-          setEditDateEst(p.dateEstablished);
-          setEditTerminalLoc(p.terminalLocation);
-          setEditBarangay(p.barangay);
-          setEditCoverage(p.serviceCoverageArea);
-          setEditPresident(p.officers.president);
-          setEditVicePresident(p.officers.vicePresident);
-          setEditSecretary(p.officers.secretary);
-          setEditTreasurer(p.officers.treasurer);
-        }
-      })
-      .catch((err) => {
-        console.error('[TodaAccount] Error fetching TODA profile from database:', err);
-      });
+  const populateFormFields = (p: TodaProfile) => {
+    setEditTodaName(p.name || '');
+    setEditTodaAcronym(p.acronym || '');
+    setEditBarangay(p.barangay || 'San Vicente Central');
+    setEditDateEst(p.dateEstablished || '');
+    setEditTerminalLoc(p.terminalLocation || '');
+    setEditTerminalCoordinates(
+      p.terminalLatitude && p.terminalLongitude
+        ? `${p.terminalLatitude}, ${p.terminalLongitude}`
+        : ''
+    );
+    setEditPresident(p.officers?.president || '');
+    setEditPresidentContact(p.officers?.presidentContact || '');
+    setEditVicePresident(p.officers?.vicePresident || '');
+    setEditVicePresidentContact(p.officers?.vicePresidentContact || '');
+    setEditSecretary(p.officers?.secretary || '');
+    setEditSecretaryContact(p.officers?.secretaryContact || '');
+    setEditTreasurer(p.officers?.treasurer || '');
+    setEditTreasurerContact(p.officers?.treasurerContact || '');
+  };
+
+  const loadProfile = async () => {
+    setIsLoading(true);
+    try {
+      const p = await fetchTodaProfile(targetTodaId);
+      if (p) {
+        setProfile(p);
+        populateFormFields(p);
+      }
+    } catch (err) {
+      console.error('[TodaAccount] Error fetching TODA profile from database:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
     loadProfile();
-  }, []);
+  }, [targetTodaId]);
 
   // Logo Change Handler
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -121,13 +162,15 @@ export const TodaAccountManagementPage: React.FC = () => {
       const imageUrl = URL.createObjectURL(file);
       setLogoImage(imageUrl);
 
-      recordTodaAuditAction({
-        actionType: 'TODA_PROFILE_UPDATED',
-        targetId: profile.id,
-        targetName: profile.name,
-        details: `Updated TODA Organization logo icon (${file.name}).`,
-        category: 'Account',
-      });
+      if (profile) {
+        recordTodaAuditAction({
+          actionType: 'TODA_PROFILE_UPDATED',
+          targetId: profile.id,
+          targetName: profile.name,
+          details: `Updated TODA Organization logo icon (${file.name}).`,
+          category: 'Account',
+        });
+      }
     }
   };
 
@@ -140,78 +183,95 @@ export const TodaAccountManagementPage: React.FC = () => {
 
   // Submit Organizational Profile Edit
   const handleEditProfileSubmit = async () => {
-    try {
-      await updateTodaProfile(profile.id, {
-        name: editTodaName,
-        acronym: editTodaAcronym,
-        serviceArea: editCoverage,
-        officers: {
-          president: editPresident,
-          vicePresident: editVicePresident,
-          secretary: editSecretary,
-          treasurer: editTreasurer,
-        },
-      });
-      loadProfile();
-    } catch (err) {
-      console.error('[TodaAccount] Error updating profile in database:', err);
+    if (!profile) return;
+    setIsSavingEdit(true);
+
+    let lat: number | null = null;
+    let lng: number | null = null;
+    if (editTerminalCoordinates.trim()) {
+      const parts = editTerminalCoordinates.split(',').map((s) => parseFloat(s.trim()));
+      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+        lat = parts[0];
+        lng = parts[1];
+      }
     }
 
-    setProfile((prev) => ({
-      ...prev,
-      name: editTodaName,
-      acronym: editTodaAcronym,
-      registrationNumber: editRegNum,
-      dateEstablished: editDateEst,
-      terminalLocation: editTerminalLoc,
-      barangay: editBarangay,
-      serviceCoverageArea: editCoverage,
-      officers: {
-        president: editPresident,
-        vicePresident: editVicePresident,
-        secretary: editSecretary,
-        treasurer: editTreasurer,
-      },
-    }));
+    try {
+      await updateTodaProfile(profile.id, {
+        name: editTodaName.trim(),
+        acronym: editTodaAcronym.trim(),
+        barangay: editBarangay,
+        dateEstablished: editDateEst,
+        terminalLocation: editTerminalLoc.trim(),
+        terminalLatitude: lat,
+        terminalLongitude: lng,
+        serviceArea: editTerminalLoc.trim(),
+        officers: {
+          president: editPresident.trim(),
+          presidentContact: editPresidentContact.trim(),
+          vicePresident: editVicePresident.trim(),
+          vicePresidentContact: editVicePresidentContact.trim(),
+          secretary: editSecretary.trim(),
+          secretaryContact: editSecretaryContact.trim(),
+          treasurer: editTreasurer.trim(),
+          treasurerContact: editTreasurerContact.trim(),
+        },
+      });
 
-    setEditProfileModalOpen(false);
+      await loadProfile();
+      setEditProfileModalOpen(false);
+    } catch (err) {
+      console.error('[TodaAccount] Error updating profile in database:', err);
+    } finally {
+      setIsSavingEdit(false);
+    }
   };
 
   // Submit Annual Compliance Document Renewal Upload
-  const handleDocumentUploadSubmit = () => {
-    if (!selectedFile) return;
+  const handleDocumentUploadSubmit = async () => {
+    if (!selectedFile || !profile) return;
+    setIsUploadingDoc(true);
 
-    const fileName = selectedFile.name;
-    if (docCategory === 'Barangay Clearance') {
-      setProfile((prev) => ({
-        ...prev,
-        barangayClearanceFile: {
-          name: fileName,
-          date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
-        },
-      }));
-    } else {
-      setProfile((prev) => ({
-        ...prev,
-        rosterFile: {
-          name: fileName,
-          date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
-          count: prev.rosterFile.count,
-        },
-      }));
+    try {
+      const targetBucket =
+        docCategory === 'Barangay Clearance'
+          ? 'barangay-clearances'
+          : docCategory === 'Driver Master List'
+          ? 'toda-accredited-driver-lists'
+          : 'toda-bylaws';
+
+      await uploadTodaDocument(selectedFile, targetBucket as any);
+
+      await recordTodaAuditAction({
+        actionType: 'COMPLIANCE_DOCUMENT_UPLOADED',
+        targetId: profile.id,
+        targetName: selectedFile.name,
+        details: `Uploaded annual accreditation renewal document (${docCategory}: ${selectedFile.name}) for LGU review.`,
+        category: 'Account',
+      });
+
+      await loadProfile();
+      setSelectedFile(null);
+      setUploadDocModalOpen(false);
+    } catch (err) {
+      console.error('[TodaAccount] Error uploading compliance document:', err);
+    } finally {
+      setIsUploadingDoc(false);
     }
-
-    recordTodaAuditAction({
-      actionType: 'COMPLIANCE_DOCUMENT_UPLOADED',
-      targetId: profile.id,
-      targetName: fileName,
-      details: `Uploaded annual accreditation renewal document (${docCategory}: ${fileName}) for LGU review.`,
-      category: 'Account',
-    });
-
-    setSelectedFile(null);
-    setUploadDocModalOpen(false);
   };
+
+  if (isLoading || !profile) {
+    return (
+      <Box sx={{ maxWidth: 1600, margin: '0 auto', pb: 6, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={36} sx={{ color: 'var(--sakay-orange)', mb: 2 }} />
+          <Typography sx={{ fontSize: '14.5px', color: 'var(--mac-text-muted)', fontWeight: 500 }}>
+            Loading association account records...
+          </Typography>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ maxWidth: 1600, margin: '0 auto', pb: 6 }}>
@@ -242,7 +302,7 @@ export const TodaAccountManagementPage: React.FC = () => {
                   boxShadow: '0 10px 24px rgba(255, 107, 26, 0.22)',
                 }}
               >
-                {!logoImage && profile.acronym.charAt(0)}
+                {!logoImage && (profile.acronym ? profile.acronym.charAt(0) : 'T')}
               </Avatar>
               <IconButton
                 component="label"
@@ -270,15 +330,17 @@ export const TodaAccountManagementPage: React.FC = () => {
                   {profile.name}
                 </Typography>
                 <Chip
-                  icon={<VerifiedIcon sx={{ fontSize: 18, color: '#1E8E3E' }} />}
-                  label={`Permit #${profile.accreditationNo}`}
+                  icon={<VerifiedIcon sx={{ fontSize: 18, color: profile.accreditationStatus === 'Active' ? '#1E8E3E' : '#B06000' }} />}
+                  label={profile.accreditationStatus === 'Active' ? 'Accredited Active' : 'Pending Verification'}
                   size="small"
-                  sx={{ backgroundColor: '#E6F4EA', color: '#1E8E3E', fontWeight: 600, fontSize: '13px' }}
+                  sx={{
+                    backgroundColor: profile.accreditationStatus === 'Active' ? '#E6F4EA' : '#FEF3C7',
+                    color: profile.accreditationStatus === 'Active' ? '#1E8E3E' : '#B06000',
+                    fontWeight: 600,
+                    fontSize: '13px',
+                  }}
                 />
               </Box>
-              <Typography sx={{ fontSize: '14.5px', color: 'var(--mac-text-muted)', mt: '4px' }}>
-                Registration No: {profile.registrationNumber} • Established: {profile.dateEstablished}
-              </Typography>
             </Box>
           </Box>
 
@@ -286,7 +348,10 @@ export const TodaAccountManagementPage: React.FC = () => {
             <Button
               variant="contained"
               startIcon={<EditIcon />}
-              onClick={() => setEditProfileModalOpen(true)}
+              onClick={() => {
+                populateFormFields(profile);
+                setEditProfileModalOpen(true);
+              }}
               sx={{
                 height: 42,
                 px: 2.5,
@@ -323,8 +388,8 @@ export const TodaAccountManagementPage: React.FC = () => {
       </Card>
 
       {/* 2. Balanced 2-Column Grid Layout for TODA Information */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
-        {/* Left Column: TODA Organization Information (Renamed per directive, contact info removed) */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3, alignItems: 'flex-start' }}>
+        {/* Left Column: TODA Organization Information */}
         <Card
           elevation={0}
           sx={{
@@ -333,7 +398,6 @@ export const TodaAccountManagementPage: React.FC = () => {
             border: '1px solid var(--mac-border-color)',
             backgroundColor: '#FFFFFF',
             boxShadow: 'var(--mac-shadow-card)',
-            height: '100%',
             display: 'flex',
             flexDirection: 'column',
           }}
@@ -345,55 +409,48 @@ export const TodaAccountManagementPage: React.FC = () => {
             </Typography>
           </Box>
 
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.2, flex: 1 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.2 }}>
             <Box>
               <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Official TODA Name</Typography>
               <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                {profile.name} ({profile.acronym})
-              </Typography>
-            </Box>
-
-            <Box>
-              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>LGU Registration Number</Typography>
-              <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                {profile.registrationNumber}
+                {profile.name}
               </Typography>
             </Box>
 
             <Box>
               <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Date Established</Typography>
               <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                {profile.dateEstablished}
-              </Typography>
-            </Box>
-
-            <Divider sx={{ my: 0.5 }} />
-
-            <Box>
-              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Terminal Address / Location</Typography>
-              <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                {profile.terminalLocation}
+                {formatDisplayDate(profile.dateEstablished)}
               </Typography>
             </Box>
 
             <Box>
-              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Barangay Jurisdiction</Typography>
+              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Terminal Location</Typography>
               <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                {profile.barangay}
+                {profile.terminalLocation || 'Calapan City Terminal'}
               </Typography>
             </Box>
 
             <Box>
-              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Service Coverage Route</Typography>
+              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Terminal Coordinates</Typography>
               <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                {profile.serviceCoverageArea}
+                {profile.terminalLatitude && profile.terminalLongitude
+                  ? `${profile.terminalLatitude}, ${profile.terminalLongitude}`
+                  : 'None specified'}
+              </Typography>
+            </Box>
+
+            <Box>
+              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Operating Barangay</Typography>
+              <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                {profile.barangay || 'San Vicente Central'}
               </Typography>
             </Box>
           </Box>
         </Card>
 
         {/* Right Column: Authorized Officers & Accreditation Documents */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, height: '100%' }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           {/* Officers Card */}
           <Card
             elevation={0}
@@ -416,34 +473,54 @@ export const TodaAccountManagementPage: React.FC = () => {
               <Box>
                 <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>President</Typography>
                 <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                  {profile.officers.president}
+                  {profile.officers?.president || 'N/A'}
                 </Typography>
+                {profile.officers?.presidentContact && (
+                  <Typography sx={{ fontSize: '12.5px', color: 'var(--sakay-orange)', fontWeight: 500 }}>
+                    {profile.officers.presidentContact}
+                  </Typography>
+                )}
               </Box>
 
               <Box>
                 <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Vice President</Typography>
                 <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                  {profile.officers.vicePresident}
+                  {profile.officers?.vicePresident || 'N/A'}
                 </Typography>
+                {profile.officers?.vicePresidentContact && (
+                  <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+                    {profile.officers.vicePresidentContact}
+                  </Typography>
+                )}
               </Box>
 
               <Box>
                 <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Secretary</Typography>
                 <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                  {profile.officers.secretary}
+                  {profile.officers?.secretary || 'N/A'}
                 </Typography>
+                {profile.officers?.secretaryContact && (
+                  <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+                    {profile.officers.secretaryContact}
+                  </Typography>
+                )}
               </Box>
 
               <Box>
                 <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>Treasurer</Typography>
                 <Typography sx={{ fontSize: '16px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                  {profile.officers.treasurer}
+                  {profile.officers?.treasurer || 'N/A'}
                 </Typography>
+                {profile.officers?.treasurerContact && (
+                  <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
+                    {profile.officers.treasurerContact}
+                  </Typography>
+                )}
               </Box>
             </Box>
           </Card>
 
-          {/* Annual Accreditation Compliance Documents with Explicit View Buttons */}
+          {/* Annual Accreditation Compliance Documents with Review Modals */}
           <Card
             elevation={0}
             sx={{
@@ -452,7 +529,6 @@ export const TodaAccountManagementPage: React.FC = () => {
               border: '1px solid var(--mac-border-color)',
               backgroundColor: '#FFFFFF',
               boxShadow: 'var(--mac-shadow-card)',
-              flex: 1,
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -462,7 +538,16 @@ export const TodaAccountManagementPage: React.FC = () => {
                   Annual Compliance & Accreditation Renewal
                 </Typography>
               </Box>
-              <Chip label="Active Accreditation" size="small" sx={{ backgroundColor: '#E6F4EA', color: '#1E8E3E', fontWeight: 600, fontSize: '12.5px' }} />
+              <Chip
+                label={profile.accreditationStatus === 'Active' ? 'Active Accreditation' : 'Pending Review'}
+                size="small"
+                sx={{
+                  backgroundColor: profile.accreditationStatus === 'Active' ? '#E6F4EA' : '#FEF3C7',
+                  color: profile.accreditationStatus === 'Active' ? '#1E8E3E' : '#B06000',
+                  fontWeight: 600,
+                  fontSize: '12.5px',
+                }}
+              />
             </Box>
 
             <Typography sx={{ fontSize: '14px', color: 'var(--mac-text-muted)', mb: 2 }}>
@@ -470,8 +555,8 @@ export const TodaAccountManagementPage: React.FC = () => {
             </Typography>
 
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {/* Document 1: Barangay Clearance */}
               <Box
-                onClick={() => setSelectedDoc({ name: profile.barangayClearanceFile.name, type: 'pdf' })}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
@@ -480,8 +565,6 @@ export const TodaAccountManagementPage: React.FC = () => {
                   borderRadius: '10px',
                   backgroundColor: '#FAFAFC',
                   border: '1px solid var(--mac-border-color)',
-                  cursor: 'pointer',
-                  '&:hover': { backgroundColor: 'var(--sakay-orange-soft)', borderColor: 'var(--sakay-orange-border)' },
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -499,10 +582,14 @@ export const TodaAccountManagementPage: React.FC = () => {
                   variant="outlined"
                   size="small"
                   startIcon={<VisibilityIcon fontSize="small" />}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedDoc({ name: profile.barangayClearanceFile.name, type: 'pdf' });
-                  }}
+                  onClick={() =>
+                    setReviewModalState({
+                      open: true,
+                      title: 'Barangay Clearance for TODA Accreditation',
+                      fileName: profile.barangayClearanceFile.name,
+                      fileUrl: profile.barangayClearanceFile.url || '',
+                    })
+                  }
                   sx={{
                     height: 34,
                     px: 2,
@@ -513,14 +600,18 @@ export const TodaAccountManagementPage: React.FC = () => {
                     color: 'var(--sakay-orange)',
                     borderColor: 'var(--sakay-orange-border)',
                     backgroundColor: 'var(--sakay-orange-soft)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255, 107, 26, 0.16)',
+                      borderColor: 'var(--sakay-orange)',
+                    },
                   }}
                 >
                   View
                 </Button>
               </Box>
 
+              {/* Document 2: Master Driver Roster */}
               <Box
-                onClick={() => setSelectedDoc({ name: profile.rosterFile.name, type: 'pdf' })}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
@@ -529,8 +620,6 @@ export const TodaAccountManagementPage: React.FC = () => {
                   borderRadius: '10px',
                   backgroundColor: '#FAFAFC',
                   border: '1px solid var(--mac-border-color)',
-                  cursor: 'pointer',
-                  '&:hover': { backgroundColor: 'var(--sakay-orange-soft)', borderColor: 'var(--sakay-orange-border)' },
                 }}
               >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -548,10 +637,14 @@ export const TodaAccountManagementPage: React.FC = () => {
                   variant="outlined"
                   size="small"
                   startIcon={<VisibilityIcon fontSize="small" />}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedDoc({ name: profile.rosterFile.name, type: 'pdf' });
-                  }}
+                  onClick={() =>
+                    setReviewModalState({
+                      open: true,
+                      title: 'Accredited Master Driver Roster',
+                      fileName: profile.rosterFile.name,
+                      fileUrl: profile.rosterFile.url || '',
+                    })
+                  }
                   sx={{
                     height: 34,
                     px: 2,
@@ -562,6 +655,65 @@ export const TodaAccountManagementPage: React.FC = () => {
                     color: 'var(--sakay-orange)',
                     borderColor: 'var(--sakay-orange-border)',
                     backgroundColor: 'var(--sakay-orange-soft)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255, 107, 26, 0.16)',
+                      borderColor: 'var(--sakay-orange)',
+                    },
+                  }}
+                >
+                  View
+                </Button>
+              </Box>
+
+              {/* Document 3: Internal TODA Bylaws */}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  p: 2,
+                  borderRadius: '10px',
+                  backgroundColor: '#FAFAFC',
+                  border: '1px solid var(--mac-border-color)',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <DescriptionIcon sx={{ color: '#059669', fontSize: 22 }} />
+                  <Box>
+                    <Typography sx={{ fontSize: '15px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                      Internal TODA Bylaws & Constitution
+                    </Typography>
+                    <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)' }}>
+                      {profile.bylawsFile?.name || 'TODA_Bylaws.pdf'} • Submitted {profile.bylawsFile?.date || 'Recent'}
+                    </Typography>
+                  </Box>
+                </Box>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<VisibilityIcon fontSize="small" />}
+                  onClick={() =>
+                    setReviewModalState({
+                      open: true,
+                      title: 'Internal TODA Bylaws & Constitution',
+                      fileName: profile.bylawsFile?.name || 'TODA_Bylaws.pdf',
+                      fileUrl: profile.bylawsFile?.url || '',
+                    })
+                  }
+                  sx={{
+                    height: 34,
+                    px: 2,
+                    borderRadius: '8px',
+                    fontSize: '13.5px',
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    color: 'var(--sakay-orange)',
+                    borderColor: 'var(--sakay-orange-border)',
+                    backgroundColor: 'var(--sakay-orange-soft)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255, 107, 26, 0.16)',
+                      borderColor: 'var(--sakay-orange)',
+                    },
                   }}
                 >
                   View
@@ -572,122 +724,202 @@ export const TodaAccountManagementPage: React.FC = () => {
         </Box>
       </Box>
 
-      {/* 3. Edit TODA Organizational Profile Centered Modal */}
+      {/* 3. Edit TODA Organizational Profile Centered Modal (Exact TODA Registration Labels & Layout) */}
       <MacCenterModal
         open={editProfileModalOpen}
         onClose={() => setEditProfileModalOpen(false)}
         title="Edit TODA Organizational Profile"
         subtitle={`Update official TODA records and authorized officers for ${profile.name}`}
-        maxWidth={760}
-        primaryActionLabel="Save Organizational Profile"
+        maxWidth={780}
+        primaryActionLabel={isSavingEdit ? 'Saving...' : 'Save Organizational Profile'}
         onPrimaryAction={handleEditProfileSubmit}
         secondaryActionLabel="Cancel"
         onSecondaryAction={() => setEditProfileModalOpen(false)}
       >
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          <Typography sx={{ fontSize: '15px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
-            TODA Organization Information
-          </Typography>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
+          {/* Section 1: Association Information */}
+          <Box>
+            <Typography sx={{ fontSize: '14px', fontWeight: 700, color: 'var(--sakay-orange)', textTransform: 'uppercase', mb: 2, letterSpacing: '0.5px' }}>
+              1. Association Information
+            </Typography>
 
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
-            <TextField
-              label="Official TODA Name"
-              value={editTodaName}
-              onChange={(e) => setEditTodaName(e.target.value)}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-            />
-            <TextField
-              label="TODA Acronym"
-              value={editTodaAcronym}
-              onChange={(e) => setEditTodaAcronym(e.target.value)}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-            />
-            <TextField
-              label="Registration Number"
-              value={editRegNum}
-              onChange={(e) => setEditRegNum(e.target.value)}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-            />
-            <TextField
-              label="Date Established"
-              value={editDateEst}
-              onChange={(e) => setEditDateEst(e.target.value)}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-            />
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
+              <TextField
+                label="Official Association / TODA Name *"
+                placeholder="e.g. Calapan Central Tricycle Operators & Drivers Association"
+                value={editTodaName}
+                onChange={(e) => setEditTodaName(e.target.value)}
+                required
+                fullWidth
+                size="small"
+              />
+              <TextField
+                label="TODA Acronym *"
+                placeholder="e.g. CCTODA"
+                value={editTodaAcronym}
+                onChange={(e) => setEditTodaAcronym(e.target.value.toUpperCase())}
+                required
+                fullWidth
+                size="small"
+              />
+            </Box>
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel id="edit-barangay-label">Operating Barangay *</InputLabel>
+                <Select
+                  labelId="edit-barangay-label"
+                  label="Operating Barangay *"
+                  value={editBarangay}
+                  onChange={(e) => setEditBarangay(e.target.value)}
+                >
+                  {CALAPAN_BARANGAYS.map((brgy) => (
+                    <MenuItem key={brgy} value={brgy}>
+                      {brgy}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <TextField
+                label="Date Established *"
+                type="date"
+                value={editDateEst}
+                onChange={(e) => setEditDateEst(e.target.value)}
+                slotProps={{ inputLabel: { shrink: true } }}
+                required
+                fullWidth
+                size="small"
+              />
+            </Box>
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5 }}>
+              <TextField
+                label="Terminal Location *"
+                placeholder="e.g. Calapan Public Market, J.P. Rizal St."
+                value={editTerminalLoc}
+                onChange={(e) => setEditTerminalLoc(e.target.value)}
+                required
+                fullWidth
+                size="small"
+              />
+              <TextField
+                label="Terminal Coordinates"
+                placeholder="Latitude, Longitude"
+                value={editTerminalCoordinates}
+                onChange={(e) => setEditTerminalCoordinates(e.target.value)}
+                fullWidth
+                size="small"
+              />
+            </Box>
           </Box>
 
-          <TextField
-            label="Terminal Address / Location"
-            value={editTerminalLoc}
-            onChange={(e) => setEditTerminalLoc(e.target.value)}
-            fullWidth
-            sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-          />
+          <Divider sx={{ borderColor: 'var(--mac-border-color)' }} />
 
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
-            <TextField
-              label="Barangay Jurisdiction"
-              value={editBarangay}
-              onChange={(e) => setEditBarangay(e.target.value)}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-            />
-            <TextField
-              label="Service Coverage Area"
-              value={editCoverage}
-              onChange={(e) => setEditCoverage(e.target.value)}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-            />
-          </Box>
+          {/* Section 2: Authorized Association Officers */}
+          <Box>
+            <Typography sx={{ fontSize: '14px', fontWeight: 700, color: 'var(--sakay-orange)', textTransform: 'uppercase', mb: 2, letterSpacing: '0.5px' }}>
+              2. Executive Officers
+            </Typography>
 
-          <Divider sx={{ my: 1 }} />
+            {/* President */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
+              <TextField
+                label="President Full Name *"
+                placeholder="e.g. Roberto Alcantara"
+                value={editPresident}
+                onChange={(e) => setEditPresident(e.target.value)}
+                required
+                fullWidth
+                size="small"
+              />
+              <TextField
+                label="President Mobile Contact *"
+                placeholder="e.g. 0917 555 1001"
+                value={editPresidentContact}
+                onChange={(e) => setEditPresidentContact(formatPhoneNumber(e.target.value))}
+                required
+                fullWidth
+                size="small"
+              />
+            </Box>
 
-          <Typography sx={{ fontSize: '15px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
-            Authorized Officers Roster
-          </Typography>
+            {/* Vice President */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
+              <TextField
+                label="Vice President Name"
+                placeholder="e.g. Eduardo Perez"
+                value={editVicePresident}
+                onChange={(e) => setEditVicePresident(e.target.value)}
+                fullWidth
+                size="small"
+              />
+              <TextField
+                label="Vice President Contact"
+                placeholder="e.g. 0917 555 1002"
+                value={editVicePresidentContact}
+                onChange={(e) => setEditVicePresidentContact(formatPhoneNumber(e.target.value))}
+                fullWidth
+                size="small"
+              />
+            </Box>
 
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2 }}>
-            <TextField
-              label="President"
-              value={editPresident}
-              onChange={(e) => setEditPresident(e.target.value)}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-            />
-            <TextField
-              label="Vice President"
-              value={editVicePresident}
-              onChange={(e) => setEditVicePresident(e.target.value)}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-            />
-            <TextField
-              label="Secretary"
-              value={editSecretary}
-              onChange={(e) => setEditSecretary(e.target.value)}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-            />
-            <TextField
-              label="Treasurer"
-              value={editTreasurer}
-              onChange={(e) => setEditTreasurer(e.target.value)}
-              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
-            />
+            {/* Secretary */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
+              <TextField
+                label="Secretary Name"
+                placeholder="e.g. Leticia Cruz"
+                value={editSecretary}
+                onChange={(e) => setEditSecretary(e.target.value)}
+                fullWidth
+                size="small"
+              />
+              <TextField
+                label="Secretary Contact"
+                placeholder="e.g. 0917 555 1003"
+                value={editSecretaryContact}
+                onChange={(e) => setEditSecretaryContact(formatPhoneNumber(e.target.value))}
+                fullWidth
+                size="small"
+              />
+            </Box>
+
+            {/* Treasurer */}
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5 }}>
+              <TextField
+                label="Treasurer Name"
+                placeholder="e.g. Mario Hernandez"
+                value={editTreasurer}
+                onChange={(e) => setEditTreasurer(e.target.value)}
+                fullWidth
+                size="small"
+              />
+              <TextField
+                label="Treasurer Contact"
+                placeholder="e.g. 0917 555 1004"
+                value={editTreasurerContact}
+                onChange={(e) => setEditTreasurerContact(formatPhoneNumber(e.target.value))}
+                fullWidth
+                size="small"
+              />
+            </Box>
           </Box>
         </Box>
       </MacCenterModal>
 
-      {/* 4. Upload Annual Compliance Document Centered Modal with SAKAY Orange MUI Select & Drag/Drop File Attachment Zone */}
+      {/* 4. Upload Annual Compliance Document Centered Modal */}
       <MacCenterModal
         open={uploadDocModalOpen}
         onClose={() => setUploadDocModalOpen(false)}
-        title="Annual Barangay Clearance & Master Roster Upload"
+        title="Annual Accreditation Document Upload"
         subtitle="Submit updated accreditation compliance files for City LGU review"
         maxWidth={660}
-        primaryActionLabel={selectedFile ? "Submit Document for LGU Review" : undefined}
-        onPrimaryAction={selectedFile ? handleDocumentUploadSubmit : undefined}
+        primaryActionLabel={isUploadingDoc ? 'Uploading...' : selectedFile ? 'Submit Document for LGU Review' : undefined}
+        onPrimaryAction={selectedFile && !isUploadingDoc ? handleDocumentUploadSubmit : undefined}
         secondaryActionLabel="Cancel"
         onSecondaryAction={() => setUploadDocModalOpen(false)}
       >
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          {/* Styled SAKAY Orange MUI Select Dropdown (Fixes Photo 3 bug) */}
           <FormControl fullWidth size="small">
             <InputLabel id="doc-category-label" sx={{ fontSize: '15px', color: 'var(--mac-text-secondary)' }}>
               Document Category
@@ -697,18 +929,6 @@ export const TodaAccountManagementPage: React.FC = () => {
               label="Document Category"
               value={docCategory}
               onChange={(e) => setDocCategory(e.target.value as any)}
-              MenuProps={{
-                slotProps: {
-                  paper: {
-                    sx: {
-                      borderRadius: '12px',
-                      boxShadow: 'var(--mac-shadow-popover)',
-                      border: '1px solid var(--mac-border-color)',
-                      mt: 1,
-                    },
-                  },
-                },
-              }}
               sx={{
                 borderRadius: '10px',
                 backgroundColor: '#FFFFFF',
@@ -718,9 +938,6 @@ export const TodaAccountManagementPage: React.FC = () => {
                   borderColor: 'var(--sakay-orange) !important',
                   borderWidth: '2px',
                 },
-                '&:hover .MuiOutlinedInput-notchedOutline': {
-                  borderColor: 'var(--sakay-orange-border)',
-                },
               }}
             >
               <MenuItem value="Barangay Clearance" sx={{ fontSize: '15px', py: 1.2 }}>
@@ -728,6 +945,9 @@ export const TodaAccountManagementPage: React.FC = () => {
               </MenuItem>
               <MenuItem value="Driver Master List" sx={{ fontSize: '15px', py: 1.2 }}>
                 Updated Accredited Driver Master Roster
+              </MenuItem>
+              <MenuItem value="TODA Bylaws" sx={{ fontSize: '15px', py: 1.2 }}>
+                Internal TODA Bylaws & Constitution
               </MenuItem>
             </Select>
           </FormControl>
@@ -760,7 +980,7 @@ export const TodaAccountManagementPage: React.FC = () => {
               <input
                 type="file"
                 hidden
-                accept=".pdf,.doc,.docx,.png,.jpg"
+                accept=".pdf,.doc,.docx,.png,.jpg,.xlsx,.csv"
                 onChange={handleFileSelect}
               />
               <UploadFileIcon sx={{ fontSize: 40, color: 'var(--sakay-orange)', mb: 1 }} />
@@ -770,7 +990,7 @@ export const TodaAccountManagementPage: React.FC = () => {
               <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mt: 0.5 }}>
                 {selectedFile
                   ? `${(selectedFile.size / 1024).toFixed(1)} KB • Ready for upload`
-                  : 'Supports PDF, DOCX, PNG, JPG (Max 25MB)'}
+                  : 'Supports PDF, XLSX, CSV, PNG, JPG (Max 25MB)'}
               </Typography>
             </Box>
 
@@ -804,15 +1024,14 @@ export const TodaAccountManagementPage: React.FC = () => {
         </Box>
       </MacCenterModal>
 
-      {/* Document Preview Modal */}
-      {selectedDoc && (
-        <DocumentPreviewModal
-          open={Boolean(selectedDoc)}
-          onClose={() => setSelectedDoc(null)}
-          documentName={selectedDoc.name}
-          documentType={selectedDoc.type}
-        />
-      )}
+      {/* Document Review Modal (Identical to TODA Registration Review Modal) */}
+      <DocumentReviewModal
+        open={reviewModalState.open}
+        onClose={() => setReviewModalState((prev) => ({ ...prev, open: false }))}
+        documentTitle={reviewModalState.title}
+        fileName={reviewModalState.fileName}
+        fileUrl={reviewModalState.fileUrl}
+      />
     </Box>
   );
 };

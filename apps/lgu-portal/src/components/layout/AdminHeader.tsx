@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Button, IconButton, Badge, Popover } from '@mui/material';
 import NotificationsNoneIcon from '@mui/icons-material/NotificationsNone';
@@ -8,11 +8,10 @@ import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import LogoutIcon from '@mui/icons-material/Logout';
 
 import { NotificationPopover } from '../popovers/NotificationPopover';
-import { MOCK_NOTIFICATIONS } from '../../mockData/dashboardData';
-import { CURRENT_ADMIN } from '../../mockData/adminData';
 import { NotificationItem } from '../../types/admin';
 import { useAuth } from '../../contexts/AuthContext';
 import { LogoutConfirmModal } from '../admin/LogoutConfirmModal';
+import { supabase } from '../../services/supabaseClient';
 
 interface AdminHeaderProps {
   pageTitle?: string;
@@ -25,8 +24,42 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
 }) => {
   const navigate = useNavigate();
   const { adminProfile, user, signOut } = useAuth();
-  const [notifications, setNotifications] = useState<NotificationItem[]>(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
+
+  // Load real notifications from live database
+  useEffect(() => {
+    let isMounted = true;
+    const fetchNotifications = async () => {
+      try {
+        const { data: logs } = await supabase
+          .from('audit_log')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(8);
+
+        if (isMounted && logs && logs.length > 0) {
+          const items: NotificationItem[] = logs.map((log: any) => ({
+            id: log.log_id,
+            title: log.action_type ? log.action_type.replace(/_/g, ' ') : 'Administrative Activity',
+            description: log.details || '',
+            time: log.created_at ? new Date(log.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+            read: false,
+            unread: true,
+            type: (log.category || 'System').toLowerCase(),
+          }));
+          setNotifications(items);
+        }
+      } catch (err) {
+        console.warn('[AdminHeader] Could not load audit notifications:', err);
+      }
+    };
+
+    fetchNotifications();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Account Popover State
   const [accountAnchorEl, setAccountAnchorEl] = useState<null | HTMLElement>(null);

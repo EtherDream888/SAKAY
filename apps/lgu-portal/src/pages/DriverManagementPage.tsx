@@ -145,26 +145,26 @@ export const DriverManagementPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '9.2px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
-                DRIVER & CREDENTIALS
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+                Driver & Credentials
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '9.2px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
-                TODA AFFILIATION
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+                TODA Affiliation
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '9.2px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
-                FRANCHISE & PLATE
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+                Franchise & Plate
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '9.2px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
-                ONLINE SESSION
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+                Online Session
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '9.2px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
-                VERIFICATION
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+                Verification
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '9.2px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
-                ACCOUNT STATUS
+              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+                Account Status
               </TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '9.2px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
-                ACTIONS
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+                Actions
               </TableCell>
             </TableRow>
           </TableHead>

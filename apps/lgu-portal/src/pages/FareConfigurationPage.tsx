@@ -23,11 +23,12 @@ import EditNoteIcon from '@mui/icons-material/EditNote';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 
-import { MOCK_FARE_MATRIX_HISTORY, FareMatrixRecord, CURRENT_ADMIN } from '../mockData/adminData';
+import { FareMatrixRecord } from '../mockData/adminData';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { fetchFareMatrices, createFareMatrix, recordAdminAuditAction } from '../services/adminApiService';
+import { useAuth } from '../contexts/AuthContext';
 
 /**
  * ============================================================================
@@ -40,6 +41,10 @@ import { fetchFareMatrices, createFareMatrix, recordAdminAuditAction } from '../
  * ============================================================================
  */
 export const FareConfigurationPage: React.FC = () => {
+  const { adminProfile, user } = useAuth();
+  const currentAdminName = adminProfile?.full_name || 'City Administrator';
+  const currentAdminRole = adminProfile?.position || 'LGU Transport Officer';
+
   // State: Historical and currently enacted fare matrix records
   const [fareHistory, setFareHistory] = useState<FareMatrixRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -69,8 +74,23 @@ export const FareConfigurationPage: React.FC = () => {
     };
   }, []);
 
+  const defaultMatrix: FareMatrixRecord = {
+    id: 'FARE-2026-V1',
+    fare_matrix_id: 'FM-001',
+    base_fare: 15.0,
+    base_distance_km: 2.0,
+    succeeding_rate: 1.0,
+    effective_timestamp: new Date().toISOString(),
+    effective_date: 'Standard Municipal Rate',
+    is_active: true,
+    configured_by_lgu_admin: 'Calapan City LGU Transport Board',
+    ordinance_reference: 'City Ordinance No. 118, Series of 2022',
+    notes: 'Standard municipal tricycle fare matrix.',
+    created_at: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
+  };
+
   // Compute: The currently active municipal matrix (first record where is_active is true)
-  const activeMatrix = fareHistory.find((f) => f.is_active) || fareHistory[0];
+  const activeMatrix = fareHistory.find((f) => f.is_active) || fareHistory[0] || defaultMatrix;
 
   // Form State: Controlled inputs for enacting a new municipal fare rate ordinance
   const [newBaseFare, setNewBaseFare] = useState<string>('15.00');
@@ -102,7 +122,7 @@ export const FareConfigurationPage: React.FC = () => {
       effective_timestamp: new Date().toISOString(),
       effective_date: newEffectiveDate,
       is_active: true,
-      configured_by_lgu_admin: `${CURRENT_ADMIN.name} (${CURRENT_ADMIN.role})`,
+      configured_by_lgu_admin: `${currentAdminName} (${currentAdminRole})`,
       ordinance_reference: newOrdinance,
       notes: newNotes || 'Updated municipal fare rates according to Sangguniang Panlungsod resolution.',
       created_at: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
@@ -115,7 +135,7 @@ export const FareConfigurationPage: React.FC = () => {
         baseDistanceKm: dist,
         succeedingRate: succ,
         ordinanceNumber: newOrdinance,
-        configuredBy: `${CURRENT_ADMIN.name} (${CURRENT_ADMIN.role})`,
+        configuredBy: `${currentAdminName} (${currentAdminRole})`,
       });
     } catch (error) {
       console.warn('[FareConfiguration] Failed to save matrix to backend, saving locally:', error);

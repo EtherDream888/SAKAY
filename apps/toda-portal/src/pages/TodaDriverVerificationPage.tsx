@@ -368,12 +368,12 @@ export const TodaDriverVerificationPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>DRIVER APPLICANT</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>VEHICLE & FRANCHISE</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>MASTER ROSTER CHECK</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>SUBMISSION & AGE</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>STAGE STATUS</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--mac-text-muted)', py: 2, px: 3, width: 180 }}>ACTIONS</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Driver Applicant</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Vehicle & Franchise</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Master Roster Check</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Submission & Age</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Stage Status</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3, width: 180 }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
