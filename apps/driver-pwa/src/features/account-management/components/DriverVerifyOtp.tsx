@@ -15,6 +15,7 @@ import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { sendDriverOtp, verifyDriverOtp } from '../../../services/driverApiService';
+import { supabase } from '../../../services/supabaseClient';
 
 const formatDisplayPhone = (raw: string = ''): string => {
   const digits = raw.replace(/\D/g, '');
@@ -27,7 +28,7 @@ export const DriverVerifyOtp: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useLanguage();
-  const state = location.state as { phone?: string; isRecovery?: boolean; driverName?: string; todaId?: string; debugOtp?: string } | undefined;
+  const state = location.state as { phone?: string; password?: string; isRecovery?: boolean; driverName?: string; todaId?: string; debugOtp?: string } | undefined;
 
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
@@ -83,6 +84,84 @@ export const DriverVerifyOtp: React.FC = () => {
           return;
         }
 
+        // Establish active Supabase Auth session for driver
+        const cleanPhone = (state?.phone || localStorage.getItem('sakay_driver_phone') || '').replace(/\D/g, '');
+        const driverPassword = state?.password || localStorage.getItem('sakay_driver_password') || `SakayDriver#2026_${cleanPhone.slice(-4)}`;
+
+        if (cleanPhone) {
+          try {
+            const driverEmail = `driver_${cleanPhone}@sakay.ph`;
+            let authUser = (await supabase.auth.getUser()).data.user;
+
+            if (!authUser) {
+              const { data: signInRes } = await supabase.auth.signInWithPassword({
+                email: driverEmail,
+                password: driverPassword,
+              });
+              authUser = signInRes?.user || null;
+            }
+
+            if (!authUser) {
+              const { data: signUpRes } = await supabase.auth.signUp({
+                email: driverEmail,
+                password: driverPassword,
+                options: { data: { phone: cleanPhone, full_name: state?.driverName } },
+              });
+              authUser = signUpRes?.user || null;
+            }
+
+            if (authUser) {
+              console.log('[DriverVerifyOtp] Authenticated user session established:', authUser.id);
+              // Link or update driver record in public.driver
+              const { data: driverByAuth } = await supabase
+                .from('driver')
+                .select('driver_id, auth_user_id')
+                .eq('auth_user_id', authUser.id)
+                .maybeSingle();
+
+              if (driverByAuth) {
+                console.log('[DriverVerifyOtp] Driver record already linked to auth_user_id:', driverByAuth.driver_id);
+              } else {
+                const { data: driverByPhone } = await supabase
+                  .from('driver')
+                  .select('driver_id, auth_user_id')
+                  .or(`contact_number.eq.${cleanPhone},contact_number.eq.+63${cleanPhone.replace(/^0/, '')}`)
+                  .maybeSingle();
+
+                if (driverByPhone) {
+                  if (!driverByPhone.auth_user_id) {
+                    await supabase
+                      .from('driver')
+                      .update({ auth_user_id: authUser.id })
+                      .eq('driver_id', driverByPhone.driver_id);
+                  }
+                } else {
+                  await supabase
+                    .from('driver')
+                    .upsert(
+                      [
+                        {
+                          auth_user_id: authUser.id,
+                          full_name: state?.driverName || 'Bagong Drayber',
+                          contact_number: cleanPhone,
+                          account_status: 'Pending Verification',
+                          is_profile_complete: true,
+                        },
+                      ],
+                      { onConflict: 'auth_user_id' }
+                    );
+                }
+              }
+            }
+          } catch (authErr) {
+            console.warn('[DriverVerifyOtp] Auth session setup warning:', authErr);
+          } finally {
+            try {
+              localStorage.removeItem('sakay_driver_password');
+            } catch {}
+          }
+        }
+
         setLoading(false);
         if (state?.isRecovery) {
           navigate('/driver/reset-password', { replace: true, state: { phone: state?.phone } });
@@ -90,8 +169,8 @@ export const DriverVerifyOtp: React.FC = () => {
           navigate('/driver/terms-of-service', {
             replace: true,
             state: {
-              driverName: state?.driverName || 'Aurelio Bautista',
-              phone: state?.phone || '09181234567',
+              driverName: state?.driverName || 'Bagong Drayber',
+              phone: state?.phone || cleanPhone,
             },
           });
         }

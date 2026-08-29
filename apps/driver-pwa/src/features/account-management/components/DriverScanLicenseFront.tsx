@@ -25,6 +25,7 @@ import { useLanguage } from '../../../utils/LanguageContext';
 import {
   enhanceLicenseDocument,
   assessImageQuality,
+  captureRawFrame,
   ImageQualityAssessment,
 } from '../../../services/imageEnhancementService';
 import appIcon from '../../../../../../packages/shared/src/assets/icons/app-icon.png';
@@ -49,7 +50,7 @@ export const DriverScanLicenseFront: React.FC = () => {
   // Analysis & Quality modal states
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [qualityDialogOpen, setQualityDialogOpen] = useState(false);
-  const [pendingCapturedPhoto, setPendingCapturedPhoto] = useState<string | null>(null);
+  const [pendingCapturedPhoto, setPendingCapturedPhoto] = useState<{ processed: string; raw: string } | null>(null);
   const [qualityAssessment, setQualityAssessment] = useState<ImageQualityAssessment | null>(null);
 
   // Preload app icon
@@ -225,11 +226,13 @@ export const DriverScanLicenseFront: React.FC = () => {
   const handleCapture = async () => {
     setIsAnalyzing(true);
     let capturedDataUrl = '';
+    let rawFrameDataUrl = '';
 
     try {
       if (videoRef.current && videoRef.current.videoWidth > 0) {
         try {
-          capturedDataUrl = await enhanceLicenseDocument(videoRef.current);
+          rawFrameDataUrl = captureRawFrame(videoRef.current);
+          capturedDataUrl = await enhanceLicenseDocument(videoRef.current, viewfinderRef.current, 'front');
         } catch (err) {
           console.warn('[DriverScanLicenseFront] Image enhancement error:', err);
           const video = videoRef.current;
@@ -240,6 +243,7 @@ export const DriverScanLicenseFront: React.FC = () => {
           if (ctx) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             capturedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+            rawFrameDataUrl = capturedDataUrl;
           }
         }
       }
@@ -251,7 +255,7 @@ export const DriverScanLicenseFront: React.FC = () => {
 
       // Assess photo quality immediately after capture
       const assessment = await assessImageQuality(capturedDataUrl);
-      setPendingCapturedPhoto(capturedDataUrl);
+      setPendingCapturedPhoto({ processed: capturedDataUrl, raw: rawFrameDataUrl });
       setQualityAssessment(assessment);
 
       setIsAnalyzing(false);
@@ -261,14 +265,14 @@ export const DriverScanLicenseFront: React.FC = () => {
         return;
       }
 
-      proceedWithPhoto(capturedDataUrl);
+      proceedWithPhoto(capturedDataUrl, rawFrameDataUrl);
     } catch (err) {
       console.error('[DriverScanLicenseFront] Capture failed:', err);
       setIsAnalyzing(false);
     }
   };
 
-  const proceedWithPhoto = (photoUrl: string) => {
+  const proceedWithPhoto = (photoUrl: string, rawPhotoUrl?: string) => {
     if (stream) {
       stream.getTracks().forEach((t) => t.stop());
     }
@@ -277,6 +281,7 @@ export const DriverScanLicenseFront: React.FC = () => {
       state: {
         ...state,
         frontPhoto: photoUrl,
+        rawFrontPhoto: rawPhotoUrl || photoUrl,
       },
     });
   };
@@ -741,7 +746,7 @@ export const DriverScanLicenseFront: React.FC = () => {
             fullWidth
             onClick={() => {
               setQualityDialogOpen(false);
-              if (pendingCapturedPhoto) proceedWithPhoto(pendingCapturedPhoto);
+              if (pendingCapturedPhoto) proceedWithPhoto(pendingCapturedPhoto.processed, pendingCapturedPhoto.raw);
             }}
             sx={{
               height: '48px',

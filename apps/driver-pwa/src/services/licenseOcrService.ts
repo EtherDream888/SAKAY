@@ -26,11 +26,22 @@ function toTitleCase(text: string): string {
 }
 
 /**
- * Converts Philippine DL name format "LASTNAME, FIRSTNAME MIDDLENAME"
- * into "Firstname Middlename Lastname" (FN MN LN in Title Case)
+ * Splits Philippine DL name into firstName, middleName, lastName, and suffix
  */
-export function formatPhilippineDlName(rawName: string): string {
-  if (!rawName) return '';
+export function splitNameParts(rawName: string): {
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  suffix: string;
+} {
+  let firstName = '';
+  let middleName = '';
+  let lastName = '';
+  let suffix = '';
+
+  if (!rawName) return { firstName: '', middleName: '', lastName: '', suffix: '' };
+
+  const suffixes = ['JR', 'JR.', 'SR', 'SR.', 'III', 'IV', 'II', 'V'];
 
   let clean = rawName
     .replace(/^1\.\s*/, '')
@@ -43,25 +54,103 @@ export function formatPhilippineDlName(rawName: string): string {
     .replace(/\s{2,}/g, ' ')
     .trim();
 
-  // If contains comma "DELA CRUZ, JUAN MANALO" -> parts: ["DELA CRUZ", "JUAN MANALO"]
   if (clean.includes(',')) {
-    const parts = clean.split(',').map((p) => p.trim()).filter(Boolean);
-    if (parts.length >= 2) {
-      const lastName = parts[0];
-      const firstAndMiddle = parts.slice(1).join(' ');
-      return toTitleCase(`${firstAndMiddle} ${lastName}`);
+    const commaSplit = clean.split(',').map((s) => s.trim()).filter(Boolean);
+    if (commaSplit.length >= 2) {
+      lastName = toTitleCase(commaSplit[0]);
+      const restWords = commaSplit[1].split(/\s+/).filter(Boolean);
+
+      const lastWordUpper = restWords[restWords.length - 1]?.toUpperCase();
+      if (lastWordUpper && suffixes.includes(lastWordUpper)) {
+        suffix = restWords.pop()?.toUpperCase() || '';
+      }
+
+      if (restWords.length > 0) {
+        firstName = toTitleCase(restWords[0]);
+        middleName = toTitleCase(restWords.slice(1).join(' '));
+      }
+      return { firstName, middleName, lastName, suffix };
     }
   }
 
-  // If stacked or newline separated
-  const lines = clean.split('\n').map((l) => l.trim()).filter(Boolean);
-  if (lines.length >= 2) {
-    const lastName = lines[0];
-    const firstAndMiddle = lines.slice(1).join(' ');
-    return toTitleCase(`${firstAndMiddle} ${lastName}`);
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length > 0) {
+    const lastWordUpper = words[words.length - 1]?.toUpperCase();
+    if (words.length > 1 && suffixes.includes(lastWordUpper)) {
+      suffix = words.pop()?.toUpperCase() || '';
+    }
+    if (words.length === 1) {
+      firstName = toTitleCase(words[0]);
+    } else if (words.length === 2) {
+      firstName = toTitleCase(words[0]);
+      lastName = toTitleCase(words[1]);
+    } else if (words.length >= 3) {
+      firstName = toTitleCase(words[0]);
+      lastName = toTitleCase(words[words.length - 1]);
+      middleName = toTitleCase(words.slice(1, -1).join(' '));
+    }
   }
 
-  return toTitleCase(clean);
+  return { firstName, middleName, lastName, suffix };
+}
+
+/**
+ * Converts Philippine DL name format "LASTNAME, FIRSTNAME MIDDLENAME"
+ * into "Firstname Middlename Lastname" (FN MN LN in Title Case)
+ */
+export function formatPhilippineDlName(rawName: string): string {
+  if (!rawName) return '';
+  const { firstName, middleName, lastName, suffix } = splitNameParts(rawName);
+  return [firstName, middleName, lastName, suffix].filter(Boolean).join(' ');
+}
+
+/**
+ * Helper to validate ISO Date string (YYYY-MM-DD) within expected year bounds
+ */
+function validateIsoDate(rawDate: string, minYear: number, maxYear: number): string {
+  if (!rawDate) return '';
+  const clean = rawDate.replace(/[/.]/g, '-').trim();
+  const match = clean.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return '';
+
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const day = parseInt(match[3], 10);
+
+  if (year >= minYear && year <= maxYear && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+    return `${match[1]}-${match[2]}-${match[3]}`;
+  }
+  return '';
+}
+
+/**
+ * Normalizes common OCR misreadings in Philippine License Number (e.g. N01-23-456789)
+ */
+function normalizeLicenseNumber(rawNum: string): string {
+  if (!rawNum) return '';
+  let s = rawNum.toUpperCase().replace(/[\s.]+/g, '-').replace(/--+/g, '-').trim();
+  
+  // Format check: e.g. N01-23-456789 (Letter/Digit + 2 digits + 2 digits + 6 digits)
+  const match = s.match(/([A-Z0-9])(\d{2})[-]?(\d{2})[-]?(\d{6})/);
+  if (match) {
+    return `${match[1]}${match[2]}-${match[3]}-${match[4]}`;
+  }
+  
+  // Try fixing missing hyphens or OCR character substitutions (e.g. O -> 0, I/l -> 1)
+  let cleanChars = s.replace(/[^A-Z0-9-]/g, '');
+  if (cleanChars.length >= 11 && cleanChars.length <= 13) {
+    let digitsOnly = cleanChars.replace(/-/g, '');
+    if (digitsOnly.length === 11) {
+      const p1 = digitsOnly.charAt(0);
+      let rest = digitsOnly.slice(1);
+      // Replace O/Q -> 0, I/L -> 1, S -> 5, Z -> 2
+      rest = rest.replace(/O|Q/g, '0').replace(/I|L/g, '1').replace(/S/g, '5').replace(/Z/g, '2');
+      if (/^\d{10}$/.test(rest)) {
+        return `${p1}${rest.slice(0, 2)}-${rest.slice(2, 4)}-${rest.slice(4)}`;
+      }
+    }
+  }
+  return '';
 }
 
 /**
@@ -80,19 +169,23 @@ export function parsePhilippineLicenseText(rawText: string): Partial<LicenseExtr
     rawOcrText: rawText,
   };
 
+  const currentYear = new Date().getFullYear();
+
   const lines = rawText
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
 
-  // 1. License Number extraction (e.g. N03-12-123456, D01-23-456789, P03-54-458061)
+  // 1. License Number extraction with format validation
   const licMatch =
-    rawText.match(/([A-Z0-9]\d{2}[-\s]\d{2}[-\s]\d{6})/i) ||
+    rawText.match(/([A-Z0-9]\d{2}[-\s]?\d{2}[-\s]?\d{6})/i) ||
     rawText.match(/License\s*No[.:\s]*([A-Z0-9-]+)/i) ||
     rawText.match(/DL\s*No[.:\s]*([A-Z0-9-]+)/i);
   if (licMatch) {
-    const rawNum = licMatch[1].replace(/\s+/g, '-').replace(/--+/g, '-');
-    result.licenseNumber = rawNum.toUpperCase();
+    const norm = normalizeLicenseNumber(licMatch[1] || licMatch[0]);
+    if (norm) {
+      result.licenseNumber = norm;
+    }
   }
 
   // 2. Expiration Date (YYYY/MM/DD, YYYY-MM-DD)
@@ -102,8 +195,10 @@ export function parsePhilippineLicenseText(rawText: string): Partial<LicenseExtr
     rawText.match(/202[4-9][-/.]\d{2}[-/.]\d{2}/) ||
     rawText.match(/203\d[-/.]\d{2}[-/.]\d{2}/);
   if (expMatch) {
-    const rawExp = expMatch[1] || expMatch[0];
-    result.expirationDate = rawExp.replace(/[/.]/g, '-');
+    const validExp = validateIsoDate(expMatch[1] || expMatch[0], currentYear - 2, 2050);
+    if (validExp) {
+      result.expirationDate = validExp;
+    }
   }
 
   // 3. Date of Birth (YYYY/MM/DD, YYYY-MM-DD)
@@ -113,8 +208,10 @@ export function parsePhilippineLicenseText(rawText: string): Partial<LicenseExtr
     rawText.match(/DOB[:\s]*(\d{4}[-/.]\d{2}[-/.]\d{2})/i) ||
     rawText.match(/(?:19\d{2}|200[0-8])[-/.]\d{2}[-/.]\d{2}/);
   if (dobMatch) {
-    const rawDob = dobMatch[1] || dobMatch[0];
-    result.dob = rawDob.replace(/[/.]/g, '-');
+    const validDob = validateIsoDate(dobMatch[1] || dobMatch[0], 1940, currentYear - 16);
+    if (validDob) {
+      result.dob = validDob;
+    }
   }
 
   // 4. Gender (Male / Female)
@@ -263,6 +360,11 @@ export function parsePhilippineLicenseText(rawText: string): Partial<LicenseExtr
 
   if (rawExtractedName) {
     result.fullName = formatPhilippineDlName(rawExtractedName);
+    const split = splitNameParts(rawExtractedName);
+    result.firstName = split.firstName;
+    result.middleName = split.middleName;
+    result.lastName = split.lastName;
+    result.suffix = split.suffix;
   }
 
   // 7. ADDRESS Extraction (Strictly isolative: stop before License No, Exp Date, Agency Code)

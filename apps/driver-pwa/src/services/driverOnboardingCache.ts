@@ -7,7 +7,13 @@
 export interface LicenseExtractedData {
   frontPhoto: string;
   backPhoto: string;
+  rawFrontPhoto?: string;
+  rawBackPhoto?: string;
   fullName: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  suffix?: string;
   dob: string;
   gender: string;
   address: string;

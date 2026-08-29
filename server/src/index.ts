@@ -25,8 +25,14 @@ const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173,http:/
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. mobile apps, curl) or matched origins
-      if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:')) {
+      // Allow requests with no origin (e.g. mobile apps, curl), matched origins, localhost, or VS Code Dev Tunnels (.devtunnels.ms)
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('https://localhost:') ||
+        origin.endsWith('.devtunnels.ms')
+      ) {
         callback(null, true);
       } else {
         callback(new Error('Blocked by CORS policy'));

@@ -26,16 +26,19 @@ export const DriverReviewLicenseFront: React.FC = () => {
     phone?: string;
     driverName?: string;
     frontPhoto?: string;
+    rawFrontPhoto?: string;
   } | undefined;
 
   const [currentPhoto, setCurrentPhoto] = useState<string>(state?.frontPhoto || defaultFrontSample);
+  const [rawPhoto, setRawPhoto] = useState<string>(state?.rawFrontPhoto || state?.frontPhoto || defaultFrontSample);
   const [qualityWarning, setQualityWarning] = useState<string | null>(null);
 
   useEffect(() => {
     if (state?.frontPhoto) {
       setCurrentPhoto(state.frontPhoto);
+      setRawPhoto(state.rawFrontPhoto || state.frontPhoto);
     }
-  }, [state?.frontPhoto]);
+  }, [state?.frontPhoto, state?.rawFrontPhoto]);
 
   useEffect(() => {
     if (currentPhoto) {
@@ -56,11 +59,19 @@ export const DriverReviewLicenseFront: React.FC = () => {
   const handleRotateLeft = async () => {
     const rotated = await rotateImage(currentPhoto, -90);
     setCurrentPhoto(rotated);
+    if (rawPhoto) {
+      const rotatedRaw = await rotateImage(rawPhoto, -90);
+      setRawPhoto(rotatedRaw);
+    }
   };
 
   const handleRotateRight = async () => {
     const rotated = await rotateImage(currentPhoto, 90);
     setCurrentPhoto(rotated);
+    if (rawPhoto) {
+      const rotatedRaw = await rotateImage(rawPhoto, 90);
+      setRawPhoto(rotatedRaw);
+    }
   };
 
   const handleUsePhoto = () => {
@@ -68,6 +79,7 @@ export const DriverReviewLicenseFront: React.FC = () => {
       state: {
         ...state,
         frontPhoto: currentPhoto,
+        rawFrontPhoto: rawPhoto,
       },
     });
   };

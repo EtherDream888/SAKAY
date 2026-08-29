@@ -320,7 +320,7 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem('sakay_language');
-    return (saved === 'tl' || saved === 'en') ? saved : 'en';
+    return (saved === 'tl' || saved === 'en') ? saved : 'tl';
   });
 
   const setLanguage = (lang: Language) => {

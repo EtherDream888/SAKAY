@@ -4,32 +4,370 @@ import {
   Box,
   Typography,
   IconButton,
-  TextField,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  Radio,
+  MenuItem,
+  Select,
+  InputBase,
   Alert,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CheckIcon from '@mui/icons-material/Check';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
-import { useLanguage } from '../../../utils/LanguageContext';
+import { DateCalendarPopover } from '../../../components/common/DateCalendarPopover';
 import {
   getCachedLicenseData,
   saveLicenseScanData,
   LicenseExtractedData,
 } from '../../../services/driverOnboardingCache';
 import { saveDriverLicenseVerification } from '../../../services/driverApiService';
+import { splitNameParts } from '../../../services/licenseOcrService';
+
+/**
+ * Formats Philippine LTO License Number: A 00-00-000000
+ */
+export function formatDriverLicenseNumberInput(val: string): string {
+  if (!val) return '';
+  let cleaned = val.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (cleaned.length === 0) return '';
+
+  const letter = cleaned.charAt(0);
+  const digits = cleaned.slice(1, 11);
+
+  let result = letter;
+  if (digits.length > 0) {
+    result += ' ' + digits.slice(0, 2);
+  }
+  if (digits.length > 2) {
+    result += '-' + digits.slice(2, 4);
+  }
+  if (digits.length > 4) {
+    result += '-' + digits.slice(4, 10);
+  }
+  return result;
+}
+
+/**
+ * Auto-formats Date Input to MM-DD-YYYY (numerical only)
+ */
+export function formatDateInput(val: string): string {
+  if (!val) return '';
+  const digits = val.replace(/\D/g, '').slice(0, 8);
+  let mm = digits.slice(0, 2);
+  let dd = digits.slice(2, 4);
+  let yyyy = digits.slice(4, 8);
+
+  let result = mm;
+  if (digits.length > 2) {
+    result += '-' + dd;
+  }
+  if (digits.length > 4) {
+    result += '-' + yyyy;
+  }
+  return result;
+}
+
+/**
+ * Converts ISO YYYY-MM-DD to MM-DD-YYYY format for UI display
+ */
+export function convertIsoToMmDdYyyy(isoDate: string): string {
+  if (!isoDate) return '';
+  const match = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    return `${match[2]}-${match[3]}-${match[1]}`;
+  }
+  return formatDateInput(isoDate);
+}
+
+/**
+ * Converts MM-DD-YYYY or YYYY-MM-DD back to ISO YYYY-MM-DD for DB
+ */
+export function convertMmDdYyyyToIso(dateStr: string): string {
+  if (!dateStr) return '';
+  const mmDdMatch = dateStr.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (mmDdMatch) {
+    return `${mmDdMatch[3]}-${mmDdMatch[1]}-${mmDdMatch[2]}`;
+  }
+  return dateStr;
+}
+
+// Raw restriction code values ONLY
+const LTO_RESTRICTION_CODES = [
+  'A1',
+  'A',
+  'B',
+  'B1',
+  'B2',
+  'C',
+  'D',
+  'BE',
+  'CE',
+  '1',
+  '2',
+  '3',
+  '4',
+  '5',
+  'MT',
+  'AT',
+  '1, 2',
+];
+
+const parseRestrictionList = (raw: string): string[] => {
+  if (!raw || !raw.trim()) return ['A1'];
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+};
+
+interface SakayFormInputProps {
+  label: string;
+  value: string;
+  onChange: (val: string) => void;
+  multiline?: boolean;
+  rows?: number;
+  isDate?: boolean;
+  isGender?: boolean;
+  isRestriction?: boolean;
+  onOpenCalendar?: (anchor: HTMLElement) => void;
+  placeholder?: string;
+  error?: boolean;
+  helperText?: string;
+}
+
+const SakayFormInput: React.FC<SakayFormInputProps> = ({
+  label,
+  value,
+  onChange,
+  multiline = false,
+  rows = 1,
+  isDate = false,
+  isGender = false,
+  isRestriction = false,
+  onOpenCalendar,
+  placeholder,
+  error = false,
+  helperText = '',
+}) => {
+  const [focused, setFocused] = useState(false);
+  const isFloating = focused || Boolean(value && value.length > 0) || isGender || isRestriction;
+
+  return (
+    <Box sx={{ width: '100%' }}>
+      <Box
+        sx={{
+          width: '100%',
+          minHeight: multiline ? '84px' : '62px',
+          height: multiline ? 'auto' : '62px',
+          borderRadius: '16px',
+          backgroundColor: focused ? '#FFFFFF' : '#F1F3F5',
+          border: `1.5px solid ${error ? '#DC2626' : focused ? '#FF6B00' : '#E2E8F0'}`,
+          boxShadow: focused
+            ? '0 0 0 3px rgba(255, 107, 0, 0.12)'
+            : 'none',
+          px: 2,
+          py: multiline ? 1.5 : 0,
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          boxSizing: 'border-box',
+          cursor: 'text',
+        }}
+      >
+        <Typography
+          sx={{
+            position: 'absolute',
+            left: '16px',
+            right: '16px',
+            top: isFloating ? '8px' : '50%',
+            transform: isFloating ? 'translateY(0)' : 'translateY(-50%)',
+            fontSize: isFloating ? '9.5px' : '15px',
+            fontWeight: isFloating ? 700 : 500,
+            color: error ? '#DC2626' : focused ? '#FF6B00' : isFloating ? '#64748B' : '#94A3B8',
+            letterSpacing: isFloating ? '0.5px' : '0px',
+            textTransform: isFloating ? 'uppercase' : 'none',
+            userSelect: 'none',
+            pointerEvents: 'none',
+            whiteSpace: isFloating ? 'normal' : 'nowrap',
+            wordBreak: 'break-word',
+            lineHeight: 1.15,
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            zIndex: 1,
+          }}
+        >
+          {label}
+        </Typography>
+
+        <Box
+          sx={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            mt: isFloating ? (multiline ? '20px' : '16px') : 0,
+            transition: 'margin-top 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
+        >
+          {isGender ? (
+            <Select
+              value={value === 'Female' || value === 'Babae' ? 'Babae' : 'Lalaki'}
+              onChange={(e) => onChange(e.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              fullWidth
+              variant="standard"
+              disableUnderline
+              IconComponent={(props) => (
+                <ExpandMoreIcon {...props} sx={{ color: '#64748B', fontSize: 20, right: 0 }} />
+              )}
+              sx={{
+                fontSize: '15px',
+                fontWeight: 600,
+                color: '#0F172A',
+                '& .MuiSelect-select': { py: 0, pr: '24px !important', lineHeight: 1.2 },
+              }}
+            >
+              <MenuItem value="Lalaki" sx={{ fontSize: '15px', fontWeight: 600 }}>Lalaki</MenuItem>
+              <MenuItem value="Babae" sx={{ fontSize: '15px', fontWeight: 600 }}>Babae</MenuItem>
+            </Select>
+          ) : isRestriction ? (
+            <Select
+              multiple
+              value={parseRestrictionList(value)}
+              onChange={(e) => {
+                const selected = typeof e.target.value === 'string' ? e.target.value.split(', ') : e.target.value;
+                onChange((selected as string[]).join(', '));
+              }}
+              renderValue={(selected) => (
+                <Typography sx={{ fontSize: '15px', fontWeight: 600, color: '#0F172A', py: 0, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {(selected as string[]).join(', ') || 'A1'}
+                </Typography>
+              )}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              fullWidth
+              variant="standard"
+              disableUnderline
+              IconComponent={(props) => (
+                <ExpandMoreIcon {...props} sx={{ color: '#64748B', fontSize: 20, right: 0 }} />
+              )}
+              MenuProps={{
+                slotProps: {
+                  paper: {
+                    sx: {
+                      maxHeight: 92,
+                      borderRadius: '14px',
+                      boxShadow: '0 10px 25px rgba(15, 23, 42, 0.14)',
+                      border: '1px solid #E2E8F0',
+                    },
+                  },
+                },
+              }}
+              sx={{
+                fontSize: '15px',
+                fontWeight: 600,
+                color: '#0F172A',
+                '& .MuiSelect-select': { py: 0, pr: '24px !important', lineHeight: 1.2 },
+              }}
+            >
+              {LTO_RESTRICTION_CODES.map((code) => {
+                const isChecked = parseRestrictionList(value).includes(code);
+                return (
+                  <MenuItem
+                    key={code}
+                    value={code}
+                    sx={{
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      py: 1,
+                      minHeight: '44px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <Typography sx={{ fontSize: '14px', fontWeight: isChecked ? 800 : 600, color: isChecked ? '#FF6B00' : '#0F172A' }}>
+                      {code}
+                    </Typography>
+                    {isChecked && <CheckIcon sx={{ fontSize: 18, color: '#FF6B00' }} />}
+                  </MenuItem>
+                );
+              })}
+            </Select>
+          ) : isDate ? (
+            <Box
+              sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}
+            >
+              <InputBase
+                value={value}
+                onChange={(e) => onChange(formatDateInput(e.target.value))}
+                onFocus={() => setFocused(true)}
+                onBlur={() => setFocused(false)}
+                placeholder={isFloating ? (placeholder || "MM-DD-YYYY") : ""}
+                fullWidth
+                inputProps={{ inputMode: 'numeric', pattern: '[0-9-]*' }}
+                sx={{
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  color: '#0F172A',
+                  py: 0,
+                  '& input': {
+                    py: 0,
+                    lineHeight: 1.2,
+                    opacity: isFloating ? 1 : 0,
+                    transition: 'opacity 0.15s ease-in-out',
+                  },
+                }}
+              />
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenCalendar?.(e.currentTarget.parentElement || e.currentTarget);
+                }}
+                sx={{ p: 0.25, ml: 0.5, color: '#64748B', '&:hover': { color: '#FF6B00' } }}
+              >
+                <CalendarTodayIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Box>
+          ) : (
+            <InputBase
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              multiline={multiline}
+              rows={rows}
+              placeholder={isFloating ? placeholder : ""}
+              fullWidth
+              sx={{
+                fontSize: '15px',
+                fontWeight: 600,
+                color: '#0F172A',
+                py: 0,
+                '& input, & textarea': {
+                  py: 0,
+                  lineHeight: 1.2,
+                  opacity: isFloating ? 1 : 0,
+                  transition: 'opacity 0.15s ease-in-out',
+                },
+              }}
+            />
+          )}
+        </Box>
+      </Box>
+      {helperText && (
+        <Typography sx={{ color: '#DC2626', fontSize: '12px', mt: 0.5, px: 1, fontWeight: 500 }}>
+          {helperText}
+        </Typography>
+      )}
+    </Box>
+  );
+};
 
 export const DriverConfirmLicenseInfo: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useLanguage();
   const state = location.state as {
     phone?: string;
     driverName?: string;
@@ -41,84 +379,140 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
     frontPhoto: '',
     backPhoto: '',
     fullName: state?.driverName || '',
+    firstName: '',
+    middleName: '',
+    lastName: '',
+    suffix: '',
     dob: '',
-    gender: 'Male',
+    gender: 'Lalaki',
     address: '',
     licenseNumber: '',
-    dlCodes: '',
+    dlCodes: 'A1',
     expirationDate: '',
     scannedAt: new Date().toISOString(),
   };
 
+  if (initial.fullName && (!initial.firstName || !initial.lastName)) {
+    const split = splitNameParts(initial.fullName);
+    initial.firstName = initial.firstName || split.firstName;
+    initial.middleName = initial.middleName || split.middleName;
+    initial.lastName = initial.lastName || split.lastName;
+    initial.suffix = initial.suffix || split.suffix;
+  }
+
+  if (initial.dob) {
+    initial.dob = convertIsoToMmDdYyyy(initial.dob);
+  }
+  if (initial.expirationDate) {
+    initial.expirationDate = convertIsoToMmDdYyyy(initial.expirationDate);
+  }
+  if (initial.licenseNumber) {
+    initial.licenseNumber = formatDriverLicenseNumberInput(initial.licenseNumber);
+  }
+  if (!initial.dlCodes) {
+    initial.dlCodes = 'A1';
+  }
+
   const [formData, setFormData] = useState<LicenseExtractedData>(initial);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editField, setEditField] = useState<{
-    key: keyof LicenseExtractedData;
-    label: string;
-    value: string;
-    type: 'text' | 'date' | 'gender';
-  } | null>(null);
 
-  const handleOpenEdit = (
-    key: keyof LicenseExtractedData,
-    label: string,
-    type: 'text' | 'date' | 'gender' = 'text'
-  ) => {
-    setEditField({ key, label, value: String(formData[key] || ''), type });
-    setEditDialogOpen(true);
+  const isFormValid = Boolean(
+    (formData.firstName?.trim() || formData.fullName?.trim()) &&
+    formData.lastName?.trim() &&
+    formData.licenseNumber?.trim()
+  );
+
+  const [activeDateField, setActiveDateField] = useState<'dob' | 'expirationDate' | null>(null);
+  const [calendarAnchorEl, setCalendarAnchorEl] = useState<HTMLElement | null>(null);
+
+  const handleOpenCalendar = (field: 'dob' | 'expirationDate', anchor: HTMLElement) => {
+    setActiveDateField(field);
+    setCalendarAnchorEl(anchor);
   };
 
-  const handleSaveEdit = () => {
-    if (editField) {
-      setFormData((prev) => ({
-        ...prev,
-        [editField.key]: editField.value,
-      }));
+  const handleCloseCalendar = () => {
+    setActiveDateField(null);
+    setCalendarAnchorEl(null);
+  };
+
+  const handleSelectCalendarDate = (date: Date) => {
+    if (!activeDateField) return;
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const formattedMmDdYyyy = `${mm}-${dd}-${yyyy}`;
+    handleFieldChange(activeDateField, formattedMmDdYyyy);
+    handleCloseCalendar();
+  };
+
+  const handleFieldChange = (field: keyof LicenseExtractedData, value: string) => {
+    let finalValue = value;
+    if (field === 'licenseNumber') {
+      finalValue = formatDriverLicenseNumberInput(value);
     }
-    setEditDialogOpen(false);
-    setEditField(null);
+    setFormData((prev) => {
+      const next = { ...prev, [field]: finalValue };
+      if (field === 'firstName' || field === 'middleName' || field === 'lastName' || field === 'suffix') {
+        next.fullName = [next.firstName, next.middleName, next.lastName, next.suffix]
+          .filter(Boolean)
+          .join(' ');
+      }
+      return next;
+    });
   };
 
   const handleContinue = async () => {
-    if (submitting) return;
-
-    if (!formData.fullName || !formData.fullName.trim()) {
-      setSubmitError('Please enter your full name before continuing.');
-      return;
-    }
-
-    if (!formData.licenseNumber || !formData.licenseNumber.trim()) {
-      setSubmitError("Please enter your driver's license number before continuing.");
-      return;
-    }
+    if (submitting || !isFormValid) return;
 
     setSubmitting(true);
     setSubmitError(null);
 
-    // 1. Persist offline cache backup
-    saveLicenseScanData(formData, state?.phone || '');
+    const payloadToSave: LicenseExtractedData = {
+      ...formData,
+      dob: convertMmDdYyyyToIso(formData.dob),
+      expirationDate: convertMmDdYyyyToIso(formData.expirationDate),
+      gender: formData.gender === 'Female' || formData.gender === 'Babae' ? 'Babae' : 'Lalaki',
+    };
 
-    // 2. Upload license photos to Supabase Storage & insert/update driver_verification in Supabase
-    const res = await saveDriverLicenseVerification(formData, state?.phone);
+    const targetPhone = state?.phone || localStorage.getItem('sakay_driver_phone') || '';
 
-    if (!res.success) {
+    try {
+      const saveRes = await saveDriverLicenseVerification(payloadToSave, targetPhone);
+      if (saveRes.success) {
+        saveLicenseScanData(formData, targetPhone);
+        navigate('/driver/account-verification-submitted', {
+          replace: true,
+          state: {
+            ...state,
+            extracted: formData,
+            driverId: saveRes.driverId,
+            verificationId: saveRes.verificationId,
+          },
+        });
+      } else {
+        setSubmitError(saveRes.error || 'May problema sa pag-save ng rekord ng beripikasyon. Pakisubukang muli.');
+      }
+    } catch (err: any) {
+      console.error('[DriverConfirmLicenseInfo] Save error:', err);
+      setSubmitError(err.message || 'May hindi inaasahang problema. Pakisubukang muli.');
+    } finally {
       setSubmitting(false);
-      setSubmitError(res.error || "We couldn't save your driver's license verification details. Please try again.");
-      return;
     }
+  };
 
-    setSubmitting(false);
-
-    // 3. Advance to driver status monitor only on successful database persistence
-    navigate('/driver/status', {
-      state: {
-        driverName: formData.fullName || state?.driverName || '',
-        phone: state?.phone || '09181234567',
-        licenseNumber: formData.licenseNumber,
-      },
-    });
+  const parseDateForCalendar = (val: string): Date => {
+    if (!val) return new Date();
+    const mmDdMatch = val.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (mmDdMatch) {
+      return new Date(parseInt(mmDdMatch[3], 10), parseInt(mmDdMatch[1], 10) - 1, parseInt(mmDdMatch[2], 10));
+    }
+    const isoMatch = val.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+      return new Date(parseInt(isoMatch[1], 10), parseInt(isoMatch[2], 10) - 1, parseInt(isoMatch[3], 10));
+    }
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? new Date() : d;
   };
 
   return (
@@ -133,7 +527,6 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
         overflow: 'hidden',
       }}
     >
-      {/* 1. Top Header Bar */}
       <Box
         sx={{
           display: 'flex',
@@ -143,6 +536,7 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
           pt: 'calc(var(--safe-area-top) + 20px)',
           pb: 2,
           backgroundColor: '#FFFFFF',
+          flexShrink: 0,
           zIndex: 10,
         }}
       >
@@ -151,33 +545,31 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
           sx={{
             width: 44,
             height: 44,
-            borderRadius: '12px',
+            borderRadius: '14px',
             border: '1px solid #E2E8F0',
             backgroundColor: '#FFFFFF',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
             '&:hover': { backgroundColor: '#F8FAFC' },
           }}
         >
-          <ArrowBackIcon sx={{ color: '#0F172A', fontSize: 22 }} />
+          <ArrowBackIcon sx={{ color: '#0F172A', fontSize: 20 }} />
         </IconButton>
 
         <Logo color="orange" width={110} />
       </Box>
 
-      {/* 2. Scrollable Content Area */}
       <Box
         sx={{
           flex: 1,
           overflowY: 'auto',
           px: 3,
-          pb: 'calc(var(--safe-area-bottom) + 110px)',
+          pb: 3,
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
           '&::-webkit-scrollbar': { display: 'none' },
         }}
       >
-        {/* Title */}
         <Typography
           sx={{
             fontSize: '26px',
@@ -189,479 +581,163 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
             mb: 1.25,
           }}
         >
-          {t.confirmInfoTitle}
+          Kumpirmahin ang Iyong Impormasyon
         </Typography>
 
-        {/* Subtitle */}
         <Typography
           sx={{
             fontSize: '15px',
-            color: '#334155',
+            color: '#64748B',
             lineHeight: 1.45,
-            fontWeight: 400,
+            fontWeight: 500,
             mb: 2.5,
           }}
         >
-          {t.confirmInfoSubtitle}
+          Pakisuri at kumpirmahin ang impormasyon ng iyong lisensya bago magpatuloy.
         </Typography>
 
-        {/* User-facing error feedback alert */}
         {submitError && (
           <Alert severity="error" sx={{ mb: 2.5, borderRadius: '12px' }}>
             {submitError}
           </Alert>
         )}
+        {/* Directly Editable Form Fields */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {/* 1. Unang Pangalan (100%) */}
+          <SakayFormInput
+            label="UNANG PANGALAN"
+            value={formData.firstName || ''}
+            onChange={(val) => handleFieldChange('firstName', val)}
+          />
 
-        {/* Extracted Details Cards List */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          {/* Card 1: Full Name */}
-          <Box
-            onClick={() => handleOpenEdit('fullName', t.labelFullName, 'text')}
-            sx={{
-              backgroundColor: '#F1F5F9',
-              borderRadius: '16px',
-              p: 2,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-              border: '1px solid #E2E8F0',
-              '&:hover': { backgroundColor: '#E2E8F0' },
-            }}
-          >
-            <Box sx={{ flex: 1 }}>
-              <Typography
-                sx={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  color: '#64748B',
-                  letterSpacing: '0.6px',
-                  mb: 0.5,
-                }}
-              >
-                {t.labelFullName}
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '16px',
-                  fontWeight: 700,
-                  color: '#0F172A',
-                  minHeight: '24px',
-                }}
-              >
-                {formData.fullName || ''}
-              </Typography>
-            </Box>
-            <EditOutlinedIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
-          </Box>
+          {/* 2. Gitnang Pangalan (100%) */}
+          <SakayFormInput
+            label="GITNANG PANGALAN"
+            value={formData.middleName || ''}
+            onChange={(val) => handleFieldChange('middleName', val)}
+          />
 
-          {/* Row Card 2: Date of Birth + Gender */}
+          {/* 3. Apelyido (70%) + Suffix (30%) */}
           <Box sx={{ display: 'flex', gap: 1.5 }}>
-            {/* Date of Birth with Calendar Edit */}
-            <Box
-              onClick={() => handleOpenEdit('dob', t.labelDob, 'date')}
-              sx={{
-                flex: 1,
-                backgroundColor: '#F1F5F9',
-                borderRadius: '16px',
-                p: 2,
-                cursor: 'pointer',
-                border: '1px solid #E2E8F0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                '&:hover': { backgroundColor: '#E2E8F0' },
-              }}
-            >
-              <Box sx={{ flex: 1 }}>
-                <Typography
-                  sx={{
-                    fontSize: '10.5px',
-                    fontWeight: 700,
-                    color: '#64748B',
-                    letterSpacing: '0.4px',
-                    mb: 0.5,
-                  }}
-                >
-                  {t.labelDob}
-                </Typography>
-                <Typography
-                  sx={{
-                    fontSize: '15px',
-                    fontWeight: 700,
-                    color: '#0F172A',
-                    minHeight: '22px',
-                  }}
-                >
-                  {formData.dob || ''}
-                </Typography>
-              </Box>
-              <EditOutlinedIcon sx={{ fontSize: 16, color: '#94A3B8' }} />
+            <Box sx={{ flex: '7 7 70%', minWidth: 0 }}>
+              <SakayFormInput
+                label="APELYIDO"
+                value={formData.lastName || ''}
+                onChange={(val) => handleFieldChange('lastName', val)}
+              />
             </Box>
-
-            {/* Gender with Vertical Selection Edit */}
-            <Box
-              onClick={() => handleOpenEdit('gender', t.labelGender, 'gender')}
-              sx={{
-                flex: 1,
-                backgroundColor: '#F1F5F9',
-                borderRadius: '16px',
-                p: 2,
-                cursor: 'pointer',
-                border: '1px solid #E2E8F0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                '&:hover': { backgroundColor: '#E2E8F0' },
-              }}
-            >
-              <Box sx={{ flex: 1 }}>
-                <Typography
-                  sx={{
-                    fontSize: '10.5px',
-                    fontWeight: 700,
-                    color: '#64748B',
-                    letterSpacing: '0.4px',
-                    mb: 0.5,
-                  }}
-                >
-                  {t.labelGender}
-                </Typography>
-                <Typography
-                  sx={{
-                    fontSize: '15px',
-                    fontWeight: 700,
-                    color: '#0F172A',
-                    minHeight: '22px',
-                  }}
-                >
-                  {formData.gender || 'Male'}
-                </Typography>
-              </Box>
-              <EditOutlinedIcon sx={{ fontSize: 16, color: '#94A3B8' }} />
+            <Box sx={{ flex: '3 3 30%', minWidth: 0 }}>
+              <SakayFormInput
+                label="SUFFIX"
+                value={formData.suffix || ''}
+                onChange={(val) => handleFieldChange('suffix', val)}
+              />
             </Box>
           </Box>
 
-          {/* Card 3: Address */}
-          <Box
-            onClick={() => handleOpenEdit('address', t.labelAddress, 'text')}
-            sx={{
-              backgroundColor: '#F1F5F9',
-              borderRadius: '16px',
-              p: 2,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-              border: '1px solid #E2E8F0',
-              '&:hover': { backgroundColor: '#E2E8F0' },
-            }}
-          >
-            <Box sx={{ flex: 1 }}>
-              <Typography
-                sx={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  color: '#64748B',
-                  letterSpacing: '0.6px',
-                  mb: 0.5,
-                }}
-              >
-                {t.labelAddress}
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  color: '#0F172A',
-                  lineHeight: 1.35,
-                  minHeight: '22px',
-                }}
-              >
-                {formData.address || ''}
-              </Typography>
+          {/* 4. Petsa ng Kapanganakan (70%) + Kasarian (30%) */}
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <Box sx={{ flex: '7 7 70%', minWidth: 0 }}>
+              <SakayFormInput
+                label="PETSA NG KAPANGANAKAN"
+                value={formData.dob}
+                onChange={(val) => handleFieldChange('dob', val)}
+                isDate
+                placeholder="MM-DD-YYYY"
+                onOpenCalendar={(anchor) => handleOpenCalendar('dob', anchor)}
+              />
             </Box>
-            <EditOutlinedIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
+            <Box sx={{ flex: '3 3 30%', minWidth: 0 }}>
+              <SakayFormInput
+                label="KASARIAN"
+                value={formData.gender || 'Lalaki'}
+                onChange={(val) => handleFieldChange('gender', val)}
+                isGender
+              />
+            </Box>
           </Box>
 
-          {/* Card 4: Driver License Number */}
-          <Box
-            onClick={() => handleOpenEdit('licenseNumber', t.labelLicenseNumber, 'text')}
-            sx={{
-              backgroundColor: '#F1F5F9',
-              borderRadius: '16px',
-              p: 2,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-              border: '1px solid #E2E8F0',
-              '&:hover': { backgroundColor: '#E2E8F0' },
-            }}
-          >
-            <Box sx={{ flex: 1 }}>
-              <Typography
-                sx={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  color: '#64748B',
-                  letterSpacing: '0.6px',
-                  mb: 0.5,
-                }}
-              >
-                {t.labelLicenseNumber}
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '16px',
-                  fontWeight: 700,
-                  color: '#0F172A',
-                  letterSpacing: '0.5px',
-                  minHeight: '24px',
-                }}
-              >
-                {formData.licenseNumber || ''}
-              </Typography>
-            </Box>
-            <EditOutlinedIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
-          </Box>
+          {/* 5. Tirahan (100%) */}
+          <SakayFormInput
+            label="TIRAHAN"
+            value={formData.address}
+            onChange={(val) => handleFieldChange('address', val)}
+            multiline
+            rows={2}
+          />
 
-          {/* Card 5: RESTRICTIONS (Renamed) */}
-          <Box
-            onClick={() => handleOpenEdit('dlCodes', t.labelDlCodes, 'text')}
-            sx={{
-              backgroundColor: '#F1F5F9',
-              borderRadius: '16px',
-              p: 2,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-              border: '1px solid #E2E8F0',
-              '&:hover': { backgroundColor: '#E2E8F0' },
-            }}
-          >
-            <Box sx={{ flex: 1 }}>
-              <Typography
-                sx={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  color: '#64748B',
-                  letterSpacing: '0.6px',
-                  mb: 0.5,
-                }}
-              >
-                {t.labelDlCodes}
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  color: '#0F172A',
-                  minHeight: '22px',
-                }}
-              >
-                {formData.dlCodes || ''}
-              </Typography>
-            </Box>
-            <EditOutlinedIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
-          </Box>
+          {/* 6. Numero ng Lisensya (100%) */}
+          <SakayFormInput
+            label="NUMERO NG LISENSYA"
+            value={formData.licenseNumber}
+            onChange={(val) => handleFieldChange('licenseNumber', val)}
+          />
 
-          {/* Card 6: EXPIRATION DATE with Calendar Picker */}
-          <Box
-            onClick={() => handleOpenEdit('expirationDate', t.labelExpirationDate, 'date')}
-            sx={{
-              backgroundColor: '#F1F5F9',
-              borderRadius: '16px',
-              p: 2,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              cursor: 'pointer',
-              border: '1px solid #E2E8F0',
-              '&:hover': { backgroundColor: '#E2E8F0' },
-            }}
-          >
-            <Box sx={{ flex: 1 }}>
-              <Typography
-                sx={{
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  color: '#64748B',
-                  letterSpacing: '0.6px',
-                  mb: 0.5,
-                }}
-              >
-                {t.labelExpirationDate}
-              </Typography>
-              <Typography
-                sx={{
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  color: '#0F172A',
-                  minHeight: '22px',
-                }}
-              >
-                {formData.expirationDate || ''}
-              </Typography>
-            </Box>
-            <EditOutlinedIcon sx={{ fontSize: 18, color: '#94A3B8' }} />
-          </Box>
+          {/* 7. Restriksyon / Kategorya ng Lisensya (100%) */}
+          <SakayFormInput
+            label="RESTRIKSYON / KATEGORYA NG LISENSYA"
+            value={formData.dlCodes}
+            onChange={(val) => handleFieldChange('dlCodes', val)}
+            isRestriction
+          />
+
+          {/* 8. Petsa ng Pagkapaso (100%) */}
+          <SakayFormInput
+            label="PETSA NG PAGKAPASO (EXPIRATION)"
+            value={formData.expirationDate}
+            onChange={(val) => handleFieldChange('expirationDate', val)}
+            isDate
+            placeholder="MM-DD-YYYY"
+            onOpenCalendar={(anchor) => handleOpenCalendar('expirationDate', anchor)}
+          />
         </Box>
       </Box>
 
-      {/* 3. Sticky Bottom Action Button */}
+      <DateCalendarPopover
+        open={Boolean(calendarAnchorEl && activeDateField)}
+        anchorEl={calendarAnchorEl}
+        onClose={handleCloseCalendar}
+        selectedDate={parseDateForCalendar(
+          activeDateField ? formData[activeDateField] : ''
+        )}
+        onSelectDate={handleSelectCalendarDate}
+      />
+
       <Box
         sx={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: '16px 24px calc(var(--safe-area-bottom) + 16px) 24px',
-          background: 'linear-gradient(to top, #FFFFFF 85%, rgba(255, 255, 255, 0.9) 95%, rgba(255, 255, 255, 0) 100%)',
-          zIndex: 15,
+          padding: '12px 24px calc(var(--safe-area-bottom) + 16px) 24px',
+          backgroundColor: '#FFFFFF',
+          borderTop: '1px solid #F1F5F9',
+          flexShrink: 0,
+          zIndex: 30,
         }}
       >
         <PrimaryButton
-          fullWidth
           onClick={handleContinue}
           loading={submitting}
-          disabled={submitting}
+          disabled={!isFormValid || submitting}
+          fullWidth
           sx={{
             height: '56px',
             borderRadius: '16px',
             fontSize: '16px',
             fontWeight: 800,
-            backgroundColor: '#FF6B00',
+            backgroundColor: isFormValid ? '#FF6B00' : '#E2E8F0',
+            color: isFormValid ? '#FFFFFF' : '#94A3B8',
             boxShadow: 'none',
-            '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
+            '&.Mui-disabled': {
+              backgroundColor: '#E2E8F0',
+              color: '#94A3B8',
+            },
+            '&:hover': {
+              backgroundColor: isFormValid ? '#E66000' : '#E2E8F0',
+              boxShadow: 'none',
+            },
           }}
         >
-          {submitting ? 'Saving...' : t.continue}
+          Magpatuloy
         </PrimaryButton>
       </Box>
-
-      {/* 4. Dynamic Field Edit Dialog (Text / Calendar Date / Vertical Gender Selection) */}
-      <Dialog
-        open={editDialogOpen}
-        onClose={() => setEditDialogOpen(false)}
-        slotProps={{
-          paper: {
-            sx: {
-              borderRadius: '20px',
-              p: 1.5,
-              width: '90%',
-              maxWidth: '380px',
-            },
-          },
-        }}
-      >
-        <DialogTitle sx={{ fontWeight: 800, color: '#0F172A', pb: 1 }}>
-          Edit {editField?.label}
-        </DialogTitle>
-        <DialogContent sx={{ pt: 1 }}>
-          {editField?.type === 'date' ? (
-            /* Native Calendar Date Picker */
-            <TextField
-              autoFocus
-              fullWidth
-              type="date"
-              margin="dense"
-              value={editField?.value || ''}
-              onChange={(e) =>
-                setEditField((prev) => (prev ? { ...prev, value: e.target.value } : null))
-              }
-              slotProps={{
-                inputLabel: { shrink: true },
-              }}
-              sx={{ mt: 1 }}
-            />
-          ) : editField?.type === 'gender' ? (
-            /* Two vertical options: Male / Female */
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
-              {['Male', 'Female'].map((genderOption) => {
-                const isSelected = editField?.value === genderOption;
-                return (
-                  <Box
-                    key={genderOption}
-                    onClick={() =>
-                      setEditField((prev) => (prev ? { ...prev, value: genderOption } : null))
-                    }
-                    sx={{
-                      p: 2,
-                      borderRadius: '14px',
-                      border: isSelected ? '2px solid #FF6B00' : '1.5px solid #E2E8F0',
-                      backgroundColor: isSelected ? 'rgba(255, 107, 0, 0.05)' : '#F8FAFC',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      transition: 'all 0.15s ease-in-out',
-                      '&:hover': {
-                        borderColor: '#FF6B00',
-                        backgroundColor: 'rgba(255, 107, 0, 0.04)',
-                      },
-                    }}
-                  >
-                    <Typography
-                      sx={{
-                        fontSize: '15px',
-                        fontWeight: isSelected ? 800 : 600,
-                        color: isSelected ? '#FF6B00' : '#0F172A',
-                      }}
-                    >
-                      {genderOption}
-                    </Typography>
-                    <Radio
-                      checked={isSelected}
-                      value={genderOption}
-                      sx={{
-                        p: 0,
-                        color: '#CBD5E1',
-                        '&.Mui-checked': { color: '#FF6B00' },
-                      }}
-                    />
-                  </Box>
-                );
-              })}
-            </Box>
-          ) : (
-            /* Standard Text Field */
-            <TextField
-              autoFocus
-              fullWidth
-              margin="dense"
-              value={editField?.value || ''}
-              onChange={(e) =>
-                setEditField((prev) => (prev ? { ...prev, value: e.target.value } : null))
-              }
-              sx={{ mt: 1 }}
-            />
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2, pt: 2 }}>
-          <Button
-            onClick={() => setEditDialogOpen(false)}
-            sx={{ color: '#64748B', fontWeight: 600, textTransform: 'none' }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSaveEdit}
-            variant="contained"
-            sx={{
-              backgroundColor: '#FF6B00',
-              fontWeight: 700,
-              borderRadius: '12px',
-              boxShadow: 'none',
-              textTransform: 'none',
-              '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
-            }}
-          >
-            Save
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };

@@ -263,7 +263,7 @@ export function normalizePhoneE164(raw: string): string {
 export async function sendDriverOtp(phone: string): Promise<{ success: boolean; message?: string; error?: string; debugOtp?: string }> {
   const e164Phone = normalizePhoneE164(phone);
   try {
-    const response = await fetchWithTimeout('http://localhost:5000/api/auth/send-otp', {
+    const response = await fetchWithTimeout('/api/auth/send-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone: e164Phone }),
@@ -294,7 +294,7 @@ export async function verifyDriverOtp(phone: string, code: string): Promise<{ su
   }
 
   try {
-    const response = await fetchWithTimeout('http://localhost:5000/api/auth/verify-otp', {
+    const response = await fetchWithTimeout('/api/auth/verify-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone: e164Phone, code: trimmed }),
@@ -312,6 +312,153 @@ export async function verifyDriverOtp(phone: string, code: string): Promise<{ su
   }
 
   return { success: true };
+}
+
+// ============================================================================
+// 5b. SUPABASE AUTH SESSION LIFECYCLE (DRIVER REGISTRATION)
+// ============================================================================
+
+/**
+ * Creates (or recovers) the driver's Supabase Auth account and ensures an
+ * authenticated session is active in this browser before verification data
+ * is written anywhere.
+ */
+export async function ensureDriverAuthSession(
+  phone: string,
+  password: string,
+  fullName?: string
+): Promise<{ success: boolean; error?: string }> {
+  const cleanPhone = phone.replace(/\D/g, '');
+  const driverEmail = `driver_${cleanPhone}@sakay.ph`;
+
+  console.log('[DRIVER REGISTRATION AUTH] ========================================');
+  console.log('[DRIVER REGISTRATION AUTH] Starting fresh driver registration auth');
+  console.log('[DRIVER REGISTRATION AUTH] Phone:', cleanPhone);
+  console.log('[DRIVER REGISTRATION AUTH] Identifier Email:', driverEmail);
+
+  try {
+    // 1. Check existing active session
+    const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+    console.log('[DRIVER REGISTRATION AUTH] Existing session check:', {
+      exists: Boolean(sessionData?.session),
+      userId: sessionData?.session?.user?.id || null,
+      error: sessionErr ? sessionErr.message : null,
+    });
+
+    if (sessionData?.session?.user) {
+      console.log('[DRIVER REGISTRATION AUTH] Active session already exists for user:', sessionData.session.user.id);
+      return { success: true };
+    }
+
+    // 2. FRESH REGISTRATION: Call signUp FIRST (do NOT call signInWithPassword first!)
+    console.log('[DRIVER REGISTRATION AUTH] Invoking signUp with fresh driver credentials...');
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email: driverEmail,
+      password: password,
+      options: {
+        data: {
+          role: 'driver',
+          phone: cleanPhone,
+          full_name: fullName || null,
+        },
+      },
+    });
+
+    console.log('[DRIVER REGISTRATION AUTH] signUp result:', {
+      userCreated: Boolean(signUpData?.user),
+      userId: signUpData?.user?.id || null,
+      sessionCreated: Boolean(signUpData?.session),
+      errorCode: signUpError?.code || null,
+      errorMessage: signUpError?.message || null,
+    });
+
+    // If signUp returned a live session immediately, registration auth is complete!
+    if (!signUpError && signUpData?.session) {
+      console.log('[DRIVER REGISTRATION AUTH] Fresh registration signUp SUCCESS. Session established:', signUpData.session.user.id);
+      return { success: true };
+    }
+
+    const message = (signUpError?.message || '').toLowerCase();
+    const isAlreadyRegistered = message.includes('already registered') || message.includes('already exists');
+
+    // 3. If user already exists or signUp created user record, attempt signInWithPassword to activate session
+    if (!signUpError || isAlreadyRegistered) {
+      console.log('[DRIVER REGISTRATION AUTH] Attempting signInWithPassword (session activation)...');
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: driverEmail,
+        password: password,
+      });
+
+      console.log('[DRIVER REGISTRATION AUTH] signInWithPassword result:', {
+        hasSession: Boolean(signInData?.session),
+        userId: signInData?.user?.id || null,
+        errorCode: signInError?.code || null,
+        errorMessage: signInError?.message || null,
+      });
+
+      if (!signInError && signInData?.session) {
+        console.log('[DRIVER REGISTRATION AUTH] Session established via signInWithPassword:', signInData.session.user.id);
+        return { success: true };
+      }
+
+      if (isAlreadyRegistered) {
+        console.warn('[DRIVER REGISTRATION AUTH] Account already exists with different credentials.');
+        return {
+          success: false,
+          error: 'Ang mobile number na ito ay nakarehistro na sa ibang password. Pakisubukang mag-login.',
+        };
+      }
+    }
+
+    // 4. Fallback phone-based registration if email provider returned error
+    console.log('[DRIVER REGISTRATION AUTH] Trying phone-based registration fallback...');
+    const e164Phone = `+63${cleanPhone.replace(/^0/, '')}`;
+    const { data: phoneSignUpData, error: phoneSignUpErr } = await supabase.auth.signUp({
+      phone: e164Phone,
+      password: password,
+      options: {
+        data: {
+          role: 'driver',
+          full_name: fullName || null,
+        },
+      },
+    });
+
+    console.log('[DRIVER REGISTRATION AUTH] Phone signUp result:', {
+      hasSession: Boolean(phoneSignUpData?.session),
+      hasUser: Boolean(phoneSignUpData?.user),
+      errorCode: phoneSignUpErr?.code || null,
+      errorMessage: phoneSignUpErr?.message || null,
+    });
+
+    if (!phoneSignUpErr && phoneSignUpData?.session) {
+      console.log('[DRIVER REGISTRATION AUTH] Phone signUp SUCCESS with session:', phoneSignUpData.session.user.id);
+      return { success: true };
+    }
+
+    // Attempt phone sign-in if account exists
+    const { data: phoneSignInData, error: phoneSignInErr } = await supabase.auth.signInWithPassword({
+      phone: e164Phone,
+      password: password,
+    });
+
+    if (!phoneSignInErr && phoneSignInData?.session) {
+      console.log('[DRIVER REGISTRATION AUTH] Phone signIn SUCCESS with session:', phoneSignInData.session.user.id);
+      return { success: true };
+    }
+
+    console.error('[DRIVER REGISTRATION AUTH] All registration auth strategies failed.');
+    return {
+      success: false,
+      error: 'Hindi maihanda ang inyong account. Pakisuri ang koneksyon at subukang muli.',
+    };
+  } catch (err: any) {
+    console.error('[DRIVER REGISTRATION AUTH] Exception in ensureDriverAuthSession:', err);
+    return {
+      success: false,
+      error: 'Hindi maihanda ang inyong account. Pakisuri ang koneksyon at subukang muli.',
+    };
+  }
 }
 
 // ============================================================================
@@ -360,137 +507,249 @@ function parseDateForDb(val?: string): string | null {
 export async function saveDriverLicenseVerification(
   formData: LicenseExtractedData,
   phone?: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; driverId?: string; verificationId?: string }> {
+  console.log('[DRIVER LICENSE SAVE] ========================================');
+  console.log('[DRIVER LICENSE SAVE] Starting driver license submission flow');
+  console.log('[DRIVER LICENSE SAVE] Target Phone:', phone);
+  console.log('[DRIVER LICENSE SAVE] Form Data Received:', {
+    fullName: formData.fullName,
+    licenseNumber: formData.licenseNumber,
+    dob: formData.dob,
+    hasRawFront: Boolean(formData.rawFrontPhoto),
+    hasProcessedFront: Boolean(formData.frontPhoto),
+    hasRawBack: Boolean(formData.rawBackPhoto),
+    hasProcessedBack: Boolean(formData.backPhoto),
+  });
+
   try {
-    // 1. Identify current authenticated driver user
-    const { data: { user }, error: authErr } = await supabase.auth.getUser();
     const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
 
-    let driverId: string | null = null;
-    let authUserId: string | null = user?.id || null;
+    // 1. Verify Active Supabase Auth Session
+    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
 
-    if (authUserId) {
-      const { data: driverRow } = await supabase
-        .from('driver')
-        .select('driver_id')
-        .eq('auth_user_id', authUserId)
-        .maybeSingle();
+    console.log('[DRIVER LICENSE SAVE] Auth User:', user ? `ID=${user.id}, Email=${user.email}` : 'NULL');
+    console.log('[DRIVER LICENSE SAVE] Auth Session:', session ? `Valid (Expires=${session.expires_at})` : 'NULL');
 
-      if (driverRow) {
-        driverId = driverRow.driver_id;
-      }
+    if (!user || !session) {
+      console.error('[DRIVER LICENSE SAVE] Authentication check failed. User or session is missing.');
+      console.error('[DRIVER LICENSE SAVE] userErr:', userErr, 'sessionErr:', sessionErr);
+      return {
+        success: false,
+        error: 'Kailangan munang mag-login o kumpletuhin ang oryentasyon upang ma-save ang iyong beripikasyon.',
+      };
     }
 
-    if (!driverId && cleanPhone) {
-      const { data: driverByPhone } = await supabase
+    const authUserId = user.id;
+
+    console.log('[DRIVER PROFILE DEBUG] ========================================');
+    console.log('[DRIVER PROFILE DEBUG] Starting saveDriverLicenseVerification');
+    console.log('[DRIVER PROFILE DEBUG] Auth User ID:', authUserId);
+    console.log('[DRIVER PROFILE DEBUG] Clean Phone Input:', cleanPhone);
+
+    // 2. Identify and verify public.driver profile record
+    let driverId: string | null = null;
+
+    // Lookup driver profile linked directly to auth_user_id
+    const { data: driverRow, error: driverLookupErr } = await supabase
+      .from('driver')
+      .select('driver_id, auth_user_id, contact_number')
+      .eq('auth_user_id', authUserId)
+      .maybeSingle();
+
+    console.log('[DRIVER PROFILE DEBUG] Lookup by auth_user_id:', {
+      found: Boolean(driverRow),
+      driverId: driverRow?.driver_id || null,
+      error: driverLookupErr ? { code: driverLookupErr.code, message: driverLookupErr.message } : null,
+    });
+
+    if (driverRow) {
+      driverId = driverRow.driver_id;
+    } else if (cleanPhone) {
+      const rawDigits = cleanPhone.replace(/\D/g, '');
+      const phone09 = rawDigits.startsWith('0') ? rawDigits : `0${rawDigits}`;
+      const phone63 = `+63${rawDigits.replace(/^0/, '')}`;
+      const phone63NoPlus = `63${rawDigits.replace(/^0/, '')}`;
+
+      // Check by normalized phone variations and link auth_user_id
+      const { data: driverByPhone, error: phoneLookupErr } = await supabase
         .from('driver')
-        .select('driver_id, auth_user_id')
-        .or(`contact_number.eq.${cleanPhone},contact_number.eq.+63${cleanPhone.replace(/^0/, '')}`)
+        .select('driver_id, auth_user_id, contact_number')
+        .or(`contact_number.eq.${phone09},contact_number.eq.${phone63},contact_number.eq.${phone63NoPlus}`)
         .maybeSingle();
+
+      console.log('[DRIVER PROFILE DEBUG] Lookup by phone:', {
+        phone09,
+        phone63,
+        found: Boolean(driverByPhone),
+        driverId: driverByPhone?.driver_id || null,
+        existingAuthUser: driverByPhone?.auth_user_id || null,
+        error: phoneLookupErr ? { code: phoneLookupErr.code, message: phoneLookupErr.message } : null,
+      });
 
       if (driverByPhone) {
         driverId = driverByPhone.driver_id;
-        if (authUserId && !driverByPhone.auth_user_id) {
-          await supabase
+
+        if (!driverByPhone.auth_user_id) {
+          console.log('[DRIVER PROFILE DEBUG] Linking existing driver record to auth_user_id:', authUserId);
+          const { error: linkErr } = await supabase
             .from('driver')
             .update({ auth_user_id: authUserId })
             .eq('driver_id', driverId);
+
+          if (linkErr) {
+            console.error('[DRIVER PROFILE DEBUG] Link auth_user_id error:', {
+              code: linkErr.code,
+              message: linkErr.message,
+              details: linkErr.details,
+              hint: linkErr.hint,
+            });
+          }
         }
       }
     }
 
-    if (!driverId) {
-      if (!authUserId) {
-        const { data: defaultDriver } = await supabase
-          .from('driver')
-          .select('driver_id')
-          .limit(1)
-          .maybeSingle();
+    // If existing driver row was found, update its fields
+    if (driverId) {
+      console.log('[DRIVER PROFILE DEBUG] Updating existing driver record ID:', driverId);
+      const updatePayload: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (formData.fullName) updatePayload.full_name = formData.fullName;
+      if (formData.licenseNumber) updatePayload.license_number = formData.licenseNumber;
+      if (formData.dob) updatePayload.date_of_birth = formData.dob;
+      if (formData.address) updatePayload.residential_address = formData.address;
 
-        if (defaultDriver) {
-          driverId = defaultDriver.driver_id;
-        } else {
-          return {
-            success: false,
-            error: "Unable to identify driver account. Please log in or register before submitting verification.",
-          };
-        }
-      } else {
-        const { data: newDriver, error: createErr } = await supabase
-          .from('driver')
-          .insert([
+      const { error: updateErr } = await supabase
+        .from('driver')
+        .update(updatePayload)
+        .eq('driver_id', driverId);
+
+      if (updateErr) {
+        console.error('[DRIVER PROFILE DEBUG] Driver update error:', {
+          code: updateErr.code,
+          message: updateErr.message,
+          details: updateErr.details,
+          hint: updateErr.hint,
+        });
+      }
+    } else {
+      // Safe fallback upsert
+      console.log('[DRIVER PROFILE DEBUG] No existing driver record found. Upserting profile for auth_user_id:', authUserId);
+      const { data: newDriver, error: createErr } = await supabase
+        .from('driver')
+        .upsert(
+          [
             {
               auth_user_id: authUserId,
-              full_name: formData.fullName || 'Driver Candidate',
+              full_name: formData.fullName || 'Bagong Drayber',
               contact_number: cleanPhone || null,
+              license_number: formData.licenseNumber || null,
               account_status: 'Pending Verification',
+              is_profile_complete: true,
             },
-          ])
-          .select('driver_id')
-          .single();
+          ],
+          { onConflict: 'auth_user_id' }
+        )
+        .select('driver_id')
+        .single();
 
-        if (createErr || !newDriver) {
-          console.error('[driverApiService] Error creating driver record:', createErr);
-          return {
-            success: false,
-            error: "We couldn't save your driver account profile. Please try again.",
-          };
-        }
+      if (newDriver && !createErr) {
         driverId = newDriver.driver_id;
+        console.log('[DRIVER PROFILE DEBUG] Successfully upserted driver profile:', driverId);
+      } else {
+        console.error('[DRIVER PROFILE DEBUG] Error upserting driver profile:', {
+          code: createErr?.code,
+          message: createErr?.message,
+          details: createErr?.details,
+          hint: createErr?.hint,
+        });
+        return {
+          success: false,
+          error: 'Hindi ma-link ang iyong profile sa database. Pakisubukang muli.',
+        };
       }
     }
 
-    const folderPrefix = authUserId || driverId;
+    console.log('[DRIVER PROFILE DEBUG] Confirmed Driver ID:', driverId);
+    console.log('[DRIVER PROFILE DEBUG] Confirmed Auth User ID:', authUserId);
 
-    // 2. Upload Front License Photo to Supabase Storage ('driver-licenses')
+    // 3. Upload raw license photo proof to Supabase Storage ('driver-licenses')
     let totalSizeBytes = 0;
     let frontStoragePath: string | null = null;
     let backStoragePath: string | null = null;
 
-    if (formData.frontPhoto && formData.frontPhoto.startsWith('data:')) {
-      const frontBlobInfo = dataUrlToBlob(formData.frontPhoto);
-      totalSizeBytes += frontBlobInfo.blob.size;
-      frontStoragePath = `${folderPrefix}/license_front.jpg`;
+    const frontUploadDataUrl = formData.rawFrontPhoto || formData.frontPhoto;
 
-      const { error: frontUploadErr } = await supabase.storage
-        .from('driver-licenses')
-        .upload(frontStoragePath, frontBlobInfo.blob, {
-          contentType: frontBlobInfo.mimeType,
-          upsert: true,
-        });
+    if (frontUploadDataUrl && frontUploadDataUrl.startsWith('data:')) {
+      try {
+        const frontBlobInfo = dataUrlToBlob(frontUploadDataUrl);
+        totalSizeBytes += frontBlobInfo.blob.size;
+        frontStoragePath = `${authUserId}/license_front.jpg`;
 
-      if (frontUploadErr) {
-        console.error('[driverApiService] Storage upload error (front photo):', frontUploadErr);
+        console.log('[DRIVER LICENSE SAVE] Converting front photo to Blob...');
+        console.log('[DRIVER LICENSE SAVE] Blob size:', frontBlobInfo.blob.size, 'bytes');
+        console.log('[DRIVER LICENSE SAVE] Target Bucket: driver-licenses');
+        console.log('[DRIVER LICENSE SAVE] Target Path:', frontStoragePath);
+
+        const { data: storageRes, error: frontUploadErr } = await supabase.storage
+          .from('driver-licenses')
+          .upload(frontStoragePath, frontBlobInfo.blob, {
+            contentType: frontBlobInfo.mimeType,
+            upsert: true,
+          });
+
+        if (frontUploadErr) {
+          console.error('[DRIVER LICENSE SAVE] Storage upload error (front photo):', frontUploadErr);
+          return {
+            success: false,
+            error: 'Hindi na-save ang larawan ng iyong lisensya sa storage. Pakisubukang muli.',
+          };
+        }
+        console.log('[DRIVER LICENSE SAVE] Storage upload SUCCESS (front photo):', storageRes);
+      } catch (frontErr) {
+        console.error('[DRIVER LICENSE SAVE] Front photo conversion exception:', frontErr);
         return {
           success: false,
-          error: "We couldn't save your front driver's license image. Please try again.",
+          error: 'May problema sa pagproseso ng larawan ng lisensya. Pakisubukang muli.',
         };
+      }
+    } else {
+      console.error('[DRIVER LICENSE SAVE] Missing rawFrontPhoto or frontPhoto payload.');
+      return {
+        success: false,
+        error: 'Kailangan ng malinaw na larawan ng iyong driver license.',
+      };
+    }
+
+    // 4. Upload back photo proof if available
+    const backUploadDataUrl = formData.rawBackPhoto || formData.backPhoto;
+    if (backUploadDataUrl && backUploadDataUrl.startsWith('data:')) {
+      try {
+        const backBlobInfo = dataUrlToBlob(backUploadDataUrl);
+        totalSizeBytes += backBlobInfo.blob.size;
+        backStoragePath = `${authUserId}/license_back.jpg`;
+
+        console.log('[DRIVER LICENSE SAVE] Uploading back photo to path:', backStoragePath);
+
+        const { data: backStorageRes, error: backUploadErr } = await supabase.storage
+          .from('driver-licenses')
+          .upload(backStoragePath, backBlobInfo.blob, {
+            contentType: backBlobInfo.mimeType,
+            upsert: true,
+          });
+
+        if (backUploadErr) {
+          console.warn('[DRIVER LICENSE SAVE] Storage upload warning (back photo):', backUploadErr);
+        } else {
+          console.log('[DRIVER LICENSE SAVE] Storage upload SUCCESS (back photo):', backStorageRes);
+        }
+      } catch (backErr) {
+        console.warn('[DRIVER LICENSE SAVE] Back photo conversion warning:', backErr);
       }
     }
 
-    // 3. Upload Back License Photo to Supabase Storage ('driver-licenses')
-    if (formData.backPhoto && formData.backPhoto.startsWith('data:')) {
-      const backBlobInfo = dataUrlToBlob(formData.backPhoto);
-      totalSizeBytes += backBlobInfo.blob.size;
-      backStoragePath = `${folderPrefix}/license_back.jpg`;
-
-      const { error: backUploadErr } = await supabase.storage
-        .from('driver-licenses')
-        .upload(backStoragePath, backBlobInfo.blob, {
-          contentType: backBlobInfo.mimeType,
-          upsert: true,
-        });
-
-      if (backUploadErr) {
-        console.error('[driverApiService] Storage upload error (back photo):', backUploadErr);
-        return {
-          success: false,
-          error: "We couldn't save your back driver's license image. Please try again.",
-        };
-      }
-    }
-
-    // 4. Parse raw OCR fields vs Submitted/Confirmed fields
+    // 5. Build database verification record payload
     let ocrFullName = '';
     let ocrLicenseNo = '';
     let ocrDobStr: string | null = null;
@@ -499,7 +758,7 @@ export async function saveDriverLicenseVerification(
 
     if (formData.rawOcrText) {
       const rawText = formData.rawOcrText;
-      const licMatch = rawText.match(/([A-Z0-9]\d{2}[-\s]\d{2}[-\s]\d{6})/i);
+      const licMatch = rawText.match(/([A-Z0-9]\d{2}[-\s]?\d{2}[-\s]?\d{6})/i);
       if (licMatch) ocrLicenseNo = licMatch[1].replace(/\s+/g, '-');
 
       const dobMatch = rawText.match(/(?:19\d{2}|200[0-8])[-/.]\d{2}[-/.]\d{2}/);
@@ -526,7 +785,10 @@ export async function saveDriverLicenseVerification(
       submitted_at: new Date().toISOString(),
     };
 
-    // 5. Check if existing driver_verification record exists (UPSERT pattern)
+    console.log('[DRIVER LICENSE SAVE] Writing verification record to database public.driver_verification...');
+    console.log('[DRIVER LICENSE SAVE] Payload:', verificationPayload);
+
+    // 6. Check if existing driver_verification record exists (UPSERT pattern)
     const { data: existingVerif } = await supabase
       .from('driver_verification')
       .select('verification_id')
@@ -534,33 +796,39 @@ export async function saveDriverLicenseVerification(
       .maybeSingle();
 
     if (existingVerif) {
-      const { error: verifUpdateErr } = await supabase
+      console.log('[DRIVER LICENSE SAVE] Updating existing verification record ID:', existingVerif.verification_id);
+      const { data: updateRes, error: verifUpdateErr } = await supabase
         .from('driver_verification')
         .update(verificationPayload)
-        .eq('verification_id', existingVerif.verification_id);
+        .eq('verification_id', existingVerif.verification_id)
+        .select();
 
       if (verifUpdateErr) {
-        console.error('[driverApiService] Error updating driver_verification:', verifUpdateErr);
+        console.error('[DRIVER LICENSE SAVE] Error updating driver_verification record:', verifUpdateErr);
         return {
           success: false,
-          error: "We couldn't save your driver's license verification record. Please try again.",
+          error: 'Hindi na-save ang impormasyon ng iyong beripikasyon sa database. Pakisubukang muli.',
         };
       }
+      console.log('[DRIVER LICENSE SAVE] Verification record update SUCCESS:', updateRes);
     } else {
-      const { error: verifInsertErr } = await supabase
+      console.log('[DRIVER LICENSE SAVE] Inserting new verification record...');
+      const { data: insertRes, error: verifInsertErr } = await supabase
         .from('driver_verification')
-        .insert([verificationPayload]);
+        .insert([verificationPayload])
+        .select();
 
       if (verifInsertErr) {
-        console.error('[driverApiService] Error inserting driver_verification:', verifInsertErr);
+        console.error('[DRIVER LICENSE SAVE] Error inserting driver_verification record:', verifInsertErr);
         return {
           success: false,
-          error: "We couldn't save your driver's license verification record. Please try again.",
+          error: 'Hindi na-save ang impormasyon ng iyong beripikasyon sa database. Pakisubukang muli.',
         };
       }
+      console.log('[DRIVER LICENSE SAVE] Verification record insert SUCCESS:', insertRes);
     }
 
-    // 6. Update allowable non-restricted fields on public.driver profile
+    // 7. Update allowable profile fields on public.driver profile
     try {
       await supabase
         .from('driver')
@@ -570,16 +838,20 @@ export async function saveDriverLicenseVerification(
           date_of_birth: parseDateForDb(formData.dob),
         })
         .eq('driver_id', driverId);
+      console.log('[DRIVER LICENSE SAVE] Driver profile update SUCCESS');
     } catch (profileErr) {
-      console.warn('[driverApiService] Driver profile soft update warning:', profileErr);
+      console.warn('[DRIVER LICENSE SAVE] Driver profile soft update warning:', profileErr);
     }
 
+    console.log('[DRIVER LICENSE SAVE] ========================================');
+    console.log('[DRIVER LICENSE SAVE] SUBMISSION FLOW COMPLETED SUCCESSFULLY!');
+    console.log('[DRIVER LICENSE SAVE] ========================================');
     return { success: true };
   } catch (err: any) {
-    console.error('[driverApiService] saveDriverLicenseVerification exception:', err);
+    console.error('[DRIVER LICENSE SAVE] saveDriverLicenseVerification exception:', err);
     return {
       success: false,
-      error: "An unexpected network error occurred while saving your license information. Please try again.",
+      error: 'Nagkaroon ng hindi inaasahang problema sa koneksyon habang isina-save ang iyong impormasyon. Pakisubukang muli.',
     };
   }
 }
