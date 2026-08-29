@@ -18,6 +18,38 @@ import GavelIcon from '@mui/icons-material/Gavel';
 
 import { INITIAL_DRIVER_PROFILE, ACCREDITED_TODAS, VERIFIED_TRICYCLES } from '../../../mockData/driverMockData';
 
+export const formatMobileNumber = (value: string): string => {
+  const digits = value.replace(/\D/g, '');
+
+  let afterPrefix = '';
+  if (digits.startsWith('09')) {
+    afterPrefix = digits.slice(2);
+  } else if (digits.startsWith('639')) {
+    afterPrefix = digits.slice(3);
+  } else if (digits.startsWith('9')) {
+    afterPrefix = digits.slice(1);
+  } else if (digits.startsWith('0')) {
+    afterPrefix = digits.slice(1);
+  } else {
+    afterPrefix = digits;
+  }
+
+  afterPrefix = afterPrefix.slice(0, 9);
+
+  if (!afterPrefix) {
+    return '09';
+  }
+
+  const full = '09' + afterPrefix;
+  if (full.length <= 4) {
+    return full;
+  }
+  if (full.length <= 7) {
+    return `${full.slice(0, 4)} ${full.slice(4)}`;
+  }
+  return `${full.slice(0, 4)} ${full.slice(4, 7)} ${full.slice(7, 11)}`;
+};
+
 export const DriverProfileEditor: React.FC = () => {
   const navigate = useNavigate();
 
@@ -26,9 +58,23 @@ export const DriverProfileEditor: React.FC = () => {
     return saved ? JSON.parse(saved) : INITIAL_DRIVER_PROFILE;
   });
 
-  const [phone, setPhone] = useState(profile.phone);
+  const [phone, setPhone] = useState(() => formatMobileNumber(profile.phone || '09'));
   const [email, setEmail] = useState(profile.email);
   const [savedNotice, setSavedNotice] = useState(false);
+
+  const handlePhoneKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const input = e.currentTarget;
+    const start = input.selectionStart ?? 0;
+    const end = input.selectionEnd ?? 0;
+
+    // Only prevent deletion when cursor is collapsed at or before '09'
+    if (e.key === 'Backspace' && start === end && start <= 2) {
+      e.preventDefault();
+    }
+    if (e.key === 'Delete' && start === end && start < 2) {
+      e.preventDefault();
+    }
+  };
 
   const handleSave = () => {
     const updated = { ...profile, phone, email };
@@ -73,7 +119,7 @@ export const DriverProfileEditor: React.FC = () => {
               <Typography sx={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>★ {profile.rating.toFixed(1)}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '11px', color: '#64748B' }}>Biyahe</Typography>
+              <Typography sx={{ fontSize: '11px', color: '#64748B' }}>Trips</Typography>
               <Typography sx={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>{profile.totalTrips}</Typography>
             </Box>
             <Box>
@@ -86,7 +132,7 @@ export const DriverProfileEditor: React.FC = () => {
         {/* Active Affiliations Summary */}
         <Paper elevation={0} sx={{ p: 2, borderRadius: '16px', border: '1px solid #E2E8F0', backgroundColor: '#FFFFFF' }}>
           <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', mb: 1 }}>
-            Aktibong Rehistrasyon
+            Active Registration
           </Typography>
           <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
             TODA: {activeToda?.name} ({activeToda?.acronym})
@@ -104,7 +150,8 @@ export const DriverProfileEditor: React.FC = () => {
           fullWidth
           label="Contact Mobile Number"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={(e) => setPhone(formatMobileNumber(e.target.value))}
+          onKeyDown={handlePhoneKeyDown}
         />
 
         <TextField
@@ -116,7 +163,7 @@ export const DriverProfileEditor: React.FC = () => {
 
         {savedNotice && (
           <Typography sx={{ fontSize: '13px', color: '#1E8E3E', fontWeight: 700, textAlign: 'center' }}>
-            ✓ Matagumpay na na-save ang profile!
+            ✓ Profile saved successfully!
           </Typography>
         )}
 
@@ -132,7 +179,7 @@ export const DriverProfileEditor: React.FC = () => {
             '&:hover': { backgroundColor: '#E66000' },
           }}
         >
-          I-save ang Pagbabago
+          Save Changes
         </Button>
       </Box>
     </Box>

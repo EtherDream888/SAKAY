@@ -25,11 +25,15 @@ const PrimaryButton: React.FC<PrimaryButtonProps> = ({
         textTransform: 'none',
         borderRadius: '16px',
         backgroundColor: '#FF6B00',
-        boxShadow: '0 8px 20px rgba(255, 107, 0, 0.25)',
-        transition: 'all 0.2s ease-in-out',
+        boxShadow: 'none',
+        transition: 'background-color 0.2s ease-in-out',
         '&:hover': {
           backgroundColor: '#E66000',
-          boxShadow: '0 12px 28px rgba(255, 107, 0, 0.4)',
+          boxShadow: 'none',
+        },
+        '&:disabled': {
+          backgroundColor: '#CBD5E1',
+          color: '#FFFFFF',
         },
         ...sx,
       }}

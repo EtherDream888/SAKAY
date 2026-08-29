@@ -1,45 +1,174 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
   IconButton,
   TextField,
-  Chip,
+  Alert,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
+import { useLanguage } from '../../../utils/LanguageContext';
+import { sendDriverOtp, verifyDriverOtp } from '../../../services/driverApiService';
+
+const formatDisplayPhone = (raw: string = ''): string => {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 4)} ${digits.slice(4)}`;
+  return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7, 11)}`;
+};
 
 export const DriverVerifyOtp: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as { phone?: string; isRecovery?: boolean; driverName?: string; todaId?: string } | undefined;
+  const { t } = useLanguage();
+  const state = location.state as { phone?: string; isRecovery?: boolean; driverName?: string; todaId?: string; debugOtp?: string } | undefined;
 
-  const [otp, setOtp] = useState(['1', '2', '3', '4', '5', '6']);
+  const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [infoNotice, setInfoNotice] = useState<string | null>(null);
+  const [resendTimer, setResendTimer] = useState(60);
+  const [activeDebugOtp, setActiveDebugOtp] = useState<string | undefined>(state?.debugOtp);
+
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const resendNoticeTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isComplete = otp.every((digit) => digit !== '');
+
+  // Countdown timer for resend (stops immediately if OTP is completely filled)
+  useEffect(() => {
+    if (resendTimer <= 0 || isComplete) return;
+    const timer = setInterval(() => {
+      setResendTimer((prev) => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendTimer, isComplete]);
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (resendNoticeTimerRef.current) clearTimeout(resendNoticeTimerRef.current);
+    };
+  }, []);
+
+  // Automatically enter the OTP code in the fields after 5 seconds without forcing keyboard popup
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const codeToFill = activeDebugOtp || '123456';
+      const digits = codeToFill.slice(0, 6).split('');
+      setOtp(digits);
+      setError('');
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [activeDebugOtp]);
+
+  // Core verification function
+  const executeVerification = useCallback(
+    async (enteredCode: string) => {
+      if (enteredCode.length < 6 || loading) return;
+
+      setLoading(true);
+      setError('');
+
+      try {
+        const result = await verifyDriverOtp(state?.phone || '', enteredCode);
+        if (!result.success) {
+          setLoading(false);
+          setError(result.error || 'Incorrect OTP code. Please try again.');
+          return;
+        }
+
+        setLoading(false);
+        if (state?.isRecovery) {
+          navigate('/driver/reset-password', { replace: true, state: { phone: state?.phone } });
+        } else {
+          navigate('/driver/terms-of-service', {
+            replace: true,
+            state: {
+              driverName: state?.driverName || 'Aurelio Bautista',
+              phone: state?.phone || '09181234567',
+            },
+          });
+        }
+      } catch {
+        setLoading(false);
+        setError('Verification service unavailable. Please check your connection.');
+      }
+    },
+    [loading, navigate, state]
+  );
 
   const handleOtpChange = (index: number, val: string) => {
-    if (val.length > 1) {
-      val = val.charAt(val.length - 1);
+    // If user pasted a 6-digit code
+    const cleaned = val.replace(/\D/g, '');
+    if (cleaned.length >= 6) {
+      const pasted = cleaned.slice(0, 6).split('');
+      setOtp(pasted);
+      setError('');
+      inputRefs.current[5]?.focus();
+      return;
     }
+
+    const singleDigit = cleaned ? cleaned.slice(-1) : '';
     const next = [...otp];
-    next[index] = val;
+    next[index] = singleDigit;
     setOtp(next);
+    setError('');
+
+    // Advance to next input
+    if (singleDigit && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
   };
 
-  const handleVerify = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      if (state?.isRecovery) {
-        navigate('/driver/reset-password', { replace: true, state: { phone: state.phone } });
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleResend = async () => {
+    if (resendTimer > 0) return;
+    setResendTimer(60);
+    setError('');
+
+    // Clear previous notice timer if active
+    if (resendNoticeTimerRef.current) {
+      clearTimeout(resendNoticeTimerRef.current);
+    }
+
+    try {
+      const res = await sendDriverOtp(state?.phone || '');
+      if (res.success) {
+        if (res.debugOtp) {
+          setActiveDebugOtp(res.debugOtp);
+        }
+        setInfoNotice(t.otpResentSuccess);
+        // Automatically disappear after 5 seconds
+        resendNoticeTimerRef.current = setTimeout(() => {
+          setInfoNotice(null);
+        }, 5000);
       } else {
-        navigate('/driver/status', { replace: true, state: { driverName: state?.driverName || 'Aurelio Bautista', phone: state?.phone } });
+        setError(res.error || 'Failed to resend SMS OTP.');
       }
-    }, 600);
+    } catch {
+      setError('Network error while requesting new OTP.');
+    }
+  };
+
+  const handleManualSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const enteredCode = otp.join('');
+    if (enteredCode.length < 6) {
+      setError('Please enter all 6 digits of the OTP code.');
+      return;
+    }
+    executeVerification(enteredCode);
   };
 
   return (
@@ -54,98 +183,204 @@ export const DriverVerifyOtp: React.FC = () => {
         overflow: 'hidden',
       }}
     >
-      {/* Sticky Top Bar */}
+      {/* 1. Header with Rounded Back Button and SAKAY Logo */}
       <Box
         sx={{
-          padding: 'calc(var(--safe-area-top) + 12px) 20px 12px 20px',
+          padding: 'calc(var(--safe-area-top) + 16px) 24px 12px 24px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid #F1F5F9',
           backgroundColor: '#FFFFFF',
           flexShrink: 0,
+          zIndex: 20,
         }}
       >
         <IconButton
           onClick={() => navigate(state?.isRecovery ? '/driver/forgot-password' : '/driver/register')}
           sx={{
             color: '#0F172A',
-            backgroundColor: '#F8FAFC',
-            borderRadius: '12px',
-            '&:hover': { backgroundColor: '#F1F5F9' },
+            backgroundColor: '#FFFFFF',
+            borderRadius: '14px',
+            border: '1px solid #E2E8F0',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+            width: 44,
+            height: 44,
+            '&:hover': { backgroundColor: '#F8FAFC' },
           }}
         >
-          <ArrowBackIcon fontSize="small" />
+          <ArrowBackIcon sx={{ fontSize: 20 }} />
         </IconButton>
-        <Logo color="orange" width={100} />
-        <Box sx={{ width: 40 }} />
+        <Logo color="orange" width={110} />
       </Box>
 
-      {/* Form Content */}
+      {/* 2. Scrollable Form Content */}
       <Box
         component="form"
-        onSubmit={handleVerify}
+        onSubmit={handleManualSubmit}
         sx={{
           flex: 1,
           overflowY: 'auto',
-          padding: '24px 24px calc(var(--safe-area-bottom) + 24px) 24px',
+          padding: '16px 24px calc(var(--safe-area-bottom) + 24px) 24px',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           textAlign: 'center',
         }}
       >
-        <Box sx={{ width: '100%', textAlign: 'left', mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-            <Typography sx={{ fontSize: '24px', fontWeight: 800, color: '#0F172A' }}>
-              I-verify ang OTP
-            </Typography>
-            <Chip label="SMS Code" size="small" sx={{ backgroundColor: '#ECFDF5', color: '#10B981', fontWeight: 800 }} />
-          </Box>
-          <Typography sx={{ fontSize: '13.5px', color: '#64748B' }}>
-            Ipinadala ang 6-digit code sa <strong>{state?.phone || '0918 123 4567'}</strong>.
+        <Box sx={{ width: '100%', textAlign: 'left', mb: 3, mt: 1 }}>
+          <Typography
+            sx={{
+              fontSize: '26px',
+              fontWeight: 800,
+              color: '#0F172A',
+              lineHeight: 1.2,
+              letterSpacing: '-0.5px',
+              mb: 0.75,
+            }}
+          >
+            {t.verifyOtpTitle}
+          </Typography>
+          <Typography sx={{ fontSize: '15px', color: '#64748B', fontWeight: 500 }}>
+            {t.otpSentTo} <strong style={{ color: '#0F172A' }}>{formatDisplayPhone(state?.phone || '09181234567')}</strong>.
           </Typography>
         </Box>
 
+        {error && (
+          <Alert severity="error" sx={{ width: '100%', mb: 2.5, borderRadius: '12px', textAlign: 'left' }}>
+            {error}
+          </Alert>
+        )}
+
         {/* 6 Digit Inputs */}
-        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', width: '100%', mb: 4 }}>
+        <Box sx={{ display: 'flex', gap: 1.2, justifyContent: 'center', width: '100%', mb: 2.5 }}>
           {otp.map((digit, i) => (
             <TextField
               key={i}
+              inputRef={(el) => {
+                inputRefs.current[i] = el;
+              }}
               value={digit}
               onChange={(e) => handleOtpChange(i, e.target.value)}
+              onKeyDown={(e) => handleKeyDown(i, e)}
               slotProps={{
                 htmlInput: {
                   maxLength: 1,
+                  inputMode: 'numeric',
                   style: {
                     textAlign: 'center',
-                    fontSize: '20px',
+                    fontSize: '22px',
                     fontWeight: 800,
                     padding: '14px 0',
+                    color: '#0F172A',
                   },
                 },
               }}
               sx={{
-                width: '46px',
+                width: '48px',
                 '& .MuiOutlinedInput-root': {
-                  borderRadius: '12px',
+                  borderRadius: '14px',
                   backgroundColor: '#F8FAFC',
+                  '& fieldset': { borderColor: digit ? '#FF6B00' : '#E2E8F0' },
+                  '&:hover fieldset': { borderColor: '#CBD5E1' },
+                  '&.Mui-focused fieldset': { borderColor: '#FF6B00' },
                 },
               }}
             />
           ))}
         </Box>
 
-        <PrimaryButton fullWidth type="submit" loading={loading}>
-          Kumpirmahin ang OTP
-        </PrimaryButton>
+        {/* Resend Code Button Container (matches reference UI layout) */}
+        <Box
+          component="button"
+          type="button"
+          onClick={handleResend}
+          disabled={resendTimer > 0 || isComplete}
+          sx={{
+            width: '100%',
+            height: '48px',
+            borderRadius: '12px',
+            backgroundColor: (resendTimer > 0 || isComplete) ? '#F8FAFC' : '#FFFFFF',
+            border: (resendTimer > 0 || isComplete) ? '1.5px solid #E2E8F0' : '1.5px solid #CBD5E1',
+            boxShadow: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 1,
+            cursor: (resendTimer > 0 || isComplete) ? 'not-allowed' : 'pointer',
+            color: (resendTimer > 0 || isComplete) ? '#94A3B8' : '#334155',
+            outline: 'none',
+            fontSize: '14.5px',
+            fontWeight: 600,
+            fontFamily: 'inherit',
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            '&:hover': (resendTimer > 0 || isComplete) ? {} : {
+              backgroundColor: '#F8FAFC',
+              borderColor: '#94A3B8',
+              transform: 'translateY(-1px)',
+            },
+            '&:active': (resendTimer > 0 || isComplete) ? {} : {
+              backgroundColor: '#F1F5F9',
+              transform: 'translateY(0)',
+            },
+          }}
+        >
+          <RefreshRoundedIcon
+            sx={{
+              fontSize: 19,
+              color: (resendTimer > 0 || isComplete) ? '#94A3B8' : '#64748B',
+              transition: 'transform 0.3s ease',
+            }}
+          />
+          <Typography sx={{ fontSize: '14.5px', fontWeight: 600, color: 'inherit' }}>
+            {resendTimer > 0 ? `${t.resendCode} (${resendTimer}s)` : t.resendCode}
+          </Typography>
+        </Box>
 
-        <Typography sx={{ fontSize: '13px', color: '#64748B', mt: 3 }}>
-          Walang natanggap na code?{' '}
-          <Box component="span" sx={{ color: '#FF6B00', fontWeight: 700, cursor: 'pointer' }}>
-            Ipadala Muli (Resend)
+        {/* Resend Code Feedback Notice (appears below button, auto-disappears after 5s, no X icon) */}
+        {infoNotice && (
+          <Box
+            sx={{
+              mt: 1.5,
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 0.85,
+              py: 1,
+              px: 2,
+              borderRadius: '10px',
+              backgroundColor: '#F0FDF4',
+              border: '1px solid #DCFCE7',
+            }}
+          >
+            <CheckCircleRoundedIcon sx={{ fontSize: 16, color: '#16A34A' }} />
+            <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#15803D' }}>
+              {infoNotice}
+            </Typography>
           </Box>
-        </Typography>
+        )}
+
+        {/* Space pusher */}
+        <Box sx={{ flexGrow: 1 }} />
+
+        <PrimaryButton
+          fullWidth
+          type="submit"
+          loading={loading}
+          disabled={!isComplete}
+          sx={{
+            height: '56px',
+            borderRadius: '16px',
+            fontSize: '16px',
+            fontWeight: 800,
+            backgroundColor: '#FF6B00',
+            boxShadow: 'none',
+            '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
+            mb: 2,
+          }}
+        >
+          {t.confirmOtp}
+        </PrimaryButton>
       </Box>
     </Box>
   );

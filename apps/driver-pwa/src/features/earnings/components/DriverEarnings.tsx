@@ -12,7 +12,6 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 export const DriverEarnings: React.FC = () => {
   const navigate = useNavigate();
@@ -39,7 +38,7 @@ export const DriverEarnings: React.FC = () => {
           <ArrowBackIcon />
         </IconButton>
         <Typography sx={{ fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>
-          Talaan ng Kita (Fare & Earnings)
+          Fare & Earnings
         </Typography>
       </Box>
 
@@ -49,7 +48,7 @@ export const DriverEarnings: React.FC = () => {
           <Paper elevation={0} sx={{ p: 2.5, borderRadius: '20px', backgroundColor: '#E6F4EA', border: '1px solid #A7F3D0' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#1E8E3E', mb: 1 }}>
               <CheckCircleIcon />
-              <Typography sx={{ fontWeight: 800, fontSize: '15px' }}>Matagumpay na Nakumpleto ang Biyahe!</Typography>
+              <Typography sx={{ fontWeight: 800, fontSize: '15px' }}>Trip Completed Successfully!</Typography>
             </Box>
             <Typography sx={{ fontSize: '13px', color: '#334155' }}>
               Booking: <strong>{justCompleted.bookingCode}</strong> • {justCompleted.passengerName}
@@ -61,7 +60,7 @@ export const DriverEarnings: React.FC = () => {
             )}
             <Divider sx={{ my: 1.5, borderColor: '#A7F3D0' }} />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>Kabuuang Nakolekta:</Typography>
+              <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>Total Collected:</Typography>
               <Typography sx={{ fontSize: '24px', fontWeight: 900, color: '#1E8E3E' }}>₱{justCompleted.fareAmount.toFixed(2)}</Typography>
             </Box>
           </Paper>
@@ -72,7 +71,7 @@ export const DriverEarnings: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <AccountBalanceWalletIcon sx={{ color: '#FF6B00' }} />
-              <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#94A3B8' }}>KABUUANG KITA NGAYONG ARAW</Typography>
+              <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#94A3B8' }}>TODAY'S TOTAL EARNINGS</Typography>
             </Box>
             <Chip label="Live Daily Total" size="small" sx={{ backgroundColor: 'rgba(255, 107, 0, 0.2)', color: '#FF8533', fontWeight: 700, fontSize: '10.5px' }} />
           </Box>
@@ -81,18 +80,18 @@ export const DriverEarnings: React.FC = () => {
             ₱{justCompleted ? (680 + justCompleted.fareAmount).toFixed(2) : '680.00'}
           </Typography>
           <Typography sx={{ fontSize: '12px', color: '#94A3B8', mt: 0.5 }}>
-            {justCompleted ? 9 : 8} natapos na mga biyahe (100% Cash / GCash Remittance)
+            {justCompleted ? 9 : 8} completed trips (100% Cash / GCash Remittance)
           </Typography>
 
           <Divider sx={{ my: 2, borderColor: 'rgba(255, 255, 255, 0.1)' }} />
 
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box>
-              <Typography sx={{ fontSize: '11px', color: '#94A3B8' }}>Lingguhang Kita (This Week)</Typography>
+              <Typography sx={{ fontSize: '11px', color: '#94A3B8' }}>Weekly Earnings</Typography>
               <Typography sx={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF' }}>₱4,930.00</Typography>
             </Box>
             <Box sx={{ textAlign: 'right' }}>
-              <Typography sx={{ fontSize: '11px', color: '#94A3B8' }}>Kabuuang Biyahe (Week)</Typography>
+              <Typography sx={{ fontSize: '11px', color: '#94A3B8' }}>Total Trips (Week)</Typography>
               <Typography sx={{ fontSize: '16px', fontWeight: 800, color: '#34D399' }}>49 rides</Typography>
             </Box>
           </Box>
@@ -110,9 +109,11 @@ export const DriverEarnings: React.FC = () => {
             '&:hover': { backgroundColor: '#1E293B' },
           }}
         >
-          Bumalik sa Driver Dashboard
+          Back to Driver Dashboard
         </Button>
       </Box>
     </Box>
   );
 };
+
+export default DriverEarnings;

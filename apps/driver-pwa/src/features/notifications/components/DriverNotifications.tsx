@@ -38,7 +38,7 @@ export const DriverNotifications: React.FC = () => {
           <ArrowBackIcon />
         </IconButton>
         <Typography sx={{ fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>
-          Mga Abiso at Anunsyo ng TODA
+          TODA Notifications & Bulletins
         </Typography>
       </Box>
 
@@ -114,7 +114,7 @@ export const DriverNotifications: React.FC = () => {
               {selectedItem.title}
             </Typography>
             <Typography sx={{ fontSize: '13px', color: '#64748B', mb: 2 }}>
-              Oras: {selectedItem.time}
+              Time: {selectedItem.time}
             </Typography>
             <Typography sx={{ fontSize: '13.5px', color: '#334155', lineHeight: 1.6 }}>
               {selectedItem.message}
@@ -133,7 +133,7 @@ export const DriverNotifications: React.FC = () => {
                 textTransform: 'none',
               }}
             >
-              Isara (Close)
+              Close
             </Button>
           </DialogActions>
         </Dialog>
@@ -141,3 +141,5 @@ export const DriverNotifications: React.FC = () => {
     </Box>
   );
 };
+
+export default DriverNotifications;

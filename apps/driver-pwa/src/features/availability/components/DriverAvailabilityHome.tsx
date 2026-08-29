@@ -190,7 +190,7 @@ export const DriverAvailabilityHome: React.FC = () => {
                 {profile.rating.toFixed(1)}
               </Typography>
               <Typography sx={{ fontSize: '11px', color: '#64748B' }}>
-                ({profile.totalTrips} biyahe)
+                ({profile.totalTrips} trips)
               </Typography>
             </Box>
           </Box>
@@ -248,9 +248,9 @@ export const DriverAvailabilityHome: React.FC = () => {
         label={
           profile.isOnline
             ? profile.isPaused
-              ? 'Dispatch Paused • Naka-pahinga'
-              : 'Naghahanap ng pasahero sa paligid...'
-            : 'Naka-offline • Mag-online upang bumiyahe'
+              ? 'Dispatch Paused'
+              : 'Searching for nearby passengers...'
+            : 'Offline • Go online to receive trips'
         }
         sx={{
           position: 'absolute',
@@ -351,7 +351,7 @@ export const DriverAvailabilityHome: React.FC = () => {
         {!canGoOnline && (
           <Box sx={{ p: '10px 14px', borderRadius: '12px', backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography sx={{ fontSize: '11.5px', color: '#B45309', fontWeight: 700 }}>
-              Pumili ng Verified TODA at Tricycle Unit bago mag-Online.
+              Please select a Verified TODA and Tricycle Unit before going Online.
             </Typography>
           </Box>
         )}
@@ -374,10 +374,10 @@ export const DriverAvailabilityHome: React.FC = () => {
         >
           <Box>
             <Typography sx={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-              Aktibong TODA Affiliation
+              Active TODA Affiliation
             </Typography>
             <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', mt: '2px' }}>
-              {selectedToda ? `${selectedToda.name} (${selectedToda.acronym})` : 'Pumili ng TODA...'}
+              {selectedToda ? `${selectedToda.name} (${selectedToda.acronym})` : 'Select TODA...'}
             </Typography>
           </Box>
           <ArrowForwardIosIcon sx={{ fontSize: 14, color: '#94A3B8' }} />
@@ -401,10 +401,10 @@ export const DriverAvailabilityHome: React.FC = () => {
         >
           <Box>
             <Typography sx={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-              Gagamiting Tricycle Unit
+              Tricycle Unit in Use
             </Typography>
             <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', mt: '2px' }}>
-              {selectedVehicle ? `Plate: ${selectedVehicle.plateNumber} • ${selectedVehicle.franchiseNumber}` : 'Pumili ng Tricycle...'}
+              {selectedVehicle ? `Plate: ${selectedVehicle.plateNumber} • Franchise: ${selectedVehicle.franchiseNumber}` : 'Select Tricycle Unit...'}
             </Typography>
           </Box>
           <ArrowForwardIosIcon sx={{ fontSize: 14, color: '#94A3B8' }} />
@@ -429,12 +429,12 @@ export const DriverAvailabilityHome: React.FC = () => {
           }}
         >
           <DialogTitle sx={{ textAlign: 'center', pb: 1, pt: 2 }}>
-            <Chip label={`Bagong Booking Request (${countdown}s)`} color="warning" sx={{ fontWeight: 800, fontSize: '12px' }} />
+            <Chip label={`New Booking Request (${countdown}s)`} color="warning" sx={{ fontWeight: 800, fontSize: '12px' }} />
             <Typography sx={{ fontSize: '19px', fontWeight: 800, color: '#0F172A', mt: 1 }}>
               {incomingRequest.is_shared_trip ? 'Shared Commuter Ride' : 'Solo Charter Ride'}
             </Typography>
             <Typography sx={{ fontSize: '13px', color: '#64748B' }}>
-              Pasahero: <strong>{incomingRequest.passenger_name}</strong> • {incomingRequest.passenger_count} tao
+              Passenger: <strong>{incomingRequest.passenger_name}</strong> • {incomingRequest.passenger_count} passenger(s)
             </Typography>
           </DialogTitle>
 
@@ -459,11 +459,11 @@ export const DriverAvailabilityHome: React.FC = () => {
 
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1 }}>
               <Box>
-                <Typography sx={{ fontSize: '11.5px', color: '#64748B' }}>Tinatayang Distansya</Typography>
+                <Typography sx={{ fontSize: '11.5px', color: '#64748B' }}>Estimated Distance</Typography>
                 <Typography sx={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>{incomingRequest.estimated_distance_km} km</Typography>
               </Box>
               <Box sx={{ textAlign: 'right' }}>
-                <Typography sx={{ fontSize: '11.5px', color: '#64748B' }}>Pamasahe</Typography>
+                <Typography sx={{ fontSize: '11.5px', color: '#64748B' }}>Fare</Typography>
                 <Typography sx={{ fontSize: '24px', fontWeight: 900, color: '#FF6B00' }}>₱{incomingRequest.estimated_fare.toFixed(2)}</Typography>
               </Box>
             </Box>
@@ -477,7 +477,7 @@ export const DriverAvailabilityHome: React.FC = () => {
               onClick={handleDeclineRequest}
               sx={{ height: 48, borderRadius: '14px', fontWeight: 700, color: '#64748B', textTransform: 'none' }}
             >
-              Tanggihan (Decline)
+              Decline
             </Button>
 
             <Button
@@ -495,7 +495,7 @@ export const DriverAvailabilityHome: React.FC = () => {
                 '&:hover': { backgroundColor: '#137333' },
               }}
             >
-              Tanggapin (Accept)
+              Accept
             </Button>
           </DialogActions>
         </Dialog>
@@ -503,7 +503,7 @@ export const DriverAvailabilityHome: React.FC = () => {
 
       {/* 5. TODA Selection Modal */}
       <Dialog open={todaModalOpen} onClose={() => setTodaModalOpen(false)} fullWidth maxWidth="xs" slotProps={{ paper: { sx: { borderRadius: '20px' } } }}>
-        <DialogTitle sx={{ fontWeight: 800, color: '#0F172A' }}>Pumili ng Aktibong TODA</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800, color: '#0F172A' }}>Select Active TODA</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
             {ACCREDITED_TODAS.map((toda) => (
@@ -533,7 +533,7 @@ export const DriverAvailabilityHome: React.FC = () => {
 
       {/* 6. Vehicle Selection Modal */}
       <Dialog open={vehicleModalOpen} onClose={() => setVehicleModalOpen(false)} fullWidth maxWidth="xs" slotProps={{ paper: { sx: { borderRadius: '20px' } } }}>
-        <DialogTitle sx={{ fontWeight: 800, color: '#0F172A' }}>Pumili ng Tricycle Unit</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800, color: '#0F172A' }}>Select Tricycle Unit</DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
             {VERIFIED_TRICYCLES.map((veh) => (

@@ -85,12 +85,12 @@ export const DriverSplash: React.FC = () => {
       activeDotIdx = 0;
     } else if (step === 5) {
       slideTitle = "Tamang Pamasahe";
-      slideDesc = "Malinaw at tapat na presyo para sa bawat byahe, walang hulaan.";
+      slideDesc = "Malinaw at tapat na presyo para sa bawat biyahe, walang hulaan.";
       slideIllustration = <FareIllustration />;
       activeDotIdx = 1;
     } else if (step === 6) {
       slideTitle = "Ligtas at Maaasahan";
-      slideDesc = "Siguradong driver na lisensyado at rehistrado sa TODA ang susundo sa iyo.";
+      slideDesc = "Siguradong drayber na lisensyado at rehistrado sa TODA ang susundo sa iyo.";
       slideIllustration = <SafetyIllustration />;
       activeDotIdx = 2;
     }

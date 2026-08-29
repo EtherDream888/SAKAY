@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -6,31 +6,96 @@ import {
   TextField,
   InputAdornment,
   IconButton,
+  LinearProgress,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import HttpsOutlinedIcon from '@mui/icons-material/HttpsOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
+import { useLanguage } from '../../../utils/LanguageContext';
 
 export const DriverResetPassword: React.FC = () => {
   const navigate = useNavigate();
-  const [newPassword, setNewPassword] = useState('NewDriverPass123!');
-  const [confirmPassword, setConfirmPassword] = useState('NewDriverPass123!');
+  const { t } = useLanguage();
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
+
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [confirmPasswordFocused, setConfirmPasswordFocused] = useState(false);
+
+  // Password Criteria Validation (matching TODA registration)
+  const hasMinLength = newPassword.length >= 8;
+  const hasUppercase = /[A-Z]/.test(newPassword);
+  const hasLowercase = /[a-z]/.test(newPassword);
+  const hasNumber = /[0-9]/.test(newPassword);
+  const hasSpecial = /[!@#$%^&*(),.?":{}|<>_\-]/.test(newPassword);
+
+  const criteriaList = [
+    { label: 'Minimum 8 characters', met: hasMinLength },
+    { label: 'At least 1 uppercase letter (A-Z)', met: hasUppercase },
+    { label: 'At least 1 lowercase letter (a-z)', met: hasLowercase },
+    { label: 'At least 1 number (0-9)', met: hasNumber },
+    { label: 'At least 1 special character (!@#$%^&*)', met: hasSpecial },
+  ];
+
+  const metCount = criteriaList.filter((c) => c.met).length;
+  const passwordScore = (metCount / criteriaList.length) * 100;
+  const isPasswordValid = metCount === criteriaList.length;
+
+  const getStrengthColor = () => {
+    if (metCount <= 2) return '#DC2626';
+    if (metCount <= 4) return '#EA580C';
+    return '#16A34A';
+  };
+
+  const getStrengthLabel = () => {
+    if (newPassword.length === 0) return '';
+    if (metCount <= 2) return 'Weak';
+    if (metCount <= 4) return 'Moderate';
+    return 'Strong';
+  };
+
+  // Password Confirmation Validation
+  const isPasswordMatched = confirmPassword.length > 0 && newPassword === confirmPassword;
+  const isPasswordMismatched = confirmPassword.length > 0 && newPassword !== confirmPassword;
+  const [showMatchSuccess, setShowMatchSuccess] = useState(false);
+
+  useEffect(() => {
+    if (confirmPassword.length > 0 && newPassword === confirmPassword) {
+      setShowMatchSuccess(true);
+      const timer = setTimeout(() => {
+        setShowMatchSuccess(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowMatchSuccess(false);
+    }
+  }, [newPassword, confirmPassword]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPassword || newPassword !== confirmPassword) return;
+    setHasAttemptedSubmit(true);
+    if (!isPasswordValid || newPassword !== confirmPassword) return;
+
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
       navigate('/driver/login', { replace: true });
     }, 600);
   };
+
+  const showPasswordIcon = !passwordFocused && !newPassword;
+  const showConfirmPasswordIcon = !confirmPasswordFocused && !confirmPassword;
 
   return (
     <Box
@@ -44,110 +109,273 @@ export const DriverResetPassword: React.FC = () => {
         overflow: 'hidden',
       }}
     >
-      {/* Sticky Top Bar */}
+      {/* 1. Header with Rounded Back Button and SAKAY Logo */}
       <Box
         sx={{
-          padding: 'calc(var(--safe-area-top) + 12px) 20px 12px 20px',
+          padding: 'calc(var(--safe-area-top) + 16px) 24px 12px 24px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid #F1F5F9',
           backgroundColor: '#FFFFFF',
           flexShrink: 0,
+          zIndex: 20,
         }}
       >
         <IconButton
           onClick={() => navigate('/driver/login')}
           sx={{
             color: '#0F172A',
-            backgroundColor: '#F8FAFC',
-            borderRadius: '12px',
-            '&:hover': { backgroundColor: '#F1F5F9' },
+            backgroundColor: '#FFFFFF',
+            borderRadius: '14px',
+            border: '1px solid #E2E8F0',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+            width: 44,
+            height: 44,
+            '&:hover': { backgroundColor: '#F8FAFC' },
           }}
         >
-          <ArrowBackIcon fontSize="small" />
+          <ArrowBackIcon sx={{ fontSize: 20 }} />
         </IconButton>
-        <Logo color="orange" width={100} />
-        <Box sx={{ width: 40 }} />
+        <Logo color="orange" width={110} />
       </Box>
 
-      {/* Form Content */}
+      {/* 2. Scrollable Form Content */}
       <Box
         component="form"
         onSubmit={handleSubmit}
         sx={{
           flex: 1,
           overflowY: 'auto',
-          padding: '24px 24px calc(var(--safe-area-bottom) + 24px) 24px',
+          padding: '16px 24px calc(var(--safe-area-bottom) + 24px) 24px',
           display: 'flex',
           flexDirection: 'column',
         }}
       >
-        <Box sx={{ mb: 3 }}>
-          <Typography sx={{ fontSize: '24px', fontWeight: 800, color: '#0F172A', mb: 0.5 }}>
-            Bagong Password
+        <Box sx={{ mb: 3.5, mt: 1 }}>
+          <Typography
+            sx={{
+              fontSize: '26px',
+              fontWeight: 800,
+              color: '#0F172A',
+              lineHeight: 1.2,
+              letterSpacing: '-0.5px',
+            }}
+          >
+            {t.newPasswordTitle}
           </Typography>
-          <Typography sx={{ fontSize: '13.5px', color: '#64748B' }}>
-            Gumawa ng bagong secure password para sa iyong driver account.
+          <Typography
+            sx={{
+              fontSize: '15px',
+              color: '#64748B',
+              mt: 0.75,
+              fontWeight: 500,
+              lineHeight: 1.5,
+            }}
+          >
+            {t.newPasswordDesc}
           </Typography>
         </Box>
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-          <Box>
-            <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', mb: 1 }}>
-              Bagong Password
-            </Typography>
-            <TextField
-              fullWidth
-              type={showPassword ? 'text' : 'password'}
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LockOutlinedIcon sx={{ color: '#94A3B8', fontSize: 20 }} />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
-                        {showPassword ? <VisibilityOff sx={{ fontSize: 20 }} /> : <Visibility sx={{ fontSize: 20 }} />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                  sx: { borderRadius: '14px', backgroundColor: '#F8FAFC' },
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {/* New Password */}
+          <TextField
+            fullWidth
+            required
+            type={showPassword ? 'text' : 'password'}
+            label={t.newPassword}
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            onFocus={() => setPasswordFocused(true)}
+            onBlur={() => setPasswordFocused(false)}
+            error={hasAttemptedSubmit && !isPasswordValid}
+            slotProps={{
+              inputLabel: {
+                shrink: Boolean(passwordFocused || newPassword),
+                sx: {
+                  color: '#64748B',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  '&.Mui-focused': { color: '#FF6B00', fontWeight: 600 },
+                  ...(showPasswordIcon ? { transform: 'translate(44px, 16px) scale(1)' } : {}),
                 },
-              }}
-            />
-          </Box>
-
-          <Box>
-            <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#0F172A', mb: 1 }}>
-              Kumpirmahin ang Password
-            </Typography>
-            <TextField
-              fullWidth
-              type={showPassword ? 'text' : 'password'}
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LockOutlinedIcon sx={{ color: '#94A3B8', fontSize: 20 }} />
-                    </InputAdornment>
-                  ),
-                  sx: { borderRadius: '14px', backgroundColor: '#F8FAFC' },
+              },
+              input: {
+                startAdornment: showPasswordIcon ? (
+                  <InputAdornment position="start">
+                    <LockOutlinedIcon sx={{ color: '#0F172A', fontSize: 20 }} />
+                  </InputAdornment>
+                ) : null,
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowPassword(!showPassword)}
+                      edge="end"
+                      size="small"
+                      sx={{ color: '#64748B' }}
+                    >
+                      {showPassword ? <VisibilityOffOutlinedIcon fontSize="small" /> : <VisibilityOutlinedIcon fontSize="small" />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+                sx: {
+                  borderRadius: '16px',
+                  backgroundColor: '#F8FAFC',
+                  fontSize: '15px',
+                  height: '56px',
+                  '& fieldset': { borderColor: '#E2E8F0' },
+                  '&:hover fieldset': { borderColor: '#CBD5E1' },
+                  '&.Mui-focused fieldset': { borderColor: '#FF6B00' },
                 },
-              }}
-            />
-          </Box>
+              },
+            }}
+          />
 
-          <PrimaryButton fullWidth type="submit" loading={loading} sx={{ mt: 1 }}>
-            I-save at Mag-login
-          </PrimaryButton>
+          {/* Password Progress Bar */}
+          {!isPasswordValid && newPassword.length > 0 && (
+            <Box sx={{ mt: -0.5, mb: 0.5 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                <Typography sx={{ fontSize: '11px', color: '#64748B', fontWeight: 600 }}>
+                  Password Strength:
+                </Typography>
+                <Typography sx={{ fontSize: '11px', color: getStrengthColor(), fontWeight: 700 }}>
+                  {getStrengthLabel()}
+                </Typography>
+              </Box>
+              <LinearProgress
+                variant="determinate"
+                value={passwordScore}
+                sx={{
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: '#E2E8F0',
+                  '& .MuiLinearProgress-bar': {
+                    backgroundColor: getStrengthColor(),
+                    borderRadius: 3,
+                    transition: 'all 0.3s ease',
+                  },
+                }}
+              />
+            </Box>
+          )}
+
+          {/* Password Criteria Checklist */}
+          {!isPasswordValid && newPassword.length > 0 && (
+            <Box sx={{ p: 1.75, borderRadius: '12px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+              <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#334155', mb: 1 }}>
+                Password Requirements:
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.85 }}>
+                {criteriaList.map((crit, idx) => (
+                  <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {crit.met ? (
+                      <CheckCircleIcon sx={{ fontSize: 16, color: '#16A34A' }} />
+                    ) : (
+                      <RadioButtonUncheckedIcon sx={{ fontSize: 16, color: '#94A3B8' }} />
+                    )}
+                    <Typography
+                      sx={{
+                        fontSize: '11.5px',
+                        color: crit.met ? '#16A34A' : '#64748B',
+                        fontWeight: crit.met ? 600 : 400,
+                      }}
+                    >
+                      {crit.label}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Confirm Password */}
+          <TextField
+            fullWidth
+            required
+            type={showConfirmPassword ? 'text' : 'password'}
+            label={t.confirmPassword}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            onFocus={() => setConfirmPasswordFocused(true)}
+            onBlur={() => setConfirmPasswordFocused(false)}
+            error={isPasswordMismatched || (hasAttemptedSubmit && !confirmPassword)}
+            helperText={
+              isPasswordMismatched
+                ? 'Passwords do not match.'
+                : showMatchSuccess
+                ? 'Passwords match ✓'
+                : ''
+            }
+            slotProps={{
+              formHelperText: {
+                sx: {
+                  fontSize: '11.5px',
+                  color: isPasswordMismatched ? '#DC2626' : showMatchSuccess ? '#16A34A' : '#64748B',
+                  fontWeight: isPasswordMismatched || showMatchSuccess ? 600 : 400,
+                },
+              },
+              inputLabel: {
+                shrink: Boolean(confirmPasswordFocused || confirmPassword),
+                sx: {
+                  color: '#64748B',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  '&.Mui-focused': { color: '#FF6B00', fontWeight: 600 },
+                  ...(showConfirmPasswordIcon ? { transform: 'translate(44px, 16px) scale(1)' } : {}),
+                },
+              },
+              input: {
+                startAdornment: showConfirmPasswordIcon ? (
+                  <InputAdornment position="start">
+                    <HttpsOutlinedIcon sx={{ color: '#0F172A', fontSize: 20 }} />
+                  </InputAdornment>
+                ) : null,
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      edge="end"
+                      size="small"
+                      sx={{ color: '#64748B' }}
+                    >
+                      {showConfirmPassword ? <VisibilityOffOutlinedIcon fontSize="small" /> : <VisibilityOutlinedIcon fontSize="small" />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+                sx: {
+                  borderRadius: '16px',
+                  backgroundColor: '#F8FAFC',
+                  fontSize: '15px',
+                  height: '56px',
+                  '& fieldset': { borderColor: '#E2E8F0' },
+                  '&:hover fieldset': { borderColor: '#CBD5E1' },
+                  '&.Mui-focused fieldset': { borderColor: '#FF6B00' },
+                },
+              },
+            }}
+          />
         </Box>
+
+        {/* Space pusher to push button to bottom */}
+        <Box sx={{ flexGrow: 1 }} />
+
+        <PrimaryButton
+          fullWidth
+          type="submit"
+          loading={loading}
+          sx={{
+            height: '56px',
+            borderRadius: '16px',
+            fontSize: '16px',
+            fontWeight: 800,
+            backgroundColor: '#FF6B00',
+            boxShadow: 'none',
+            '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
+            mt: 2,
+            mb: 1,
+          }}
+        >
+          {t.saveAndLogin}
+        </PrimaryButton>
       </Box>
     </Box>
   );

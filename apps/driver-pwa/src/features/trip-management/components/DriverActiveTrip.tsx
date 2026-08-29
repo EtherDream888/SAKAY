@@ -161,7 +161,7 @@ export const DriverActiveTrip: React.FC = () => {
           </IconButton>
           <Box>
             <Typography sx={{ fontSize: '10.5px', color: '#64748B', fontWeight: 800, textTransform: 'uppercase' }}>
-              {tripStarted ? 'KASALUKUYANG BIYAHE' : 'PAGSAKAY NG PASAHERO'}
+              {tripStarted ? 'ONGOING TRIP' : 'PASSENGER BOARDING'}
             </Typography>
             <Typography sx={{ fontSize: '15px', fontWeight: 800, color: '#0F172A', lineHeight: 1.2 }}>
               {dropoffAddress.split(',')[0]}
@@ -194,7 +194,7 @@ export const DriverActiveTrip: React.FC = () => {
       >
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.75 }}>
           <Typography sx={{ fontSize: '12px', color: '#64748B', fontWeight: 700 }}>
-            Progreso patungo sa Destinasyon
+            Progress towards Destination
           </Typography>
           <Typography sx={{ fontSize: '14px', fontWeight: 900, color: '#FF6B00' }}>
             {progress}%
@@ -220,7 +220,7 @@ export const DriverActiveTrip: React.FC = () => {
           </Avatar>
           <Box sx={{ flex: 1 }}>
             <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>{passengerName}</Typography>
-            <Typography sx={{ fontSize: '11px', color: '#64748B' }}>Pasahero #1 • {dropoffAddress.split(',')[0]}</Typography>
+            <Typography sx={{ fontSize: '11px', color: '#64748B' }}>Passenger #1 • {dropoffAddress.split(',')[0]}</Typography>
           </Box>
           <Typography sx={{ fontSize: '14px', fontWeight: 800, color: '#10B981' }}>
             ₱{proportionateFareP1.toFixed(2)}
@@ -235,7 +235,7 @@ export const DriverActiveTrip: React.FC = () => {
             </Avatar>
             <Box sx={{ flex: 1 }}>
               <Typography sx={{ fontSize: '12.5px', fontWeight: 700, color: '#065F46' }}>{pairedPassenger}</Typography>
-              <Typography sx={{ fontSize: '10.5px', color: '#047857' }}>Pasahero #2 (Shared Carpool)</Typography>
+              <Typography sx={{ fontSize: '10.5px', color: '#047857' }}>Passenger #2 (Shared Carpool)</Typography>
             </Box>
             <Typography sx={{ fontSize: '13px', fontWeight: 800, color: '#047857' }}>
               ₱15.00
@@ -266,7 +266,7 @@ export const DriverActiveTrip: React.FC = () => {
       >
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 0.5 }}>
           <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#64748B' }}>
-            Kabuuang Singil sa Biyahe:
+            Total Trip Fare:
           </Typography>
           <Typography sx={{ fontSize: '24px', fontWeight: 900, color: '#FF6B00' }}>
             ₱{currentFare.toFixed(2)}
@@ -289,7 +289,7 @@ export const DriverActiveTrip: React.FC = () => {
               '&:hover': { backgroundColor: '#059669' },
             }}
           >
-            Simulan ang Biyahe (Start Trip)
+            Start Trip
           </Button>
         ) : (
           <Button
@@ -307,7 +307,7 @@ export const DriverActiveTrip: React.FC = () => {
               '&:hover': { backgroundColor: '#E66000' },
             }}
           >
-            Tapusin ang Biyahe (Complete Trip)
+            Complete Trip
           </Button>
         )}
       </Paper>
@@ -331,23 +331,23 @@ export const DriverActiveTrip: React.FC = () => {
         <DialogTitle sx={{ textAlign: 'center', pb: 1 }}>
           <Chip label="Mid-Trip Carpool Match (<50% Route)" color="warning" sx={{ fontWeight: 800 }} />
           <Typography sx={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', mt: 1 }}>
-            Karagdagang Pasahero sa Ruta?
+            Additional Passenger along Route?
           </Typography>
           <Typography sx={{ fontSize: '12.5px', color: '#64748B' }}>
-            May commuter sa tapat ng San Vicente High patungo rin sa City Hall core.
+            A commuter near San Vicente High is also heading towards City Hall.
           </Typography>
         </DialogTitle>
 
         <DialogContent sx={{ py: 1 }}>
           <Box sx={{ p: 2, backgroundColor: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
             <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>
-              Pasahero: Joshua Dizon (1 seat)
+              Passenger: Joshua Dizon (1 seat)
             </Typography>
             <Typography sx={{ fontSize: '12px', color: '#64748B', mt: 0.5 }}>
               Pickup: San Vicente NHS Gate (+200m detour)
             </Typography>
             <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#10B981', mt: 1 }}>
-              Dagdag Kita sa Biyahe: +₱15.00
+              Extra Trip Earnings: +₱15.00
             </Typography>
           </Box>
         </DialogContent>
@@ -360,7 +360,7 @@ export const DriverActiveTrip: React.FC = () => {
             onClick={handleDeclineSharedPassenger}
             sx={{ height: 44, borderRadius: '12px', fontWeight: 700, textTransform: 'none' }}
           >
-            Huwag Tanggapin
+            Decline
           </Button>
 
           <Button
@@ -376,7 +376,7 @@ export const DriverActiveTrip: React.FC = () => {
               '&:hover': { backgroundColor: '#059669' },
             }}
           >
-            Tanggapin (+₱15)
+            Accept (+₱15)
           </Button>
         </DialogActions>
       </Dialog>
@@ -397,11 +397,11 @@ export const DriverActiveTrip: React.FC = () => {
         }}
       >
         <DialogTitle sx={{ fontWeight: 800, fontSize: '17px', color: '#0F172A', textAlign: 'center' }}>
-          Kasalukuyang Aktibo ang Biyahe
+          Active Ongoing Trip
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'center', py: 1 }}>
           <Typography sx={{ fontSize: '13.5px', color: '#475569', lineHeight: 1.5 }}>
-            Kasalukuyang may nakasakay kang pasahero (<strong>{passengerName}</strong>). Nais mo bang umalis sa tracking screen at bumalik sa Home? Mananatiling nakatala ang biyahe.
+            You currently have passenger(s) on board (<strong>{passengerName}</strong>). Do you want to return to Home? Your trip progress will remain active.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 2, pb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -418,7 +418,7 @@ export const DriverActiveTrip: React.FC = () => {
               '&:hover': { backgroundColor: '#E66000' },
             }}
           >
-            Manatili sa Biyahe
+            Stay in Trip
           </Button>
           <Button
             fullWidth
@@ -432,7 +432,7 @@ export const DriverActiveTrip: React.FC = () => {
               textTransform: 'none',
             }}
           >
-            Bumalik sa Home
+            Return to Home
           </Button>
         </DialogActions>
       </Dialog>

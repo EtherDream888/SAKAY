@@ -10,12 +10,13 @@ const translations = {
     hasAccount: "May account na?",
     loginLink: " Mag-login",
     selectRole: "Paano mo gustong gamitin ang SAKAY?",
-    selectRoleDesc: "Pumili ng uri ng account para makapagsimula. Maaari kang magparehistro bilang pasahero o driver.",
+    selectRoleDesc: "Pumili ng uri ng account para makapagsimula. Maaari kang magparehistro bilang pasahero o drayber.",
     passenger: "Pasahero",
     passengerDesc: "Mag-book ng tricycle sa paligid ng Calapan City",
     driver: "Drayber",
     driverDesc: "Tumanggap ng mga booking at pamahalaan ang iyong mga biyahe",
     continue: "Magpatuloy",
+    skip: "Laktawan",
     back: "Bumalik",
     loginTitle: "Maligayang pagbalik!",
     loginSubtitle: "Mag-login para makapag-book ng biyahe!",
@@ -48,6 +49,7 @@ const translations = {
     driver: "Driver",
     driverDesc: "Accept bookings and manage your trips",
     continue: "Continue",
+    skip: "Skip",
     back: "Back",
     loginTitle: "Welcome back!",
     loginSubtitle: "Login to start booking rides!",
@@ -62,7 +64,7 @@ const translations = {
     confirmPassword: "Confirm Password",
     createAccountBtn: "Create Account",
     backToLogin: "Back to Login",
-    phoneRequired: "Phone number or email is required",
+    phoneRequired: "Mobile number or email is required",
     passwordRequired: "Password is required",
     nameRequired: "Full name is required",
     passwordsMustMatch: "Passwords must match",
@@ -73,14 +75,22 @@ const translations = {
 
 interface LanguageContextType {
   language: Language;
-  t: typeof translations['tl'];
+  t: typeof translations['en'];
   setLanguage: (lang: Language) => void;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [language, setLanguage] = useState<Language>('tl');
+  const [language, setLanguageState] = useState<Language>(() => {
+    const saved = localStorage.getItem('sakay_language');
+    return (saved === 'tl' || saved === 'en') ? saved : 'en';
+  });
+
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+    localStorage.setItem('sakay_language', lang);
+  };
 
   const value = {
     language,

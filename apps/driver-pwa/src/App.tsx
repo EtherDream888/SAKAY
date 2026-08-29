@@ -11,6 +11,16 @@ import { AccountSelection } from './features/account-management/components/Accou
 import { DriverLogin } from './features/account-management/components/DriverLogin';
 import { DriverRegister } from './features/account-management/components/DriverRegister';
 import { DriverVerifyOtp } from './features/account-management/components/DriverVerifyOtp';
+import { DriverTermsOfService } from './features/account-management/components/DriverTermsOfService';
+import { DriverPrivacyPolicy } from './features/account-management/components/DriverPrivacyPolicy';
+import { DriverPrepareDocuments } from './features/account-management/components/DriverPrepareDocuments';
+import { DriverPrepareLicense } from './features/account-management/components/DriverPrepareLicense';
+import { DriverScanLicenseFront } from './features/account-management/components/DriverScanLicenseFront';
+import { DriverReviewLicenseFront } from './features/account-management/components/DriverReviewLicenseFront';
+import { DriverScanLicenseBack } from './features/account-management/components/DriverScanLicenseBack';
+import { DriverReviewLicenseBack } from './features/account-management/components/DriverReviewLicenseBack';
+import { DriverLicenseLoading } from './features/account-management/components/DriverLicenseLoading';
+import { DriverConfirmLicenseInfo } from './features/account-management/components/DriverConfirmLicenseInfo';
 import { DriverForgotPassword } from './features/account-management/components/DriverForgotPassword';
 import { DriverResetPassword } from './features/account-management/components/DriverResetPassword';
 import { DriverStatusMonitor } from './features/account-management/components/DriverStatusMonitor';
@@ -42,6 +52,30 @@ export const App: React.FC = () => {
             <Route path="/driver/register" element={<DriverRegister />} />
             <Route path="/verify-otp" element={<DriverVerifyOtp />} />
             <Route path="/driver/verify-otp" element={<DriverVerifyOtp />} />
+            <Route path="/terms-of-service" element={<DriverTermsOfService />} />
+            <Route path="/driver/terms-of-service" element={<DriverTermsOfService />} />
+            <Route path="/driver/terms" element={<DriverTermsOfService />} />
+            <Route path="/privacy-policy" element={<DriverPrivacyPolicy />} />
+            <Route path="/driver/privacy-policy" element={<DriverPrivacyPolicy />} />
+            <Route path="/driver/privacy" element={<DriverPrivacyPolicy />} />
+            <Route path="/prepare-documents" element={<DriverPrepareDocuments />} />
+            <Route path="/driver/prepare-documents" element={<DriverPrepareDocuments />} />
+            <Route path="/driver/documents" element={<DriverPrepareDocuments />} />
+            <Route path="/prepare-license" element={<DriverPrepareLicense />} />
+            <Route path="/driver/prepare-license" element={<DriverPrepareLicense />} />
+            <Route path="/driver/license-guidelines" element={<DriverPrepareLicense />} />
+            <Route path="/scan-license-front" element={<DriverScanLicenseFront />} />
+            <Route path="/driver/scan-license-front" element={<DriverScanLicenseFront />} />
+            <Route path="/review-license-front" element={<DriverReviewLicenseFront />} />
+            <Route path="/driver/review-license-front" element={<DriverReviewLicenseFront />} />
+            <Route path="/scan-license-back" element={<DriverScanLicenseBack />} />
+            <Route path="/driver/scan-license-back" element={<DriverScanLicenseBack />} />
+            <Route path="/review-license-back" element={<DriverReviewLicenseBack />} />
+            <Route path="/driver/review-license-back" element={<DriverReviewLicenseBack />} />
+            <Route path="/license-loading" element={<DriverLicenseLoading />} />
+            <Route path="/driver/license-loading" element={<DriverLicenseLoading />} />
+            <Route path="/confirm-license-info" element={<DriverConfirmLicenseInfo />} />
+            <Route path="/driver/confirm-license-info" element={<DriverConfirmLicenseInfo />} />
             <Route path="/forgot-password" element={<DriverForgotPassword />} />
             <Route path="/driver/forgot-password" element={<DriverForgotPassword />} />
             <Route path="/reset-password" element={<DriverResetPassword />} />

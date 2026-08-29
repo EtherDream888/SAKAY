@@ -3,18 +3,15 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogActions,
   Box,
   Typography,
   TextField,
   Button,
   IconButton,
-  Chip,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import PhoneIcon from '@mui/icons-material/Phone';
 import SendIcon from '@mui/icons-material/Send';
-import MessageIcon from '@mui/icons-material/Message';
 
 interface DriverCommunicationModalProps {
   open: boolean;
@@ -33,15 +30,15 @@ export const DriverCommunicationModal: React.FC<DriverCommunicationModalProps> =
   const [sentAlert, setSentAlert] = useState<string | null>(null);
 
   const templates = [
-    'Papunta na po ako sa inyong pickup point.',
-    'Nandito na po ako sa labas / tapat.',
-    'Medyo ma-trapik po, darating ako sa loob ng 3 minuto.',
-    'Pakihanda na po ang inyong pamasahe. Salamat!',
+    "I'm on my way to your pickup point.",
+    "I've arrived at your pickup location.",
+    'Traffic is heavy, arriving in about 3 minutes.',
+    'Please have your fare ready. Thank you!',
   ];
 
   const handleSend = (text: string) => {
     if (!text.trim()) return;
-    setSentAlert(`Naipadala ang SMS kay ${passengerName}: "${text}"`);
+    setSentAlert(`SMS sent to ${passengerName}: "${text}"`);
     setCustomMsg('');
     setTimeout(() => {
       setSentAlert(null);
@@ -72,7 +69,7 @@ export const DriverCommunicationModal: React.FC<DriverCommunicationModalProps> =
       <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
         <Box>
           <Typography sx={{ fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>
-            Makipag-ugnayan sa Pasahero
+            Contact Passenger
           </Typography>
           <Typography sx={{ fontSize: '13px', color: '#64748B' }}>
             {passengerName} ({passengerPhone})
@@ -104,14 +101,15 @@ export const DriverCommunicationModal: React.FC<DriverCommunicationModalProps> =
             backgroundColor: '#1E8E3E',
             fontWeight: 800,
             fontSize: '14.5px',
+            textTransform: 'none',
             '&:hover': { backgroundColor: '#137333' },
           }}
         >
-          Tawagan ang Pasahero (Native Call)
+          Call Passenger
         </Button>
 
         <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', mt: 1 }}>
-          Mabilisang SMS Templates (Quick Templates)
+          Quick SMS Templates
         </Typography>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -143,7 +141,7 @@ export const DriverCommunicationModal: React.FC<DriverCommunicationModalProps> =
           <TextField
             fullWidth
             size="small"
-            placeholder="I-type ang mensahe..."
+            placeholder="Type a message..."
             value={customMsg}
             onChange={(e) => setCustomMsg(e.target.value)}
             sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
@@ -152,7 +150,13 @@ export const DriverCommunicationModal: React.FC<DriverCommunicationModalProps> =
             variant="contained"
             onClick={() => handleSend(customMsg)}
             disabled={!customMsg.trim()}
-            sx={{ borderRadius: '12px', backgroundColor: '#FF6B00', minWidth: '48px', px: 2 }}
+            sx={{
+              borderRadius: '12px',
+              backgroundColor: '#FF6B00',
+              minWidth: 48,
+              px: 2,
+              '&:hover': { backgroundColor: '#E66000' },
+            }}
           >
             <SendIcon fontSize="small" />
           </Button>
@@ -161,3 +165,5 @@ export const DriverCommunicationModal: React.FC<DriverCommunicationModalProps> =
     </Dialog>
   );
 };
+
+export default DriverCommunicationModal;

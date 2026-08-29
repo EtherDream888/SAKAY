@@ -6,7 +6,6 @@ import {
   Paper,
   Button,
   IconButton,
-  Chip,
   Avatar,
   Dialog,
   DialogTitle,
@@ -109,10 +108,10 @@ export const DriverNavigation: React.FC = () => {
         </Box>
         <Box sx={{ flex: 1 }}>
           <Typography sx={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase' }}>
-            SUSUNOD NA DIREKSYON (IN 200M)
+            NEXT DIRECTION (IN 200M)
           </Typography>
           <Typography sx={{ fontSize: '14px', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.2 }}>
-            Kumanan sa JP Rizal St. patungo sa pickup point
+            Turn right onto JP Rizal St. towards pickup point
           </Typography>
         </Box>
       </Paper>
@@ -165,11 +164,11 @@ export const DriverNavigation: React.FC = () => {
         {/* ETA & Distance */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: '10px 14px', borderRadius: '14px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0' }}>
           <Box>
-            <Typography sx={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>ORAS NG DATING (ETA)</Typography>
-            <Typography sx={{ fontSize: '17px', fontWeight: 900, color: '#0F172A' }}>{eta} minuto</Typography>
+            <Typography sx={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>ESTIMATED ARRIVAL (ETA)</Typography>
+            <Typography sx={{ fontSize: '17px', fontWeight: 900, color: '#0F172A' }}>{eta} mins</Typography>
           </Box>
           <Box sx={{ textAlign: 'right' }}>
-            <Typography sx={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>PAMASAHE</Typography>
+            <Typography sx={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>FARE</Typography>
             <Typography sx={{ fontSize: '17px', fontWeight: 900, color: '#FF6B00' }}>₱{fare.toFixed(2)}</Typography>
           </Box>
         </Box>
@@ -190,7 +189,7 @@ export const DriverNavigation: React.FC = () => {
             '&:hover': { backgroundColor: '#E66000' },
           }}
         >
-          Dumating na sa Pickup (Driver Arrived)
+          Driver Arrived at Pickup
         </Button>
       </Paper>
 
@@ -218,11 +217,11 @@ export const DriverNavigation: React.FC = () => {
         }}
       >
         <DialogTitle sx={{ fontWeight: 800, fontSize: '17px', color: '#0F172A', textAlign: 'center' }}>
-          Aktibo ang Pag-navigate sa Pickup
+          Active Navigation En Route
         </DialogTitle>
         <DialogContent sx={{ textAlign: 'center', py: 1 }}>
           <Typography sx={{ fontSize: '13.5px', color: '#475569', lineHeight: 1.5 }}>
-            Kasalukuyan kang papunta sa pickup point ni <strong>{passengerName}</strong>. Nais mo bang kanselahin ang biyahe at bumalik sa Home?
+            You are currently en route to the pickup point of <strong>{passengerName}</strong>. Do you wish to cancel this navigation and return to Home?
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 2, pb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -239,7 +238,7 @@ export const DriverNavigation: React.FC = () => {
               '&:hover': { backgroundColor: '#E66000' },
             }}
           >
-            Manatili sa Navigation
+            Stay in Navigation
           </Button>
           <Button
             fullWidth
@@ -253,7 +252,7 @@ export const DriverNavigation: React.FC = () => {
               textTransform: 'none',
             }}
           >
-            Kanselahin at Bumalik sa Home
+            Cancel and Return to Home
           </Button>
         </DialogActions>
       </Dialog>

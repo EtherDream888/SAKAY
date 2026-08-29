@@ -16,7 +16,6 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 import { MOCK_DRIVER_HISTORY, DriverEarningRecord } from '../../../mockData/driverMockData';
 
@@ -32,7 +31,7 @@ export const DriverTripHistory: React.FC = () => {
           <ArrowBackIcon />
         </IconButton>
         <Typography sx={{ fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>
-          Kasaysayan ng mga Biyahe
+          Trip History
         </Typography>
       </Box>
 
@@ -80,7 +79,7 @@ export const DriverTripHistory: React.FC = () => {
             </Box>
 
             <Typography sx={{ fontSize: '12px', color: '#64748B' }}>
-              Pasahero: <strong>{trip.passengerName}</strong> • {trip.distanceKm} km • {trip.date}, {trip.time}
+              Passenger: <strong>{trip.passengerName}</strong> • {trip.distanceKm} km • {trip.date}, {trip.time}
             </Typography>
 
             <Divider sx={{ my: 0.5 }} />
@@ -119,7 +118,7 @@ export const DriverTripHistory: React.FC = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <ReceiptLongIcon sx={{ color: '#FF6B00' }} />
               <Typography sx={{ fontWeight: 800, fontSize: '16px', color: '#0F172A' }}>
-                Detalye ng Biyahe
+                Trip Details
               </Typography>
             </Box>
             <Chip
@@ -133,32 +132,32 @@ export const DriverTripHistory: React.FC = () => {
               <Typography sx={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>BOOKING CODE</Typography>
               <Typography sx={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{selectedTrip.bookingCode}</Typography>
               <Typography sx={{ fontSize: '12px', color: '#64748B', mt: 0.5 }}>
-                Petsa: {selectedTrip.date} • {selectedTrip.time}
+                Date: {selectedTrip.date} • {selectedTrip.time}
               </Typography>
             </Box>
 
             <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#0F172A', mb: 0.5 }}>
-              PASAHERO
+              PASSENGER
             </Typography>
             <Typography sx={{ fontSize: '14px', color: '#334155', mb: 1.5 }}>
               {selectedTrip.passengerName}
             </Typography>
 
             <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#0F172A', mb: 0.5 }}>
-              RUTA AT DISTANSYA
+              ROUTE & DISTANCE
             </Typography>
             <Typography sx={{ fontSize: '13px', color: '#334155', mb: 0.5 }}>
-              <strong>Mula:</strong> {selectedTrip.pickup}
+              <strong>From:</strong> {selectedTrip.pickup}
             </Typography>
             <Typography sx={{ fontSize: '13px', color: '#334155', mb: 1.5 }}>
-              <strong>Patungo:</strong> {selectedTrip.dropoff} ({selectedTrip.distanceKm} km)
+              <strong>To:</strong> {selectedTrip.dropoff} ({selectedTrip.distanceKm} km)
             </Typography>
 
             <Divider sx={{ my: 1.5 }} />
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
-                Kabuuang Pamasahe:
+                Total Fare:
               </Typography>
               <Typography sx={{ fontSize: '18px', fontWeight: 900, color: '#FF6B00' }}>
                 ₱{selectedTrip.fareAmount.toFixed(2)}
@@ -178,7 +177,7 @@ export const DriverTripHistory: React.FC = () => {
                 textTransform: 'none',
               }}
             >
-              Isara (Close)
+              Close
             </Button>
           </DialogActions>
         </Dialog>
@@ -186,3 +185,5 @@ export const DriverTripHistory: React.FC = () => {
     </Box>
   );
 };
+
+export default DriverTripHistory;
