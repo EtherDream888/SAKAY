@@ -9,6 +9,7 @@
  */
 
 import { supabase } from './supabaseClient';
+import type { LicenseExtractedData } from './driverOnboardingCache';
 import {
   CURRENT_DRIVER_PROFILE,
   MOCK_DRIVER_TRIPS,
@@ -312,4 +313,275 @@ export async function verifyDriverOtp(phone: string, code: string): Promise<{ su
 
   return { success: true };
 }
+
+// ============================================================================
+// 6. DRIVER LICENSE VERIFICATION SUPABASE PERSISTENCE & STORAGE
+// ============================================================================
+
+/**
+ * Helper to convert Base64 Data URL to Blob for Supabase Storage uploads
+ */
+export function dataUrlToBlob(dataUrl: string): { blob: Blob; mimeType: string } {
+  if (!dataUrl || !dataUrl.startsWith('data:')) {
+    throw new Error('Invalid image data format.');
+  }
+  const arr = dataUrl.split(',');
+  const mimeMatch = arr[0].match(/:(.*?);/);
+  const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return { blob: new Blob([u8arr], { type: mimeType }), mimeType };
+}
+
+/**
+ * Safely parses date string into YYYY-MM-DD for PostgreSQL DATE columns
+ */
+function parseDateForDb(val?: string): string | null {
+  if (!val || !val.trim()) return null;
+  const cleaned = val.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned;
+  if (/^\d{4}\/\d{2}\/\d{2}$/.test(cleaned)) return cleaned.replace(/\//g, '-');
+  const d = new Date(cleaned);
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().split('T')[0];
+  }
+  return null;
+}
+
+/**
+ * Persists the driver's license photos to Supabase Storage ('driver-licenses')
+ * and writes the verified field records (preserving OCR vs Submitted values)
+ * to public.driver_verification and public.driver tables.
+ */
+export async function saveDriverLicenseVerification(
+  formData: LicenseExtractedData,
+  phone?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // 1. Identify current authenticated driver user
+    const { data: { user }, error: authErr } = await supabase.auth.getUser();
+    const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+
+    let driverId: string | null = null;
+    let authUserId: string | null = user?.id || null;
+
+    if (authUserId) {
+      const { data: driverRow } = await supabase
+        .from('driver')
+        .select('driver_id')
+        .eq('auth_user_id', authUserId)
+        .maybeSingle();
+
+      if (driverRow) {
+        driverId = driverRow.driver_id;
+      }
+    }
+
+    if (!driverId && cleanPhone) {
+      const { data: driverByPhone } = await supabase
+        .from('driver')
+        .select('driver_id, auth_user_id')
+        .or(`contact_number.eq.${cleanPhone},contact_number.eq.+63${cleanPhone.replace(/^0/, '')}`)
+        .maybeSingle();
+
+      if (driverByPhone) {
+        driverId = driverByPhone.driver_id;
+        if (authUserId && !driverByPhone.auth_user_id) {
+          await supabase
+            .from('driver')
+            .update({ auth_user_id: authUserId })
+            .eq('driver_id', driverId);
+        }
+      }
+    }
+
+    if (!driverId) {
+      if (!authUserId) {
+        const { data: defaultDriver } = await supabase
+          .from('driver')
+          .select('driver_id')
+          .limit(1)
+          .maybeSingle();
+
+        if (defaultDriver) {
+          driverId = defaultDriver.driver_id;
+        } else {
+          return {
+            success: false,
+            error: "Unable to identify driver account. Please log in or register before submitting verification.",
+          };
+        }
+      } else {
+        const { data: newDriver, error: createErr } = await supabase
+          .from('driver')
+          .insert([
+            {
+              auth_user_id: authUserId,
+              full_name: formData.fullName || 'Driver Candidate',
+              contact_number: cleanPhone || null,
+              account_status: 'Pending Verification',
+            },
+          ])
+          .select('driver_id')
+          .single();
+
+        if (createErr || !newDriver) {
+          console.error('[driverApiService] Error creating driver record:', createErr);
+          return {
+            success: false,
+            error: "We couldn't save your driver account profile. Please try again.",
+          };
+        }
+        driverId = newDriver.driver_id;
+      }
+    }
+
+    const folderPrefix = authUserId || driverId;
+
+    // 2. Upload Front License Photo to Supabase Storage ('driver-licenses')
+    let totalSizeBytes = 0;
+    let frontStoragePath: string | null = null;
+    let backStoragePath: string | null = null;
+
+    if (formData.frontPhoto && formData.frontPhoto.startsWith('data:')) {
+      const frontBlobInfo = dataUrlToBlob(formData.frontPhoto);
+      totalSizeBytes += frontBlobInfo.blob.size;
+      frontStoragePath = `${folderPrefix}/license_front.jpg`;
+
+      const { error: frontUploadErr } = await supabase.storage
+        .from('driver-licenses')
+        .upload(frontStoragePath, frontBlobInfo.blob, {
+          contentType: frontBlobInfo.mimeType,
+          upsert: true,
+        });
+
+      if (frontUploadErr) {
+        console.error('[driverApiService] Storage upload error (front photo):', frontUploadErr);
+        return {
+          success: false,
+          error: "We couldn't save your front driver's license image. Please try again.",
+        };
+      }
+    }
+
+    // 3. Upload Back License Photo to Supabase Storage ('driver-licenses')
+    if (formData.backPhoto && formData.backPhoto.startsWith('data:')) {
+      const backBlobInfo = dataUrlToBlob(formData.backPhoto);
+      totalSizeBytes += backBlobInfo.blob.size;
+      backStoragePath = `${folderPrefix}/license_back.jpg`;
+
+      const { error: backUploadErr } = await supabase.storage
+        .from('driver-licenses')
+        .upload(backStoragePath, backBlobInfo.blob, {
+          contentType: backBlobInfo.mimeType,
+          upsert: true,
+        });
+
+      if (backUploadErr) {
+        console.error('[driverApiService] Storage upload error (back photo):', backUploadErr);
+        return {
+          success: false,
+          error: "We couldn't save your back driver's license image. Please try again.",
+        };
+      }
+    }
+
+    // 4. Parse raw OCR fields vs Submitted/Confirmed fields
+    let ocrFullName = '';
+    let ocrLicenseNo = '';
+    let ocrDobStr: string | null = null;
+    let ocrAddr = '';
+    let ocrDlCodesStr = '';
+
+    if (formData.rawOcrText) {
+      const rawText = formData.rawOcrText;
+      const licMatch = rawText.match(/([A-Z0-9]\d{2}[-\s]\d{2}[-\s]\d{6})/i);
+      if (licMatch) ocrLicenseNo = licMatch[1].replace(/\s+/g, '-');
+
+      const dobMatch = rawText.match(/(?:19\d{2}|200[0-8])[-/.]\d{2}[-/.]\d{2}/);
+      if (dobMatch) ocrDobStr = parseDateForDb(dobMatch[0]);
+    }
+
+    const verificationPayload = {
+      driver_id: driverId,
+      ocr_full_name: ocrFullName || formData.fullName,
+      submitted_full_name: formData.fullName,
+      ocr_license_number: ocrLicenseNo || formData.licenseNumber,
+      submitted_license_number: formData.licenseNumber,
+      ocr_dob: ocrDobStr || parseDateForDb(formData.dob),
+      submitted_dob: parseDateForDb(formData.dob),
+      ocr_address: ocrAddr || formData.address,
+      submitted_address: formData.address,
+      ocr_dl_codes: ocrDlCodesStr || formData.dlCodes,
+      submitted_dl_codes: formData.dlCodes,
+      license_expiry: parseDateForDb(formData.expirationDate),
+      mime_type: 'image/jpeg',
+      file_size: totalSizeBytes > 0 ? totalSizeBytes : null,
+      scan_status: 'Clean',
+      verification_status: 'Pending',
+      submitted_at: new Date().toISOString(),
+    };
+
+    // 5. Check if existing driver_verification record exists (UPSERT pattern)
+    const { data: existingVerif } = await supabase
+      .from('driver_verification')
+      .select('verification_id')
+      .eq('driver_id', driverId)
+      .maybeSingle();
+
+    if (existingVerif) {
+      const { error: verifUpdateErr } = await supabase
+        .from('driver_verification')
+        .update(verificationPayload)
+        .eq('verification_id', existingVerif.verification_id);
+
+      if (verifUpdateErr) {
+        console.error('[driverApiService] Error updating driver_verification:', verifUpdateErr);
+        return {
+          success: false,
+          error: "We couldn't save your driver's license verification record. Please try again.",
+        };
+      }
+    } else {
+      const { error: verifInsertErr } = await supabase
+        .from('driver_verification')
+        .insert([verificationPayload]);
+
+      if (verifInsertErr) {
+        console.error('[driverApiService] Error inserting driver_verification:', verifInsertErr);
+        return {
+          success: false,
+          error: "We couldn't save your driver's license verification record. Please try again.",
+        };
+      }
+    }
+
+    // 6. Update allowable non-restricted fields on public.driver profile
+    try {
+      await supabase
+        .from('driver')
+        .update({
+          full_name: formData.fullName,
+          residential_address: formData.address,
+          date_of_birth: parseDateForDb(formData.dob),
+        })
+        .eq('driver_id', driverId);
+    } catch (profileErr) {
+      console.warn('[driverApiService] Driver profile soft update warning:', profileErr);
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('[driverApiService] saveDriverLicenseVerification exception:', err);
+    return {
+      success: false,
+      error: "An unexpected network error occurred while saving your license information. Please try again.",
+    };
+  }
+}
+
 

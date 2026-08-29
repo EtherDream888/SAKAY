@@ -11,6 +11,7 @@ import {
   DialogActions,
   Button,
   Radio,
+  Alert,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -23,6 +24,7 @@ import {
   saveLicenseScanData,
   LicenseExtractedData,
 } from '../../../services/driverOnboardingCache';
+import { saveDriverLicenseVerification } from '../../../services/driverApiService';
 
 export const DriverConfirmLicenseInfo: React.FC = () => {
   const navigate = useNavigate();
@@ -49,6 +51,8 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
   };
 
   const [formData, setFormData] = useState<LicenseExtractedData>(initial);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editField, setEditField] = useState<{
     key: keyof LicenseExtractedData;
@@ -77,11 +81,37 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
     setEditField(null);
   };
 
-  const handleContinue = () => {
-    // Persist verified license details into offline cache
+  const handleContinue = async () => {
+    if (submitting) return;
+
+    if (!formData.fullName || !formData.fullName.trim()) {
+      setSubmitError('Please enter your full name before continuing.');
+      return;
+    }
+
+    if (!formData.licenseNumber || !formData.licenseNumber.trim()) {
+      setSubmitError("Please enter your driver's license number before continuing.");
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    // 1. Persist offline cache backup
     saveLicenseScanData(formData, state?.phone || '');
 
-    // Advance to driver status monitor
+    // 2. Upload license photos to Supabase Storage & insert/update driver_verification in Supabase
+    const res = await saveDriverLicenseVerification(formData, state?.phone);
+
+    if (!res.success) {
+      setSubmitting(false);
+      setSubmitError(res.error || "We couldn't save your driver's license verification details. Please try again.");
+      return;
+    }
+
+    setSubmitting(false);
+
+    // 3. Advance to driver status monitor only on successful database persistence
     navigate('/driver/status', {
       state: {
         driverName: formData.fullName || state?.driverName || '',
@@ -169,11 +199,18 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
             color: '#334155',
             lineHeight: 1.45,
             fontWeight: 400,
-            mb: 3,
+            mb: 2.5,
           }}
         >
           {t.confirmInfoSubtitle}
         </Typography>
+
+        {/* User-facing error feedback alert */}
+        {submitError && (
+          <Alert severity="error" sx={{ mb: 2.5, borderRadius: '12px' }}>
+            {submitError}
+          </Alert>
+        )}
 
         {/* Extracted Details Cards List */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -488,6 +525,8 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
         <PrimaryButton
           fullWidth
           onClick={handleContinue}
+          loading={submitting}
+          disabled={submitting}
           sx={{
             height: '56px',
             borderRadius: '16px',
@@ -498,7 +537,7 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
             '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
           }}
         >
-          {t.continue}
+          {submitting ? 'Saving...' : t.continue}
         </PrimaryButton>
       </Box>
 
