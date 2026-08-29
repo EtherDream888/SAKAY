@@ -8,6 +8,11 @@ import {
   Select,
   InputBase,
   Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
@@ -93,7 +98,6 @@ export function convertMmDdYyyyToIso(dateStr: string): string {
   return dateStr;
 }
 
-// Raw restriction code values ONLY
 const LTO_RESTRICTION_CODES = [
   'A1',
   'A',
@@ -104,14 +108,6 @@ const LTO_RESTRICTION_CODES = [
   'D',
   'BE',
   'CE',
-  '1',
-  '2',
-  '3',
-  '4',
-  '5',
-  'MT',
-  'AT',
-  '1, 2',
 ];
 
 const parseRestrictionList = (raw: string): string[] => {
@@ -128,8 +124,8 @@ interface SakayFormInputProps {
   isDate?: boolean;
   isGender?: boolean;
   isRestriction?: boolean;
-  onOpenCalendar?: (anchor: HTMLElement) => void;
   placeholder?: string;
+  onOpenCalendar?: (anchor: HTMLElement) => void;
   error?: boolean;
   helperText?: string;
 }
@@ -138,30 +134,35 @@ const SakayFormInput: React.FC<SakayFormInputProps> = ({
   label,
   value,
   onChange,
-  multiline = false,
-  rows = 1,
   isDate = false,
   isGender = false,
   isRestriction = false,
-  onOpenCalendar,
+  multiline = false,
+  rows = 1,
   placeholder,
-  error = false,
-  helperText = '',
+  onOpenCalendar,
+  error,
+  helperText,
 }) => {
   const [focused, setFocused] = useState(false);
-  const isFloating = focused || Boolean(value && value.length > 0) || isGender || isRestriction;
+  const isFloating = focused || Boolean(value) || isGender || isRestriction;
 
   return (
     <Box sx={{ width: '100%' }}>
       <Box
         sx={{
           width: '100%',
-          minHeight: multiline ? '84px' : '62px',
-          height: multiline ? 'auto' : '62px',
+          minHeight: isRestriction ? '68px' : multiline ? '84px' : '62px',
           borderRadius: '16px',
           backgroundColor: focused ? '#FFFFFF' : '#F1F3F5',
-          border: `1.5px solid ${error ? '#DC2626' : focused ? '#FF6B00' : '#E2E8F0'}`,
-          boxShadow: focused
+          border: error
+            ? '1.5px solid #DC2626'
+            : focused
+            ? '1.5px solid #FF6B00'
+            : '1.5px solid transparent',
+          boxShadow: error
+            ? '0 0 0 3px rgba(220, 38, 38, 0.12)'
+            : focused
             ? '0 0 0 3px rgba(255, 107, 0, 0.12)'
             : 'none',
           px: 2,
@@ -178,10 +179,10 @@ const SakayFormInput: React.FC<SakayFormInputProps> = ({
           sx={{
             position: 'absolute',
             left: '16px',
-            right: '16px',
-            top: isFloating ? '8px' : '50%',
+            right: isRestriction || isGender ? '36px' : '16px',
+            top: isFloating ? '6px' : '50%',
             transform: isFloating ? 'translateY(0)' : 'translateY(-50%)',
-            fontSize: isFloating ? '9.5px' : '15px',
+            fontSize: isFloating ? '9.5px' : '14px',
             fontWeight: isFloating ? 700 : 500,
             color: error ? '#DC2626' : focused ? '#FF6B00' : isFloating ? '#64748B' : '#94A3B8',
             letterSpacing: isFloating ? '0.5px' : '0px',
@@ -189,7 +190,6 @@ const SakayFormInput: React.FC<SakayFormInputProps> = ({
             userSelect: 'none',
             pointerEvents: 'none',
             whiteSpace: isFloating ? 'normal' : 'nowrap',
-            wordBreak: 'break-word',
             lineHeight: 1.15,
             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
             zIndex: 1,
@@ -204,7 +204,7 @@ const SakayFormInput: React.FC<SakayFormInputProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            mt: isFloating ? (multiline ? '20px' : '16px') : 0,
+            mt: isFloating ? (isRestriction ? '24px' : multiline ? '20px' : '16px') : 0,
             transition: 'margin-top 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           }}
         >
@@ -255,7 +255,7 @@ const SakayFormInput: React.FC<SakayFormInputProps> = ({
                 slotProps: {
                   paper: {
                     sx: {
-                      maxHeight: 92,
+                      maxHeight: 180,
                       borderRadius: '14px',
                       boxShadow: '0 10px 25px rgba(15, 23, 42, 0.14)',
                       border: '1px solid #E2E8F0',
@@ -303,7 +303,7 @@ const SakayFormInput: React.FC<SakayFormInputProps> = ({
                 onChange={(e) => onChange(formatDateInput(e.target.value))}
                 onFocus={() => setFocused(true)}
                 onBlur={() => setFocused(false)}
-                placeholder={isFloating ? (placeholder || "MM-DD-YYYY") : ""}
+                placeholder={isFloating ? (placeholder || 'MM-DD-YYYY') : ''}
                 fullWidth
                 inputProps={{ inputMode: 'numeric', pattern: '[0-9-]*' }}
                 sx={{
@@ -338,7 +338,7 @@ const SakayFormInput: React.FC<SakayFormInputProps> = ({
               onBlur={() => setFocused(false)}
               multiline={multiline}
               rows={rows}
-              placeholder={isFloating ? placeholder : ""}
+              placeholder={isFloating ? placeholder : ''}
               fullWidth
               sx={{
                 fontSize: '15px',
@@ -372,8 +372,10 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
     phone?: string;
     driverName?: string;
     extracted?: LicenseExtractedData;
+    isEditMode?: boolean;
   } | undefined;
 
+  const isEditMode = Boolean(state?.isEditMode);
   const cached = getCachedLicenseData();
   const initial: LicenseExtractedData = state?.extracted || cached || {
     frontPhoto: '',
@@ -392,30 +394,14 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
     scannedAt: new Date().toISOString(),
   };
 
-  if (initial.fullName && (!initial.firstName || !initial.lastName)) {
-    const split = splitNameParts(initial.fullName);
-    initial.firstName = initial.firstName || split.firstName;
-    initial.middleName = initial.middleName || split.middleName;
-    initial.lastName = initial.lastName || split.lastName;
-    initial.suffix = initial.suffix || split.suffix;
-  }
-
-  if (initial.dob) {
-    initial.dob = convertIsoToMmDdYyyy(initial.dob);
-  }
-  if (initial.expirationDate) {
-    initial.expirationDate = convertIsoToMmDdYyyy(initial.expirationDate);
-  }
-  if (initial.licenseNumber) {
-    initial.licenseNumber = formatDriverLicenseNumberInput(initial.licenseNumber);
-  }
-  if (!initial.dlCodes) {
-    initial.dlCodes = 'A1';
-  }
+  if (initial.dob) initial.dob = convertIsoToMmDdYyyy(initial.dob);
+  if (initial.expirationDate) initial.expirationDate = convertIsoToMmDdYyyy(initial.expirationDate);
+  if (initial.licenseNumber) initial.licenseNumber = formatDriverLicenseNumberInput(initial.licenseNumber);
 
   const [formData, setFormData] = useState<LicenseExtractedData>(initial);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showBackModal, setShowBackModal] = useState(false);
 
   const isFormValid = Boolean(
     (formData.firstName?.trim() || formData.fullName?.trim()) &&
@@ -441,25 +427,47 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
     const yyyy = date.getFullYear();
     const mm = String(date.getMonth() + 1).padStart(2, '0');
     const dd = String(date.getDate()).padStart(2, '0');
-    const formattedMmDdYyyy = `${mm}-${dd}-${yyyy}`;
-    handleFieldChange(activeDateField, formattedMmDdYyyy);
+    setFormData((prev) => ({ ...prev, [activeDateField]: `${mm}-${dd}-${yyyy}` }));
     handleCloseCalendar();
   };
 
   const handleFieldChange = (field: keyof LicenseExtractedData, value: string) => {
     let finalValue = value;
-    if (field === 'licenseNumber') {
-      finalValue = formatDriverLicenseNumberInput(value);
-    }
+    if (field === 'licenseNumber') finalValue = formatDriverLicenseNumberInput(value);
     setFormData((prev) => {
       const next = { ...prev, [field]: finalValue };
-      if (field === 'firstName' || field === 'middleName' || field === 'lastName' || field === 'suffix') {
-        next.fullName = [next.firstName, next.middleName, next.lastName, next.suffix]
-          .filter(Boolean)
-          .join(' ');
+      if (['firstName', 'middleName', 'lastName', 'suffix'].includes(field)) {
+        next.fullName = [next.firstName, next.middleName, next.lastName, next.suffix].filter(Boolean).join(' ');
       }
       return next;
     });
+  };
+
+  const handleBackClick = () => {
+    if (isEditMode) {
+      navigate('/driver/confirm-all-info', { state });
+    } else {
+      setShowBackModal(true);
+    }
+  };
+
+  const handleConfirmBackModal = () => {
+    setShowBackModal(false);
+    navigate('/driver/review-license-back', { state });
+  };
+
+  const parseDateForCalendar = (val: string): Date => {
+    if (!val) return new Date();
+    const mmDdMatch = val.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    if (mmDdMatch) {
+      return new Date(parseInt(mmDdMatch[3], 10), parseInt(mmDdMatch[1], 10) - 1, parseInt(mmDdMatch[2], 10));
+    }
+    const isoMatch = val.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (isoMatch) {
+      return new Date(parseInt(isoMatch[1], 10), parseInt(isoMatch[2], 10) - 1, parseInt(isoMatch[3], 10));
+    }
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? new Date() : d;
   };
 
   const handleContinue = async () => {
@@ -481,13 +489,15 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
       const saveRes = await saveDriverLicenseVerification(payloadToSave, targetPhone);
       if (saveRes.success) {
         saveLicenseScanData(formData, targetPhone);
-        navigate('/driver/account-verification-submitted', {
+        const targetRoute = isEditMode ? '/driver/confirm-all-info' : '/driver/mtop-instructions';
+        navigate(targetRoute, {
           replace: true,
           state: {
             ...state,
             extracted: formData,
             driverId: saveRes.driverId,
             verificationId: saveRes.verificationId,
+            isEditMode: false,
           },
         });
       } else {
@@ -499,20 +509,6 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const parseDateForCalendar = (val: string): Date => {
-    if (!val) return new Date();
-    const mmDdMatch = val.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-    if (mmDdMatch) {
-      return new Date(parseInt(mmDdMatch[3], 10), parseInt(mmDdMatch[1], 10) - 1, parseInt(mmDdMatch[2], 10));
-    }
-    const isoMatch = val.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (isoMatch) {
-      return new Date(parseInt(isoMatch[1], 10), parseInt(isoMatch[2], 10) - 1, parseInt(isoMatch[3], 10));
-    }
-    const d = new Date(val);
-    return isNaN(d.getTime()) ? new Date() : d;
   };
 
   return (
@@ -527,6 +523,64 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
         overflow: 'hidden',
       }}
     >
+      <Dialog
+        open={showBackModal}
+        onClose={() => setShowBackModal(false)}
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: '20px',
+              p: 1,
+              width: '100%',
+              maxWidth: '340px',
+            },
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, fontSize: '18px', color: '#0F172A', pb: 1 }}>
+          Bumalik sa pagkuha ng larawan?
+        </DialogTitle>
+        <DialogContent sx={{ py: 1 }}>
+          <Typography sx={{ fontSize: '14px', color: '#64748B', lineHeight: 1.45 }}>
+            Kapag bumalik ka, maaaring kailanganin mong kunan muli ng larawan ang iyong dokumento.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2, pt: 1, display: 'flex', gap: 1 }}>
+          <Button
+            onClick={() => setShowBackModal(false)}
+            sx={{
+              flex: 1,
+              height: '44px',
+              borderRadius: '12px',
+              backgroundColor: '#F1F3F5',
+              color: '#0F172A',
+              fontWeight: 700,
+              fontSize: '14px',
+              textTransform: 'none',
+              '&:hover': { backgroundColor: '#E2E8F0' },
+            }}
+          >
+            Manatili
+          </Button>
+          <Button
+            onClick={handleConfirmBackModal}
+            sx={{
+              flex: 1,
+              height: '44px',
+              borderRadius: '12px',
+              backgroundColor: '#FF6B00',
+              color: '#FFFFFF',
+              fontWeight: 700,
+              fontSize: '14px',
+              textTransform: 'none',
+              '&:hover': { backgroundColor: '#E05000' },
+            }}
+          >
+            Bumalik
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Box
         sx={{
           display: 'flex',
@@ -541,7 +595,7 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
         }}
       >
         <IconButton
-          onClick={() => navigate('/driver/review-license-back', { state })}
+          onClick={handleBackClick}
           sx={{
             width: 44,
             height: 44,
@@ -581,7 +635,7 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
             mb: 1.25,
           }}
         >
-          Kumpirmahin ang Iyong Impormasyon
+          {isEditMode ? 'Lisensya sa Pagmamaneho' : 'Kumpirmahin ang Iyong Impormasyon'}
         </Typography>
 
         <Typography
@@ -593,7 +647,9 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
             mb: 2.5,
           }}
         >
-          Pakisuri at kumpirmahin ang impormasyon ng iyong lisensya bago magpatuloy.
+          {isEditMode
+            ? 'Pakisuri at i-update ang impormasyon ng iyong lisensya.'
+            : 'Pakisuri at kumpirmahin ang impormasyon ng iyong lisensya bago magpatuloy.'}
         </Typography>
 
         {submitError && (
@@ -735,7 +791,7 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
             },
           }}
         >
-          Magpatuloy
+          {isEditMode ? 'Kumpirmahin' : 'Magpatuloy'}
         </PrimaryButton>
       </Box>
     </Box>

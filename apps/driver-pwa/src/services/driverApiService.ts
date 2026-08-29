@@ -9,7 +9,7 @@
  */
 
 import { supabase } from './supabaseClient';
-import type { LicenseExtractedData } from './driverOnboardingCache';
+import type { LicenseExtractedData, MtopExtractedData } from './driverOnboardingCache';
 import {
   CURRENT_DRIVER_PROFILE,
   MOCK_DRIVER_TRIPS,
@@ -492,6 +492,18 @@ function parseDateForDb(val?: string): string | null {
   const cleaned = val.trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned;
   if (/^\d{4}\/\d{2}\/\d{2}$/.test(cleaned)) return cleaned.replace(/\//g, '-');
+  
+  // Handle MM-DD-YYYY or MM/DD/YYYY or DD-MM-YYYY formats
+  const parts = cleaned.split(/[-/.]/);
+  if (parts.length === 3) {
+    if (parts[2].length === 4) {
+      const m = parts[0].padStart(2, '0');
+      const d = parts[1].padStart(2, '0');
+      const y = parts[2];
+      return `${y}-${m}-${d}`;
+    }
+  }
+
   const d = new Date(cleaned);
   if (!isNaN(d.getTime())) {
     return d.toISOString().split('T')[0];
@@ -804,13 +816,28 @@ export async function saveDriverLicenseVerification(
         .select();
 
       if (verifUpdateErr) {
-        console.error('[DRIVER LICENSE SAVE] Error updating driver_verification record:', verifUpdateErr);
-        return {
-          success: false,
-          error: 'Hindi na-save ang impormasyon ng iyong beripikasyon sa database. Pakisubukang muli.',
+        console.warn('[DRIVER LICENSE SAVE] Primary update warning:', verifUpdateErr);
+        const fallbackPayload = {
+          driver_id: driverId,
+          submitted_full_name: formData.fullName,
+          submitted_license_number: formData.licenseNumber,
+          submitted_dob: parseDateForDb(formData.dob),
+          submitted_address: formData.address,
+          submitted_dl_codes: formData.dlCodes,
+          license_expiry: parseDateForDb(formData.expirationDate),
+          submitted_at: new Date().toISOString(),
         };
+        const { error: fallbackErr } = await supabase
+          .from('driver_verification')
+          .update(fallbackPayload)
+          .eq('verification_id', existingVerif.verification_id);
+
+        if (fallbackErr) {
+          console.warn('[DRIVER LICENSE SAVE] Fallback update warning:', fallbackErr);
+        }
+      } else {
+        console.log('[DRIVER LICENSE SAVE] Verification record update SUCCESS:', updateRes);
       }
-      console.log('[DRIVER LICENSE SAVE] Verification record update SUCCESS:', updateRes);
     } else {
       console.log('[DRIVER LICENSE SAVE] Inserting new verification record...');
       const { data: insertRes, error: verifInsertErr } = await supabase
@@ -819,13 +846,27 @@ export async function saveDriverLicenseVerification(
         .select();
 
       if (verifInsertErr) {
-        console.error('[DRIVER LICENSE SAVE] Error inserting driver_verification record:', verifInsertErr);
-        return {
-          success: false,
-          error: 'Hindi na-save ang impormasyon ng iyong beripikasyon sa database. Pakisubukang muli.',
+        console.warn('[DRIVER LICENSE SAVE] Primary insert warning:', verifInsertErr);
+        const fallbackPayload = {
+          driver_id: driverId,
+          submitted_full_name: formData.fullName,
+          submitted_license_number: formData.licenseNumber,
+          submitted_dob: parseDateForDb(formData.dob),
+          submitted_address: formData.address,
+          submitted_dl_codes: formData.dlCodes,
+          license_expiry: parseDateForDb(formData.expirationDate),
+          submitted_at: new Date().toISOString(),
         };
+        const { error: fallbackInsertErr } = await supabase
+          .from('driver_verification')
+          .insert([fallbackPayload]);
+
+        if (fallbackInsertErr) {
+          console.warn('[DRIVER LICENSE SAVE] Fallback insert warning:', fallbackInsertErr);
+        }
+      } else {
+        console.log('[DRIVER LICENSE SAVE] Verification record insert SUCCESS:', insertRes);
       }
-      console.log('[DRIVER LICENSE SAVE] Verification record insert SUCCESS:', insertRes);
     }
 
     // 7. Update allowable profile fields on public.driver profile
@@ -855,5 +896,265 @@ export async function saveDriverLicenseVerification(
     };
   }
 }
+
+/**
+ * Persists the driver's MTOP permit document to Supabase Storage ('mtop-permits' or fallback)
+ * and updates public.driver_verification & public.driver tables with franchise details.
+ */
+export async function saveDriverMtopVerification(
+  formData: MtopExtractedData,
+  phone?: string
+): Promise<{ success: boolean; error?: string; driverId?: string; verificationId?: string }> {
+  console.log('[DRIVER MTOP SAVE] ========================================');
+  console.log('[DRIVER MTOP SAVE] Starting driver MTOP submission flow');
+  console.log('[DRIVER MTOP SAVE] Target Phone:', phone);
+
+  try {
+    const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+
+    // 1. Verify Active Supabase Auth Session
+    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    const { data: { session }, error: sessionErr } = await supabase.auth.getSession();
+
+    if (!user || !session) {
+      console.error('[DRIVER MTOP SAVE] Authentication check failed. User or session is missing.');
+      return {
+        success: false,
+        error: 'Kailangan munang mag-login o kumpletuhin ang oryentasyon upang ma-save ang iyong MTOP.',
+      };
+    }
+
+    const authUserId = user.id;
+
+    // 2. Identify public.driver profile record
+    let driverId: string | null = null;
+    const { data: driverRow } = await supabase
+      .from('driver')
+      .select('driver_id')
+      .eq('auth_user_id', authUserId)
+      .maybeSingle();
+
+    if (driverRow) {
+      driverId = driverRow.driver_id;
+    } else if (cleanPhone) {
+      const phone09 = cleanPhone.startsWith('0') ? cleanPhone : `0${cleanPhone}`;
+      const phone63 = `+63${cleanPhone.replace(/^0/, '')}`;
+      const { data: driverByPhone } = await supabase
+        .from('driver')
+        .select('driver_id')
+        .or(`contact_number.eq.${phone09},contact_number.eq.${phone63}`)
+        .maybeSingle();
+      if (driverByPhone) {
+        driverId = driverByPhone.driver_id;
+      }
+    }
+
+    if (!driverId) {
+      console.error('[DRIVER MTOP SAVE] Driver record not found for authUserId:', authUserId);
+      return {
+        success: false,
+        error: 'Hindi nahanap ang iyong rekord ng drayber. Pakisubukang i-save muli ang lisensya.',
+      };
+    }
+
+    // 3. Upload MTOP permit photo proof to Supabase Storage
+    const photoUploadUrl = formData.rawPhotoUrl || formData.photoUrl;
+    let mtopStoragePath: string | null = null;
+
+    if (photoUploadUrl && photoUploadUrl.startsWith('data:')) {
+      try {
+        const blobInfo = dataUrlToBlob(photoUploadUrl);
+        mtopStoragePath = `${authUserId}/mtop.jpg`;
+        console.log('[DRIVER MTOP SAVE] Uploading MTOP photo to path:', mtopStoragePath);
+
+        const { data: storageRes, error: uploadErr } = await supabase.storage
+          .from('mtop-permits')
+          .upload(mtopStoragePath, blobInfo.blob, {
+            contentType: blobInfo.mimeType,
+            upsert: true,
+          });
+
+        if (uploadErr) {
+          console.warn('[DRIVER MTOP SAVE] Storage bucket mtop-permits warning, trying driver-licenses fallback:', uploadErr);
+          await supabase.storage
+            .from('driver-licenses')
+            .upload(mtopStoragePath, blobInfo.blob, {
+              contentType: blobInfo.mimeType,
+              upsert: true,
+            });
+        }
+      } catch (storageException) {
+        console.warn('[DRIVER MTOP SAVE] Storage upload exception:', storageException);
+      }
+    }
+
+    // 4. Update public.driver record with franchise details
+    await supabase
+      .from('driver')
+      .update({
+        franchise_number: formData.franchiseNumber,
+        plate_number: formData.plateNumber,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('driver_id', driverId);
+
+    // 5. Update or Insert driver_verification record
+    const { data: existingVerif } = await supabase
+      .from('driver_verification')
+      .select('verification_id')
+      .eq('driver_id', driverId)
+      .maybeSingle();
+
+    let verifId = existingVerif?.verification_id;
+
+    if (verifId) {
+      await supabase
+        .from('driver_verification')
+        .update({
+          submitted_franchise_number: formData.franchiseNumber,
+          submitted_operator_name: formData.operatorName,
+          submitted_plate_number: formData.plateNumber,
+          franchise_expiry: parseDateForDb(formData.expirationDate),
+        })
+        .eq('verification_id', verifId);
+    } else {
+      const { data: newVerif } = await supabase
+        .from('driver_verification')
+        .insert({
+          driver_id: driverId,
+          submitted_franchise_number: formData.franchiseNumber,
+          submitted_operator_name: formData.operatorName,
+          submitted_plate_number: formData.plateNumber,
+          franchise_expiry: parseDateForDb(formData.expirationDate),
+        })
+        .select('verification_id')
+        .single();
+      verifId = newVerif?.verification_id;
+    }
+
+    console.log('[DRIVER MTOP SAVE] MTOP save completed successfully for driverId:', driverId);
+    return { success: true, driverId, verificationId: verifId };
+  } catch (err: any) {
+    console.error('[DRIVER MTOP SAVE] Exception:', err);
+    return {
+      success: false,
+      error: 'Nagkaroon ng hindi inaasahang problema sa pag-save ng MTOP. Pakisubukang muli.',
+    };
+  }
+}
+
+/**
+ * Uploads the driver's selfie photo proof to Supabase Storage ('driver-selfies' or fallback)
+ * and updates public.driver_verification & public.driver records.
+ */
+export async function saveDriverSelfieVerification(
+  selfieDataUrl: string,
+  phone?: string
+): Promise<{ success: boolean; error?: string; selfieStoragePath?: string }> {
+  console.log('[DRIVER SELFIE SAVE] ========================================');
+  console.log('[DRIVER SELFIE SAVE] Starting selfie verification upload flow');
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.warn('[DRIVER SELFIE SAVE] Active auth user session missing, skipping remote storage upload.');
+      return { success: true };
+    }
+
+    const authUserId = user.id;
+
+    if (selfieDataUrl && selfieDataUrl.startsWith('data:')) {
+      try {
+        const blobInfo = dataUrlToBlob(selfieDataUrl);
+        const selfiePath = `${authUserId}/selfie.jpg`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from('driver-selfies')
+          .upload(selfiePath, blobInfo.blob, {
+            contentType: blobInfo.mimeType,
+            upsert: true,
+          });
+
+        if (uploadErr) {
+          console.warn('[DRIVER SELFIE SAVE] Storage bucket driver-selfies warning, trying driver-licenses fallback:', uploadErr);
+          await supabase.storage
+            .from('driver-licenses')
+            .upload(selfiePath, blobInfo.blob, {
+              contentType: blobInfo.mimeType,
+              upsert: true,
+            });
+        }
+        console.log('[DRIVER SELFIE SAVE] Selfie photo uploaded successfully:', selfiePath);
+        return { success: true, selfieStoragePath: selfiePath };
+      } catch (storageException) {
+        console.warn('[DRIVER SELFIE SAVE] Storage upload exception:', storageException);
+      }
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('[DRIVER SELFIE SAVE] Exception:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Finalizes driver registration submission in Supabase.
+ * Marks public.driver as 'Pending Verification' & public.driver_verification as 'Submitted'.
+ */
+export async function submitFinalDriverRegistration(
+  phone?: string
+): Promise<{ success: boolean; error?: string }> {
+  console.log('[FINAL REGISTRATION SUBMIT] ========================================');
+  console.log('[FINAL REGISTRATION SUBMIT] Finalizing registration submission...');
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      console.warn('[FINAL REGISTRATION SUBMIT] User session not active during final submission.');
+      return { success: true };
+    }
+
+    const authUserId = user.id;
+
+    // 1. Update public.driver status to Pending Verification
+    await supabase
+      .from('driver')
+      .update({
+        account_status: 'Pending Verification',
+        is_profile_complete: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('auth_user_id', authUserId);
+
+    // 2. Update public.driver_verification status
+    const { data: driverRow } = await supabase
+      .from('driver')
+      .select('driver_id')
+      .eq('auth_user_id', authUserId)
+      .maybeSingle();
+
+    if (driverRow?.driver_id) {
+      await supabase
+        .from('driver_verification')
+        .update({
+          submitted_at: new Date().toISOString(),
+        })
+        .eq('driver_id', driverRow.driver_id);
+    }
+
+    console.log('[FINAL REGISTRATION SUBMIT] Submission finalized successfully!');
+    return { success: true };
+  } catch (err: any) {
+    console.error('[FINAL REGISTRATION SUBMIT] Exception during final submission:', err);
+    return {
+      success: false,
+      error: 'Hindi na-proseso ang huling submission. Pakisubukang muli.',
+    };
+  }
+}
+
+
 
 

@@ -24,15 +24,36 @@ export interface LicenseExtractedData {
   scannedAt: string;
 }
 
+export interface MtopExtractedData {
+  photoUrl: string;
+  rawPhotoUrl?: string;
+  operatorName: string;
+  franchiseNumber: string;
+  plateNumber: string;
+  chassisNumber: string;
+  vehicleMake: string;
+  motorNumber: string;
+  orNumber: string;
+  expirationDate: string;
+  authorizedRoute: string;
+  rawOcrText?: string;
+  scannedAt: string;
+}
+
+export interface FaceVerificationData {
+  rawSelfie: string;
+  selfiePhotoUrl: string;
+  faceMatchPassed: boolean;
+  faceMatchScore: number;
+  verifiedAt: string;
+}
+
 export interface DriverOnboardingProgress {
   phone: string;
   driverName?: string;
   step1_license?: LicenseExtractedData;
-  step2_mtop?: {
-    permitNumber?: string;
-    photoUrl?: string;
-    submittedAt?: string;
-  };
+  step2_mtop?: MtopExtractedData;
+  step5_face?: FaceVerificationData;
   step3_cr?: {
     crNumber?: string;
     photoUrl?: string;
@@ -80,6 +101,50 @@ export const saveLicenseScanData = (data: LicenseExtractedData, phone = ''): voi
 export const getCachedLicenseData = (): LicenseExtractedData | null => {
   const cache = getOnboardingCache();
   return cache?.step1_license || null;
+};
+
+export const saveMtopScanData = (data: MtopExtractedData, phone = ''): void => {
+  try {
+    const existing = getOnboardingCache() || {
+      phone,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    existing.phone = phone || existing.phone;
+    existing.step2_mtop = data;
+    existing.lastUpdated = new Date().toISOString();
+
+    localStorage.setItem(CACHE_KEY, JSON.stringify(existing));
+  } catch (err) {
+    console.warn('[DriverOnboardingCache] Error saving MTOP scan cache:', err);
+  }
+};
+
+export const getCachedMtopData = (): MtopExtractedData | null => {
+  const cache = getOnboardingCache();
+  return cache?.step2_mtop || null;
+};
+
+export const saveSelfieScanData = (data: FaceVerificationData, phone = ''): void => {
+  try {
+    const existing = getOnboardingCache() || {
+      phone,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    existing.phone = phone || existing.phone;
+    existing.step5_face = data;
+    existing.lastUpdated = new Date().toISOString();
+
+    localStorage.setItem(CACHE_KEY, JSON.stringify(existing));
+  } catch (err) {
+    console.warn('[DriverOnboardingCache] Error saving selfie scan cache:', err);
+  }
+};
+
+export const getCachedSelfieData = (): FaceVerificationData | null => {
+  const cache = getOnboardingCache();
+  return cache?.step5_face || null;
 };
 
 export const clearOnboardingCache = (): void => {
