@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
-  TextField,
   InputAdornment,
   IconButton,
   Alert,
@@ -11,15 +10,17 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
-import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
+import { RegisterInput } from '../../../common/components/RegisterInput';
+import SakayPhoneInput from '../../../common/components/SakayPhoneInput';
 import { useLanguage } from '../../../utils/LanguageContext';
+import { supabase } from '../../../services/supabaseClient';
 
 export const formatMobileNumber = (value: string): string => {
   const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
 
   let afterPrefix = '';
   if (digits.startsWith('09')) {
@@ -35,18 +36,11 @@ export const formatMobileNumber = (value: string): string => {
   }
 
   afterPrefix = afterPrefix.slice(0, 9);
-
-  if (!afterPrefix) {
-    return '09';
-  }
+  if (!afterPrefix) return '09';
 
   const full = '09' + afterPrefix;
-  if (full.length <= 4) {
-    return full;
-  }
-  if (full.length <= 7) {
-    return `${full.slice(0, 4)} ${full.slice(4)}`;
-  }
+  if (full.length <= 4) return full;
+  if (full.length <= 7) return `${full.slice(0, 4)} ${full.slice(4)}`;
   return `${full.slice(0, 4)} ${full.slice(4, 7)} ${full.slice(7, 11)}`;
 };
 
@@ -54,81 +48,83 @@ export const DriverLogin: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
 
-  // Pre-filled demo credentials for fast review
-  const [phone, setPhone] = useState('0918 123 4567');
-  const [password, setPassword] = useState('DriverPass123!');
+  // Input fields start EMPTY (no prefilled default credentials)
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const [phoneFocused, setPhoneFocused] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
-
-  const handlePhoneFocus = () => {
-    setPhoneFocused(true);
-    if (!phone || phone.replace(/\D/g, '').length < 2) {
-      setPhone('09');
-    }
-  };
-
-  const handlePhoneBlur = () => {
-    setPhoneFocused(false);
-    if (!phone || phone.replace(/\D/g, '').length < 2) {
-      setPhone('09');
-    }
-  };
-
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatMobileNumber(e.target.value);
+  const handlePhoneChange = (val: string) => {
+    const formatted = formatMobileNumber(val);
     setPhone(formatted);
   };
 
-  const handlePhoneKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const input = e.currentTarget;
-    const start = input.selectionStart ?? 0;
-    const end = input.selectionEnd ?? 0;
-
-    if (e.key === 'Backspace') {
-      if (start === end) {
-        if (start <= 2) {
-          e.preventDefault();
-          return;
-        }
-        if (input.value[start - 1] === ' ') {
-          e.preventDefault();
-          const currentVal = input.value;
-          const updated = currentVal.slice(0, start - 2) + currentVal.slice(start);
-          setPhone(formatMobileNumber(updated));
-        }
-      }
-    }
-
-    if (e.key === 'Delete') {
-      if (start === end && start < 2) {
-        e.preventDefault();
-      }
-    }
-  };
-
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanDigits = phone.replace(/\D/g, '');
     if (!cleanDigits || !password) {
-      setError(t.enterPhoneAndPassword);
+      setError(t.enterPhoneAndPassword || 'Mangyaring ilagay ang iyong numero at password.');
       return;
     }
 
     setLoading(true);
     setError('');
 
-    setTimeout(() => {
-      setLoading(false);
-      navigate('/driver/home', { replace: true });
-    }, 600);
-  };
+    try {
+      // Query driver record status from Supabase
+      const { data: driverData } = await supabase
+        .from('driver')
+        .select('account_status, full_name, rejection_reason, rejection_comment')
+        .or(`contact_number.eq.${cleanDigits},contact_number.eq.+63${cleanDigits.slice(-10)}`)
+        .maybeSingle();
 
-  const showPhoneIcon = !phoneFocused && !phone;
-  const showPasswordIcon = !passwordFocused && !password;
+      setLoading(false);
+
+      if (driverData) {
+        // Enforce strict approval lifecycle routing:
+        // Only grant full map & dashboard access if BOTH TODA & LGU have approved (Active / Verified)
+        if (driverData.account_status === 'Active' || driverData.account_status === 'Verified') {
+          navigate('/driver/home', { replace: true });
+        } else if (driverData.account_status === 'Rejected') {
+          navigate('/driver/status', {
+            replace: true,
+            state: {
+              driverName: driverData.full_name,
+              accountStatus: 'Rejected',
+              rejectionReason: driverData.rejection_reason,
+              rejectionComment: driverData.rejection_comment,
+            },
+          });
+        } else {
+          // Pending review screen (NO map access)
+          navigate('/driver/status', {
+            replace: true,
+            state: {
+              driverName: driverData.full_name,
+              accountStatus: driverData.account_status || 'Pending Verification',
+            },
+          });
+        }
+      } else {
+        // Default route to status monitor for unverified/pending accounts
+        navigate('/driver/status', {
+          replace: true,
+          state: {
+            accountStatus: 'Pending Verification',
+          },
+        });
+      }
+    } catch {
+      setLoading(false);
+      navigate('/driver/status', {
+        replace: true,
+        state: {
+          accountStatus: 'Pending Verification',
+        },
+      });
+    }
+  };
 
   return (
     <Box
@@ -142,7 +138,7 @@ export const DriverLogin: React.FC = () => {
         overflow: 'hidden',
       }}
     >
-      {/* 1. Header with Rounded Back Button and SAKAY Logo */}
+      {/* Header with Back Button & SAKAY Logo */}
       <Box
         sx={{
           padding: 'calc(var(--safe-area-top) + 16px) 24px 12px 24px',
@@ -172,7 +168,7 @@ export const DriverLogin: React.FC = () => {
         <Logo color="orange" width={110} />
       </Box>
 
-      {/* 2. Scrollable Form Content */}
+      {/* Form Content */}
       <Box
         component="form"
         onSubmit={handleLogin}
@@ -215,89 +211,33 @@ export const DriverLogin: React.FC = () => {
         )}
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {/* Mobile Number Field */}
-          <TextField
-            fullWidth
-            label={t.phoneOrEmail}
+          {/* Mobile Phone Number Input (+63 | 9XXXXXXXX) */}
+          <SakayPhoneInput
+            label={t.phoneOrEmail || 'Numero ng Telepono'}
             value={phone}
-            onChange={handlePhoneChange}
-            onKeyDown={handlePhoneKeyDown}
-            onFocus={handlePhoneFocus}
-            onBlur={handlePhoneBlur}
-            slotProps={{
-              inputLabel: {
-                shrink: true,
-                sx: {
-                  color: '#64748B',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  '&.Mui-focused': { color: '#FF6B00', fontWeight: 600 },
-                },
-              },
-              input: {
-                sx: {
-                  borderRadius: '16px',
-                  backgroundColor: '#F8FAFC',
-                  fontSize: '15px',
-                  fontWeight: 500,
-                  height: '56px',
-                  '& fieldset': { borderColor: '#E2E8F0' },
-                  '&:hover fieldset': { borderColor: '#CBD5E1' },
-                  '&.Mui-focused fieldset': { borderColor: '#FF6B00' },
-                },
-              },
-            }}
+            onChange={(val) => setPhone(val)}
           />
 
-          {/* Password Field */}
-          <TextField
-            fullWidth
-            type={showPassword ? 'text' : 'password'}
-            label={t.password}
+          {/* Password Input (Starts Empty, Floating Label Inside, Active Orange Glow) */}
+          <RegisterInput
+            label={t.password || 'Password'}
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onFocus={() => setPasswordFocused(true)}
-            onBlur={() => setPasswordFocused(false)}
-            slotProps={{
-              inputLabel: {
-                shrink: Boolean(passwordFocused || password),
-                sx: {
-                  color: '#64748B',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  '&.Mui-focused': { color: '#FF6B00', fontWeight: 600 },
-                  ...(showPasswordIcon ? { transform: 'translate(44px, 16px) scale(1)' } : {}),
-                },
-              },
-              input: {
-                startAdornment: showPasswordIcon ? (
-                  <InputAdornment position="start">
-                    <LockOutlinedIcon sx={{ color: '#0F172A', fontSize: 20 }} />
-                  </InputAdornment>
-                ) : null,
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={() => setShowPassword(!showPassword)}
-                      edge="end"
-                      size="small"
-                      sx={{ color: '#64748B' }}
-                    >
-                      {showPassword ? <VisibilityOffOutlinedIcon fontSize="small" /> : <VisibilityOutlinedIcon fontSize="small" />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-                sx: {
-                  borderRadius: '16px',
-                  backgroundColor: '#F8FAFC',
-                  fontSize: '15px',
-                  height: '56px',
-                  '& fieldset': { borderColor: '#E2E8F0' },
-                  '&:hover fieldset': { borderColor: '#CBD5E1' },
-                  '&.Mui-focused fieldset': { borderColor: '#FF6B00' },
-                },
-              },
-            }}
+            onChange={(val) => setPassword(val)}
+            type={showPassword ? 'text' : 'password'}
+            endAdornment={
+              <IconButton
+                onClick={() => setShowPassword(!showPassword)}
+                edge="end"
+                size="small"
+                sx={{ color: '#64748B' }}
+              >
+                {showPassword ? (
+                  <VisibilityOffOutlinedIcon fontSize="small" />
+                ) : (
+                  <VisibilityOutlinedIcon fontSize="small" />
+                )}
+              </IconButton>
+            }
           />
 
           {/* Forgot Password Link */}
@@ -317,10 +257,9 @@ export const DriverLogin: React.FC = () => {
           </Box>
         </Box>
 
-        {/* Space pusher to push button to bottom on tall screens */}
         <Box sx={{ flexGrow: 1 }} />
 
-        {/* Submit Action Button */}
+        {/* Primary Submit Action Button */}
         <PrimaryButton
           fullWidth
           type="submit"
@@ -340,7 +279,7 @@ export const DriverLogin: React.FC = () => {
           {t.loginTitle}
         </PrimaryButton>
 
-        {/* Register Link */}
+        {/* Tagalog Registration Link */}
         <Typography
           sx={{
             textAlign: 'center',
@@ -350,7 +289,7 @@ export const DriverLogin: React.FC = () => {
             mb: 1,
           }}
         >
-          {t.dontHaveAccount}{' '}
+          {t.dontHaveAccount || 'Wala ka pang account?'}{' '}
           <Box
             component="span"
             onClick={() => navigate('/account-selection')}
@@ -362,7 +301,7 @@ export const DriverLogin: React.FC = () => {
               '&:hover': { textDecoration: 'underline' },
             }}
           >
-            {t.registerLink}
+            {t.registerLink || 'Mag-register'}
           </Box>
         </Typography>
       </Box>

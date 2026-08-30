@@ -351,19 +351,19 @@ export const TodaApplicationsPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 TODA Name & Acronym
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 Representative
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 Date Submitted
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 Status
               </TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 Actions
               </TableCell>
             </TableRow>
@@ -397,7 +397,7 @@ export const TodaApplicationsPage: React.FC = () => {
                         <Chip
                           label={app.acronym}
                           size="small"
-                          sx={{ fontSize: '10px', fontWeight: 600, backgroundColor: 'rgba(255, 107, 26, 0.1)', color: 'var(--sakay-orange)', height: 22 }}
+                          sx={{ fontSize: '12px', fontWeight: 600, backgroundColor: 'rgba(255, 107, 26, 0.1)', color: 'var(--sakay-orange)', height: 22 }}
                         />
                       )}
                       {app.isOverdue5Days && (
@@ -461,9 +461,9 @@ export const TodaApplicationsPage: React.FC = () => {
           maxWidth={820}
           primaryActionLabel={selectedApp.status === 'Approved' ? undefined : 'Approve & Issue Accreditation'}
           onPrimaryAction={selectedApp.status === 'Approved' ? undefined : () => setApproveDialogOpen(true)}
-          secondaryActionLabel="Decline Application"
-          onSecondaryAction={() => setRejectDialogOpen(true)}
-          secondaryActionColor="error"
+          secondaryActionLabel={selectedApp.status === 'Approved' ? 'Close' : 'Decline Application'}
+          onSecondaryAction={selectedApp.status === 'Approved' ? () => setSelectedApp(null) : () => setRejectDialogOpen(true)}
+          secondaryActionColor={selectedApp.status === 'Approved' ? undefined : 'error'}
         >
           {/* Section 1: Organization Information (Matches TODA Registration Layout) */}
           <Box sx={{ mb: 3.5 }}>
@@ -482,37 +482,37 @@ export const TodaApplicationsPage: React.FC = () => {
               }}
             >
               <Box>
-                <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '4px' }}>Official Association / TODA Name</Typography>
+                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mb: '4px' }}>Official Association / TODA Name</Typography>
                 <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                   {selectedApp.name}
                 </Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '4px' }}>TODA Acronym</Typography>
+                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mb: '4px' }}>TODA Acronym</Typography>
                 <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                   {selectedApp.acronym || 'N/A'}
                 </Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '4px' }}>Operating Barangay</Typography>
+                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mb: '4px' }}>Operating Barangay</Typography>
                 <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                   {selectedApp.barangay}
                 </Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '4px' }}>Date Established</Typography>
+                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mb: '4px' }}>Date Established</Typography>
                 <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                   {formatDisplayDate(selectedApp.dateEstablished)}
                 </Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '4px' }}>Terminal Location</Typography>
+                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mb: '4px' }}>Terminal Location</Typography>
                 <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                   {selectedApp.terminalLocation || 'Calapan City Terminal'}
                 </Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '4px' }}>Terminal Coordinates</Typography>
+                <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mb: '4px' }}>Terminal Coordinates</Typography>
                 <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                   {selectedApp.terminalLatitude && selectedApp.terminalLongitude
                     ? `${selectedApp.terminalLatitude}, ${selectedApp.terminalLongitude}`
@@ -540,7 +540,7 @@ export const TodaApplicationsPage: React.FC = () => {
                 }}
               >
                 <Box>
-                  <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '3px' }}>President</Typography>
+                  <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mb: '3px' }}>President</Typography>
                   <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                     {selectedApp.officers.president || 'N/A'}
                   </Typography>
@@ -551,7 +551,7 @@ export const TodaApplicationsPage: React.FC = () => {
                   )}
                 </Box>
                 <Box>
-                  <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '3px' }}>Vice President</Typography>
+                  <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mb: '3px' }}>Vice President</Typography>
                   <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                     {selectedApp.officers.vicePresident || 'N/A'}
                   </Typography>
@@ -562,7 +562,7 @@ export const TodaApplicationsPage: React.FC = () => {
                   )}
                 </Box>
                 <Box>
-                  <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '3px' }}>Secretary</Typography>
+                  <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mb: '3px' }}>Secretary</Typography>
                   <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                     {selectedApp.officers.secretary || 'N/A'}
                   </Typography>
@@ -573,7 +573,7 @@ export const TodaApplicationsPage: React.FC = () => {
                   )}
                 </Box>
                 <Box>
-                  <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mb: '3px' }}>Treasurer</Typography>
+                  <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mb: '3px' }}>Treasurer</Typography>
                   <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                     {selectedApp.officers.treasurer || 'N/A'}
                   </Typography>
@@ -626,7 +626,7 @@ export const TodaApplicationsPage: React.FC = () => {
                         <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)', lineHeight: 1.2 }}>
                           {doc.name}
                         </Typography>
-                        <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', mt: '3px' }}>
+                        <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', mt: '3px' }}>
                           {doc.type} • Uploaded {doc.date}
                         </Typography>
                       </Box>

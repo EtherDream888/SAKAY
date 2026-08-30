@@ -419,7 +419,7 @@ export const TodaAccountManagementPage: React.FC = () => {
       </Card>
 
       {/* 2. Balanced 2-Column Grid Layout for TODA Information */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3, alignItems: 'flex-start' }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3, alignItems: 'stretch' }}>
         {/* Left Column: TODA Organization Information */}
         <Card
           elevation={0}
@@ -431,6 +431,7 @@ export const TodaAccountManagementPage: React.FC = () => {
             boxShadow: 'var(--mac-shadow-card)',
             display: 'flex',
             flexDirection: 'column',
+            height: '100%',
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.5 }}>

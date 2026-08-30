@@ -12,6 +12,7 @@ import LocalPhoneOutlinedIcon from '@mui/icons-material/LocalPhoneOutlined';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
+import SakayPhoneInput from '../../../common/components/SakayPhoneInput';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { sendDriverOtp } from '../../../services/driverApiService';
 
@@ -214,45 +215,13 @@ export const DriverForgotPassword: React.FC = () => {
         </Box>
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <TextField
-            fullWidth
-            required
-            label={t.mobileNumber}
+          <SakayPhoneInput
+            label={t.mobileNumber || 'Numero ng Telepono'}
             value={phone}
-            onChange={handlePhoneChange}
-            onKeyDown={handlePhoneKeyDown}
-            onFocus={handlePhoneFocus}
-            onBlur={handlePhoneBlur}
-            slotProps={{
-              inputLabel: {
-                shrink: Boolean(phoneFocused || phone),
-                sx: {
-                  color: '#64748B',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  '&.Mui-focused': { color: '#FF6B00', fontWeight: 600 },
-                  ...(showPhoneIcon ? { transform: 'translate(44px, 16px) scale(1)' } : {}),
-                },
-              },
-              input: {
-                startAdornment: showPhoneIcon ? (
-                  <InputAdornment position="start">
-                    <LocalPhoneOutlinedIcon sx={{ color: '#0F172A', fontSize: 20 }} />
-                  </InputAdornment>
-                ) : null,
-                sx: {
-                  borderRadius: '16px',
-                  backgroundColor: '#F8FAFC',
-                  fontSize: '15px',
-                  fontWeight: 500,
-                  height: '56px',
-                  '& fieldset': { borderColor: '#E2E8F0' },
-                  '&:hover fieldset': { borderColor: '#CBD5E1' },
-                  '&.Mui-focused fieldset': { borderColor: '#FF6B00' },
-                },
-              },
-            }}
+            onChange={(val) => setPhone(val)}
+            required
           />
+
 
           {/* Space pusher to push button to bottom */}
           <Box sx={{ flexGrow: 1 }} />

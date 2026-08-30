@@ -219,7 +219,7 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
               <Typography sx={{ fontSize: '15.3px', fontWeight: 700, color: 'var(--mac-text-primary)', lineHeight: 1.2 }}>
                 {driver.name}
               </Typography>
-              <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-muted)', mt: '4px' }}>
+              <Typography sx={{ fontSize: '12.8px', color: 'var(--mac-text-muted)', mt: '4px' }}>
                 Affiliated with <span style={{ fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.todaName}</span>
               </Typography>
             </Box>
@@ -228,13 +228,13 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.8 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
               <Rating value={driver.rating} readOnly precision={0.1} size="small" emptyIcon={<StarIcon fontSize="inherit" />} />
-              <Typography sx={{ fontSize: '11.6px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+              <Typography sx={{ fontSize: '13.6px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
                 {driver.rating} / 5
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
               <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: driver.onlineStatus === 'Online' ? '#34A853' : '#9AA0A6' }} />
-              <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: driver.onlineStatus === 'Online' ? '#1E8E3E' : 'var(--mac-text-muted)' }}>
+              <Typography sx={{ fontSize: '12.4px', fontWeight: 600, color: driver.onlineStatus === 'Online' ? '#1E8E3E' : 'var(--mac-text-muted)' }}>
                 Session: {driver.onlineStatus}
               </Typography>
             </Box>
@@ -246,7 +246,7 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
               <FlashOnIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
-              <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+              <Typography sx={{ fontSize: '12.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                 Policy Strikes & Disciplinary Status
               </Typography>
             </Box>
@@ -258,7 +258,7 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
                 backgroundColor: strikeLevel.bg,
                 color: strikeLevel.color,
                 fontWeight: 700,
-                fontSize: '9.6px',
+                fontSize: '13.6px',
                 height: 26,
                 border: `1px solid ${strikeLevel.border}`,
               }}
@@ -274,7 +274,7 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
                 label="+ Issue Administrative Strike"
                 showArrow={false}
                 onClick={() => setStrikeDialogOpen(true)}
-                sx={{ height: 32, fontSize: '10px' }}
+                sx={{ height: 32, fontSize: '12px' }}
               />
             </Box>
           </Box>
@@ -284,26 +284,26 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
             <PersonIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
-            <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+            <Typography sx={{ fontSize: '12.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
               1. Personal Details
             </Typography>
           </Box>
 
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px' }}>
             <Box>
-              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Full Name</Typography>
-              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.name}</Typography>
+              <Typography sx={{ fontSize: '13.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Full Name</Typography>
+              <Typography sx={{ fontSize: '13.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.name}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Contact Phone</Typography>
-              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.phone}</Typography>
+              <Typography sx={{ fontSize: '13.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Contact Phone</Typography>
+              <Typography sx={{ fontSize: '13.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.phone}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Residential Barangay</Typography>
-              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.barangay}</Typography>
+              <Typography sx={{ fontSize: '13.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Residential Barangay</Typography>
+              <Typography sx={{ fontSize: '13.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.barangay}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Account Status</Typography>
+              <Typography sx={{ fontSize: '13.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Account Status</Typography>
               <StatusBadge status={driver.accountStatus as any} />
             </Box>
           </Box>
@@ -313,29 +313,29 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
             <AccountBalanceIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
-            <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+            <Typography sx={{ fontSize: '12.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
               2. TODA Affiliation & Endorsement
             </Typography>
           </Box>
 
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px' }}>
             <Box>
-              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Affiliated TODA</Typography>
-              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.todaName}</Typography>
+              <Typography sx={{ fontSize: '13.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Affiliated TODA</Typography>
+              <Typography sx={{ fontSize: '13.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.todaName}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>TODA Stage 1 Endorsement</Typography>
+              <Typography sx={{ fontSize: '13.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>TODA Stage 1 Endorsement</Typography>
               <StatusBadge status={driver.todaVerificationStatus as any} />
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>TODA Membership No.</Typography>
-              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+              <Typography sx={{ fontSize: '13.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>TODA Membership No.</Typography>
+              <Typography sx={{ fontSize: '13.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                 {driver.mtopNo ? `MEM-${driver.mtopNo}` : 'MEM-2026-01'}
               </Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Assigned Corridor</Typography>
-              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.barangay}</Typography>
+              <Typography sx={{ fontSize: '13.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Assigned Corridor</Typography>
+              <Typography sx={{ fontSize: '13.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.barangay}</Typography>
             </Box>
           </Box>
         </Box>
@@ -344,39 +344,39 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
         <Box sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
             <DirectionsCarIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
-            <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+            <Typography sx={{ fontSize: '12.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
               3. Vehicle Credentials & MTOP Franchise (City Ord. No. 118)
             </Typography>
           </Box>
 
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px' }}>
             <Box>
-              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Professional Driver's License</Typography>
-              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.licenseNo}</Typography>
+              <Typography sx={{ fontSize: '13.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Professional Driver's License</Typography>
+              <Typography sx={{ fontSize: '13.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.licenseNo}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>License Expiry</Typography>
-              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.licenseExpiry}</Typography>
+              <Typography sx={{ fontSize: '13.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>License Expiry</Typography>
+              <Typography sx={{ fontSize: '13.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.licenseExpiry}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>MTOP Franchise No.</Typography>
-              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.mtopNo}</Typography>
+              <Typography sx={{ fontSize: '13.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>MTOP Franchise No.</Typography>
+              <Typography sx={{ fontSize: '13.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.mtopNo}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Tricycle Vehicle Plate</Typography>
-              <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.vehiclePlate}</Typography>
+              <Typography sx={{ fontSize: '13.6px', color: 'var(--mac-text-muted)', mb: '4px' }}>Tricycle Vehicle Plate</Typography>
+              <Typography sx={{ fontSize: '13.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{driver.vehiclePlate}</Typography>
             </Box>
           </Box>
 
           <Box sx={{ mt: 2.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FAFAFC', padding: '14px 18px', borderRadius: '10px', border: '1px solid var(--mac-border-color)' }}>
-            <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-secondary)' }}>
+            <Typography sx={{ fontSize: '12.8px', color: 'var(--mac-text-secondary)' }}>
               Send License & Franchise renewal advisory to driver.
             </Typography>
             <ActionButton
               label={reminderSent ? 'Alert Sent ✓' : 'Send Renewal Alert'}
               showArrow={false}
               onClick={handleSendReminder}
-              sx={{ height: 34, fontSize: '10.4px' }}
+              sx={{ height: 34, fontSize: '12.4px' }}
             />
           </Box>
         </Box>
@@ -385,7 +385,7 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
         <Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
             <VerifiedUserIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
-            <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+            <Typography sx={{ fontSize: '12.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
               4. Verification Documents ({driver.documents.length})
             </Typography>
           </Box>
@@ -407,10 +407,10 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                   <VerifiedUserIcon sx={{ color: doc.status === 'Verified' ? '#34A853' : '#FBBC04', fontSize: '17.6' }} />
                   <Box>
-                    <Typography sx={{ fontSize: '11.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontSize: '13.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                       {doc.name}
                     </Typography>
-                    <Typography sx={{ fontSize: '10px', color: 'var(--mac-text-muted)', mt: '3px' }}>
+                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mt: '3px' }}>
                       {doc.type} • Status: <span style={{ fontWeight: 600, color: '#1E8E3E' }}>{doc.status}</span>
                     </Typography>
                   </Box>
@@ -419,7 +419,7 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
                   label="Inspect File"
                   showArrow={false}
                   onClick={() => setSelectedDoc({ name: doc.name, type: doc.type })}
-                  sx={{ height: 34, fontSize: '10.4px' }}
+                  sx={{ height: 34, fontSize: '12.4px' }}
                 />
               </Box>
             ))}

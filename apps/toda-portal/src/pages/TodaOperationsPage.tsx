@@ -203,7 +203,7 @@ export const TodaOperationsPage: React.FC = () => {
       </Box>
 
       {/* 5. Driver Roster & Active Trips Tables */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3, mb: 3.5, alignItems: 'flex-start' }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 3, mb: 3.5, alignItems: 'stretch' }}>
         {/* Affiliated Drivers Card */}
         <Box
           sx={{
@@ -214,6 +214,7 @@ export const TodaOperationsPage: React.FC = () => {
             padding: '24px',
             display: 'flex',
             flexDirection: 'column',
+            height: '100%',
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -232,8 +233,19 @@ export const TodaOperationsPage: React.FC = () => {
             />
           </Box>
 
-          <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid var(--mac-border-color)', borderRadius: '10px' }}>
-            <Table size="small">
+          <TableContainer
+            component={Paper}
+            elevation={0}
+            sx={{
+              border: '1px solid var(--mac-border-color)',
+              borderRadius: '10px',
+              maxHeight: '300px',
+              overflowY: 'auto',
+              '&::-webkit-scrollbar': { width: '6px' },
+              '&::-webkit-scrollbar-thumb': { backgroundColor: '#CBD5E1', borderRadius: '3px' },
+            }}
+          >
+            <Table size="small" stickyHeader>
               <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>Driver Name</TableCell>
@@ -298,6 +310,7 @@ export const TodaOperationsPage: React.FC = () => {
             padding: '24px',
             display: 'flex',
             flexDirection: 'column',
+            height: '100%',
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -316,8 +329,19 @@ export const TodaOperationsPage: React.FC = () => {
             />
           </Box>
 
-          <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid var(--mac-border-color)', borderRadius: '10px' }}>
-            <Table size="small">
+          <TableContainer
+            component={Paper}
+            elevation={0}
+            sx={{
+              border: '1px solid var(--mac-border-color)',
+              borderRadius: '10px',
+              maxHeight: '300px',
+              overflowY: 'auto',
+              '&::-webkit-scrollbar': { width: '6px' },
+              '&::-webkit-scrollbar-thumb': { backgroundColor: '#CBD5E1', borderRadius: '3px' },
+            }}
+          >
+            <Table size="small" stickyHeader>
               <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 600, fontSize: '12px', py: 1.5, px: 2 }}>Trip Code</TableCell>

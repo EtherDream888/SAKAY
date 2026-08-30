@@ -327,10 +327,12 @@ export const TerminalMapPickerModal: React.FC<TerminalMapPickerModalProps> = ({
             width: '100%',
             height: 440,
             backgroundColor: '#E2E8F0',
+            borderRadius: 0,
             zIndex: 1,
             '& .leaflet-container': {
               width: '100%',
               height: '100%',
+              borderRadius: 0,
               fontFamily: "'Poppins', sans-serif !important",
             },
           }}

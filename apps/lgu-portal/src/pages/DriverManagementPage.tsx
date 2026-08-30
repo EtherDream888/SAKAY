@@ -203,7 +203,7 @@ export const DriverManagementPage: React.FC = () => {
                       </Avatar>
                       <Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <Typography sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-primary)' }}>
+                          <Typography sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-primary)' }}>
                             {driver.name}
                           </Typography>
                           {driver.isOverdue5Days && (
@@ -214,25 +214,25 @@ export const DriverManagementPage: React.FC = () => {
                             />
                           )}
                         </Box>
-                        <Typography sx={{ fontSize: '9.2px', color: 'var(--mac-text-muted)', mt: '2px' }}>
+                        <Typography sx={{ fontSize: '11.2px', color: 'var(--mac-text-muted)', mt: '2px' }}>
                           License: {driver.licenseNo} • Tel: {driver.phone}
                         </Typography>
                       </Box>
                     </Box>
                   </TableCell>
-                  <TableCell sx={{ fontSize: '11px', color: 'var(--mac-text-primary)', py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-primary)' }}>
+                  <TableCell sx={{ fontSize: '13px', color: 'var(--mac-text-primary)', py: 2.2, px: 3 }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-primary)' }}>
                       {driver.todaName}
                     </Typography>
-                    <Typography sx={{ fontSize: '9.2px', color: 'var(--mac-text-muted)' }}>
+                    <Typography sx={{ fontSize: '11.2px', color: 'var(--mac-text-muted)' }}>
                       Brgy. {driver.barangay}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <Typography sx={{ fontSize: '9.2px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                    <Typography sx={{ fontSize: '11.2px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                       MTOP: {driver.mtopNo}
                     </Typography>
-                    <Typography sx={{ fontSize: '9.2px', color: 'var(--mac-text-secondary)', mt: '2px' }}>
+                    <Typography sx={{ fontSize: '11.2px', color: 'var(--mac-text-secondary)', mt: '2px' }}>
                       Plate: {driver.vehiclePlate}
                     </Typography>
                   </TableCell>
@@ -246,7 +246,7 @@ export const DriverManagementPage: React.FC = () => {
                           backgroundColor: driver.onlineStatus === 'Online' ? '#34A853' : '#9AA0A6',
                         }}
                       />
-                      <Typography sx={{ fontSize: '9.2px', color: 'var(--mac-text-secondary)' }}>
+                      <Typography sx={{ fontSize: '11.2px', color: 'var(--mac-text-secondary)' }}>
                         {driver.onlineStatus}
                       </Typography>
                     </Box>

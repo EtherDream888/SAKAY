@@ -9,6 +9,14 @@ interface StatusBadgeProps extends Omit<ChipProps, 'color'> {
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, sx, ...props }) => {
   const getStatusStyles = (status: StatusType | string) => {
     switch (status) {
+      case 'Endorsed to LGU':
+      case 'TODA Approved':
+      case 'TODA Endorsed':
+        return {
+          backgroundColor: 'rgba(0, 122, 255, 0.12)',
+          color: '#0066CC',
+          borderColor: 'rgba(0, 122, 255, 0.3)',
+        };
       case 'Approved':
       case 'Active':
       case 'Verified':

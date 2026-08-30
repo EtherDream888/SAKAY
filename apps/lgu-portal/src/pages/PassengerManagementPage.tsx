@@ -240,13 +240,13 @@ export const PassengerManagementPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Passenger</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Phone / Email</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Verification</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Bookings</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Policy Strikes</TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Account Status</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Actions</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Passenger</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Phone / Email</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Verification</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Bookings</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Policy Strikes</TableCell>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Account Status</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -267,29 +267,29 @@ export const PassengerManagementPage: React.FC = () => {
                           height: 36,
                           backgroundColor: '#E8F0FE',
                           color: '#1A73E8',
-                          fontSize: '11px',
+                          fontSize: '13px',
                           fontWeight: 600,
                         }}
                       >
                         {passenger.name.charAt(0)}
                       </Avatar>
                       <Box>
-                        <Typography sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-primary)' }}>
+                        <Typography sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-primary)' }}>
                           {passenger.name}
                         </Typography>
-                        <Typography sx={{ fontSize: '9.2px', color: 'var(--mac-text-muted)', mt: '3px' }}>
+                        <Typography sx={{ fontSize: '11.2px', color: 'var(--mac-text-muted)', mt: '3px' }}>
                           Registered: {passenger.registeredDate}
                         </Typography>
                       </Box>
                     </Box>
                   </TableCell>
-                  <TableCell sx={{ fontSize: '11px', color: 'var(--mac-text-primary)', py: 2.2, px: 3 }}>
+                  <TableCell sx={{ fontSize: '13px', color: 'var(--mac-text-primary)', py: 2.2, px: 3 }}>
                     {passenger.phone}
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
                     <StatusBadge status={passenger.verificationStatus} />
                   </TableCell>
-                  <TableCell sx={{ fontSize: '11px', fontWeight: 600, color: 'var(--mac-text-primary)', py: 2.2, px: 3 }}>
+                  <TableCell sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)', py: 2.2, px: 3 }}>
                     {passenger.totalBookings} Rides
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
@@ -298,7 +298,7 @@ export const PassengerManagementPage: React.FC = () => {
                         label={`${passenger.strikesCount} Strike(s)`}
                         size="small"
                         sx={{
-                          fontSize: '9.2px',
+                          fontSize: '11.2px',
                           fontWeight: 600,
                           backgroundColor: passenger.strikesCount > 0 ? 'rgba(234, 67, 53, 0.12)' : 'rgba(52, 168, 83, 0.12)',
                           color: passenger.strikesCount > 0 ? '#D93025' : '#1E8E3E',
@@ -360,15 +360,15 @@ export const PassengerManagementPage: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FAFAFC', padding: '16px 20px', borderRadius: '12px', mb: 4, border: '1px solid var(--mac-border-color)' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Rating value={selectedPassenger.rating} readOnly precision={0.1} size="small" emptyIcon={<StarIcon fontSize="inherit" />} />
-              <Typography sx={{ fontSize: '11px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+              <Typography sx={{ fontSize: '13px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
                 {selectedPassenger.rating} / 5
               </Typography>
-              <Typography sx={{ fontSize: '9.2px', color: 'var(--mac-text-muted)' }}>
+              <Typography sx={{ fontSize: '11.2px', color: 'var(--mac-text-muted)' }}>
                 ({selectedPassenger.ratingCount} passenger ratings)
               </Typography>
             </Box>
 
-            <Typography sx={{ fontSize: '9.2px', fontWeight: 600, color: 'var(--mac-text-secondary)' }}>
+            <Typography sx={{ fontSize: '11.2px', fontWeight: 600, color: 'var(--mac-text-secondary)' }}>
               Registered: {selectedPassenger.registeredDate}
             </Typography>
           </Box>
@@ -378,7 +378,7 @@ export const PassengerManagementPage: React.FC = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
                 <FlashOnIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
-                <Typography sx={{ fontSize: '9.2px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                <Typography sx={{ fontSize: '11.2px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
                   Passenger Strike System & Compliance Log (Rolling 90 Days)
                 </Typography>
               </Box>
@@ -390,7 +390,7 @@ export const PassengerManagementPage: React.FC = () => {
                   backgroundColor: getStrikeLevel(selectedPassenger.strikesCount).bg,
                   color: getStrikeLevel(selectedPassenger.strikesCount).color,
                   fontWeight: 700,
-                  fontSize: '9.2px',
+                  fontSize: '11.2px',
                   height: 26,
                   border: `1px solid ${getStrikeLevel(selectedPassenger.strikesCount).border}`,
                 }}
@@ -399,14 +399,14 @@ export const PassengerManagementPage: React.FC = () => {
 
             <Box sx={{ backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px', mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                   Active Strike Count: <span style={{ color: selectedPassenger.strikesCount > 0 ? '#DC2626' : '#1E8E3E', fontWeight: 700 }}>{selectedPassenger.strikesCount} Strike(s)</span>
                 </Typography>
                 <ActionButton
                   label={strikeIssued ? 'Administrative Strike Issued ✓' : '+ Issue Manual Strike'}
                   showArrow={false}
                   onClick={handleIssueStrike}
-                  sx={{ height: 32, fontSize: '9.2px' }}
+                  sx={{ height: 32, fontSize: '11.2px' }}
                 />
               </Box>
 
@@ -433,11 +433,11 @@ export const PassengerManagementPage: React.FC = () => {
                             size="small"
                             sx={{ fontSize: '8.4px', fontWeight: 700, backgroundColor: '#FEE2E2', color: '#DC2626', height: 20 }}
                           />
-                          <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                          <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                             {item.reason}
                           </Typography>
                         </Box>
-                        <Typography sx={{ fontSize: '9.2px', color: 'var(--mac-text-muted)' }}>
+                        <Typography sx={{ fontSize: '11.2px', color: 'var(--mac-text-muted)' }}>
                           Date: {item.date} • Issued by: {item.issuedBy}
                         </Typography>
                       </Box>
@@ -451,7 +451,7 @@ export const PassengerManagementPage: React.FC = () => {
                   ))}
                 </Box>
               ) : (
-                <Typography sx={{ fontSize: '9.2px', color: '#1E8E3E', fontStyle: 'italic', fontWeight: 500 }}>
+                <Typography sx={{ fontSize: '11.2px', color: '#1E8E3E', fontStyle: 'italic', fontWeight: 500 }}>
                   ✓ Clean Record: No policy strikes recorded against this passenger within the current 90-day window.
                 </Typography>
               )}
@@ -463,11 +463,11 @@ export const PassengerManagementPage: React.FC = () => {
             <Box sx={{ mb: 4, backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', padding: '16px 20px', borderRadius: '12px' }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
                 <ReportProblemIcon sx={{ color: '#DC2626', fontSize: '17.6' }} />
-                <Typography sx={{ fontSize: '11px', fontWeight: 600, color: '#991B1B' }}>
+                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#991B1B' }}>
                   Account Suspended — Policy Violation
                 </Typography>
               </Box>
-              <Typography sx={{ fontSize: '9.2px', color: '#B91C1C', mt: '4px' }}>
+              <Typography sx={{ fontSize: '11.2px', color: '#B91C1C', mt: '4px' }}>
                 {selectedPassenger.suspensionReason}
               </Typography>
             </Box>
@@ -477,36 +477,36 @@ export const PassengerManagementPage: React.FC = () => {
           <Box sx={{ mb: 4 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
               <PersonIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
-              <Typography sx={{ fontSize: '9.2px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
+              <Typography sx={{ fontSize: '11.2px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase' }}>
                 Account & Activity Summary
               </Typography>
             </Box>
 
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2.5, backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px' }}>
               <Box>
-                <Typography sx={{ fontSize: '9.2px', color: 'var(--mac-text-muted)', mb: '4px' }}>Mobile Phone</Typography>
-                <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedPassenger.phone}</Typography>
+                <Typography sx={{ fontSize: '11.2px', color: 'var(--mac-text-muted)', mb: '4px' }}>Mobile Phone</Typography>
+                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedPassenger.phone}</Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '9.2px', color: 'var(--mac-text-muted)', mb: '4px' }}>Email Address</Typography>
-                <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedPassenger.email}</Typography>
+                <Typography sx={{ fontSize: '11.2px', color: 'var(--mac-text-muted)', mb: '4px' }}>Email Address</Typography>
+                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedPassenger.email}</Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '9.2px', color: 'var(--mac-text-muted)', mb: '4px' }}>Verification Status</Typography>
-                <Typography sx={{ fontSize: '11px', fontWeight: 600, color: selectedPassenger.verificationStatus === 'Verified' ? '#34A853' : '#FBBC04' }}>
+                <Typography sx={{ fontSize: '11.2px', color: 'var(--mac-text-muted)', mb: '4px' }}>Verification Status</Typography>
+                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: selectedPassenger.verificationStatus === 'Verified' ? '#34A853' : '#FBBC04' }}>
                   {selectedPassenger.verificationStatus} (OTP Verified)
                 </Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: '9.2px', color: 'var(--mac-text-muted)', mb: '4px' }}>Total Completed Rides</Typography>
-                <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedPassenger.totalBookings} Bookings</Typography>
+                <Typography sx={{ fontSize: '11.2px', color: 'var(--mac-text-muted)', mb: '4px' }}>Total Completed Rides</Typography>
+                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>{selectedPassenger.totalBookings} Bookings</Typography>
               </Box>
             </Box>
           </Box>
 
           {/* Passenger Feedback Summary */}
           <Box>
-            <Typography sx={{ fontSize: '9.2px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 2 }}>
+            <Typography sx={{ fontSize: '11.2px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 2 }}>
               Recent Passenger Feedback & Complaints Log
             </Typography>
 
@@ -525,22 +525,22 @@ export const PassengerManagementPage: React.FC = () => {
                   >
                     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
                       <Rating value={fb.rating} readOnly precision={0.5} size="small" emptyIcon={<StarIcon fontSize="inherit" />} />
-                      <Typography sx={{ fontSize: '9.2px', color: 'var(--mac-text-muted)' }}>{fb.date}</Typography>
+                      <Typography sx={{ fontSize: '11.2px', color: 'var(--mac-text-muted)' }}>{fb.date}</Typography>
                     </Box>
-                    <Typography sx={{ fontSize: '9.2px', fontWeight: 600, color: 'var(--sakay-orange)', mb: '4px' }}>
+                    <Typography sx={{ fontSize: '11.2px', fontWeight: 600, color: 'var(--sakay-orange)', mb: '4px' }}>
                       Category: {fb.category}
                     </Typography>
-                    <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-primary)', lineHeight: 1.4 }}>
+                    <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-primary)', lineHeight: 1.4 }}>
                       "{fb.comment}"
                     </Typography>
-                    <Typography sx={{ fontSize: '9.2px', color: 'var(--mac-text-muted)', mt: 1 }}>
+                    <Typography sx={{ fontSize: '11.2px', color: 'var(--mac-text-muted)', mt: 1 }}>
                       Trip Ref: {fb.tripId}
                     </Typography>
                   </Box>
                 ))}
               </Box>
             ) : (
-              <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)', fontStyle: 'italic' }}>
+              <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-muted)', fontStyle: 'italic' }}>
                 No recent feedback or complaints submitted for this passenger.
               </Typography>
             )}

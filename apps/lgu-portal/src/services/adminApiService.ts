@@ -95,9 +95,9 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
     ] = await Promise.all([
       supabase.from('passenger').select('*', { count: 'exact', head: true }),
       supabase.from('passenger').select('*', { count: 'exact', head: true }).eq('account_status', 'Active'),
-      supabase.from('driver').select('*', { count: 'exact', head: true }),
+      supabase.from('driver').select('*', { count: 'exact', head: true }).in('account_status', ['TODA Approved', 'TODA Endorsed', 'Endorsed to LGU', 'LGU Approved', 'Active', 'Verified', 'Rejected']),
       supabase.from('driver').select('*', { count: 'exact', head: true }).eq('account_status', 'Verified'),
-      supabase.from('driver').select('*', { count: 'exact', head: true }).eq('account_status', 'Pending Verification'),
+      supabase.from('driver').select('*', { count: 'exact', head: true }).in('account_status', ['TODA Approved', 'TODA Endorsed', 'Endorsed to LGU']),
       supabase.from('driver').select('*', { count: 'exact', head: true }).eq('account_status', 'Suspended'),
       supabase.from('toda').select('*').order('created_at', { ascending: false }),
       supabase.from('booking').select('*', { count: 'exact', head: true }),
@@ -663,53 +663,142 @@ export async function createFareMatrix(newMatrix: {
 
 export async function fetchDrivers(filters?: { status?: string; toda?: string }): Promise<DriverRecord[]> {
   try {
-    let query = supabase.from('driver').select('*, toda:toda_id ( toda_id, toda_name, toda_acronym, barangay )');
+    // Collect TODA-endorsed driver IDs from driver_verification.
+    // driver_verification.verification_status = 'Approved' = TODA Stage 1 endorsement.
+    // LGU Stage 2 final approval is ONLY tracked via driver.account_status = 'Verified'.
+    let todaEndorsedDriverIds: string[] = [];
+    try {
+      const { data: verifEndorsed } = await supabase
+        .from('driver_verification')
+        .select('driver_id, verification_status')
+        .in('verification_status', ['Approved', 'TODA Approved', 'TODA Endorsed', 'Endorsed to LGU']);
+
+      if (verifEndorsed && verifEndorsed.length > 0) {
+        todaEndorsedDriverIds = verifEndorsed
+          .map((v: any) => v.driver_id)
+          .filter(Boolean);
+      }
+    } catch (syncErr) {
+      console.warn('[adminApiService] fetchDrivers verification query note:', syncErr);
+    }
+
+    // STRICT LGU FILTERING: Only show drivers that have TODA endorsement or are in final stages
+    const allowedStatuses = ['TODA Approved', 'TODA Endorsed', 'Endorsed to LGU', 'LGU Approved', 'Active', 'Verified', 'Rejected', 'Suspended'];
+
+    // Fetch drivers in two queries: by account_status AND by TODA-endorsed IDs, merge results
+    const [mainRes, endorsedRes] = await Promise.all([
+      supabase
+        .from('driver')
+        .select('*, toda:toda_id ( toda_id, toda_name, toda_acronym, barangay )')
+        .in('account_status', allowedStatuses),
+      todaEndorsedDriverIds.length > 0
+        ? supabase
+            .from('driver')
+            .select('*, toda:toda_id ( toda_id, toda_name, toda_acronym, barangay )')
+            .in('driver_id', todaEndorsedDriverIds)
+        : Promise.resolve({ data: [] }),
+    ]);
+
+    const mainData = mainRes.data || [];
+    const endorsedData = (endorsedRes as any).data || [];
+
+    // Merge, deduplicating by driver_id
+    const mergedMap = new Map<string, any>();
+    for (const d of mainData) mergedMap.set(d.driver_id, d);
+    for (const d of endorsedData) {
+      if (!mergedMap.has(d.driver_id)) mergedMap.set(d.driver_id, d);
+    }
+    let data = Array.from(mergedMap.values());
+
+    // Apply status filter
     if (filters?.status && filters.status !== 'All') {
-      if (filters.status === 'Pending Verification' || filters.status === 'Pending') {
-        // LGU sees only TODA-endorsed applications
-        query = query.in('account_status', ['TODA Approved', 'TODA Endorsed']);
+      const endorsedSet = new Set(todaEndorsedDriverIds);
+      if (filters.status === 'Endorsed to LGU' || filters.status === 'Pending' || filters.status === 'Pending Verification') {
+        data = data.filter((d: any) =>
+          endorsedSet.has(d.driver_id) &&
+          !['Verified', 'Active', 'LGU Approved'].includes(d.account_status)
+        );
+      } else if (filters.status === 'Verified' || filters.status === 'Active') {
+        data = data.filter((d: any) => ['Verified', 'Active', 'LGU Approved'].includes(d.account_status));
       } else {
-        query = query.eq('account_status', filters.status);
+        data = data.filter((d: any) => d.account_status === filters.status);
       }
     }
-    const { data, error } = await query;
-    if (error || !data) return [];
 
-    return data.map((d: any) => ({
-      id: d.driver_id,
-      name: d.full_name,
-      licenseNo: d.license_number || 'N/A',
-      licenseExpiry: d.license_expiry || '2026-12-31',
-      licenseStatus: 'Valid',
-      mtopNo: d.franchise_number || 'N/A',
-      mtopExpiry: d.license_expiry || '2026-12-31',
-      mtopStatus: 'Valid',
-      mtopOperatorName: d.full_name,
-      todaName: d.toda?.toda_name || 'Calapan Central TODA',
-      todaId: d.toda_id || '',
-      vehiclePlate: d.plate_number || 'N/A',
-      franchiseNo: d.franchise_number || 'N/A',
-      franchiseExpiry: '2026-12-31',
-      todaVerificationStatus: 'Verified',
-      lguVerificationStatus: d.account_status === 'Verified' ? 'Verified' : 'Pending',
-      verificationStatus: d.account_status === 'Verified' ? 'Verified' : 'Pending',
-      accountStatus: d.account_status === 'Verified' || d.account_status === 'Active' ? 'Active' : 'Inactive',
-      onlineStatus: d.availability_status === 'Available' || d.availability_status === 'Busy' ? 'Online' : 'Offline',
-      rating: Number(d.weighted_average_rating) || 5.0,
-      ratingCount: 0,
-      phone: d.contact_number,
-      barangay: d.barangay_service_area || d.toda?.barangay || 'Calapan City',
-      strikesCount: 0,
-      strikeHistory: [],
-      documents: [
-        { name: "Driver's License (Professional)", type: 'PDF / Image', status: 'Verified' },
-        { name: 'MTOP Franchise Clearance (Calapan City)', type: 'Official LGU Permit', status: 'Verified' },
-        { name: 'Tricycle Unit Photos with TODA Sticker', type: 'Image Verification', status: 'Verified' },
-        { name: 'Barangay Clearance & Police Clearance', type: 'Certified Clearance', status: 'Verified' },
-      ],
-    }));
+    // Map TODAs for fallback lookup
+    const { data: todas } = await supabase.from('toda').select('toda_id, toda_name, toda_acronym, barangay');
+    const todaMap = new Map((todas || []).map((t: any) => [t.toda_id, t]));
+    const todaEndorsedSet = new Set(todaEndorsedDriverIds);
+
+    return data.map((d: any) => {
+      const todaInfo = d.toda || todaMap.get(d.toda_id);
+
+      // Stage 2 LGU final approval: ONLY driver.account_status in ('Verified', 'Active', 'LGU Approved')
+      const isFullyApproved = ['Verified', 'Active', 'LGU Approved'].includes(d.account_status);
+      const isRejected = d.account_status === 'Rejected';
+      const isSuspended = d.account_status === 'Suspended';
+      // Stage 1 TODA endorsement: driver is in driver_verification with 'Approved' but NOT yet LGU-approved
+      const isTodaEndorsed = todaEndorsedSet.has(d.driver_id) && !isFullyApproved;
+
+      let verificationStatus: DriverRecord['verificationStatus'];
+      let lguVerificationStatus: DriverRecord['lguVerificationStatus'];
+      let accountStatus: DriverRecord['accountStatus'];
+
+      if (isFullyApproved) {
+        verificationStatus = 'Verified';
+        lguVerificationStatus = 'Verified';
+        accountStatus = 'Active';
+      } else if (isSuspended) {
+        verificationStatus = 'Suspended';
+        lguVerificationStatus = 'Suspended';
+        accountStatus = 'Inactive';
+      } else if (isTodaEndorsed) {
+        // Intermediate: awaiting LGU final review/approval
+        verificationStatus = 'Endorsed to LGU';
+        lguVerificationStatus = 'Endorsed to LGU';
+        accountStatus = 'Inactive';
+      } else {
+        verificationStatus = 'Pending';
+        lguVerificationStatus = 'Pending';
+        accountStatus = 'Inactive';
+      }
+
+      return {
+        id: d.driver_id,
+        name: d.full_name || 'Driver Applicant',
+        licenseNo: d.license_number || 'N/A',
+        licenseExpiry: d.license_expiry || '2026-12-31',
+        licenseStatus: 'Valid',
+        mtopNo: d.franchise_number || 'N/A',
+        mtopExpiry: d.license_expiry || '2026-12-31',
+        mtopStatus: 'Valid',
+        mtopOperatorName: d.full_name,
+        todaName: todaInfo?.toda_name || 'Calapan Central TODA',
+        todaId: d.toda_id || '',
+        vehiclePlate: d.plate_number || 'N/A',
+        franchiseNo: d.franchise_number || 'N/A',
+        franchiseExpiry: '2026-12-31',
+        todaVerificationStatus: 'Verified',
+        lguVerificationStatus,
+        verificationStatus,
+        accountStatus,
+        onlineStatus: d.availability_status === 'Available' || d.availability_status === 'Busy' ? 'Online' : 'Offline',
+        rating: Number(d.weighted_average_rating) || 5.0,
+        ratingCount: 0,
+        phone: d.contact_number || '',
+        barangay: d.barangay_service_area || todaInfo?.barangay || 'Calapan City',
+        strikesCount: 0,
+        strikeHistory: [],
+        documents: [
+          { name: "Driver's License (Professional)", type: 'PDF / Image', status: 'Verified' },
+          { name: 'MTOP Franchise Clearance (Calapan City)', type: 'Official LGU Permit', status: 'Verified' },
+          { name: 'Tricycle Unit Photos with TODA Sticker', type: 'Image Verification', status: 'Verified' },
+          { name: 'Barangay Clearance & Police Clearance', type: 'Certified Clearance', status: 'Verified' },
+        ],
+      };
+    });
   } catch (err) {
-    console.error('[adminApiService] fetchDrivers error:', err);
+    console.error('[adminApiService] fetchDrivers exception:', err);
     return [];
   }
 }
@@ -718,30 +807,39 @@ export async function verifyDriver(driverId: string, franchiseNumber?: string) {
   const updatePayload: any = { account_status: 'Verified', updated_at: new Date().toISOString() };
   if (franchiseNumber) updatePayload.franchise_number = franchiseNumber;
 
-  const { data, error } = await supabase
+  // 1. Update driver record to 'Verified' — this is the LGU Stage 2 final approval.
+  // NOTE: We do NOT touch driver_verification.verification_status here because
+  // 'Approved' in driver_verification already represents TODA Stage 1 endorsement.
+  // LGU final approval is tracked exclusively via driver.account_status = 'Verified'.
+  let { data, error } = await supabase
     .from('driver')
     .update(updatePayload)
     .eq('driver_id', driverId)
-    .select()
-    .single();
+    .select();
 
-  if (error) throw error;
-
-  // Update driver_verification status
-  await supabase
-    .from('driver_verification')
-    .update({ verification_status: 'Approved', reviewed_at: new Date().toISOString() })
-    .eq('driver_id', driverId);
+  if (error || !data || data.length === 0) {
+    const retryRes = await supabase
+      .from('driver')
+      .update(updatePayload)
+      .eq('driver_id', driverId)
+      .select();
+    if (retryRes.error) {
+      throw new Error(`verifyDriver failed: ${retryRes.error.message}`);
+    }
+    data = retryRes.data;
+  }
 
   await recordAdminAuditAction({
     actionType: 'DRIVER_STAGE2_VERIFIED',
     targetId: driverId,
-    details: `Approved Stage 2 LGU verification and accredited driver '${data?.full_name || driverId}'.`,
+    details: `LGU Admin approved and accredited driver '${data && data[0]?.full_name ? data[0].full_name : driverId}'. Driver now has full access to the Driver PWA map.`,
     category: 'Verification',
   });
 
-  return { success: true, data };
+  return { success: true, data: data ? data[0] : null };
 }
+
+
 
 export async function fetchTodaDrivers(todaId: string): Promise<DriverRecord[]> {
   try {

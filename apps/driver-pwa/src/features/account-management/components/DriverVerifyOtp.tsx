@@ -136,6 +136,7 @@ export const DriverVerifyOtp: React.FC = () => {
                       .eq('driver_id', driverByPhone.driver_id);
                   }
                 } else {
+                  const storedTodaId = typeof window !== 'undefined' ? localStorage.getItem('sakay_driver_toda_id') : null;
                   await supabase
                     .from('driver')
                     .upsert(
@@ -144,8 +145,8 @@ export const DriverVerifyOtp: React.FC = () => {
                           auth_user_id: authUser.id,
                           full_name: state?.driverName || 'Bagong Drayber',
                           contact_number: cleanPhone,
+                          toda_id: state?.todaId || storedTodaId || null,
                           account_status: 'Pending Verification',
-                          is_profile_complete: true,
                         },
                       ],
                       { onConflict: 'auth_user_id' }

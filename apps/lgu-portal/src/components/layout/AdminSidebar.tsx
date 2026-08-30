@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Box, Typography, IconButton } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -21,6 +21,7 @@ import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
 import appIcon from '@sakay/shared/assets/icons/app-icon.png';
 import logoTextOrange from '@sakay/shared/assets/images/logo-text-orange.png';
 import { MacTooltip } from '../common/MacTooltip';
+import { fetchTodaApplications, fetchDrivers } from '../../services/adminApiService';
 
 interface AdminSidebarProps {
   collapsed: boolean;
@@ -45,6 +46,26 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
   const location = useLocation();
   const navigate = useNavigate();
 
+  const [pendingTodaCount, setPendingTodaCount] = useState<number>(0);
+  const [pendingDriverCount, setPendingDriverCount] = useState<number>(0);
+
+  useEffect(() => {
+    Promise.all([
+      fetchTodaApplications(),
+      fetchDrivers({ status: 'Pending Verification' }),
+    ])
+      .then(([todas, drivers]) => {
+        const pendingTodas = todas.filter(
+          (t) => t.status === 'Pending' || t.status === 'Under Review'
+        ).length;
+        setPendingTodaCount(pendingTodas);
+        setPendingDriverCount(drivers.length);
+      })
+      .catch((err) => {
+        console.warn('[AdminSidebar] Error fetching pending counts:', err);
+      });
+  }, []);
+
   const navGroups: NavGroup[] = [
     {
       groupTitle: 'MAIN',
@@ -55,9 +76,9 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({ collapsed, onToggleC
     {
       groupTitle: 'MANAGEMENT',
       items: [
-        { id: 'toda-applications', label: 'TODA Applications', path: '/toda-applications', icon: <AssignmentIcon fontSize="small" /> },
+        { id: 'toda-applications', label: 'TODA Applications', path: '/toda-applications', icon: <AssignmentIcon fontSize="small" />, badge: pendingTodaCount > 0 ? pendingTodaCount : undefined, badgeType: 'orange' },
         { id: 'accredited-todas', label: 'Accredited TODAs', path: '/accredited-todas', icon: <VerifiedUserIcon fontSize="small" /> },
-        { id: 'drivers', label: 'Drivers', path: '/drivers', icon: <BadgeIcon fontSize="small" /> },
+        { id: 'drivers', label: 'Drivers', path: '/drivers', icon: <BadgeIcon fontSize="small" />, badge: pendingDriverCount > 0 ? pendingDriverCount : undefined, badgeType: 'orange' },
         { id: 'passengers', label: 'Passengers', path: '/passengers', icon: <PeopleIcon fontSize="small" /> },
         { id: 'feedback', label: 'Passenger Feedback', path: '/feedback', icon: <StarRateIcon fontSize="small" /> },
       ],

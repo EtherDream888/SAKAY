@@ -288,22 +288,22 @@ export const IncidentReportsPage: React.FC = () => {
         <Table>
           <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 Incident ID & Category
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 Reported Entity / Driver
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 Complainant
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 Submitted Date
               </TableCell>
-              <TableCell sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 Status
               </TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '11px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
+              <TableCell align="right" sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>
                 Actions
               </TableCell>
             </TableRow>
@@ -339,7 +339,7 @@ export const IncidentReportsPage: React.FC = () => {
                     <Typography sx={{ fontSize: '11.3px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
                       {inc.driverName}
                     </Typography>
-                    <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
+                    <Typography sx={{ fontSize: '11.6px', color: 'var(--mac-text-muted)' }}>
                       {inc.todaName}
                     </Typography>
                   </TableCell>
@@ -352,7 +352,7 @@ export const IncidentReportsPage: React.FC = () => {
                     <Typography sx={{ fontSize: '10.8px', color: 'var(--mac-text-primary)' }}>
                       {inc.submittedDate}
                     </Typography>
-                    <Typography sx={{ fontSize: '9.6px', color: 'var(--mac-text-muted)' }}>
+                    <Typography sx={{ fontSize: '11.6px', color: 'var(--mac-text-muted)' }}>
                       {inc.submittedTime}
                     </Typography>
                   </TableCell>

@@ -23,6 +23,8 @@ interface MacCenterModalProps {
   primaryActionColor?: 'primary' | 'error' | 'success' | 'warning';
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
+  leftActionLabel?: string;
+  onLeftAction?: () => void;
   maxWidth?: number | string;
 }
 
@@ -39,6 +41,8 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
   primaryActionColor = 'primary',
   secondaryActionLabel = 'Close',
   onSecondaryAction,
+  leftActionLabel,
+  onLeftAction,
   maxWidth = 720,
 }) => {
   return (
@@ -112,63 +116,95 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
       </DialogContent>
 
       {/* Modal Footer */}
-      {(primaryActionLabel || secondaryActionLabel) && (
+      {(primaryActionLabel || secondaryActionLabel || leftActionLabel) && (
         <DialogActions
           sx={{
             padding: '18px 28px 24px',
             borderTop: '1px solid var(--mac-border-color)',
             backgroundColor: '#FAFAFC',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
             gap: 1.5,
           }}
         >
-          {secondaryActionLabel && (
-            <Button
-              variant="outlined"
-              onClick={onSecondaryAction || onClose}
-              sx={{
-                height: 40,
-                padding: '0 20px',
-                borderRadius: '8px',
-                border: '1.5px solid #94A3B8',
-                color: '#334155',
-                fontSize: '14.5px',
-                fontWeight: 600,
-                textTransform: 'none',
-                backgroundColor: '#FFFFFF',
-                '&:hover': {
-                  backgroundColor: '#F1F5F9',
-                  borderColor: '#64748B',
-                  color: '#0F172A',
-                },
-              }}
-            >
-              {secondaryActionLabel}
-            </Button>
-          )}
+          <Box>
+            {leftActionLabel && (
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={onLeftAction}
+                sx={{
+                  height: 40,
+                  padding: '0 20px',
+                  borderRadius: '8px',
+                  border: '1.5px solid #EF4444',
+                  color: '#DC2626',
+                  fontSize: '14.5px',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  backgroundColor: '#FFFFFF',
+                  '&:hover': {
+                    backgroundColor: '#FEF2F2',
+                    borderColor: '#DC2626',
+                  },
+                }}
+              >
+                {leftActionLabel}
+              </Button>
+            )}
+          </Box>
 
-          {primaryActionLabel && (
-            <Button
-              variant="contained"
-              onClick={onPrimaryAction}
-              color={primaryActionColor}
-              sx={{
-                height: 40,
-                padding: '0 22px',
-                borderRadius: '8px',
-                fontSize: '14.5px',
-                fontWeight: 600,
-                textTransform: 'none',
-                backgroundColor:
-                  primaryActionColor === 'primary' ? 'var(--sakay-orange)' : undefined,
-                '&:hover': {
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            {secondaryActionLabel && (
+              <Button
+                variant="outlined"
+                onClick={onSecondaryAction || onClose}
+                sx={{
+                  height: 40,
+                  padding: '0 20px',
+                  borderRadius: '8px',
+                  border: '1.5px solid #94A3B8',
+                  color: '#334155',
+                  fontSize: '14.5px',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  backgroundColor: '#FFFFFF',
+                  '&:hover': {
+                    backgroundColor: '#F1F5F9',
+                    borderColor: '#64748B',
+                    color: '#0F172A',
+                  },
+                }}
+              >
+                {secondaryActionLabel}
+              </Button>
+            )}
+
+            {primaryActionLabel && (
+              <Button
+                variant="contained"
+                onClick={onPrimaryAction}
+                color={primaryActionColor}
+                sx={{
+                  height: 40,
+                  padding: '0 22px',
+                  borderRadius: '8px',
+                  fontSize: '14.5px',
+                  fontWeight: 600,
+                  textTransform: 'none',
                   backgroundColor:
-                    primaryActionColor === 'primary' ? 'var(--sakay-orange-hover)' : undefined,
-                },
-              }}
-            >
-              {primaryActionLabel}
-            </Button>
-          )}
+                    primaryActionColor === 'primary' ? 'var(--sakay-orange)' : undefined,
+                  '&:hover': {
+                    backgroundColor:
+                      primaryActionColor === 'primary' ? 'var(--sakay-orange-hover)' : undefined,
+                  },
+                }}
+              >
+                {primaryActionLabel}
+              </Button>
+            )}
+          </Box>
         </DialogActions>
       )}
     </Dialog>

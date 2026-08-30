@@ -27,6 +27,7 @@ import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import { supabase } from '../../services/supabaseClient';
 import { DateCalendarPopover } from '../popovers/DateCalendarPopover';
+import SakayPhoneInput from '../common/SakayPhoneInput';
 
 const STEPS = ['Organization', 'Location & Service', 'Membership', 'President & Account', 'Documents', 'Submit'];
 
@@ -629,30 +630,16 @@ export const TodaRegistrationFlow: React.FC<TodaRegistrationFlowProps> = ({ onBa
               </Typography>
               
               <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
-                <FormInput 
-                  name="contactNumber" 
-                  label="Contact Number *" 
-                  placeholder="9XXXXXXXXX"
-                  value={formData.contactNumber} 
-                  onChange={(e: any) => {
-                     let val = e.target.value.replace(/\D/g, ''); // only digits
-                     if (val.length > 10) val = val.substring(0, 10);
-                     setFormData({...formData, contactNumber: val});
-                  }} 
-                  onFocus={() => setIsPhoneFocused(true)}
-                  onBlur={() => setIsPhoneFocused(false)}
-                  sx={{ ...inputStyles, flex: 1, maxWidth: '280px' }}
-                  {...getFieldErrorProps(isPhoneInvalid, "Please enter a valid 10-digit mobile number.")}
-                  slotProps={{
-                    input: {
-                      startAdornment: (isPhoneFocused || formData.contactNumber) ? (
-                        <InputAdornment position="start">
-                          <Typography sx={{ fontWeight: 600, color: '#1D1D1F', borderRight: '1px solid #E5E5EA', pr: 1.5, mr: 0.5 }}>+63</Typography>
-                        </InputAdornment>
-                      ) : null
-                    }
-                  }}
-                />
+                <Box sx={{ flex: 1, maxWidth: '320px' }}>
+                  <SakayPhoneInput
+                    label="Contact Number"
+                    value={formData.contactNumber}
+                    onChange={(val) => setFormData({ ...formData, contactNumber: val })}
+                    required
+                    error={isPhoneInvalid}
+                    helperText={isPhoneInvalid ? 'Please enter a valid 10-digit mobile number starting with 9.' : ''}
+                  />
+                </Box>
                 
                 {!otpSent ? (
                   <Button variant="outlined" onClick={handleSendOtp} disabled={isSubmitting || !formData.contactNumber || isPhoneInvalid} sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600, height: '48px', px: 3, color: '#FF6B00', borderColor: '#FF6B00', '&:hover': { backgroundColor: '#FFF4EB', borderColor: '#FF6B00' } }}>
@@ -995,38 +982,43 @@ const stepHeadingStyles = {
 
 const inputStyles = {
   '& .MuiInputLabel-root': {
-    color: '#86868B',
-    fontSize: '14px',
-    backgroundColor: '#FFFFFF',
-    padding: '0 4px',
-    marginLeft: '-4px',
+    color: '#94A3B8',
+    fontSize: '14.5px',
+    fontWeight: 500,
     zIndex: 2,
-    transition: 'all 0.2s ease',
-    '&.Mui-focused': { color: '#FF6B00' },
-    '&.MuiInputLabel-shrink': { transform: 'translate(14px, -9px) scale(0.85)', color: '#FF6B00', background: '#fff', padding: '0 4px' },
-  },
-  '& .MuiInputLabel-outlined:not(.MuiInputLabel-shrink)': {
-    transform: 'translate(14px, 13px) scale(1)',
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+    transform: 'translate(16px, 20px) scale(1)',
+    '&.Mui-focused': { color: '#FF6B00', fontWeight: 700 },
+    '&.MuiInputLabel-shrink': {
+      transform: 'translate(16px, 8px) scale(0.72)',
+      color: '#FF6B00',
+      fontWeight: 700,
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px',
+    },
   },
   '& .MuiOutlinedInput-root': {
-    borderRadius: '10px',
-    backgroundColor: '#FFFFFF',
-    fontSize: '14px',
-    height: '48px',
-    transition: 'all 0.2s ease',
+    borderRadius: '16px',
+    backgroundColor: '#F1F3F5',
+    fontSize: '15px',
+    fontWeight: 600,
+    minHeight: '62px',
+    height: '62px',
+    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
     '& fieldset': { 
-      borderColor: '#E5E5EA', 
+      borderColor: '#E2E8F0',
+      borderWidth: '1.5px',
     },
     '&:hover fieldset': { 
-      borderColor: '#C7C7CC',
+      borderColor: '#FF6B00',
     },
     '&.Mui-focused fieldset': {
       borderColor: '#FF6B00',
-      borderWidth: '1px',
+      borderWidth: '1.5px',
     },
     '&.Mui-focused': {
       backgroundColor: '#FFFFFF',
-      boxShadow: '0 0 0 4px rgba(255, 107, 0, 0.12)',
+      boxShadow: '0 0 0 3px rgba(255, 107, 0, 0.12)',
     },
   },
   '& .MuiSelect-select': {
@@ -1034,16 +1026,18 @@ const inputStyles = {
     alignItems: 'center',
     height: '100%',
     boxSizing: 'border-box',
-    padding: '0 14px 6px 14px', // matching shifted text
+    padding: '20px 16px 4px 16px',
   },
   '& .MuiInputBase-input': {
     height: '100%',
     boxSizing: 'border-box',
-    padding: '0 14px 6px 14px', // shifted text 3px up
+    padding: '20px 16px 4px 16px',
     display: 'flex',
     alignItems: 'center',
-    color: '#1D1D1F',
-    '&::placeholder': { color: '#C7C7CC', opacity: 1, display: 'flex', alignItems: 'center' },
+    color: '#0F172A',
+    fontSize: '15px',
+    fontWeight: 600,
+    '&::placeholder': { color: '#94A3B8', opacity: 1 },
   },
   '& input[type=number]::-webkit-inner-spin-button, & input[type=number]::-webkit-outer-spin-button': {
     WebkitAppearance: 'none',

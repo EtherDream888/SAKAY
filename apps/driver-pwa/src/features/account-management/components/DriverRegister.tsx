@@ -19,6 +19,7 @@ import { Select, MenuItem } from '@mui/material';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
+import SakayPhoneInput from '../../../common/components/SakayPhoneInput';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { sendDriverOtp, ensureDriverAuthSession, fetchAccreditedTodas } from '../../../services/driverApiService';
 
@@ -600,18 +601,15 @@ export const DriverRegister: React.FC = () => {
             )}
           </Box>
 
-          <RegisterInput
+          <SakayPhoneInput
             label="NUMERO NG TELEPONO"
             value={phone}
-            onChange={handlePhoneChange}
-            onFocus={handlePhoneFocus}
-            onBlur={handlePhoneBlur}
-            onKeyDown={handlePhoneKeyDown}
-            isPhone
-            error={hasAttemptedSubmit && (cleanPhoneDigits.length !== 11 || !cleanPhoneDigits.startsWith('09'))}
+            onChange={(fullVal) => setPhone(fullVal)}
+            required
+            error={hasAttemptedSubmit && cleanPhoneDigits.length !== 11}
             helperText={
               hasAttemptedSubmit && cleanPhoneDigits.length !== 11
-                ? 'Pakilagay ang 11-digit mobile number na nagsisimula sa 09.'
+                ? 'Pakikumpleto ang 10-digit mobile number na nagsisimula sa 9.'
                 : ''
             }
           />

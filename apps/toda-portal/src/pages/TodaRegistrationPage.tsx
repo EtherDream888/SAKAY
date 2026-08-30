@@ -34,6 +34,14 @@ import CloseIcon from '@mui/icons-material/Close';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutlined';
 import { useNavigate } from 'react-router-dom';
 
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
+import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
+import ImageOutlinedIcon from '@mui/icons-material/ImageOutlined';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
+import { SakayTextField } from '../components/common/SakayTextField';
+import SakayPhoneInput from '../components/common/SakayPhoneInput';
+
 import { registerToda, uploadTodaDocument, checkAcronymAvailability } from '../services/todaApiService';
 import { DateCalendarPopover } from '../components/popovers/DateCalendarPopover';
 import { TerminalMapPickerModal } from '../components/modals/TerminalMapPickerModal';
@@ -268,6 +276,11 @@ export const TodaRegistrationPage: React.FC = () => {
       console.warn('[TodaRegistrationPage] Failed to restore draft:', e);
     }
   }, []);
+
+  // Synchronize Section 4 confirmAcronym automatically with Section 1 todaAcronym
+  useEffect(() => {
+    setConfirmAcronym(todaAcronym);
+  }, [todaAcronym]);
 
   // 2. Auto-save Draft to LocalStorage whenever fields change
   useEffect(() => {
@@ -759,58 +772,37 @@ export const TodaRegistrationPage: React.FC = () => {
               </Typography>
 
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
-                <TextField
+                <SakayTextField
                   id="field-todaName"
-                  label="Official TODA Name *"
-                  placeholder="e.g. Calapan Central TODA"
+                  label="Official TODA Name"
                   value={todaName}
                   onChange={(e) => setTodaName(e.target.value)}
                   error={hasAttemptedSubmit && !todaName.trim()}
                   helperText={hasAttemptedSubmit && !todaName.trim() ? 'Official TODA Name is required.' : ''}
                   required
-                  fullWidth
-                  size="small"
                 />
-                <Box sx={{ display: 'flex', alignItems: 'stretch', gap: 1 }}>
-                  <TextField
-                    id="field-todaAcronym"
-                    label="TODA Acronym *"
-                    placeholder="e.g. CCTODA"
-                    value={todaAcronym}
-                    onChange={(e) => setTodaAcronym(e.target.value.replace(/\s+/g, '').toUpperCase())}
-                    error={hasAttemptedSubmit && !cleanOrgAcronym}
-                    helperText={hasAttemptedSubmit && !cleanOrgAcronym ? 'TODA Acronym is required.' : ''}
-                    required
-                    fullWidth
-                    size="small"
-                  />
-                  <IconButton
-                    onClick={(e) => setInfoAnchorEl(e.currentTarget)}
-                    size="small"
-                    sx={{
-                      color: 'var(--mac-text-muted)',
-                      backgroundColor: '#F8FAFC',
-                      border: '1px solid #E2E8F0',
-                      borderRadius: '8px',
-                      width: 38,
-                      height: 'auto',
-                      alignSelf: 'stretch',
-                      flexShrink: 0,
-                      boxSizing: 'border-box',
-                      p: 0,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      '&:hover': {
-                        backgroundColor: 'var(--sakay-orange-soft)',
-                        color: 'var(--sakay-orange)',
-                        borderColor: 'var(--sakay-orange-border)',
-                      },
-                    }}
-                  >
-                    <InfoOutlinedIcon fontSize="small" />
-                  </IconButton>
-                </Box>
+                <SakayTextField
+                  id="field-todaAcronym"
+                  label="TODA Acronym"
+                  value={todaAcronym}
+                  onChange={(e) => setTodaAcronym(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                  error={hasAttemptedSubmit && !cleanOrgAcronym}
+                  helperText={hasAttemptedSubmit && !cleanOrgAcronym ? 'TODA Acronym is required.' : ''}
+                  required
+                  endAdornment={
+                    <IconButton
+                      onClick={(e) => setInfoAnchorEl(e.currentTarget)}
+                      size="small"
+                      sx={{
+                        color: '#FF6B00',
+                        backgroundColor: '#FFF2E9',
+                        '&:hover': { backgroundColor: '#FFE4D1' },
+                      }}
+                    >
+                      <InfoOutlinedIcon fontSize="small" />
+                    </IconButton>
+                  }
+                />
               </Box>
 
               {/* Styled Info Popover */}
@@ -845,14 +837,85 @@ export const TodaRegistrationPage: React.FC = () => {
                 <TextField
                   id="field-barangay"
                   select
-                  label="Operating Barangay *"
+                  label={
+                    <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <span>OPERATING BARANGAY</span>
+                      <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>*</Box>
+                    </Box>
+                  }
                   value={barangay}
                   onChange={(e) => setBarangay(e.target.value)}
                   error={hasAttemptedSubmit && !barangay}
                   helperText={hasAttemptedSubmit && !barangay ? 'Please select an operating barangay.' : ''}
                   required
                   fullWidth
-                  size="small"
+                  slotProps={{
+                    select: {
+                      IconComponent: KeyboardArrowDownIcon,
+                      MenuProps: {
+                        slotProps: {
+                          paper: {
+                            sx: {
+                              maxHeight: 180, // Shows max 4 barangays at a time with internal scroll
+                              borderRadius: '12px',
+                              mt: 1,
+                              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                              '& .MuiMenuItem-root': {
+                                fontSize: '14px',
+                                py: 1.2,
+                                px: 2,
+                                fontWeight: 500,
+                                '&.Mui-selected': {
+                                  backgroundColor: '#FFF5EF !important',
+                                  color: '#FF6B00',
+                                  fontWeight: 700,
+                                },
+                                '&:hover': {
+                                  backgroundColor: '#FFF2E9',
+                                  color: '#FF6B00',
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      minHeight: '62px',
+                      borderRadius: '16px',
+                      backgroundColor: barangay ? '#FFFFFF' : '#F1F3F5',
+                      fontSize: '15px',
+                      fontWeight: 600,
+                      border: `1.5px solid ${hasAttemptedSubmit && !barangay ? '#DC2626' : '#E2E8F0'}`,
+                      '&:hover fieldset': {
+                        borderColor: '#FF6B00',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#FF6B00',
+                        borderWidth: '1.5px',
+                      },
+                      '&.Mui-focused': {
+                        boxShadow: '0 0 0 3px rgba(255, 107, 0, 0.12)',
+                        backgroundColor: '#FFFFFF',
+                      },
+                    },
+                    '& .MuiInputLabel-root': {
+                      fontSize: '14.5px',
+                      color: '#94A3B8',
+                      '&.Mui-focused, &.MuiInputLabel-shrink': {
+                        fontSize: '9.5px',
+                        fontWeight: 700,
+                        color: '#FF6B00',
+                        transform: 'translate(14px, 8px) scale(1)',
+                      },
+                    },
+                    '& .MuiSelect-select': {
+                      pt: '20px',
+                      pb: '6px',
+                    },
+                  }}
                 >
                   <MenuItem value="" disabled>Select Barangay</MenuItem>
                   {CALAPAN_BARANGAYS.map((b) => (
@@ -861,42 +924,29 @@ export const TodaRegistrationPage: React.FC = () => {
                 </TextField>
 
                 <Box sx={{ position: 'relative' }}>
-                  <TextField
+                  <SakayTextField
+                    id="field-dateEstablished"
                     label="Date Established"
                     placeholder="YYYY-MM-DD"
                     value={dateEstablished}
+                    readOnly
                     onClick={(e) => {
                       setCalendarAnchorEl(e.currentTarget);
                       setCalendarOpen(true);
                     }}
-                    onChange={(e) => setDateEstablished(e.target.value)}
-                    fullWidth
-                    size="small"
-                    slotProps={{
-                      input: {
-                        readOnly: true,
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setCalendarAnchorEl(e.currentTarget);
-                                setCalendarOpen(true);
-                              }}
-                              edge="end"
-                              sx={{ color: 'var(--mac-text-muted)', '&:hover': { color: 'var(--sakay-orange)' } }}
-                            >
-                              <CalendarTodayIcon sx={{ fontSize: 18 }} />
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      },
-                    }}
-                    sx={{
-                      cursor: 'pointer',
-                      '& input': { cursor: 'pointer' },
-                    }}
+                    endAdornment={
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCalendarAnchorEl(e.currentTarget);
+                          setCalendarOpen(true);
+                        }}
+                        sx={{ color: '#FF6B00' }}
+                      >
+                        <CalendarTodayIcon sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    }
                   />
                   <DateCalendarPopover
                     open={calendarOpen}
@@ -915,66 +965,56 @@ export const TodaRegistrationPage: React.FC = () => {
               </Box>
 
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5 }}>
-                <TextField
+                <SakayTextField
                   id="field-serviceCoverageArea"
-                  label="Designated Service Coverage / Terminal Location *"
-                  placeholder="e.g. Calapan Public Market, J.P. Rizal St."
+                  label="Designated Service Coverage / Terminal Location"
+                  placeholder="Street, Barangay, City/Municipality"
                   value={serviceCoverageArea}
                   onChange={(e) => setServiceCoverageArea(e.target.value)}
                   error={hasAttemptedSubmit && !serviceCoverageArea.trim()}
                   helperText={hasAttemptedSubmit && !serviceCoverageArea.trim() ? 'Service coverage area is required.' : ''}
                   required
-                  fullWidth
-                  size="small"
                 />
 
-                <Box sx={{ display: 'flex', alignItems: 'stretch', gap: 1 }}>
-                  <TextField
-                    label="Terminal Coordinates"
-                    placeholder="Latitude, Longitude"
-                    value={coordinatesText}
-                    onChange={(e) => {
-                      setCoordinatesText(e.target.value);
-                      const parts = e.target.value.split(',').map((s) => parseFloat(s.trim()));
-                      if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-                        setTerminalLatitude(parts[0]);
-                        setTerminalLongitude(parts[1]);
-                      }
-                    }}
-                    fullWidth
-                    size="small"
-                  />
-                  <Button
-                    variant="outlined"
-                    startIcon={<LocationOnIcon sx={{ color: 'var(--sakay-orange)' }} />}
-                    onClick={() => setMapModalOpen(true)}
-                    sx={{
-                      height: 'auto',
-                      alignSelf: 'stretch',
-                      px: 1.75,
-                      py: 0,
-                      borderRadius: '8px',
-                      borderColor: 'var(--mac-border-color)',
-                      color: 'var(--mac-text-primary)',
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      fontSize: '12.5px',
-                      whiteSpace: 'nowrap',
-                      flexShrink: 0,
-                      backgroundColor: '#FFFFFF',
-                      boxSizing: 'border-box',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      '&:hover': {
-                        backgroundColor: 'var(--sakay-orange-soft)',
-                        borderColor: 'var(--sakay-orange-border)',
-                        color: 'var(--sakay-orange)',
-                      },
-                    }}
-                  >
-                    Pin on Map
-                  </Button>
-                </Box>
+                <SakayTextField
+                  id="field-coordinatesText"
+                  label="Terminal Coordinates"
+                  placeholder="Latitude, Longitude"
+                  value={coordinatesText}
+                  onChange={(e) => {
+                    setCoordinatesText(e.target.value);
+                    const parts = e.target.value.split(',').map((s) => parseFloat(s.trim()));
+                    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                      setTerminalLatitude(parts[0]);
+                      setTerminalLongitude(parts[1]);
+                    }
+                  }}
+                  endAdornment={
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={<LocationOnIcon sx={{ fontSize: 16 }} />}
+                      onClick={() => setMapModalOpen(true)}
+                      sx={{
+                        height: 38,
+                        borderRadius: '10px',
+                        backgroundColor: '#FF6B00',
+                        color: '#FFFFFF',
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        fontSize: '12.5px',
+                        px: 1.75,
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 2px 8px rgba(255, 107, 0, 0.25)',
+                        '&:hover': {
+                          backgroundColor: '#E05D00',
+                        },
+                      }}
+                    >
+                      Pin on Map
+                    </Button>
+                  }
+                />
               </Box>
             </Box>
 
@@ -987,100 +1027,64 @@ export const TodaRegistrationPage: React.FC = () => {
               </Typography>
 
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
-                <TextField
+                <SakayTextField
                   id="field-presidentName"
-                  label="President Full Name *"
-                  placeholder="e.g. Roberto Alcantara"
+                  label="President Full Name"
                   value={presidentName}
                   onChange={(e) => setPresidentName(e.target.value)}
                   error={hasAttemptedSubmit && !presidentName.trim()}
                   helperText={hasAttemptedSubmit && !presidentName.trim() ? 'President full name is required.' : ''}
                   required
-                  fullWidth
-                  size="small"
                 />
-                <TextField
-                  id="field-presidentContact"
-                  label="President Mobile Contact *"
-                  placeholder="e.g. 0917 555 1001"
+                <SakayPhoneInput
+                  label="President Mobile Contact"
                   value={presidentContact}
-                  onChange={(e) => setPresidentContact(formatPhoneNumber(e.target.value))}
-                  onFocus={() => handleContactFocus(presidentContact, setPresidentContact)}
-                  onBlur={() => handleContactBlur(presidentContact, setPresidentContact)}
+                  onChange={(val) => setPresidentContact(val)}
                   error={hasAttemptedSubmit && !presidentContact.trim()}
                   helperText={hasAttemptedSubmit && !presidentContact.trim() ? 'President mobile contact is required.' : ''}
                   required
-                  fullWidth
-                  size="small"
                 />
               </Box>
 
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
-                <TextField
+                <SakayTextField
                   id="field-vicePresidentName"
                   label="Vice President Name"
-                  placeholder="e.g. Eduardo Perez"
                   value={vicePresidentName}
                   onChange={(e) => setVicePresidentName(e.target.value)}
-                  fullWidth
-                  size="small"
                 />
-                <TextField
-                  id="field-vicePresidentContact"
+                <SakayPhoneInput
                   label="Vice President Contact"
-                  placeholder="e.g. 0917 555 1002"
                   value={vicePresidentContact}
-                  onChange={(e) => setVicePresidentContact(formatPhoneNumber(e.target.value))}
-                  onFocus={() => handleContactFocus(vicePresidentContact, setVicePresidentContact)}
-                  onBlur={() => handleContactBlur(vicePresidentContact, setVicePresidentContact)}
-                  fullWidth
-                  size="small"
+                  onChange={(val) => setVicePresidentContact(val)}
                 />
               </Box>
 
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, mb: 2.5 }}>
-                <TextField
+                <SakayTextField
                   id="field-secretaryName"
                   label="Secretary Name"
-                  placeholder="e.g. Leticia Cruz"
                   value={secretaryName}
                   onChange={(e) => setSecretaryName(e.target.value)}
-                  fullWidth
-                  size="small"
                 />
-                <TextField
-                  id="field-secretaryContact"
+                <SakayPhoneInput
                   label="Secretary Contact"
-                  placeholder="e.g. 0917 555 1003"
                   value={secretaryContact}
-                  onChange={(e) => setSecretaryContact(formatPhoneNumber(e.target.value))}
-                  onFocus={() => handleContactFocus(secretaryContact, setSecretaryContact)}
-                  onBlur={() => handleContactBlur(secretaryContact, setSecretaryContact)}
-                  fullWidth
-                  size="small"
+                  onChange={(val) => setSecretaryContact(val)}
                 />
               </Box>
 
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5 }}>
-                <TextField
+                <SakayTextField
                   id="field-treasurerName"
                   label="Treasurer Name"
-                  placeholder="e.g. Mario Hernandez"
                   value={treasurerName}
                   onChange={(e) => setTreasurerName(e.target.value)}
-                  fullWidth
-                  size="small"
                 />
-                <TextField
-                  id="field-treasurerContact"
+                <SakayPhoneInput
                   label="Treasurer Contact"
-                  placeholder="e.g. 0917 555 1004"
                   value={treasurerContact}
-                  onChange={(e) => setTreasurerContact(formatPhoneNumber(e.target.value))}
-                  onFocus={() => handleContactFocus(treasurerContact, setTreasurerContact)}
-                  onBlur={() => handleContactBlur(treasurerContact, setTreasurerContact)}
-                  fullWidth
-                  size="small"
+                  onChange={(val) => setTreasurerContact(val)}
                 />
               </Box>
             </Box>
@@ -1107,7 +1111,7 @@ export const TodaRegistrationPage: React.FC = () => {
                   variant="outlined"
                   sx={{
                     p: '14px 18px',
-                    borderRadius: '10px',
+                    borderRadius: '12px',
                     borderColor: hasAttemptedSubmit && !clearanceDoc.url ? '#EF4444' : (clearanceDoc.url ? '#22C55E' : 'var(--mac-border-color)'),
                     backgroundColor: hasAttemptedSubmit && !clearanceDoc.url ? '#FEF2F2' : (clearanceDoc.url ? '#F0FDF4' : '#FAFAFC'),
                     display: 'flex',
@@ -1119,11 +1123,14 @@ export const TodaRegistrationPage: React.FC = () => {
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <InsertDriveFileOutlinedIcon sx={{ color: hasAttemptedSubmit && !clearanceDoc.url ? '#DC2626' : (clearanceDoc.url ? '#16A34A' : '#64748B'), fontSize: 24 }} />
+                    <PictureAsPdfOutlinedIcon sx={{ color: hasAttemptedSubmit && !clearanceDoc.url ? '#DC2626' : (clearanceDoc.url ? '#16A34A' : '#64748B'), fontSize: 26 }} />
                     <Box>
-                      <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                        Barangay Clearance *
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                          Barangay Clearance
+                        </Typography>
+                        <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>*</Box>
+                      </Box>
                       {clearanceDoc.fileName ? (
                         <Typography sx={{ fontSize: '12px', color: '#16A34A', fontWeight: 500 }}>
                           {clearanceDoc.fileName} ({formatFileSize(clearanceDoc.sizeBytes)})
@@ -1202,10 +1209,23 @@ export const TodaRegistrationPage: React.FC = () => {
                     ) : (
                       <Button
                         size="small"
-                        variant="outlined"
+                        variant="contained"
                         startIcon={<CloudUploadIcon />}
                         onClick={() => clearanceInputRef.current?.click()}
-                        sx={{ textTransform: 'none', borderColor: hasAttemptedSubmit && !clearanceDoc.url ? '#EF4444' : 'var(--mac-border-color)', color: hasAttemptedSubmit && !clearanceDoc.url ? '#DC2626' : 'var(--mac-text-primary)' }}
+                        sx={{
+                          textTransform: 'none',
+                          backgroundColor: '#FF6B00',
+                          color: '#FFFFFF',
+                          fontWeight: 600,
+                          fontSize: '13px',
+                          borderRadius: '10px',
+                          px: 2,
+                          py: 0.75,
+                          boxShadow: '0 2px 8px rgba(255, 107, 0, 0.22)',
+                          '&:hover': {
+                            backgroundColor: '#E05D00',
+                          },
+                        }}
                       >
                         Choose File
                       </Button>
@@ -1226,7 +1246,7 @@ export const TodaRegistrationPage: React.FC = () => {
                   variant="outlined"
                   sx={{
                     p: '14px 18px',
-                    borderRadius: '10px',
+                    borderRadius: '12px',
                     borderColor: hasAttemptedSubmit && !rosterDoc.url ? '#EF4444' : (rosterDoc.url ? '#22C55E' : 'var(--mac-border-color)'),
                     backgroundColor: hasAttemptedSubmit && !rosterDoc.url ? '#FEF2F2' : (rosterDoc.url ? '#F0FDF4' : '#FAFAFC'),
                     display: 'flex',
@@ -1238,11 +1258,14 @@ export const TodaRegistrationPage: React.FC = () => {
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <InsertDriveFileOutlinedIcon sx={{ color: hasAttemptedSubmit && !rosterDoc.url ? '#DC2626' : (rosterDoc.url ? '#16A34A' : '#64748B'), fontSize: 24 }} />
+                    <TableChartOutlinedIcon sx={{ color: hasAttemptedSubmit && !rosterDoc.url ? '#DC2626' : (rosterDoc.url ? '#16A34A' : '#059669'), fontSize: 26 }} />
                     <Box>
-                      <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                        Driver Roster *
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                          Driver Roster
+                        </Typography>
+                        <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>*</Box>
+                      </Box>
                       {rosterDoc.fileName ? (
                         <Typography sx={{ fontSize: '12px', color: '#16A34A', fontWeight: 500 }}>
                           {rosterDoc.fileName} ({formatFileSize(rosterDoc.sizeBytes)})
@@ -1321,10 +1344,23 @@ export const TodaRegistrationPage: React.FC = () => {
                     ) : (
                       <Button
                         size="small"
-                        variant="outlined"
+                        variant="contained"
                         startIcon={<CloudUploadIcon />}
                         onClick={() => rosterInputRef.current?.click()}
-                        sx={{ textTransform: 'none', borderColor: hasAttemptedSubmit && !rosterDoc.url ? '#EF4444' : 'var(--mac-border-color)', color: hasAttemptedSubmit && !rosterDoc.url ? '#DC2626' : 'var(--mac-text-primary)' }}
+                        sx={{
+                          textTransform: 'none',
+                          backgroundColor: '#FF6B00',
+                          color: '#FFFFFF',
+                          fontWeight: 600,
+                          fontSize: '13px',
+                          borderRadius: '10px',
+                          px: 2,
+                          py: 0.75,
+                          boxShadow: '0 2px 8px rgba(255, 107, 0, 0.22)',
+                          '&:hover': {
+                            backgroundColor: '#E05D00',
+                          },
+                        }}
                       >
                         Choose File
                       </Button>
@@ -1345,7 +1381,7 @@ export const TodaRegistrationPage: React.FC = () => {
                   variant="outlined"
                   sx={{
                     p: '14px 18px',
-                    borderRadius: '10px',
+                    borderRadius: '12px',
                     borderColor: hasAttemptedSubmit && !bylawsDoc.url ? '#EF4444' : (bylawsDoc.url ? '#22C55E' : 'var(--mac-border-color)'),
                     backgroundColor: hasAttemptedSubmit && !bylawsDoc.url ? '#FEF2F2' : (bylawsDoc.url ? '#F0FDF4' : '#FAFAFC'),
                     display: 'flex',
@@ -1357,11 +1393,14 @@ export const TodaRegistrationPage: React.FC = () => {
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <InsertDriveFileOutlinedIcon sx={{ color: hasAttemptedSubmit && !bylawsDoc.url ? '#DC2626' : (bylawsDoc.url ? '#16A34A' : '#64748B'), fontSize: 24 }} />
+                    <DescriptionOutlinedIcon sx={{ color: hasAttemptedSubmit && !bylawsDoc.url ? '#DC2626' : (bylawsDoc.url ? '#16A34A' : '#2563EB'), fontSize: 26 }} />
                     <Box>
-                      <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                        Internal Bylaws *
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                          Internal Bylaws
+                        </Typography>
+                        <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>*</Box>
+                      </Box>
                       {bylawsDoc.fileName ? (
                         <Typography sx={{ fontSize: '12px', color: '#16A34A', fontWeight: 500 }}>
                           {bylawsDoc.fileName} ({formatFileSize(bylawsDoc.sizeBytes)})
@@ -1440,10 +1479,23 @@ export const TodaRegistrationPage: React.FC = () => {
                     ) : (
                       <Button
                         size="small"
-                        variant="outlined"
+                        variant="contained"
                         startIcon={<CloudUploadIcon />}
                         onClick={() => bylawsInputRef.current?.click()}
-                        sx={{ textTransform: 'none', borderColor: hasAttemptedSubmit && !bylawsDoc.url ? '#EF4444' : 'var(--mac-border-color)', color: hasAttemptedSubmit && !bylawsDoc.url ? '#DC2626' : 'var(--mac-text-primary)' }}
+                        sx={{
+                          textTransform: 'none',
+                          backgroundColor: '#FF6B00',
+                          color: '#FFFFFF',
+                          fontWeight: 600,
+                          fontSize: '13px',
+                          borderRadius: '10px',
+                          px: 2,
+                          py: 0.75,
+                          boxShadow: '0 2px 8px rgba(255, 107, 0, 0.22)',
+                          '&:hover': {
+                            backgroundColor: '#E05D00',
+                          },
+                        }}
                       >
                         Choose File
                       </Button>
@@ -1461,72 +1513,38 @@ export const TodaRegistrationPage: React.FC = () => {
                 4. Account Credentials
               </Typography>
 
-              {/* TODA Acronym */}
+              {/* TODA Acronym (Auto-Synchronized from Section 1) */}
               <Box sx={{ mb: 2.5 }}>
-                <TextField
+                <SakayTextField
                   id="field-confirmAcronym"
-                  fullWidth
-                  label="TODA Acronym *"
-                  placeholder="Re-enter TODA Acronym"
-                  value={confirmAcronym}
-                  onChange={(e) => setConfirmAcronym(e.target.value.replace(/\s+/g, '').toUpperCase())}
-                  error={hasAttemptedSubmit && (!confirmAcronym.trim() || cleanOrgAcronym !== cleanConfirmAcronym)}
-                  helperText={
-                    hasAttemptedSubmit && cleanOrgAcronym !== cleanConfirmAcronym && confirmAcronym.trim()
-                      ? 'TODA Acronym does not match.'
-                      : ''
-                  }
-                  slotProps={{
-                    formHelperText: {
-                      sx: {
-                        fontSize: '11.5px',
-                        color: '#DC2626',
-                        fontWeight: 600,
-                      },
-                    },
-                    input: {
-                      endAdornment: hasAttemptedSubmit && !confirmAcronym.trim() ? (
-                        <InputAdornment position="end">
-                          <ErrorOutlineIcon sx={{ color: '#DC2626', fontSize: 18 }} />
-                        </InputAdornment>
-                      ) : null,
-                    },
-                  }}
-                  size="small"
+                  label="TODA Acronym"
+                  value={todaAcronym}
+                  readOnly
+                  required
+                  helperText="Automatically synchronized with Organization Information acronym above."
                 />
               </Box>
 
               {/* Password & Confirm Password */}
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5, mb: 2 }}>
-                <TextField
+                <SakayTextField
                   id="field-password"
-                  fullWidth
-                  label="Password *"
+                  label="Password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   error={hasAttemptedSubmit && (!password || !isPasswordValid)}
-                  size="small"
-                  slotProps={{
-                    input: {
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          {hasAttemptedSubmit && !password && (
-                            <ErrorOutlineIcon sx={{ color: '#DC2626', fontSize: 18, mr: 0.5 }} />
-                          )}
-                          <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" size="small" sx={{ color: '#86868B' }}>
-                            {showPassword ? <VisibilityOffOutlinedIcon fontSize="small" /> : <VisibilityOutlinedIcon fontSize="small" />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
+                  required
+                  endAdornment={
+                    <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" size="small" sx={{ color: '#86868B' }}>
+                      {showPassword ? <VisibilityOffOutlinedIcon fontSize="small" /> : <VisibilityOutlinedIcon fontSize="small" />}
+                    </IconButton>
+                  }
                 />
 
-                <TextField
+                <SakayTextField
                   id="field-confirmPassword"
-                  fullWidth
-                  label="Confirm Password *"
+                  label="Confirm Password"
                   type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -1536,30 +1554,14 @@ export const TodaRegistrationPage: React.FC = () => {
                       ? 'Passwords do not match.'
                       : showMatchSuccess
                       ? 'Passwords match ✓'
-                      : ' '
+                      : ''
                   }
-                  slotProps={{
-                    formHelperText: {
-                      sx: {
-                        fontSize: '11.5px',
-                        color: isPasswordMismatched ? '#DC2626' : showMatchSuccess ? '#16A34A' : '#64748B',
-                        fontWeight: isPasswordMismatched || showMatchSuccess ? 600 : 400,
-                      },
-                    },
-                    input: {
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          {hasAttemptedSubmit && !confirmPassword && (
-                            <ErrorOutlineIcon sx={{ color: '#DC2626', fontSize: 18, mr: 0.5 }} />
-                          )}
-                          <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end" size="small" sx={{ color: '#86868B' }}>
-                            {showConfirmPassword ? <VisibilityOffOutlinedIcon fontSize="small" /> : <VisibilityOutlinedIcon fontSize="small" />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
-                    },
-                  }}
-                  size="small"
+                  required
+                  endAdornment={
+                    <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end" size="small" sx={{ color: '#86868B' }}>
+                      {showConfirmPassword ? <VisibilityOffOutlinedIcon fontSize="small" /> : <VisibilityOutlinedIcon fontSize="small" />}
+                    </IconButton>
+                  }
                 />
               </Box>
 

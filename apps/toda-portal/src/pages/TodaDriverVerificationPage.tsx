@@ -21,6 +21,7 @@ import {
   DialogActions,
   TextField,
   MenuItem,
+  Snackbar,
 } from '@mui/material';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -62,11 +63,17 @@ export const TodaDriverVerificationPage: React.FC = () => {
   const [rosterChecked, setRosterChecked] = useState(false);
   const [photoChecked, setPhotoChecked] = useState(false);
 
-  // Confirmation & Celebratory Dialogs
+  // Confirmation & Celebratory Dialogs & Submission Guard
   const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
   const [celebrateDialogOpen, setCelebrateDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [resubmitDialogOpen, setResubmitDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // Toast / Snackbar Notification State
+  const [toastOpen, setToastOpen] = useState<boolean>(false);
+  const [toastMessage, setToastMessage] = useState<string>('');
+  const [toastSeverity, setToastSeverity] = useState<'success' | 'error'>('success');
 
   // Rejection Reason Form State
   const [selectedRejectReason, setSelectedRejectReason] = useState<string>('Hindi natagpuan sa Master Roster ng TODA.');
@@ -187,23 +194,51 @@ export const TodaDriverVerificationPage: React.FC = () => {
   };
 
   const handleForwardConfirm = async () => {
-    if (!selectedApplicant) return;
+    if (!selectedApplicant || isSubmitting) return;
 
-    await forwardApplicantToLgu(selectedApplicant.id);
-    setApplicants((prev) =>
-      prev.map((a) => (a.id === selectedApplicant.id ? { ...a, todaStageStatus: 'Endorsed to LGU', rosterVerified: true, photoVerified: true } : a))
-    );
+    setIsSubmitting(true);
+    try {
+      const res = await forwardApplicantToLgu(selectedApplicant.id);
 
-    recordTodaAuditAction({
-      actionType: 'DRIVER_APPLICANT_ENDORSED_TO_LGU',
-      targetId: selectedApplicant.id,
-      targetName: selectedApplicant.name,
-      details: `Screened and endorsed driver ${selectedApplicant.name} (${selectedApplicant.vehiclePlate}) to City LGU Franchising Office for official accreditation.`,
-      category: 'Driver Verification',
-    });
+      if (!res || !res.success) {
+        const errDetail = (res as any)?.error || 'Database save returned unsuccessful status';
+        console.error('[TodaVerification] Endorsement update failed in Supabase:', errDetail);
+        setToastMessage('Hindi ma-endorse ang aplikasyon sa LGU. Pakisubukang muli.');
+        setToastSeverity('error');
+        setToastOpen(true);
+        setIsSubmitting(false);
+        return;
+      }
 
-    setForwardDialogOpen(false);
-    setCelebrateDialogOpen(true);
+      // ONLY update UI to "Endorsed to LGU" AFTER Supabase update succeeds!
+      setApplicants((prev) =>
+        prev.map((a) => (a.id === selectedApplicant.id ? { ...a, todaStageStatus: 'Endorsed to LGU', rosterVerified: true, photoVerified: true } : a))
+      );
+
+      recordTodaAuditAction({
+        actionType: 'DRIVER_APPLICANT_ENDORSED_TO_LGU',
+        targetId: selectedApplicant.id,
+        targetName: selectedApplicant.name,
+        details: `Screened and endorsed driver ${selectedApplicant.name} (${selectedApplicant.vehiclePlate}) to City LGU Franchising Office for official accreditation.`,
+        category: 'Driver Verification',
+      });
+
+      setForwardDialogOpen(false);
+      setToastMessage('Matagumpay na na-endorse ang aplikasyon sa LGU.');
+      setToastSeverity('success');
+      setToastOpen(true);
+      setCelebrateDialogOpen(true);
+
+      // Re-fetch driver applicant list from Supabase to verify persistent state
+      loadApplicants();
+    } catch (err) {
+      console.error('[TodaVerification] Endorsement exception:', err);
+      setToastMessage('Hindi ma-endorse ang aplikasyon sa LGU. Pakisubukang muli.');
+      setToastSeverity('error');
+      setToastOpen(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleRejectConfirm = async () => {
@@ -555,6 +590,8 @@ export const TodaDriverVerificationPage: React.FC = () => {
           onPrimaryAction={selectedApplicant.todaStageStatus !== 'Endorsed to LGU' && canEndorse ? () => setForwardDialogOpen(true) : undefined}
           secondaryActionLabel="Close"
           onSecondaryAction={() => setSelectedApplicant(null)}
+          leftActionLabel={selectedApplicant.todaStageStatus !== 'Endorsed to LGU' ? "Reject Application" : undefined}
+          onLeftAction={selectedApplicant.todaStageStatus !== 'Endorsed to LGU' ? () => setRejectDialogOpen(true) : undefined}
         >
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
             {/* Master Roster Cross-Check Badge Banner */}
@@ -657,21 +694,6 @@ export const TodaDriverVerificationPage: React.FC = () => {
                 View Photo
               </Button>
             </Box>
-
-            {/* Rejection Option inside modal */}
-            {selectedApplicant.todaStageStatus !== 'Endorsed to LGU' && (
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 1 }}>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  size="small"
-                  onClick={() => setRejectDialogOpen(true)}
-                  sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}
-                >
-                  Reject Application
-                </Button>
-              </Box>
-            )}
           </Box>
         </MacCenterModal>
       )}
@@ -684,6 +706,7 @@ export const TodaDriverVerificationPage: React.FC = () => {
         message={`Kumpirmahin ang pag-endorse sa aplikasyon ni ${selectedApplicant?.name} (${selectedApplicant?.vehiclePlate}). Ang aplikasyong ito ay ipapasa sa LGU para sa susunod na pagsusuri.`}
         confirmLabel="Kumpirmahin ang Endorsement"
         confirmVariant="primary"
+        isLoading={isSubmitting}
         onConfirm={handleForwardConfirm}
       />
 
@@ -837,6 +860,29 @@ export const TodaDriverVerificationPage: React.FC = () => {
           documentType="image"
         />
       )}
+
+      {/* Global Success / Error Toast Notification */}
+      <Snackbar
+        open={toastOpen}
+        autoHideDuration={5000}
+        onClose={() => setToastOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setToastOpen(false)}
+          severity={toastSeverity}
+          variant="filled"
+          sx={{
+            width: '100%',
+            borderRadius: '12px',
+            fontWeight: 600,
+            fontSize: '14px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.15)',
+          }}
+        >
+          {toastMessage}
+        </Alert>
+      </Snackbar>
       </>
       )}
     </Box>

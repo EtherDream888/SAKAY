@@ -697,13 +697,21 @@ export async function fetchDriverApplicants(todaId: string = DEFAULT_TODA_ID): P
     const { data, error } = await supabase
       .from('driver')
       .select('*, driver_verification(*)')
-      .eq('toda_id', targetTodaId)
-      .in('account_status', ['Pending Verification', 'Pending', 'TODA Review']);
+      .eq('toda_id', targetTodaId);
 
     if (error || !data || data.length === 0) return [];
 
     return data.map((d: any) => {
       const verif = Array.isArray(d.driver_verification) ? d.driver_verification[0] : d.driver_verification;
+      const isEndorsed = verif?.verification_status === 'Approved' || verif?.verification_status === 'TODA Approved' || d.account_status === 'TODA Approved';
+      const isRejected = verif?.verification_status === 'Rejected' || d.account_status === 'Rejected';
+      const isResubmit = verif?.verification_status === 'Resubmission Required' || d.account_status === 'Resubmission Required';
+
+      let stageStatus: DriverApplicant['todaStageStatus'] = 'Awaiting Screening';
+      if (isEndorsed) stageStatus = 'Endorsed to LGU';
+      else if (isRejected) stageStatus = 'Rejected';
+      else if (isResubmit) stageStatus = 'Resubmission Required';
+
       return {
         id: d.driver_id,
         name: d.full_name,
@@ -720,7 +728,7 @@ export async function fetchDriverApplicants(todaId: string = DEFAULT_TODA_ID): P
         tricyclePhotoUrl: d.profile_photo_url || verif?.mtop_photo_path || '',
         photoVerified: true,
         rosterVerified: true,
-        todaStageStatus: d.account_status === 'TODA Approved' ? 'Endorsed to LGU' : 'Awaiting Screening',
+        todaStageStatus: stageStatus,
       };
     });
   } catch (err) {
@@ -731,36 +739,49 @@ export async function fetchDriverApplicants(todaId: string = DEFAULT_TODA_ID): P
 
 export async function endorseDriverApplicant(applicantId: string, actorName: string = 'TODA President') {
   const timestamp = new Date().toISOString();
-  const { data, error } = await supabase
-    .from('driver')
-    .update({ account_status: 'TODA Approved', endorsed_at: timestamp, updated_at: timestamp })
-    .eq('driver_id', applicantId)
-    .select()
-    .single();
 
-  if (error) {
-    // Fallback if endorsed_at column is missing on schema cache
-    await supabase
-      .from('driver')
-      .update({ account_status: 'TODA Approved', updated_at: timestamp })
-      .eq('driver_id', applicantId);
+  // 1. Update driver_verification record
+  let verifRes = await supabase
+    .from('driver_verification')
+    .update({ verification_status: 'Approved', reviewed_at: timestamp })
+    .eq('driver_id', applicantId)
+    .select();
+
+  if (verifRes.error) {
+    // Fallback if 'Approved' constraint failed
+    verifRes = await supabase
+      .from('driver_verification')
+      .update({ verification_status: 'TODA Approved', reviewed_at: timestamp })
+      .eq('driver_id', applicantId)
+      .select();
   }
 
-  // Also update driver_verification record status
-  await supabase
-    .from('driver_verification')
-    .update({ verification_status: 'TODA Approved', reviewed_at: timestamp })
-    .eq('driver_id', applicantId);
+  if (verifRes.error) {
+    console.error('[todaApiService] endorseDriverApplicant error updating driver_verification:', verifRes.error);
+    return { success: false, error: verifRes.error };
+  }
+
+  // 2. Attempt updating public.driver record timestamp/status
+  try {
+    await supabase
+      .from('driver')
+      .update({ updated_at: timestamp })
+      .eq('driver_id', applicantId);
+  } catch (driverErr) {
+    console.warn('[todaApiService] endorseDriverApplicant driver timestamp update note:', driverErr);
+  }
+
+  const driverName = verifRes.data && verifRes.data[0]?.submitted_full_name ? verifRes.data[0].submitted_full_name : applicantId;
 
   await recordTodaAuditAction({
     actionType: 'DRIVER_STAGE1_ENDORSED',
     targetId: applicantId,
-    targetName: data?.full_name || applicantId,
-    details: `[Stage 1 TODA Screening] ${actorName}: Endorsed driver application '${data?.full_name || applicantId}' and forwarded to City LGU for Stage 2 credential accreditation.`,
+    targetName: driverName,
+    details: `[Stage 1 TODA Screening] ${actorName}: Endorsed driver application '${driverName}' and forwarded to City LGU for Stage 2 credential accreditation.`,
     category: 'Driver Verification',
   });
 
-  return { success: true, data };
+  return { success: true, data: verifRes.data ? verifRes.data[0] : null };
 }
 
 export const forwardApplicantToLgu = endorseDriverApplicant;

@@ -8,6 +8,7 @@ import {
   Button,
   Box,
   TextField,
+  CircularProgress,
 } from '@mui/material';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
@@ -21,6 +22,7 @@ interface MacConfirmDialogProps {
   confirmVariant?: 'danger' | 'orange' | 'primary';
   requireReason?: boolean;
   reasonPlaceholder?: string;
+  isLoading?: boolean;
   onConfirm: (reason?: string) => void;
 }
 
@@ -34,12 +36,14 @@ export const MacConfirmDialog: React.FC<MacConfirmDialogProps> = ({
   confirmVariant = 'primary',
   requireReason = false,
   reasonPlaceholder = 'Please enter a reason...',
+  isLoading = false,
   onConfirm,
 }) => {
   const [reason, setReason] = useState('');
   const [error, setError] = useState(false);
 
   const handleConfirm = () => {
+    if (isLoading) return;
     if (requireReason && !reason.trim()) {
       setError(true);
       return;
@@ -161,6 +165,7 @@ export const MacConfirmDialog: React.FC<MacConfirmDialogProps> = ({
 
         <Button
           variant="contained"
+          disabled={isLoading}
           onClick={handleConfirm}
           sx={{
             height: 38,
@@ -173,7 +178,7 @@ export const MacConfirmDialog: React.FC<MacConfirmDialogProps> = ({
             ...getConfirmButtonStyles(),
           }}
         >
-          {confirmLabel}
+          {isLoading ? <CircularProgress size={20} color="inherit" /> : confirmLabel}
         </Button>
       </DialogActions>
     </Dialog>

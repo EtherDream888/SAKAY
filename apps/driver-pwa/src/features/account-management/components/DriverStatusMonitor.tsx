@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -6,10 +6,14 @@ import {
   Paper,
   Chip,
   IconButton,
+  Switch,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PendingActionsIcon from '@mui/icons-material/PendingActions';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import NotificationsActiveOutlinedIcon from '@mui/icons-material/NotificationsActiveOutlined';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
@@ -28,12 +32,14 @@ export const DriverStatusMonitor: React.FC = () => {
     rejectionComment?: string;
   } | undefined;
 
-  const [loading, setLoading] = React.useState(false);
-  const [profileStatus, setProfileStatus] = React.useState<string>(state?.accountStatus || 'Pending Verification');
-  const [rejectionReason, setRejectionReason] = React.useState<string | undefined>(state?.rejectionReason);
-  const [rejectionComment, setRejectionComment] = React.useState<string | undefined>(state?.rejectionComment);
+  const [loading, setLoading] = useState(false);
+  const [profileStatus, setProfileStatus] = useState<string>(state?.accountStatus || 'Pending Verification');
+  const [rejectionReason, setRejectionReason] = useState<string | undefined>(state?.rejectionReason);
+  const [rejectionComment, setRejectionComment] = useState<string | undefined>(state?.rejectionComment);
 
-  const driverName = state?.driverName || 'Driver Applicant';
+  const [notifyEnabled, setNotifyEnabled] = useState(true);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMsg, setSnackbarMsg] = useState('');
 
   const checkStatus = async () => {
     setLoading(true);
@@ -42,19 +48,40 @@ export const DriverStatusMonitor: React.FC = () => {
       if (user) {
         const { data } = await supabase
           .from('driver')
-          .select('account_status, rejection_reason, rejection_comment')
+          .select('driver_id, account_status, rejection_reason, rejection_comment')
           .eq('auth_user_id', user.id)
           .maybeSingle();
 
         if (data) {
-          setProfileStatus(data.account_status || 'Pending Verification');
-          setRejectionReason(data.rejection_reason || undefined);
-          setRejectionComment(data.rejection_comment || undefined);
-
+          // Only route to map if EXPLICITLY LGU-verified (Stage 2 final approval).
+          // TODA endorsement alone (driver_verification.verification_status = 'Approved') is NOT enough.
           if (data.account_status === 'Active' || data.account_status === 'Verified') {
             navigate('/driver/home', { replace: true });
             return;
           }
+
+          // Check if endorsed to LGU via driver_verification (but not yet LGU-approved)
+          if (data.driver_id && data.account_status !== 'Rejected') {
+            const { data: verif } = await supabase
+              .from('driver_verification')
+              .select('verification_status')
+              .eq('driver_id', data.driver_id)
+              .maybeSingle();
+
+            if (verif?.verification_status === 'Approved' ||
+                verif?.verification_status === 'TODA Approved' ||
+                verif?.verification_status === 'TODA Endorsed' ||
+                verif?.verification_status === 'Endorsed to LGU') {
+              // Endorsed to LGU but NOT yet LGU-approved → show "under LGU review" message
+              setProfileStatus('Endorsed to LGU');
+              setLoading(false);
+              return;
+            }
+          }
+
+          setProfileStatus(data.account_status || 'Pending Verification');
+          setRejectionReason(data.rejection_reason || undefined);
+          setRejectionComment(data.rejection_comment || undefined);
         }
       }
     } catch (err) {
@@ -68,7 +95,20 @@ export const DriverStatusMonitor: React.FC = () => {
     checkStatus();
   }, []);
 
+  const handleToggleNotify = (checked: boolean) => {
+    setNotifyEnabled(checked);
+    setSnackbarMsg(
+      checked
+        ? 'Naka-turn on na ang mga abiso kapag nagbago ang status ng rehistrasyon.'
+        : 'Naka-off na ang mga abiso sa pagbago ng status.'
+    );
+    setSnackbarOpen(true);
+  };
+
   const isRejected = profileStatus === 'Rejected';
+  // True when TODA has endorsed the driver but LGU has not yet given final approval
+  const isEndorsedToLgu = profileStatus === 'Endorsed to LGU';
+
 
   return (
     <Box
@@ -109,7 +149,6 @@ export const DriverStatusMonitor: React.FC = () => {
           <ArrowBackIcon sx={{ fontSize: 20 }} />
         </IconButton>
         <Logo color="orange" width={110} />
-        <Box sx={{ width: 44 }} />
       </Box>
 
       {/* Main Centered Content Area */}
@@ -195,6 +234,119 @@ export const DriverStatusMonitor: React.FC = () => {
               )}
             </Paper>
           </>
+        ) : isEndorsedToLgu ? (
+          <>
+            {/* LGU Review State — TODA endorsed but awaiting LGU final approval */}
+            <Box
+              sx={{
+                width: 76,
+                height: 76,
+                borderRadius: '50%',
+                backgroundColor: '#EFF6FF',
+                color: '#0066CC',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mb: 3,
+                boxShadow: '0 8px 24px rgba(0, 102, 204, 0.15)',
+              }}
+            >
+              <PendingActionsIcon sx={{ fontSize: 40 }} />
+            </Box>
+
+            <Typography
+              sx={{
+                fontSize: '22px',
+                fontWeight: 800,
+                color: '#0F172A',
+                lineHeight: 1.3,
+                mb: 1.5,
+              }}
+            >
+              Nasa LGU Admin na ang Aplikasyon
+            </Typography>
+
+            <Typography
+              sx={{
+                fontSize: '14px',
+                color: '#64748B',
+                lineHeight: 1.5,
+                maxWidth: 330,
+                mb: 3,
+              }}
+            >
+              Matagumpay na na-endorse ng iyong TODA ang iyong aplikasyon sa City LGU Franchising Office. Pakihintay ang huling pagsusuri at pag-apruba ng LGU. Hindi mo pa maa-access ang iyong account hanggang sa mabigyan ka ng pinal na pahintulot.
+            </Typography>
+
+            {/* Status ng Rehistrasyon Card */}
+            <Paper
+              elevation={0}
+              sx={{
+                width: '100%',
+                maxWidth: 340,
+                p: 2.5,
+                borderRadius: '16px',
+                backgroundColor: '#EFF6FF',
+                border: '1px solid #BFDBFE',
+                textAlign: 'left',
+                mb: 2,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Typography sx={{ fontSize: '12px', fontWeight: 800, color: '#1E40AF', textTransform: 'uppercase' }}>
+                  Status ng Rehistrasyon
+                </Typography>
+                <Chip
+                  label="LGU Screening"
+                  size="small"
+                  sx={{ backgroundColor: '#DBEAFE', color: '#1D4ED8', fontWeight: 800, fontSize: '11px' }}
+                />
+              </Box>
+            </Paper>
+
+            {/* Tagalog Notification Switch Preference Card */}
+            <Paper
+              elevation={0}
+              sx={{
+                width: '100%',
+                maxWidth: 340,
+                p: '14px 18px',
+                borderRadius: '16px',
+                backgroundColor: notifyEnabled ? '#EFF6FF' : '#F8FAFC',
+                border: `1.5px solid ${notifyEnabled ? '#0066CC' : '#E2E8F0'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                mb: 4,
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pr: 1 }}>
+                <NotificationsActiveOutlinedIcon
+                  sx={{ color: notifyEnabled ? '#0066CC' : '#64748B', fontSize: 22 }}
+                />
+                <Box sx={{ textAlign: 'left' }}>
+                  <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>
+                    I-notify ako kapag nagbago ang status
+                  </Typography>
+                  <Typography sx={{ fontSize: '11.5px', color: '#64748B', fontWeight: 500, mt: '2px' }}>
+                    Magpapadala ng SMS kapag na-aprubahan ng LGU
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Switch
+                checked={notifyEnabled}
+                onChange={(e) => handleToggleNotify(e.target.checked)}
+                sx={{
+                  '& .MuiSwitch-switchBase.Mui-checked': {
+                    color: '#0066CC',
+                    '& + .MuiSwitch-track': { backgroundColor: '#0066CC', opacity: 0.9 },
+                  },
+                }}
+              />
+            </Paper>
+          </>
         ) : (
           <>
             <Box
@@ -232,12 +384,13 @@ export const DriverStatusMonitor: React.FC = () => {
                 color: '#64748B',
                 lineHeight: 1.5,
                 maxWidth: 320,
-                mb: 4,
+                mb: 3,
               }}
             >
-              Pakihintay habang sinusuri ng TODA at LGU ang iyong mga isinumiteng impormasyon.
+              Pakihintay habang sinusuri ng TODA at LGU ang iyong mga isinumiteng impormasyon. Hindi mo muna maa-access ang iyong account at mga serbisyo habang nakabinbin pa ang pinal na pag-apruba.
             </Typography>
 
+            {/* Status ng Rehistrasyon Card */}
             <Paper
               elevation={0}
               sx={{
@@ -248,26 +401,82 @@ export const DriverStatusMonitor: React.FC = () => {
                 backgroundColor: '#F8FAFC',
                 border: '1px solid #E2E8F0',
                 textAlign: 'left',
-                mb: 4,
+                mb: 2,
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Typography sx={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>
                   Status ng Rehistrasyon
                 </Typography>
                 <Chip
-                  label={profileStatus === 'TODA Approved' ? 'LGU Screening' : 'TODA Screening'}
+                  label="TODA Screening"
                   size="small"
                   sx={{ backgroundColor: '#FEF3C7', color: '#B45309', fontWeight: 800, fontSize: '11px' }}
                 />
               </Box>
-              <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
-                Aplikante: {driverName}
-              </Typography>
+            </Paper>
+
+            {/* Tagalog Notification Switch Preference Card */}
+            <Paper
+              elevation={0}
+              sx={{
+                width: '100%',
+                maxWidth: 340,
+                p: '14px 18px',
+                borderRadius: '16px',
+                backgroundColor: notifyEnabled ? '#FFF5EF' : '#F8FAFC',
+                border: `1.5px solid ${notifyEnabled ? '#FF6B00' : '#E2E8F0'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                mb: 4,
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pr: 1 }}>
+                <NotificationsActiveOutlinedIcon
+                  sx={{ color: notifyEnabled ? '#FF6B00' : '#64748B', fontSize: 22 }}
+                />
+                <Box sx={{ textAlign: 'left' }}>
+                  <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>
+                    I-notify ako kapag nagbago ang status
+                  </Typography>
+                  <Typography sx={{ fontSize: '11.5px', color: '#64748B', fontWeight: 500, mt: '2px' }}>
+                    Magpapadala ng SMS kapag na-aprubahan
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Switch
+                checked={notifyEnabled}
+                onChange={(e) => handleToggleNotify(e.target.checked)}
+                sx={{
+                  '& .MuiSwitch-switchBase.Mui-checked': {
+                    color: '#FF6B00',
+                    '& + .MuiSwitch-track': { backgroundColor: '#FF6B00', opacity: 0.9 },
+                  },
+                }}
+              />
             </Paper>
           </>
         )}
       </Box>
+
+      {/* Snackbar Notification Toast */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setSnackbarOpen(false)}
+          severity={notifyEnabled ? 'success' : 'info'}
+          sx={{ width: '100%', borderRadius: '12px', fontWeight: 600, fontSize: '13px' }}
+        >
+          {snackbarMsg}
+        </Alert>
+      </Snackbar>
 
       {/* Pinned Single Action Button */}
       <Box
@@ -282,10 +491,23 @@ export const DriverStatusMonitor: React.FC = () => {
         <PrimaryButton
           fullWidth
           size="large"
-          onClick={checkStatus}
+          onClick={isRejected ? () => navigate('/account-selection') : checkStatus}
           disabled={loading}
+          sx={{
+            backgroundColor: isRejected ? '#DC2626' : '#FF6B00',
+            '&:hover': { backgroundColor: isRejected ? '#B91C1C' : '#E66000' },
+          }}
         >
-          {loading ? 'Kinukumpirma...' : 'Tingnan ang Status ng Aplikasyon'}
+          {loading ? (
+            'Kinukumpirma...'
+          ) : isRejected ? (
+            'Mag-rehistro Muli'
+          ) : (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <RefreshIcon sx={{ fontSize: 18 }} />
+              I-refresh ang Status
+            </Box>
+          )}
         </PrimaryButton>
       </Box>
     </Box>
