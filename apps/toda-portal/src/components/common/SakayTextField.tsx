@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Box, Typography } from '@mui/material';
 
 export interface SakayTextFieldProps {
@@ -41,15 +41,25 @@ export const SakayTextField: React.FC<SakayTextFieldProps> = ({
   autoComplete,
 }) => {
   const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const isFloating = focused || Boolean(value && value.length > 0) || Boolean(readOnly && value);
 
   // Strip trailing asterisks from label string if passed explicitly
   const cleanLabel = label.replace(/\s*\*\s*$/g, '').trim();
 
+  // When the container box is clicked, focus the underlying input (unless readOnly)
+  const handleContainerClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (onClick) {
+      onClick(e);
+    } else if (!disabled && !readOnly) {
+      inputRef.current?.focus();
+    }
+  }, [onClick, disabled, readOnly]);
+
   return (
     <Box sx={{ width: '100%' }}>
       <Box
-        onClick={onClick}
+        onClick={handleContainerClick}
         sx={{
           width: '100%',
           minHeight: '62px',
@@ -70,7 +80,7 @@ export const SakayTextField: React.FC<SakayTextFieldProps> = ({
           opacity: disabled ? 0.7 : 1,
         }}
       >
-        {/* Floating Label inside field */}
+        {/* Floating Label inside field — pointerEvents:none so it never blocks clicks */}
         <Typography
           sx={{
             position: 'absolute',
@@ -85,6 +95,7 @@ export const SakayTextField: React.FC<SakayTextFieldProps> = ({
             textTransform: isFloating ? 'uppercase' : 'none',
             userSelect: 'none',
             pointerEvents: 'none',
+            background: 'transparent',
             whiteSpace: isFloating ? 'normal' : 'nowrap',
             wordBreak: 'break-word',
             lineHeight: 1.15,
@@ -113,6 +124,7 @@ export const SakayTextField: React.FC<SakayTextFieldProps> = ({
           }}
         >
           <input
+            ref={inputRef}
             id={id}
             type={type}
             value={value}

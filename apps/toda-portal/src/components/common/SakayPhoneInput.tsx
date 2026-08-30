@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Typography } from '@mui/material';
 
 export interface SakayPhoneInputProps {
@@ -11,20 +11,22 @@ export interface SakayPhoneInputProps {
   readOnly?: boolean;
 }
 
+// Extract the 9-digit suffix after the leading '9' (i.e., digits 2-10 of the 10-digit PH number)
 export const extract9DigitsAfter9 = (raw: string): string => {
   if (!raw) return '';
   const digits = raw.replace(/\D/g, '');
-  let after9 = '';
+  let national = '';
   if (digits.startsWith('639')) {
-    after9 = digits.slice(3);
+    national = digits.slice(2); // keep the 9 + 9 digits
   } else if (digits.startsWith('09')) {
-    after9 = digits.slice(2);
+    national = digits.slice(1); // strip leading 0
   } else if (digits.startsWith('9')) {
-    after9 = digits.slice(1);
+    national = digits;
   } else {
-    after9 = digits;
+    national = digits;
   }
-  return after9.slice(0, 9);
+  // national is the 10-digit number starting with 9; return it clamped to 10 digits
+  return national.slice(0, 10);
 };
 
 export const SakayPhoneInput: React.FC<SakayPhoneInputProps> = ({
@@ -37,19 +39,38 @@ export const SakayPhoneInput: React.FC<SakayPhoneInputProps> = ({
   readOnly = false,
 }) => {
   const [focused, setFocused] = useState(false);
-  const [digitsAfter9, setDigitsAfter9] = useState(() => extract9DigitsAfter9(value));
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // nationalDigits: the 10-digit PH mobile number starting with 9 (e.g. "9123456789")
+  // We store only what the user has typed — empty string if nothing entered yet.
+  const [nationalDigits, setNationalDigits] = useState<string>(() => {
+    if (!value) return '';
+    return extract9DigitsAfter9(value);
+  });
 
   useEffect(() => {
-    setDigitsAfter9(extract9DigitsAfter9(value));
+    if (!value) {
+      setNationalDigits('');
+      return;
+    }
+    setNationalDigits(extract9DigitsAfter9(value));
   }, [value]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (readOnly) return;
-    const val = e.target.value;
-    const cleanDigits = extract9DigitsAfter9(val);
-    setDigitsAfter9(cleanDigits);
-    const fullNational = cleanDigits ? `09${cleanDigits}` : '';
-    onChange(fullNational);
+    // Strip non-digits
+    const rawInput = e.target.value.replace(/\D/g, '');
+    // Clamp to 10 digits
+    const clamped = rawInput.slice(0, 10);
+    setNationalDigits(clamped);
+    // Emit full number as "09XXXXXXXXX" format (11 digits starting with 0) or empty
+    if (clamped.length > 0) {
+      // Ensure it always starts with 9 — if user typed something else, keep it as-is but validate on submit
+      const fullNational = clamped.startsWith('9') ? `0${clamped}` : `0${clamped}`;
+      onChange(fullNational);
+    } else {
+      onChange('');
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -58,7 +79,7 @@ export const SakayPhoneInput: React.FC<SakayPhoneInputProps> = ({
     const end = input.selectionEnd ?? 0;
 
     if (e.key === 'Backspace') {
-      if (start === end && start <= 1) {
+      if (start === end && start === 0) {
         e.preventDefault();
         return;
       }
@@ -71,11 +92,18 @@ export const SakayPhoneInput: React.FC<SakayPhoneInputProps> = ({
     }
   };
 
-  const displayInputValue = `9${digitsAfter9}`;
+  // Click anywhere in the field container focuses the input
+  const handleContainerClick = useCallback(() => {
+    if (!readOnly) inputRef.current?.focus();
+  }, [readOnly]);
+
+  // Display value is exactly what the user typed (the 10-digit national number)
+  const displayInputValue = nationalDigits;
 
   return (
     <Box sx={{ width: '100%' }}>
       <Box
+        onClick={handleContainerClick}
         sx={{
           width: '100%',
           minHeight: '62px',
@@ -90,7 +118,7 @@ export const SakayPhoneInput: React.FC<SakayPhoneInputProps> = ({
           alignItems: 'center',
           transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
           boxSizing: 'border-box',
-          cursor: 'text',
+          cursor: readOnly ? 'default' : 'text',
         }}
       >
         <Typography
@@ -107,6 +135,7 @@ export const SakayPhoneInput: React.FC<SakayPhoneInputProps> = ({
             textTransform: 'uppercase',
             userSelect: 'none',
             pointerEvents: 'none',
+            background: 'transparent',
             lineHeight: 1.15,
             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
             display: 'flex',
@@ -155,6 +184,7 @@ export const SakayPhoneInput: React.FC<SakayPhoneInputProps> = ({
           </Box>
 
           <input
+            ref={inputRef}
             type="tel"
             value={displayInputValue}
             onChange={handleInputChange}
@@ -162,6 +192,7 @@ export const SakayPhoneInput: React.FC<SakayPhoneInputProps> = ({
             onFocus={() => setFocused(true)}
             onBlur={() => setFocused(false)}
             readOnly={readOnly}
+            placeholder="9XXXXXXXXX"
             style={{
               width: '100%',
               border: 'none',

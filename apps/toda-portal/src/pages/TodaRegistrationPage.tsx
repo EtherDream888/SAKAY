@@ -847,7 +847,6 @@ export const TodaRegistrationPage: React.FC = () => {
                   onChange={(e) => setBarangay(e.target.value)}
                   error={hasAttemptedSubmit && !barangay}
                   helperText={hasAttemptedSubmit && !barangay ? 'Please select an operating barangay.' : ''}
-                  required
                   fullWidth
                   slotProps={{
                     select: {
@@ -904,12 +903,21 @@ export const TodaRegistrationPage: React.FC = () => {
                     '& .MuiInputLabel-root': {
                       fontSize: '14.5px',
                       color: '#94A3B8',
+                      background: 'transparent',
                       '&.Mui-focused, &.MuiInputLabel-shrink': {
                         fontSize: '9.5px',
                         fontWeight: 700,
                         color: '#FF6B00',
                         transform: 'translate(14px, 8px) scale(1)',
+                        background: 'transparent',
+                        padding: 0,
                       },
+                    },
+                    '& .MuiOutlinedInput-notchedOutline legend': {
+                      display: 'none',
+                    },
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      border: 'none',
                     },
                     '& .MuiSelect-select': {
                       pt: '20px',
@@ -929,10 +937,14 @@ export const TodaRegistrationPage: React.FC = () => {
                     label="Date Established"
                     placeholder="YYYY-MM-DD"
                     value={dateEstablished}
-                    readOnly
-                    onClick={(e) => {
-                      setCalendarAnchorEl(e.currentTarget);
-                      setCalendarOpen(true);
+                    onChange={(e) => {
+                      // Allow manual typing of date
+                      setDateEstablished(e.target.value);
+                      // Try to parse typed value for calendar sync
+                      const parsed = new Date(e.target.value);
+                      if (!isNaN(parsed.getTime())) {
+                        setSelectedDateObj(parsed);
+                      }
                     }}
                     endAdornment={
                       <IconButton
