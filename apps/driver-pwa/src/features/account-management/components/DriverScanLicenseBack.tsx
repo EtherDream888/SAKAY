@@ -40,9 +40,10 @@ export const DriverScanLicenseBack: React.FC = () => {
   } | undefined;
 
   const isTagalog = language === 'tl';
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const viewfinderRef = useRef<HTMLDivElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const viewfinderRef = useRef<HTMLDivElement>(null);
+  const guideRef = useRef<HTMLDivElement>(null);
 
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -224,7 +225,11 @@ export const DriverScanLicenseBack: React.FC = () => {
       if (videoRef.current && videoRef.current.videoWidth > 0) {
         try {
           rawFrameDataUrl = captureRawFrame(videoRef.current);
-          capturedDataUrl = await enhanceLicenseDocument(videoRef.current, viewfinderRef.current, 'back');
+          capturedDataUrl = await enhanceLicenseDocument(
+            videoRef.current,
+            guideRef.current || viewfinderRef.current,
+            'back'
+          );
         } catch (err) {
           console.warn('[DriverScanLicenseBack] Image enhancement error:', err);
           const video = videoRef.current;
@@ -418,6 +423,7 @@ export const DriverScanLicenseBack: React.FC = () => {
 
           {/* Card Boundary Dashed Frame with 4-Corner L-Brackets */}
           <Box
+            ref={guideRef}
             sx={{
               position: 'absolute',
               inset: '16px 14px',

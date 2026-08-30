@@ -681,32 +681,48 @@ export const fetchTodaDriverMembers = fetchTodaDrivers;
 
 export async function fetchDriverApplicants(todaId: string = DEFAULT_TODA_ID): Promise<DriverApplicant[]> {
   try {
+    let targetTodaId = todaId;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: adminRow } = await supabase
+        .from('toda_admin')
+        .select('toda_id')
+        .eq('auth_user_id', user.id)
+        .maybeSingle();
+      if (adminRow?.toda_id) {
+        targetTodaId = adminRow.toda_id;
+      }
+    }
+
     const { data, error } = await supabase
       .from('driver')
-      .select('*')
-      .eq('toda_id', todaId)
-      .eq('account_status', 'Pending Verification');
+      .select('*, driver_verification(*)')
+      .eq('toda_id', targetTodaId)
+      .in('account_status', ['Pending Verification', 'Pending', 'TODA Review']);
 
     if (error || !data || data.length === 0) return [];
 
-    return data.map((d: any) => ({
-      id: d.driver_id,
-      name: d.full_name,
-      phone: d.contact_number,
-      licenseNo: d.license_number || 'N/A',
-      vehiclePlate: d.plate_number || 'N/A',
-      chassisNo: 'CHAS-99812',
-      motorNo: 'ENG-44120',
-      franchiseNo: d.franchise_number || 'N/A',
-      submittedDate: d.created_at ? new Date(d.created_at).toLocaleDateString('en-US') : 'Recent',
-      daysPending: 1,
-      isOverdue: false,
-      onSubmittedRoster: true,
-      tricyclePhotoUrl: '',
-      photoVerified: true,
-      rosterVerified: true,
-      todaStageStatus: 'Awaiting Screening',
-    }));
+    return data.map((d: any) => {
+      const verif = Array.isArray(d.driver_verification) ? d.driver_verification[0] : d.driver_verification;
+      return {
+        id: d.driver_id,
+        name: d.full_name,
+        phone: d.contact_number,
+        licenseNo: d.license_number || verif?.submitted_license_number || 'N/A',
+        vehiclePlate: d.plate_number || verif?.submitted_plate_number || 'N/A',
+        chassisNo: d.chassis_number || verif?.submitted_chassis_number || 'N/A',
+        motorNo: d.motor_number || verif?.submitted_motor_number || 'N/A',
+        franchiseNo: d.franchise_number || verif?.submitted_franchise_number || 'N/A',
+        submittedDate: d.created_at ? new Date(d.created_at).toLocaleDateString('en-US') : 'Recent',
+        daysPending: 1,
+        isOverdue: false,
+        onSubmittedRoster: true,
+        tricyclePhotoUrl: d.profile_photo_url || verif?.mtop_photo_path || '',
+        photoVerified: true,
+        rosterVerified: true,
+        todaStageStatus: d.account_status === 'TODA Approved' ? 'Endorsed to LGU' : 'Awaiting Screening',
+      };
+    });
   } catch (err) {
     console.error('[todaApiService] fetchDriverApplicants error:', err);
     return [];
@@ -714,14 +730,27 @@ export async function fetchDriverApplicants(todaId: string = DEFAULT_TODA_ID): P
 }
 
 export async function endorseDriverApplicant(applicantId: string, actorName: string = 'TODA President') {
+  const timestamp = new Date().toISOString();
   const { data, error } = await supabase
     .from('driver')
-    .update({ account_status: 'Pending Verification' })
+    .update({ account_status: 'TODA Approved', endorsed_at: timestamp, updated_at: timestamp })
     .eq('driver_id', applicantId)
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // Fallback if endorsed_at column is missing on schema cache
+    await supabase
+      .from('driver')
+      .update({ account_status: 'TODA Approved', updated_at: timestamp })
+      .eq('driver_id', applicantId);
+  }
+
+  // Also update driver_verification record status
+  await supabase
+    .from('driver_verification')
+    .update({ verification_status: 'TODA Approved', reviewed_at: timestamp })
+    .eq('driver_id', applicantId);
 
   await recordTodaAuditAction({
     actionType: 'DRIVER_STAGE1_ENDORSED',
@@ -746,21 +775,46 @@ export async function returnDriverApplicant(applicantId: string, remarks: string
   return { success: true, remarks };
 }
 
-export async function rejectDriverApplicant(applicantId: string, reason: string) {
+export async function rejectDriverApplicant(applicantId: string, reason: string, customComment?: string, actorName: string = 'TODA President') {
+  const timestamp = new Date().toISOString();
+  const payload = {
+    account_status: 'Rejected',
+    rejection_reason: reason,
+    rejection_comment: customComment || null,
+    rejected_at: timestamp,
+    updated_at: timestamp,
+  };
+
   const { data, error } = await supabase
     .from('driver')
-    .update({ account_status: 'Suspended' })
+    .update(payload)
     .eq('driver_id', applicantId)
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // Fallback if rejection columns are not on schema cache
+    await supabase
+      .from('driver')
+      .update({ account_status: 'Rejected', updated_at: timestamp })
+      .eq('driver_id', applicantId);
+  }
+
+  await supabase
+    .from('driver_verification')
+    .update({
+      verification_status: 'Rejected',
+      rejection_reason: reason,
+      rejection_comment: customComment || null,
+      reviewed_at: timestamp,
+    })
+    .eq('driver_id', applicantId);
 
   await recordTodaAuditAction({
     actionType: 'DRIVER_APPLICATION_REJECTED',
     targetId: applicantId,
     targetName: data?.full_name || applicantId,
-    details: `Rejected driver membership application for '${data?.full_name || applicantId}'. Reason: ${reason}`,
+    details: `[TODA Screening] ${actorName}: Rejected driver membership application for '${data?.full_name || applicantId}'. Reason: ${reason}. Comment: ${customComment || 'None'}`,
     category: 'Driver Verification',
   });
 

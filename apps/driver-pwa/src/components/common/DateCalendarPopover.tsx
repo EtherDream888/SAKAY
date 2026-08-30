@@ -38,6 +38,13 @@ export const DateCalendarPopover: React.FC<DateCalendarPopoverProps> = ({
     new Date(safeDate.getFullYear(), safeDate.getMonth(), 1)
   );
 
+  React.useEffect(() => {
+    if (open) {
+      const today = new Date();
+      setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+    }
+  }, [open]);
+
   const currentYear = currentMonth.getFullYear();
   const currentMonthIdx = currentMonth.getMonth();
 

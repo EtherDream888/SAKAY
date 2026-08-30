@@ -14,10 +14,13 @@ import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import { Select, MenuItem } from '@mui/material';
+
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
 import { useLanguage } from '../../../utils/LanguageContext';
-import { sendDriverOtp, ensureDriverAuthSession } from '../../../services/driverApiService';
+import { sendDriverOtp, ensureDriverAuthSession, fetchAccreditedTodas } from '../../../services/driverApiService';
 
 export const formatMobileNumber = (value: string): string => {
   const digits = value.replace(/\D/g, '');
@@ -210,6 +213,8 @@ export const DriverRegister: React.FC = () => {
   const [lastName, setLastName] = useState('');
   const [suffix, setSuffix] = useState('');
   const [phone, setPhone] = useState('');
+  const [selectedTodaId, setSelectedTodaId] = useState('');
+  const [todaList, setTodaList] = useState<Array<{ id: string; name: string; acronym: string; barangay: string }>>([]);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -217,6 +222,7 @@ export const DriverRegister: React.FC = () => {
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [accountError, setAccountError] = useState<string | null>(null);
+  const [todaFocused, setTodaFocused] = useState(false);
 
   useEffect(() => {
     try {
@@ -224,6 +230,9 @@ export const DriverRegister: React.FC = () => {
     } catch (e) {
       console.warn('[DriverRegister] Error clearing draft', e);
     }
+    fetchAccreditedTodas().then((list) => {
+      setTodaList(list);
+    });
   }, []);
 
   const handlePhoneFocus = () => {
@@ -322,6 +331,7 @@ export const DriverRegister: React.FC = () => {
   const isFormValid = Boolean(
     firstName.trim() &&
     lastName.trim() &&
+    selectedTodaId &&
     cleanPhoneDigits.length === 11 &&
     cleanPhoneDigits.startsWith('09') &&
     isPasswordValid &&
@@ -336,7 +346,7 @@ export const DriverRegister: React.FC = () => {
 
     setSubmitted(true);
 
-    const sessionResult = await ensureDriverAuthSession(cleanPhoneDigits, password, fullName);
+    const sessionResult = await ensureDriverAuthSession(cleanPhoneDigits, password, fullName, selectedTodaId);
     if (!sessionResult.success) {
       setSubmitted(false);
       setAccountError(sessionResult.error || 'Hindi maihanda ang inyong account. Pakisubukang muli.');
@@ -346,6 +356,7 @@ export const DriverRegister: React.FC = () => {
     try {
       localStorage.removeItem('sakay_driver_registration_draft');
       localStorage.setItem('sakay_driver_phone', cleanPhoneDigits);
+      localStorage.setItem('sakay_driver_toda_id', selectedTodaId);
     } catch {}
 
     let otpResult: { success: boolean; message?: string; error?: string; debugOtp?: string } | null = null;
@@ -360,6 +371,7 @@ export const DriverRegister: React.FC = () => {
         phone: cleanPhoneDigits,
         password: password,
         driverName: fullName,
+        todaId: selectedTodaId,
         isRecovery: false,
         debugOtp: otpResult?.debugOtp,
       },
@@ -487,6 +499,105 @@ export const DriverRegister: React.FC = () => {
                 />
               </Box>
             </Box>
+          </Box>
+
+          {/* TODA Selection Combobox */}
+          <Box sx={{ width: '100%' }}>
+            <Box
+              sx={{
+                width: '100%',
+                minHeight: '62px',
+                height: '62px',
+                borderRadius: '16px',
+                backgroundColor: todaFocused ? '#FFFFFF' : '#F1F3F5',
+                border: `1.5px solid ${
+                  hasAttemptedSubmit && !selectedTodaId
+                    ? '#DC2626'
+                    : todaFocused
+                    ? '#FF6B00'
+                    : '#E2E8F0'
+                }`,
+                boxShadow: todaFocused
+                  ? '0 0 0 3px rgba(255, 107, 0, 0.12)'
+                  : 'none',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                px: 2,
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+                boxSizing: 'border-box',
+              }}
+            >
+              <Typography
+                sx={{
+                  position: 'absolute',
+                  left: '16px',
+                  top: selectedTodaId ? '8px' : '50%',
+                  transform: selectedTodaId ? 'translateY(0)' : 'translateY(-50%)',
+                  fontSize: selectedTodaId ? '9.5px' : '15px',
+                  fontWeight: selectedTodaId ? 700 : 500,
+                  color:
+                    hasAttemptedSubmit && !selectedTodaId
+                      ? '#DC2626'
+                      : todaFocused
+                      ? '#FF6B00'
+                      : selectedTodaId
+                      ? '#64748B'
+                      : '#94A3B8',
+                  letterSpacing: selectedTodaId ? '0.5px' : '0px',
+                  textTransform: selectedTodaId ? 'uppercase' : 'none',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  pointerEvents: 'none',
+                  zIndex: 1,
+                }}
+              >
+                TODA NA KINABABILANGAN
+              </Typography>
+              <Select
+                value={selectedTodaId}
+                onChange={(e) => setSelectedTodaId(e.target.value as string)}
+                onOpen={() => setTodaFocused(true)}
+                onClose={() => setTodaFocused(false)}
+                onFocus={() => setTodaFocused(true)}
+                onBlur={() => setTodaFocused(false)}
+                displayEmpty
+                renderValue={(selected) => {
+                  if (!selected) return null;
+                  const matched = todaList.find((t) => t.id === selected);
+                  return matched ? `${matched.name} (${matched.acronym})` : selected;
+                }}
+                IconComponent={ExpandMoreIcon}
+                fullWidth
+                sx={{
+                  height: '100%',
+                  pt: selectedTodaId ? '16px' : 0,
+                  '& .MuiSelect-select': {
+                    fontSize: '15px',
+                    fontWeight: 600,
+                    color: '#0F172A',
+                    py: 0,
+                    px: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                  },
+                  '& fieldset': { border: 'none' },
+                }}
+              >
+                <MenuItem value="" disabled sx={{ color: '#94A3B8', fontSize: '14px' }}>
+                  Piliin ang inyong TODA
+                </MenuItem>
+                {todaList.map((toda) => (
+                  <MenuItem key={toda.id} value={toda.id} sx={{ fontSize: '14px', fontWeight: 500 }}>
+                    {toda.name} ({toda.acronym})
+                  </MenuItem>
+                ))}
+              </Select>
+            </Box>
+            {hasAttemptedSubmit && !selectedTodaId && (
+              <Typography sx={{ color: '#DC2626', fontSize: '12px', mt: 0.5, px: 1, fontWeight: 500 }}>
+                Pakipili muna ang inyong TODA.
+              </Typography>
+            )}
           </Box>
 
           <RegisterInput
@@ -639,6 +750,32 @@ export const DriverRegister: React.FC = () => {
         >
           Magpatuloy
         </PrimaryButton>
+
+        <Typography
+          onClick={() => navigate('/driver/login')}
+          sx={{
+            textAlign: 'center',
+            fontSize: '13.5px',
+            color: '#64748B',
+            mt: 1.5,
+            fontWeight: 500,
+            cursor: 'pointer',
+            '&:hover': { color: '#0F172A' },
+          }}
+        >
+          May account ka na?{' '}
+          <Box
+            component="span"
+            sx={{
+              color: '#FF6B00',
+              fontWeight: 700,
+              textDecoration: 'none',
+              '&:hover': { textDecoration: 'underline' },
+            }}
+          >
+            Mag-log in
+          </Box>
+        </Typography>
       </Box>
     </Box>
   );

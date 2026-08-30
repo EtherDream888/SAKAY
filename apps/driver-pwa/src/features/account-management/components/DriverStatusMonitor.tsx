@@ -14,14 +14,61 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
 import { useLanguage } from '../../../utils/LanguageContext';
+import { supabase } from '../../../services/supabaseClient';
 
 export const DriverStatusMonitor: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useLanguage();
-  const state = location.state as { driverName?: string; phone?: string; todaId?: string } | undefined;
+  const state = location.state as {
+    driverName?: string;
+    phone?: string;
+    accountStatus?: string;
+    rejectionReason?: string;
+    rejectionComment?: string;
+  } | undefined;
 
-  const driverName = state?.driverName || 'Aurelio "Auring" Bautista';
+  const [loading, setLoading] = React.useState(false);
+  const [profileStatus, setProfileStatus] = React.useState<string>(state?.accountStatus || 'Pending Verification');
+  const [rejectionReason, setRejectionReason] = React.useState<string | undefined>(state?.rejectionReason);
+  const [rejectionComment, setRejectionComment] = React.useState<string | undefined>(state?.rejectionComment);
+
+  const driverName = state?.driverName || 'Driver Applicant';
+
+  const checkStatus = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from('driver')
+          .select('account_status, rejection_reason, rejection_comment')
+          .eq('auth_user_id', user.id)
+          .maybeSingle();
+
+        if (data) {
+          setProfileStatus(data.account_status || 'Pending Verification');
+          setRejectionReason(data.rejection_reason || undefined);
+          setRejectionComment(data.rejection_comment || undefined);
+
+          if (data.account_status === 'Active' || data.account_status === 'Verified') {
+            navigate('/driver/home', { replace: true });
+            return;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[DriverStatusMonitor] Status check warning:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    checkStatus();
+  }, []);
+
+  const isRejected = profileStatus === 'Rejected';
 
   return (
     <Box
@@ -38,7 +85,7 @@ export const DriverStatusMonitor: React.FC = () => {
       {/* Sticky Top Bar */}
       <Box
         sx={{
-          padding: 'calc(var(--safe-area-top) + 12px) 20px 12px 20px',
+          padding: 'calc(var(--safe-area-top) + 16px) 24px 16px 24px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -51,95 +98,194 @@ export const DriverStatusMonitor: React.FC = () => {
           onClick={() => navigate('/')}
           sx={{
             color: '#0F172A',
-            backgroundColor: '#F8FAFC',
-            borderRadius: '12px',
-            '&:hover': { backgroundColor: '#F1F5F9' },
+            backgroundColor: '#FFFFFF',
+            borderRadius: '14px',
+            border: '1px solid #E2E8F0',
+            width: 44,
+            height: 44,
+            '&:hover': { backgroundColor: '#F8FAFC' },
           }}
         >
-          <ArrowBackIcon fontSize="small" />
+          <ArrowBackIcon sx={{ fontSize: 20 }} />
         </IconButton>
-        <Logo color="orange" width={100} />
-        <Box sx={{ width: 40 }} />
+        <Logo color="orange" width={110} />
+        <Box sx={{ width: 44 }} />
       </Box>
 
-      {/* Content */}
+      {/* Main Centered Content Area */}
       <Box
         sx={{
           flex: 1,
           overflowY: 'auto',
-          padding: '24px 20px calc(var(--safe-area-bottom) + 24px) 20px',
+          px: 3,
+          py: 4,
           display: 'flex',
           flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
         }}
       >
-        <Box sx={{ textAlign: 'center', mb: 3 }}>
-          <Box sx={{ width: 60, height: 60, borderRadius: '50%', backgroundColor: '#FFF8F0', color: '#FF6B00', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px auto', boxShadow: '0 4px 14px rgba(255, 107, 0, 0.2)' }}>
-            <PendingActionsIcon sx={{ fontSize: 32 }} />
-          </Box>
-          <Typography sx={{ fontSize: '20px', fontWeight: 800, color: '#0F172A' }}>
-            {t.applicationStatusTitle}
-          </Typography>
-          <Typography sx={{ fontSize: '13.5px', color: '#64748B', mt: 0.5 }}>
-            Driver: <strong>{driverName}</strong>
-          </Typography>
-        </Box>
+        {isRejected ? (
+          <>
+            <Box
+              sx={{
+                width: 76,
+                height: 76,
+                borderRadius: '50%',
+                backgroundColor: '#FEF2F2',
+                color: '#DC2626',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mb: 3,
+                boxShadow: '0 8px 24px rgba(220, 38, 38, 0.15)',
+              }}
+            >
+              <PendingActionsIcon sx={{ fontSize: 40 }} />
+            </Box>
 
-        {/* SLA Progress Tracker */}
-        <Paper elevation={0} sx={{ p: 2.5, borderRadius: '18px', border: '1px solid #E2E8F0', backgroundColor: '#F8FAFC', mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Typography sx={{ fontSize: '12.5px', fontWeight: 800, color: '#0F172A' }}>
-              Review Progress
+            <Typography
+              sx={{
+                fontSize: '22px',
+                fontWeight: 800,
+                color: '#0F172A',
+                lineHeight: 1.3,
+                mb: 1.5,
+              }}
+            >
+              Hindi Na-aprubahan ang Aplikasyon
             </Typography>
-            <Chip label="Awaiting TODA Endorsement" size="small" sx={{ backgroundColor: '#FEF3C7', color: '#B45309', fontWeight: 800, fontSize: '10.5px' }} />
-          </Box>
 
-          {/* Step 1: TODA Screening */}
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 2 }}>
-            <CheckCircleIcon sx={{ color: '#10B981', fontSize: 20, mt: '2px' }} />
-            <Box>
-              <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>
-                {t.submissionComplete}
-              </Typography>
-              <Typography sx={{ fontSize: '12px', color: '#64748B' }}>
-                {t.submissionCompleteDesc}
-              </Typography>
-            </Box>
-          </Box>
+            <Typography
+              sx={{
+                fontSize: '14px',
+                color: '#64748B',
+                lineHeight: 1.5,
+                maxWidth: 320,
+                mb: 3,
+              }}
+            >
+              Ang iyong rehistrasyon ay tinanggihan ng TODA Administrator matapos ang masusing pagsusuri.
+            </Typography>
 
-          {/* Step 2: TODA Stage */}
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 2 }}>
-            <Box sx={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid #FF6B00', backgroundColor: '#FFF8F0', mt: '2px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Box sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#FF6B00' }} />
-            </Box>
-            <Box>
-              <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#FF6B00' }}>
-                {t.todaRosterVerification}
+            <Paper
+              elevation={0}
+              sx={{
+                width: '100%',
+                maxWidth: 340,
+                p: 2.5,
+                borderRadius: '16px',
+                backgroundColor: '#FFF5F5',
+                border: '1px solid #FECDD3',
+                textAlign: 'left',
+                mb: 4,
+              }}
+            >
+              <Typography sx={{ fontSize: '11px', fontWeight: 800, color: '#BE123C', letterSpacing: '0.5px', textTransform: 'uppercase', mb: 1 }}>
+                Dahilan ng Pagtanggi:
               </Typography>
-              <Typography sx={{ fontSize: '12px', color: '#64748B' }}>
-                {t.todaRosterVerificationDesc}
+              <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#9F1239', mb: 1 }}>
+                {rejectionReason || 'Hindi natagpuan sa Master Roster ng TODA.'}
               </Typography>
+              {rejectionComment && (
+                <Typography sx={{ fontSize: '13px', color: '#881337', lineHeight: 1.4 }}>
+                  Paliwanag: "{rejectionComment}"
+                </Typography>
+              )}
+            </Paper>
+          </>
+        ) : (
+          <>
+            <Box
+              sx={{
+                width: 76,
+                height: 76,
+                borderRadius: '50%',
+                backgroundColor: '#FFF8F0',
+                color: '#FF6B00',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mb: 3,
+                boxShadow: '0 8px 24px rgba(255, 107, 0, 0.15)',
+              }}
+            >
+              <PendingActionsIcon sx={{ fontSize: 40 }} />
             </Box>
-          </Box>
 
-          {/* Step 3: LGU Final Sign-off */}
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-            <Box sx={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid #CBD5E1', mt: '2px' }} />
-            <Box>
-              <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: '#94A3B8' }}>
-                {t.lguAccreditation}
-              </Typography>
-              <Typography sx={{ fontSize: '12px', color: '#94A3B8' }}>
-                {t.lguAccreditationDesc}
-              </Typography>
-            </Box>
-          </Box>
-        </Paper>
+            <Typography
+              sx={{
+                fontSize: '22px',
+                fontWeight: 800,
+                color: '#0F172A',
+                lineHeight: 1.3,
+                mb: 1.5,
+              }}
+            >
+              Patuloy na sinusuri ang iyong aplikasyon.
+            </Typography>
 
+            <Typography
+              sx={{
+                fontSize: '14px',
+                color: '#64748B',
+                lineHeight: 1.5,
+                maxWidth: 320,
+                mb: 4,
+              }}
+            >
+              Pakihintay habang sinusuri ng TODA at LGU ang iyong mga isinumiteng impormasyon.
+            </Typography>
+
+            <Paper
+              elevation={0}
+              sx={{
+                width: '100%',
+                maxWidth: 340,
+                p: 2.5,
+                borderRadius: '16px',
+                backgroundColor: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                textAlign: 'left',
+                mb: 4,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                <Typography sx={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>
+                  Status ng Rehistrasyon
+                </Typography>
+                <Chip
+                  label={profileStatus === 'TODA Approved' ? 'LGU Screening' : 'TODA Screening'}
+                  size="small"
+                  sx={{ backgroundColor: '#FEF3C7', color: '#B45309', fontWeight: 800, fontSize: '11px' }}
+                />
+              </Box>
+              <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#0F172A' }}>
+                Aplikante: {driverName}
+              </Typography>
+            </Paper>
+          </>
+        )}
+      </Box>
+
+      {/* Pinned Single Action Button */}
+      <Box
+        sx={{
+          p: 3,
+          pt: 1.5,
+          pb: 'calc(var(--safe-area-bottom) + 20px)',
+          backgroundColor: '#FFFFFF',
+          flexShrink: 0,
+        }}
+      >
         <PrimaryButton
           fullWidth
-          onClick={() => navigate('/driver/home', { replace: true })}
+          size="large"
+          onClick={checkStatus}
+          disabled={loading}
         >
-          {t.goToDashboard}
+          {loading ? 'Kinukumpirma...' : 'Tingnan ang Status ng Aplikasyon'}
         </PrimaryButton>
       </Box>
     </Box>

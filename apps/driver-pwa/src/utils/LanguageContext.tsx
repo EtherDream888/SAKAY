@@ -107,8 +107,14 @@ const translations = {
     docOrTitle: "Official Receipt (OR)",
     docOrDesc: "Para ma-verify ang pinakahuling rehistro ng iyong sasakyan.",
     estimatedTimeNotice: "Tinatayang humigit-kumulang 5 minuto",
-    // Driver's License Guidelines Screen
+    // Driver Registration Onboarding Steps (4 Steps)
     step1Of4: "Hakbang 1 ng 4",
+    step2Of4: "Hakbang 2 ng 4",
+    step3Of4: "Hakbang 3 ng 4",
+    step4Of4: "Hakbang 4 ng 4",
+    step1Of3: "Hakbang 1 ng 4",
+    step2Of3: "Hakbang 2 ng 4",
+    step3Of3: "Hakbang 3 ng 4",
     prepareLicenseTitle: "Ihanda ang iyong Driver's License",
     forClearPhoto: "Para sa malinaw na larawan:",
     licenseBullet1: "Gamitin lamang ang iyong opisyal na Driver's License card.",

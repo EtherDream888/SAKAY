@@ -118,7 +118,7 @@ export const DriverPrepareLicense: React.FC = () => {
               mb: 0.75,
             }}
           >
-            {t.step1Of4}
+            Hakbang 1 ng 4
           </Typography>
 
           {/* 4-segment Progress Bar */}
@@ -126,32 +126,32 @@ export const DriverPrepareLicense: React.FC = () => {
             <Box
               sx={{
                 flex: 1,
-                height: '4px',
-                borderRadius: '2px',
+                height: '6px',
+                borderRadius: '3px',
                 backgroundColor: '#FF6B00',
               }}
             />
             <Box
               sx={{
                 flex: 1,
-                height: '4px',
-                borderRadius: '2px',
+                height: '6px',
+                borderRadius: '3px',
                 backgroundColor: '#E2E8F0',
               }}
             />
             <Box
               sx={{
                 flex: 1,
-                height: '4px',
-                borderRadius: '2px',
+                height: '6px',
+                borderRadius: '3px',
                 backgroundColor: '#E2E8F0',
               }}
             />
             <Box
               sx={{
                 flex: 1,
-                height: '4px',
-                borderRadius: '2px',
+                height: '6px',
+                borderRadius: '3px',
                 backgroundColor: '#E2E8F0',
               }}
             />

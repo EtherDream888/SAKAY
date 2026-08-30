@@ -406,7 +406,12 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
   const isFormValid = Boolean(
     (formData.firstName?.trim() || formData.fullName?.trim()) &&
     formData.lastName?.trim() &&
-    formData.licenseNumber?.trim()
+    formData.dob?.trim() &&
+    formData.gender?.trim() &&
+    formData.address?.trim() &&
+    formData.licenseNumber?.trim() &&
+    formData.dlCodes?.trim() &&
+    formData.expirationDate?.trim()
   );
 
   const [activeDateField, setActiveDateField] = useState<'dob' | 'expirationDate' | null>(null);
@@ -453,7 +458,7 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
 
   const handleConfirmBackModal = () => {
     setShowBackModal(false);
-    navigate('/driver/review-license-back', { state });
+    navigate('/driver/prepare-license', { state });
   };
 
   const parseDateForCalendar = (val: string): Date => {
@@ -538,11 +543,11 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
         }}
       >
         <DialogTitle sx={{ fontWeight: 800, fontSize: '18px', color: '#0F172A', pb: 1 }}>
-          Bumalik sa pagkuha ng larawan?
+          Bumalik sa Pagkuha ng Lisensya?
         </DialogTitle>
         <DialogContent sx={{ py: 1 }}>
           <Typography sx={{ fontSize: '14px', color: '#64748B', lineHeight: 1.45 }}>
-            Kapag bumalik ka, maaaring kailanganin mong kunan muli ng larawan ang iyong dokumento.
+            Babalik ka sa pagkuha ng iyong lisensya. Kakailanganin mong kunan muli ang larawan.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 2, pb: 2, pt: 1, display: 'flex', gap: 1 }}>

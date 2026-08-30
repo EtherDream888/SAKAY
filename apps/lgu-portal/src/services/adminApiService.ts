@@ -665,7 +665,12 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
   try {
     let query = supabase.from('driver').select('*, toda:toda_id ( toda_id, toda_name, toda_acronym, barangay )');
     if (filters?.status && filters.status !== 'All') {
-      query = query.eq('account_status', filters.status);
+      if (filters.status === 'Pending Verification' || filters.status === 'Pending') {
+        // LGU sees only TODA-endorsed applications
+        query = query.in('account_status', ['TODA Approved', 'TODA Endorsed']);
+      } else {
+        query = query.eq('account_status', filters.status);
+      }
     }
     const { data, error } = await query;
     if (error || !data) return [];
@@ -688,7 +693,7 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
       todaVerificationStatus: 'Verified',
       lguVerificationStatus: d.account_status === 'Verified' ? 'Verified' : 'Pending',
       verificationStatus: d.account_status === 'Verified' ? 'Verified' : 'Pending',
-      accountStatus: d.account_status === 'Suspended' ? 'Inactive' : 'Active',
+      accountStatus: d.account_status === 'Verified' || d.account_status === 'Active' ? 'Active' : 'Inactive',
       onlineStatus: d.availability_status === 'Available' || d.availability_status === 'Busy' ? 'Online' : 'Offline',
       rating: Number(d.weighted_average_rating) || 5.0,
       ratingCount: 0,
@@ -710,7 +715,7 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
 }
 
 export async function verifyDriver(driverId: string, franchiseNumber?: string) {
-  const updatePayload: any = { account_status: 'Verified' };
+  const updatePayload: any = { account_status: 'Verified', updated_at: new Date().toISOString() };
   if (franchiseNumber) updatePayload.franchise_number = franchiseNumber;
 
   const { data, error } = await supabase
@@ -721,6 +726,12 @@ export async function verifyDriver(driverId: string, franchiseNumber?: string) {
     .single();
 
   if (error) throw error;
+
+  // Update driver_verification status
+  await supabase
+    .from('driver_verification')
+    .update({ verification_status: 'Approved', reviewed_at: new Date().toISOString() })
+    .eq('driver_id', driverId);
 
   await recordAdminAuditAction({
     actionType: 'DRIVER_STAGE2_VERIFIED',

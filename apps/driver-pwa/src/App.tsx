@@ -26,6 +26,9 @@ import { DriverScanMtop } from './features/account-management/components/DriverS
 import { DriverReviewMtop } from './features/account-management/components/DriverReviewMtop';
 import { DriverMtopLoading } from './features/account-management/components/DriverMtopLoading';
 import { DriverConfirmMtopInfo } from './features/account-management/components/DriverConfirmMtopInfo';
+import { DriverTricycleInstructions } from './features/account-management/components/DriverTricycleInstructions';
+import { DriverScanTricycle } from './features/account-management/components/DriverScanTricycle';
+import { DriverReviewTricycle } from './features/account-management/components/DriverReviewTricycle';
 import { DriverScanFace } from './features/account-management/components/DriverScanFace';
 import { DriverReviewFace } from './features/account-management/components/DriverReviewFace';
 import { DriverFaceLoading } from './features/account-management/components/DriverFaceLoading';
@@ -97,6 +100,12 @@ export const App: React.FC = () => {
             <Route path="/driver/mtop-loading" element={<DriverMtopLoading />} />
             <Route path="/confirm-mtop-info" element={<DriverConfirmMtopInfo />} />
             <Route path="/driver/confirm-mtop-info" element={<DriverConfirmMtopInfo />} />
+            <Route path="/tricycle-instructions" element={<DriverTricycleInstructions />} />
+            <Route path="/driver/tricycle-instructions" element={<DriverTricycleInstructions />} />
+            <Route path="/scan-tricycle" element={<DriverScanTricycle />} />
+            <Route path="/driver/scan-tricycle" element={<DriverScanTricycle />} />
+            <Route path="/review-tricycle" element={<DriverReviewTricycle />} />
+            <Route path="/driver/review-tricycle" element={<DriverReviewTricycle />} />
             <Route path="/scan-face" element={<DriverScanFace />} />
             <Route path="/driver/scan-face" element={<DriverScanFace />} />
             <Route path="/review-face" element={<DriverReviewFace />} />

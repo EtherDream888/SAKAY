@@ -8,6 +8,8 @@ import appIcon from '../../../../../../packages/shared/src/assets/icons/app-icon
 import defaultFrontSample from '../../../../../../packages/shared/src/assets/images/drivers_license_front.png';
 import defaultBackSample from '../../../../../../packages/shared/src/assets/images/drivers_license_back.png';
 
+import DriverProgressLoader from './DriverProgressLoader';
+
 // Preload app icon image in module scope for zero-glitch instant display
 const preloadedAppIcon = new Image();
 preloadedAppIcon.src = appIcon;
@@ -131,118 +133,7 @@ export const DriverLicenseLoading: React.FC = () => {
     };
   }, [state]);
 
-  // Calculate percentage (0 to 100)
-  const currentPct = Math.min(100, Math.max(0, displayProgress * 100));
-
-  // Width of the tricycle image icon in pixels
-  const TRICYCLE_WIDTH_PX = 68;
-
-  return (
-    <Box
-      sx={{
-        width: '100%',
-        height: '100%',
-        backgroundColor: '#FFFFFF',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        px: 3,
-        position: 'relative',
-      }}
-    >
-      {/* Centered Loading Animation Container */}
-      <Box
-        sx={{
-          width: '100%',
-          maxWidth: '340px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        {/* Track with Riding Tricycle */}
-        <Box
-          sx={{
-            width: '100%',
-            position: 'relative',
-            height: '76px',
-            display: 'flex',
-            alignItems: 'flex-end',
-          }}
-        >
-          {/* Animated Tricycle: right edge (front wheel) aligns with leading progress bar tip */}
-          <Box
-            sx={{
-              position: 'absolute',
-              bottom: '6px',
-              left: `max(0px, calc(${currentPct}% - ${TRICYCLE_WIDTH_PX}px))`,
-              willChange: 'left',
-              zIndex: 2,
-            }}
-          >
-            <img
-              src={appIcon}
-              alt="Loading Tricycle"
-              width={TRICYCLE_WIDTH_PX}
-              height={TRICYCLE_WIDTH_PX}
-              loading="eager"
-              decoding="sync"
-              style={{
-                width: `${TRICYCLE_WIDTH_PX}px`,
-                height: `${TRICYCLE_WIDTH_PX}px`,
-                objectFit: 'contain',
-                display: 'block',
-                imageRendering: 'auto',
-                WebkitBackfaceVisibility: 'hidden',
-                backfaceVisibility: 'hidden',
-                transform: 'translateZ(0)',
-              }}
-            />
-          </Box>
-
-          {/* Progress Track (Light Orange Base) */}
-          <Box
-            sx={{
-              width: '100%',
-              height: '14px',
-              borderRadius: '7px',
-              backgroundColor: '#FFC8B3',
-              overflow: 'hidden',
-              position: 'relative',
-              zIndex: 1,
-            }}
-          >
-            {/* Active Progress Fill (Solid Brand Orange) */}
-            <Box
-              sx={{
-                width: `${currentPct}%`,
-                height: '100%',
-                backgroundColor: '#FF6B00',
-                borderRadius: '7px',
-                willChange: 'width',
-              }}
-            />
-          </Box>
-        </Box>
-
-        {/* Dynamic Telemetry Tagalog Status Text */}
-        <Typography
-          sx={{
-            mt: 4,
-            fontSize: '15px',
-            fontWeight: 700,
-            color: '#FF6B00',
-            textAlign: 'center',
-            lineHeight: 1.5,
-            maxWidth: '320px',
-          }}
-        >
-          Sandali lang habang kinukuha namin ang impormasyon mula sa iyong dokumento.
-        </Typography>
-      </Box>
-    </Box>
-  );
+  return <DriverProgressLoader progress={displayProgress} flowType="license" />;
 };
 
 export default DriverLicenseLoading;

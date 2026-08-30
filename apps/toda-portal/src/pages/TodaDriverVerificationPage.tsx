@@ -14,6 +14,13 @@ import {
   Checkbox,
   FormControlLabel,
   Avatar,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  MenuItem,
 } from '@mui/material';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -32,6 +39,7 @@ import {
   fetchDriverApplicants,
   fetchTodaDrivers,
   forwardApplicantToLgu,
+  rejectDriverApplicant,
   recordTodaAuditAction,
 } from '../services/todaApiService';
 
@@ -54,10 +62,37 @@ export const TodaDriverVerificationPage: React.FC = () => {
   const [rosterChecked, setRosterChecked] = useState(false);
   const [photoChecked, setPhotoChecked] = useState(false);
 
-  // Confirmation Dialogs
+  // Confirmation & Celebratory Dialogs
   const [forwardDialogOpen, setForwardDialogOpen] = useState(false);
+  const [celebrateDialogOpen, setCelebrateDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [resubmitDialogOpen, setResubmitDialogOpen] = useState(false);
+
+  // Rejection Reason Form State
+  const [selectedRejectReason, setSelectedRejectReason] = useState<string>('Hindi natagpuan sa Master Roster ng TODA.');
+  const [customRejectComment, setCustomRejectComment] = useState<string>('');
+
+  const PREDEFINED_REJECTION_REASONS = [
+    'Hindi natagpuan sa Master Roster ng TODA.',
+    'Hindi tugma ang impormasyong isinumite sa Master Roster.',
+    'Hindi wasto o hindi kumpleto ang impormasyon.',
+    'Hindi balido ang Driver\'s License.',
+    'Hindi balido o hindi tugma ang MTOP.',
+    'Hindi malinaw ang mga isinumiteng dokumento.',
+    'Hindi tugma ang impormasyon ng tricycle unit.',
+    'Iba pa',
+  ];
+
+  const normalizeName = (name: string): string => {
+    if (!name) return '';
+    return name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
 
   const loadApplicants = () => {
     setIsLoading(true);
@@ -69,7 +104,21 @@ export const TodaDriverVerificationPage: React.FC = () => {
 
     Promise.all([fetchDriverApplicants(), fetchTodaDrivers()])
       .then(([apps, drvs]) => {
-        setApplicants(apps || []);
+        const rosterNameSet = new Set(
+          (drvs || []).map((d) => normalizeName(d.name || (d as any).fullName || ''))
+        );
+
+        const crossCheckedApps = (apps || []).map((app) => {
+          const normAppName = normalizeName(app.name);
+          const isMatched = rosterNameSet.has(normAppName) || (drvs || []).some(d => normalizeName(d.name).includes(normAppName) || normAppName.includes(normalizeName(d.name)));
+          return {
+            ...app,
+            onSubmittedRoster: isMatched,
+            rosterVerified: isMatched,
+          };
+        });
+
+        setApplicants(crossCheckedApps);
         const verified = (drvs || []).filter((d) => d.lguVerificationStatus === 'Verified').length;
         setLguVerifiedCount(verified);
       })
@@ -140,16 +189,10 @@ export const TodaDriverVerificationPage: React.FC = () => {
   const handleForwardConfirm = async () => {
     if (!selectedApplicant) return;
 
-    const updated = await forwardApplicantToLgu(selectedApplicant.id);
-    if (updated) {
-      setApplicants((prev) =>
-        prev.map((a) => (a.id === selectedApplicant.id ? { ...a, todaStageStatus: 'Endorsed to LGU', rosterVerified: true, photoVerified: true } : a))
-      );
-    } else {
-      setApplicants((prev) =>
-        prev.map((a) => (a.id === selectedApplicant.id ? { ...a, todaStageStatus: 'Endorsed to LGU' } : a))
-      );
-    }
+    await forwardApplicantToLgu(selectedApplicant.id);
+    setApplicants((prev) =>
+      prev.map((a) => (a.id === selectedApplicant.id ? { ...a, todaStageStatus: 'Endorsed to LGU', rosterVerified: true, photoVerified: true } : a))
+    );
 
     recordTodaAuditAction({
       actionType: 'DRIVER_APPLICANT_ENDORSED_TO_LGU',
@@ -160,11 +203,14 @@ export const TodaDriverVerificationPage: React.FC = () => {
     });
 
     setForwardDialogOpen(false);
-    setSelectedApplicant(null);
+    setCelebrateDialogOpen(true);
   };
 
-  const handleRejectConfirm = () => {
+  const handleRejectConfirm = async () => {
     if (!selectedApplicant) return;
+
+    const finalReason = selectedRejectReason === 'Iba pa' ? (customRejectComment || 'Hindi tinanggap ng TODA Admin.') : selectedRejectReason;
+    await rejectDriverApplicant(selectedApplicant.id, finalReason, customRejectComment);
 
     setApplicants((prev) =>
       prev.map((a) => (a.id === selectedApplicant.id ? { ...a, todaStageStatus: 'Rejected' } : a))
@@ -174,12 +220,13 @@ export const TodaDriverVerificationPage: React.FC = () => {
       actionType: 'DRIVER_APPLICANT_REJECTED',
       targetId: selectedApplicant.id,
       targetName: selectedApplicant.name,
-      details: `Rejected driver applicant ${selectedApplicant.name} at TODA level. Reason: Unmatched master roster membership.`,
+      details: `Rejected driver applicant ${selectedApplicant.name} at TODA level. Reason: ${finalReason}`,
       category: 'Driver Verification',
     });
 
     setRejectDialogOpen(false);
     setSelectedApplicant(null);
+    setCustomRejectComment('');
   };
 
   const handleResubmitConfirm = () => {
@@ -510,6 +557,17 @@ export const TodaDriverVerificationPage: React.FC = () => {
           onSecondaryAction={() => setSelectedApplicant(null)}
         >
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            {/* Master Roster Cross-Check Badge Banner */}
+            {selectedApplicant.onSubmittedRoster ? (
+              <Alert severity="success" sx={{ borderRadius: '12px', fontWeight: 600 }}>
+                <strong>Natagpuan sa Master Roster:</strong> Ang pangalan ng aplikante ({selectedApplicant.name}) ay nakatala sa opisyal na Master Roster ng TODA.
+              </Alert>
+            ) : (
+              <Alert severity="warning" sx={{ borderRadius: '12px', fontWeight: 600 }}>
+                <strong>Hindi natagpuan sa Master Roster:</strong> Hindi natagpuan ang aplikante sa Master Roster ng TODA na ito. Pakisuri at gumawa ng naaangkop na desisyon.
+              </Alert>
+            )}
+
             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2, backgroundColor: '#F8F9FA', p: 2.5, borderRadius: '12px' }}>
               <Box>
                 <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>Driver License No.</Typography>
@@ -599,6 +657,21 @@ export const TodaDriverVerificationPage: React.FC = () => {
                 View Photo
               </Button>
             </Box>
+
+            {/* Rejection Option inside modal */}
+            {selectedApplicant.todaStageStatus !== 'Endorsed to LGU' && (
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', pt: 1 }}>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  size="small"
+                  onClick={() => setRejectDialogOpen(true)}
+                  sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 700 }}
+                >
+                  Reject Application
+                </Button>
+              </Box>
+            )}
           </Box>
         </MacCenterModal>
       )}
@@ -607,12 +680,153 @@ export const TodaDriverVerificationPage: React.FC = () => {
       <MacConfirmDialog
         open={forwardDialogOpen}
         onClose={() => setForwardDialogOpen(false)}
-        title="Endorse Driver to City LGU Franchising Office?"
-        message={`Confirm endorsement of driver applicant ${selectedApplicant?.name} (${selectedApplicant?.vehiclePlate}) to the City LGU for official accreditation.`}
-        confirmLabel="Confirm Endorsement"
+        title="Endorse ang Aplikasyon?"
+        message={`Kumpirmahin ang pag-endorse sa aplikasyon ni ${selectedApplicant?.name} (${selectedApplicant?.vehiclePlate}). Ang aplikasyong ito ay ipapasa sa LGU para sa susunod na pagsusuri.`}
+        confirmLabel="Kumpirmahin ang Endorsement"
         confirmVariant="primary"
         onConfirm={handleForwardConfirm}
       />
+
+      {/* Celebratory Endorsement Popup Modal */}
+      <Dialog
+        open={celebrateDialogOpen}
+        onClose={() => {
+          setCelebrateDialogOpen(false);
+          setSelectedApplicant(null);
+        }}
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: '24px',
+              p: 3,
+              maxWidth: 420,
+              textAlign: 'center',
+            },
+          },
+        }}
+      >
+        <Box
+          sx={{
+            width: 72,
+            height: 72,
+            borderRadius: '50%',
+            backgroundColor: '#ECFDF5',
+            color: '#10B981',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            mx: 'auto',
+            mb: 2,
+            boxShadow: '0 8px 24px rgba(16, 185, 129, 0.2)',
+          }}
+        >
+          <CheckCircleIcon sx={{ fontSize: 44 }} />
+        </Box>
+        <Typography sx={{ fontSize: '20px', fontWeight: 800, color: '#0F172A', mb: 1 }}>
+          Matagumpay na na-endorse!
+        </Typography>
+        <Typography sx={{ fontSize: '14px', color: '#64748B', lineHeight: 1.45, mb: 3 }}>
+          Naipasa na ang aplikasyon sa LGU para sa susunod na pagsusuri.
+        </Typography>
+        <Button
+          fullWidth
+          variant="contained"
+          onClick={() => {
+            setCelebrateDialogOpen(false);
+            setSelectedApplicant(null);
+          }}
+          sx={{
+            borderRadius: '14px',
+            backgroundColor: '#FF6B00',
+            fontWeight: 700,
+            py: 1.25,
+            textTransform: 'none',
+            fontSize: '15px',
+            '&:hover': { backgroundColor: '#E05D00' },
+          }}
+        >
+          Okay
+        </Button>
+      </Dialog>
+
+      {/* Rejection Modal with Predefined Reasons */}
+      <Dialog
+        open={rejectDialogOpen}
+        onClose={() => setRejectDialogOpen(false)}
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: '20px',
+              p: 2.5,
+              maxWidth: 460,
+              width: '100%',
+            },
+          },
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, fontSize: '18px', p: 0, mb: 1, color: '#0F172A' }}>
+          Reject ang Aplikasyon
+        </DialogTitle>
+        <DialogContent sx={{ p: 0, pt: 1 }}>
+          <Typography sx={{ fontSize: '14px', color: '#64748B', mb: 2 }}>
+            Pumili ng dahilan sa pagtanggi sa aplikasyon ni <strong>{selectedApplicant?.name}</strong>:
+          </Typography>
+
+          <TextField
+            select
+            fullWidth
+            label="Dahilan ng Pagtanggi"
+            value={selectedRejectReason}
+            onChange={(e) => setSelectedRejectReason(e.target.value)}
+            sx={{ mb: 2 }}
+          >
+            {PREDEFINED_REJECTION_REASONS.map((reason) => (
+              <MenuItem key={reason} value={reason}>
+                {reason}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            fullWidth
+            multiline
+            rows={3}
+            label="Karagdagang Paliwanag (Comment)"
+            placeholder="Ilagay ang detalyadong paliwanag para sa drayber..."
+            value={customRejectComment}
+            onChange={(e) => setCustomRejectComment(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 0, pt: 3, display: 'flex', gap: 1.5 }}>
+          <Button
+            onClick={() => setRejectDialogOpen(false)}
+            sx={{
+              flex: 1,
+              borderRadius: '12px',
+              backgroundColor: '#F1F3F5',
+              color: '#0F172A',
+              fontWeight: 700,
+              textTransform: 'none',
+            }}
+          >
+            Kanselahin
+          </Button>
+          <Button
+            onClick={handleRejectConfirm}
+            variant="contained"
+            color="error"
+            disabled={selectedRejectReason === 'Iba pa' && !customRejectComment.trim()}
+            sx={{
+              flex: 1,
+              borderRadius: '12px',
+              fontWeight: 700,
+              textTransform: 'none',
+            }}
+          >
+            Kumpirmahin ang Pagtanggi
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Photo Preview Modal */}
       {previewDocModalOpen && selectedApplicant && (

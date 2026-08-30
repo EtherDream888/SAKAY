@@ -18,6 +18,7 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
+import { DateCalendarPopover } from '../../../components/common/DateCalendarPopover';
 import {
   MtopExtractedData,
   getCachedMtopData,
@@ -254,7 +255,7 @@ export const DriverConfirmMtopInfo: React.FC = () => {
 
   const handleConfirmBackModal = () => {
     setShowBackModal(false);
-    navigate('/driver/review-mtop', { state });
+    navigate('/driver/mtop-instructions', { state });
   };
 
   const handleContinue = async () => {
@@ -271,7 +272,7 @@ export const DriverConfirmMtopInfo: React.FC = () => {
       if (saveRes.success) {
         saveMtopScanData(formData, targetPhone);
         console.log('[DriverConfirmMtopInfo] MTOP Verification Saved Successfully:', saveRes);
-        const targetRoute = isEditMode ? '/driver/confirm-all-info' : '/driver/scan-face';
+        const targetRoute = isEditMode ? '/driver/confirm-all-info' : '/driver/tricycle-instructions';
         navigate(targetRoute, {
           replace: true,
           state: {
@@ -321,11 +322,11 @@ export const DriverConfirmMtopInfo: React.FC = () => {
         }}
       >
         <DialogTitle sx={{ fontWeight: 800, fontSize: '18px', color: '#0F172A', pb: 1 }}>
-          Bumalik sa pagkuha ng larawan?
+          Bumalik sa Pagkuha ng MTOP?
         </DialogTitle>
         <DialogContent sx={{ py: 1 }}>
           <Typography sx={{ fontSize: '14px', color: '#64748B', lineHeight: 1.45 }}>
-            Kapag bumalik ka, maaaring kailanganin mong kunan muli ng larawan ang iyong dokumento.
+            Babalik ka sa pagkuha ng iyong MTOP. Kakailanganin mong kunan muli ang larawan.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 2, pb: 2, pt: 1, display: 'flex', gap: 1 }}>
@@ -441,7 +442,7 @@ export const DriverConfirmMtopInfo: React.FC = () => {
 
         {/* Directly Editable MTOP Form Fields */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {/* 1. Registered Owner / Operator (100%) */}
+          {/* ROW 1: REHISTRADONG MAY-ARI / OPERATOR (Full Width) */}
           <SakayMtopInput
             label="REHISTRADONG MAY-ARI / OPERATOR"
             value={formData.operatorName}
@@ -450,40 +451,49 @@ export const DriverConfirmMtopInfo: React.FC = () => {
             helperText={hasAttemptedSubmit && isFieldEmpty(formData.operatorName) ? 'Kinakailangan ang impormasyong ito.' : ''}
           />
 
-          {/* 2. Franchise Number (70%) + Plate Number (30%) */}
+          {/* ROW 2: PRANGKISA (50%) + PLATE NUMBER (50%) */}
           <Box sx={{ display: 'flex', gap: 1.5 }}>
-            <Box sx={{ flex: '7 7 70%', minWidth: 0 }}>
+            <Box sx={{ flex: '1 1 50%', minWidth: 0 }}>
               <SakayMtopInput
-                label="NUMERO NG PRANGKISA"
+                label="PRANGKISA"
                 value={formData.franchiseNumber}
-                onChange={(val) => handleFieldChange('franchiseNumber', val)}
-                error={hasAttemptedSubmit && isFieldEmpty(formData.franchiseNumber)}
-                helperText={hasAttemptedSubmit && isFieldEmpty(formData.franchiseNumber) ? 'Kinakailangan ang impormasyong ito.' : ''}
+                onChange={(val) => handleFieldChange('franchiseNumber', val.replace(/\D/g, '').slice(0, 4))}
+                error={hasAttemptedSubmit && (isFieldEmpty(formData.franchiseNumber) || formData.franchiseNumber.length !== 4)}
+                helperText={hasAttemptedSubmit && (isFieldEmpty(formData.franchiseNumber) || formData.franchiseNumber.length !== 4) ? 'Kailangan ng 4 na numero.' : ''}
               />
             </Box>
-            <Box sx={{ flex: '3 3 30%', minWidth: 0 }}>
+            <Box sx={{ flex: '1 1 50%', minWidth: 0 }}>
               <SakayMtopInput
                 label="PLATE NUMBER"
                 value={formData.plateNumber}
-                onChange={(val) => handleFieldChange('plateNumber', val)}
+                onChange={(val) => handleFieldChange('plateNumber', val.toUpperCase().slice(0, 7))}
                 error={hasAttemptedSubmit && isFieldEmpty(formData.plateNumber)}
                 helperText={hasAttemptedSubmit && isFieldEmpty(formData.plateNumber) ? 'Kinakailangan ang impormasyong ito.' : ''}
               />
             </Box>
           </Box>
 
-          {/* 3. Chassis Number (100%) */}
+          {/* ROW 3: CHASSIS NUMBER (Full Width) */}
           <SakayMtopInput
             label="CHASSIS NUMBER"
             value={formData.chassisNumber}
-            onChange={(val) => handleFieldChange('chassisNumber', val)}
+            onChange={(val) => handleFieldChange('chassisNumber', val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17))}
             error={hasAttemptedSubmit && isFieldEmpty(formData.chassisNumber)}
             helperText={hasAttemptedSubmit && isFieldEmpty(formData.chassisNumber) ? 'Kinakailangan ang impormasyong ito.' : ''}
           />
 
-          {/* 4. Vehicle Make (70%) + Motor Number (30%) */}
+          {/* ROW 4: MOTOR NUMBER (Full Width) */}
+          <SakayMtopInput
+            label="MOTOR NUMBER"
+            value={formData.motorNumber}
+            onChange={(val) => handleFieldChange('motorNumber', val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))}
+            error={hasAttemptedSubmit && isFieldEmpty(formData.motorNumber)}
+            helperText={hasAttemptedSubmit && isFieldEmpty(formData.motorNumber) ? 'Kinakailangan ang impormasyong ito.' : ''}
+          />
+
+          {/* ROW 5: VEHICLE MAKE (50%) + OR NUMBER (50%) */}
           <Box sx={{ display: 'flex', gap: 1.5 }}>
-            <Box sx={{ flex: '7 7 70%', minWidth: 0 }}>
+            <Box sx={{ flex: '1 1 50%', minWidth: 0 }}>
               <SakayMtopInput
                 label="VEHICLE MAKE"
                 value={formData.vehicleMake}
@@ -492,29 +502,29 @@ export const DriverConfirmMtopInfo: React.FC = () => {
                 helperText={hasAttemptedSubmit && isFieldEmpty(formData.vehicleMake) ? 'Kinakailangan ang impormasyong ito.' : ''}
               />
             </Box>
-            <Box sx={{ flex: '3 3 30%', minWidth: 0 }}>
+            <Box sx={{ flex: '1 1 50%', minWidth: 0 }}>
               <SakayMtopInput
-                label="MOTOR NUMBER"
-                value={formData.motorNumber}
-                onChange={(val) => handleFieldChange('motorNumber', val)}
-                error={hasAttemptedSubmit && isFieldEmpty(formData.motorNumber)}
-                helperText={hasAttemptedSubmit && isFieldEmpty(formData.motorNumber) ? 'Kinakailangan ang impormasyong ito.' : ''}
+                label="OR NUMBER"
+                value={formData.orNumber}
+                onChange={(val) => handleFieldChange('orNumber', val.replace(/\D/g, '').slice(0, 7))}
+                error={hasAttemptedSubmit && (isFieldEmpty(formData.orNumber) || formData.orNumber.length !== 7)}
+                helperText={hasAttemptedSubmit && (isFieldEmpty(formData.orNumber) || formData.orNumber.length !== 7) ? 'Kailangan ng 7 numero.' : ''}
               />
             </Box>
           </Box>
 
-          {/* 5. Official Receipt (OR) Number (100%) */}
+          {/* ROW 6: AUTHORIZED ROUTE / ZONE OF OPERATION (Full Width) */}
           <SakayMtopInput
-            label="OFFICIAL RECEIPT (OR) NUMBER"
-            value={formData.orNumber}
-            onChange={(val) => handleFieldChange('orNumber', val)}
-            error={hasAttemptedSubmit && isFieldEmpty(formData.orNumber)}
-            helperText={hasAttemptedSubmit && isFieldEmpty(formData.orNumber) ? 'Kinakailangan ang impormasyong ito.' : ''}
+            label="AUTHORIZED ROUTE / ZONE OF OPERATION"
+            value={formData.authorizedRoute}
+            onChange={(val) => handleFieldChange('authorizedRoute', val)}
+            error={hasAttemptedSubmit && isFieldEmpty(formData.authorizedRoute)}
+            helperText={hasAttemptedSubmit && isFieldEmpty(formData.authorizedRoute) ? 'Kinakailangan ang impormasyong ito.' : ''}
           />
 
-          {/* 6. Expiration Date (100%) */}
+          {/* ROW 7: PETSA NG PAGKAPASO (EXPIRATION) (Full Width) */}
           <SakayMtopInput
-            label="PETSA NG PAGKAPASO (EXPIRATION DATE)"
+            label="PETSA NG PAGKAPASO (EXPIRATION)"
             value={formData.expirationDate}
             onChange={(val) => handleFieldChange('expirationDate', val)}
             isDate
@@ -523,60 +533,23 @@ export const DriverConfirmMtopInfo: React.FC = () => {
             error={hasAttemptedSubmit && isFieldEmpty(formData.expirationDate)}
             helperText={hasAttemptedSubmit && isFieldEmpty(formData.expirationDate) ? 'Kinakailangan ang impormasyong ito.' : ''}
           />
-
-          {/* 7. Authorized Route / Zone (100%) */}
-          <SakayMtopInput
-            label="AUTHORIZED ROUTE / ZONE OF OPERATION"
-            value={formData.authorizedRoute}
-            onChange={(val) => handleFieldChange('authorizedRoute', val)}
-            error={hasAttemptedSubmit && isFieldEmpty(formData.authorizedRoute)}
-            helperText={hasAttemptedSubmit && isFieldEmpty(formData.authorizedRoute) ? 'Kinakailangan ang impormasyong ito.' : ''}
-          />
         </Box>
       </Box>
 
       {/* Calendar Picker Popover */}
-      <Popover
+      <DateCalendarPopover
         open={Boolean(calendarAnchorEl)}
         anchorEl={calendarAnchorEl}
         onClose={handleCloseCalendar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'center' }}
-        slotProps={{
-          paper: {
-            sx: {
-              borderRadius: '16px',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-              border: '1px solid #E2E8F0',
-              p: 2,
-            },
-          },
+        selectedDate={new Date()}
+        onSelectDate={(date) => {
+          const yyyy = date.getFullYear();
+          const mm = String(date.getMonth() + 1).padStart(2, '0');
+          const dd = String(date.getDate()).padStart(2, '0');
+          handleFieldChange('expirationDate', `${mm}-${dd}-${yyyy}`);
+          handleCloseCalendar();
         }}
-      >
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, p: 1 }}>
-          <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
-            Pumili ng Petsa ng Pagkapaso:
-          </Typography>
-          <input
-            type="date"
-            onChange={(e) => {
-              if (e.target.value) {
-                const [yyyy, mm, dd] = e.target.value.split('-');
-                handleFieldChange('expirationDate', `${mm}-${dd}-${yyyy}`);
-                handleCloseCalendar();
-              }
-            }}
-            style={{
-              padding: '10px 14px',
-              borderRadius: '10px',
-              border: '1.5px solid #FF6B00',
-              fontSize: '15px',
-              fontFamily: 'inherit',
-              outline: 'none',
-            }}
-          />
-        </Box>
-      </Popover>
+      />
 
       {/* 3. Pinned Action Button */}
       <Box
@@ -590,7 +563,7 @@ export const DriverConfirmMtopInfo: React.FC = () => {
       >
         <PrimaryButton
           fullWidth
-          disabled={submitting}
+          disabled={submitting || !isFormValid}
           onClick={handleContinue}
         >
           {submitting ? 'Isina-save...' : isEditMode ? 'Kumpirmahin' : 'Magpatuloy'}

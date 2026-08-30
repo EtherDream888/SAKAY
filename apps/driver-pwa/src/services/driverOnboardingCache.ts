@@ -48,11 +48,19 @@ export interface FaceVerificationData {
   verifiedAt: string;
 }
 
+export interface TricycleUnitData {
+  photoUrl: string;
+  rawPhotoUrl?: string;
+  scannedAt: string;
+}
+
 export interface DriverOnboardingProgress {
   phone: string;
   driverName?: string;
+  todaId?: string;
   step1_license?: LicenseExtractedData;
   step2_mtop?: MtopExtractedData;
+  step3_tricycle?: TricycleUnitData;
   step5_face?: FaceVerificationData;
   step3_cr?: {
     crNumber?: string;
@@ -145,6 +153,28 @@ export const saveSelfieScanData = (data: FaceVerificationData, phone = ''): void
 export const getCachedSelfieData = (): FaceVerificationData | null => {
   const cache = getOnboardingCache();
   return cache?.step5_face || null;
+};
+
+export const saveTricycleScanData = (data: TricycleUnitData, phone = ''): void => {
+  try {
+    const existing = getOnboardingCache() || {
+      phone,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    existing.phone = phone || existing.phone;
+    existing.step3_tricycle = data;
+    existing.lastUpdated = new Date().toISOString();
+
+    localStorage.setItem(CACHE_KEY, JSON.stringify(existing));
+  } catch (err) {
+    console.warn('[DriverOnboardingCache] Error saving tricycle scan cache:', err);
+  }
+};
+
+export const getCachedTricycleData = (): TricycleUnitData | null => {
+  const cache = getOnboardingCache();
+  return cache?.step3_tricycle || null;
 };
 
 export const clearOnboardingCache = (): void => {

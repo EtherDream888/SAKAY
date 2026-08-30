@@ -30,7 +30,7 @@ import {
 } from '../../../services/imageEnhancementService';
 import appIcon from '../../../../../../packages/shared/src/assets/icons/app-icon.png';
 
-export const DriverScanLicenseFront: React.FC = () => {
+export const DriverScanTricycle: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { language, t } = useLanguage();
@@ -73,7 +73,7 @@ export const DriverScanLicenseFront: React.FC = () => {
     }
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setCameraError(t.useRearCameraError);
+      setCameraError(t.useRearCameraError || 'Hindi mabuksan ang camera. Pakisubukang muli.');
       return;
     }
 
@@ -155,8 +155,8 @@ export const DriverScanLicenseFront: React.FC = () => {
         videoRef.current.srcObject = activeStream;
       }
     } catch (err: unknown) {
-      console.warn('[DriverScanLicenseFront] Camera stream error:', err);
-      setCameraError(t.useRearCameraError);
+      console.warn('[DriverScanTricycle] Camera stream error:', err);
+      setCameraError(t.useRearCameraError || 'Hindi mabuksan ang camera. Pakisubukang muli.');
     }
   }, [t.useRearCameraError]);
 
@@ -214,7 +214,7 @@ export const DriverScanLicenseFront: React.FC = () => {
         }
       }
     } catch (err) {
-      console.warn('[DriverScanLicenseFront] Torch toggle error:', err);
+      console.warn('[DriverScanTricycle] Torch toggle error:', err);
     }
   };
 
@@ -239,7 +239,7 @@ export const DriverScanLicenseFront: React.FC = () => {
             'front'
           );
         } catch (err) {
-          console.warn('[DriverScanLicenseFront] Image enhancement error:', err);
+          console.warn('[DriverScanTricycle] Image enhancement error:', err);
           const video = videoRef.current;
           const canvas = canvasRef.current || document.createElement('canvas');
           canvas.width = video.videoWidth;
@@ -260,7 +260,7 @@ export const DriverScanLicenseFront: React.FC = () => {
 
       // Assess photo quality immediately after capture
       const assessment = await assessImageQuality(capturedDataUrl);
-      setPendingCapturedPhoto({ processed: capturedDataUrl, raw: rawFrameDataUrl });
+      setPendingCapturedPhoto({ processed: capturedDataUrl, raw: rawFrameDataUrl || capturedDataUrl });
       setQualityAssessment(assessment);
 
       setIsAnalyzing(false);
@@ -270,23 +270,23 @@ export const DriverScanLicenseFront: React.FC = () => {
         return;
       }
 
-      proceedWithPhoto(capturedDataUrl, rawFrameDataUrl);
+      proceedWithPhoto(capturedDataUrl, rawFrameDataUrl || capturedDataUrl);
     } catch (err) {
-      console.error('[DriverScanLicenseFront] Capture failed:', err);
+      console.error('[DriverScanTricycle] Capture failed:', err);
       setIsAnalyzing(false);
     }
   };
 
   const proceedWithPhoto = (photoUrl: string, rawPhotoUrl?: string) => {
     if (stream) {
-      stream.getTracks().forEach((t) => t.stop());
+      stream.getTracks().forEach((track) => track.stop());
     }
 
-    navigate('/driver/review-license-front', {
+    navigate('/driver/review-tricycle', {
       state: {
         ...state,
-        frontPhoto: photoUrl,
-        rawFrontPhoto: rawPhotoUrl || photoUrl,
+        photoUrl,
+        rawPhotoUrl: rawPhotoUrl || photoUrl,
       },
     });
   };
@@ -317,7 +317,7 @@ export const DriverScanLicenseFront: React.FC = () => {
         }}
       >
         <IconButton
-          onClick={() => navigate('/driver/prepare-license', { state })}
+          onClick={() => navigate('/driver/tricycle-instructions', { state })}
           sx={{
             width: 44,
             height: 44,
@@ -363,26 +363,21 @@ export const DriverScanLicenseFront: React.FC = () => {
             mb: 2,
           }}
         >
-          {t.scanFrontPromptPrefix}
+          {t.scanFrontPromptPrefix || 'I-scan ang '}
           <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>
-            {t.scanFrontWord}
+            Tricycle Unit
           </Box>
-          {t.scanPromptMid}
-          <br />
-          <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>
-            {t.philippineDriversLicense}
-          </Box>
-          {t.scanPromptSuffix}
+          {t.scanPromptSuffix || ' sa frame'}
         </Typography>
 
-        {/* Viewfinder Target Area with Card Boundary & 4 Corner L-Brackets */}
+        {/* Viewfinder Target Area with Boundary & 4 Corner L-Brackets */}
         <Box
           ref={viewfinderRef}
           onClick={handleTapToFocus}
           sx={{
             width: '100%',
-            maxWidth: '360px',
-            aspectRatio: '1.586/1',
+            maxWidth: '340px',
+            aspectRatio: '1/1',
             borderRadius: '20px',
             position: 'relative',
             overflow: 'hidden',
@@ -432,7 +427,7 @@ export const DriverScanLicenseFront: React.FC = () => {
             </Box>
           )}
 
-          {/* Card Boundary Dashed Frame with 4-Corner L-Brackets directly framing the card */}
+          {/* Boundary Dashed Frame with 4-Corner L-Brackets directly framing the subject */}
           <Box
             ref={guideRef}
             sx={{
@@ -516,7 +511,7 @@ export const DriverScanLicenseFront: React.FC = () => {
             >
               <CircularProgress size={38} sx={{ color: '#FF6B00', thickness: 4.5 }} />
               <Typography sx={{ color: '#FFFFFF', fontSize: '14.5px', fontWeight: 700, textAlign: 'center' }}>
-                {t.analyzingImageQuality}
+                {t.analyzingImageQuality || 'Sinusuri ang kalidad ng larawan...'}
               </Typography>
             </Box>
           )}
@@ -544,7 +539,7 @@ export const DriverScanLicenseFront: React.FC = () => {
           )}
         </Box>
 
-        {/* Camera Permission Alert (Use rear camera directive, no upload button) */}
+        {/* Camera Permission Alert */}
         {cameraError && (
           <Box sx={{ width: '100%', maxWidth: '360px', mt: 2 }}>
             <Alert
@@ -587,7 +582,7 @@ export const DriverScanLicenseFront: React.FC = () => {
               gap: 1,
             }}
           >
-            {t.tipsTitle}
+            {t.tipsTitle || 'PARA KUMUHA NG PERPEKTONG LITRATO:'}
           </Typography>
           <Box
             component="ul"
@@ -600,14 +595,14 @@ export const DriverScanLicenseFront: React.FC = () => {
               '& li': { mb: 0.5 },
             }}
           >
-            <li>{t.scanTip1}</li>
-            <li>{t.scanTip2}</li>
-            <li>{t.scanTip3}</li>
-            <li>{t.scanTip4}</li>
+            <li>Ilagay ang iyong tricycle sa isang maliwanag at maluwag na lugar.</li>
+            <li>Siguraduhing malinaw at kita ang buong tricycle sa frame.</li>
+            <li>Panatilihing hindi gumagalaw ang camera habang kumukuha ng larawan.</li>
+            <li>Siguraduhing kita ang numero ng plaka sa tricycle unit.</li>
           </Box>
         </Box>
 
-        {/* 3. Bottom Controls Row */}
+        {/* 3. Bottom Controls Row (Horizontal 3-Button Layout exact reuse) */}
         <Box
           sx={{
             display: 'flex',
@@ -714,12 +709,12 @@ export const DriverScanLicenseFront: React.FC = () => {
         </Box>
 
         <DialogTitle sx={{ fontWeight: 800, color: '#0F172A', fontSize: '19px', p: 0, mb: 1 }}>
-          {t.qualityWarningTitle}
+          {t.qualityWarningTitle || 'Maayos ba ang Kuha?'}
         </DialogTitle>
 
         <DialogContent sx={{ p: 0, px: 1, mb: 2.5 }}>
           <Typography sx={{ color: '#475569', fontSize: '14px', lineHeight: 1.5, mb: 1 }}>
-            {t.qualityWarningDesc}
+            {t.qualityWarningDesc || 'Medyo malabo o madilim ang nakuha mong larawan. Siguraduhing malinaw ang kuha.'}
           </Typography>
           {qualityAssessment?.issues && qualityAssessment.issues.length > 0 && (
             <Typography sx={{ color: '#DC2626', fontSize: '12px', fontWeight: 600 }}>
@@ -745,7 +740,7 @@ export const DriverScanLicenseFront: React.FC = () => {
               '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
             }}
           >
-            {t.qualityRetakeBtn}
+            {t.qualityRetakeBtn || 'Kuhanan Muli'}
           </PrimaryButton>
 
           <Button
@@ -765,7 +760,7 @@ export const DriverScanLicenseFront: React.FC = () => {
               '&:hover': { backgroundColor: '#E2E8F0' },
             }}
           >
-            {t.useThisPhoto}
+            {t.useThisPhoto || 'Ipagpatuloy Pa Rin'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -773,4 +768,4 @@ export const DriverScanLicenseFront: React.FC = () => {
   );
 };
 
-export default DriverScanLicenseFront;
+export default DriverScanTricycle;

@@ -125,7 +125,7 @@ export const DriverScanMtop: React.FC = () => {
           const enhanced = await enhanceLicenseDocument(
             videoRef.current,
             viewfinderRef.current,
-            'front'
+            'mtop' as any
           );
           processedPhoto = enhanced || rawCaptured;
         }
@@ -182,7 +182,7 @@ export const DriverScanMtop: React.FC = () => {
       {/* Hidden Canvas for Frame Processing */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-      {/* 1. Header Bar */}
+      {/* 1. Header Bar (White Top Section) */}
       <Box
         sx={{
           display: 'flex',
@@ -191,8 +191,8 @@ export const DriverScanMtop: React.FC = () => {
           px: 3,
           pt: 'calc(var(--safe-area-top) + 20px)',
           pb: 2,
-          backgroundColor: '#000000',
-          zIndex: 10,
+          backgroundColor: '#FFFFFF',
+          zIndex: 15,
         }}
       >
         <IconButton
@@ -200,73 +200,71 @@ export const DriverScanMtop: React.FC = () => {
           sx={{
             width: 44,
             height: 44,
-            borderRadius: '14px',
-            border: '1px solid rgba(255,255,255,0.2)',
-            backgroundColor: 'rgba(255,255,255,0.1)',
-            color: '#FFFFFF',
+            borderRadius: '12px',
+            border: '1px solid #E2E8F0',
+            backgroundColor: '#FFFFFF',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.04)',
+            '&:hover': { backgroundColor: '#F8FAFC' },
           }}
         >
-          <ArrowBackIcon sx={{ fontSize: 20 }} />
+          <ArrowBackIcon sx={{ color: '#0F172A', fontSize: 22 }} />
         </IconButton>
 
         <Logo color="orange" width={110} />
-
-        <IconButton
-          onClick={handleToggleCamera}
-          sx={{
-            width: 44,
-            height: 44,
-            borderRadius: '14px',
-            border: '1px solid rgba(255,255,255,0.2)',
-            backgroundColor: 'rgba(255,255,255,0.1)',
-            color: '#FFFFFF',
-          }}
-        >
-          <CameraswitchIcon sx={{ fontSize: 20 }} />
-        </IconButton>
       </Box>
 
-      {/* 2. Sub-Header Instruction */}
-      <Box sx={{ px: 3, py: 1.5, textAlign: 'center', zIndex: 10 }}>
-        <Typography sx={{ fontSize: '15px', fontWeight: 700, color: '#FFFFFF', lineHeight: 1.4 }}>
-          I-scan ang iyong{' '}
-          <Box component="span" sx={{ color: '#FF6B00' }}>
-            Motorized Tricycle Operator's Permit (MTOP)
-          </Box>{' '}
-          sa frame
-        </Typography>
-      </Box>
-
-      {/* 3. Viewfinder Area */}
+      {/* 2. Main Scanner Viewport Area */}
       <Box
         sx={{
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
+          justifyContent: 'space-between',
           px: 3,
+          py: 2.5,
           position: 'relative',
+          overflowY: 'auto',
+          scrollbarWidth: 'none',
+          '&::-webkit-scrollbar': { display: 'none' },
         }}
       >
-        {cameraError && (
-          <Alert severity="warning" sx={{ mb: 2, width: '100%', borderRadius: '12px' }}>
-            {cameraError}
-          </Alert>
-        )}
+        {/* Title Prompt */}
+        <Typography
+          sx={{
+            fontSize: '17px',
+            color: '#FFFFFF',
+            textAlign: 'center',
+            fontWeight: 600,
+            lineHeight: 1.4,
+            maxWidth: '320px',
+            mt: 1,
+            mb: 2,
+          }}
+        >
+          I-scan ang{' '}
+          <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>
+            Motorized Tricycle Operator's Permit (MTOP)
+          </Box>{' '}
+          sa frame
+        </Typography>
 
+        {/* Viewfinder Target Area with Dashed Frame & 4 Corner L-Brackets */}
         <Box
           ref={viewfinderRef}
           sx={{
             width: '100%',
-            maxWidth: 360,
-            aspectRatio: '1.4 / 1',
-            borderRadius: '18px',
-            border: '2.5px solid #FF6B00',
-            boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.65)',
+            maxWidth: '340px',
+            aspectRatio: '0.85/1',
+            borderRadius: '20px',
             position: 'relative',
             overflow: 'hidden',
-            backgroundColor: '#1E293B',
+            backgroundColor: '#0F172A',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.7)',
+            cursor: 'crosshair',
           }}
         >
           <video
@@ -280,34 +278,129 @@ export const DriverScanMtop: React.FC = () => {
               objectFit: 'cover',
             }}
           />
+
+          {/* Card Boundary Dashed Frame with 4-Corner L-Brackets */}
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: '16px 14px',
+              border: '1.5px dashed rgba(255, 255, 255, 0.6)',
+              borderRadius: '14px',
+              pointerEvents: 'none',
+            }}
+          >
+            {/* Top-Left Corner L Bracket */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: '-3px',
+                left: '-3px',
+                width: '32px',
+                height: '32px',
+                borderTop: '4.5px solid #FF6B00',
+                borderLeft: '4.5px solid #FF6B00',
+                borderTopLeftRadius: '14px',
+              }}
+            />
+            {/* Top-Right Corner L Bracket */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: '-3px',
+                right: '-3px',
+                width: '32px',
+                height: '32px',
+                borderTop: '4.5px solid #FF6B00',
+                borderRight: '4.5px solid #FF6B00',
+                borderTopRightRadius: '14px',
+              }}
+            />
+            {/* Bottom-Left Corner L Bracket */}
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: '-3px',
+                left: '-3px',
+                width: '32px',
+                height: '32px',
+                borderBottom: '4.5px solid #FF6B00',
+                borderLeft: '4.5px solid #FF6B00',
+                borderBottomLeftRadius: '14px',
+              }}
+            />
+            {/* Bottom-Right Corner L Bracket */}
+            <Box
+              sx={{
+                position: 'absolute',
+                bottom: '-3px',
+                right: '-3px',
+                width: '32px',
+                height: '32px',
+                borderBottom: '4.5px solid #FF6B00',
+                borderRight: '4.5px solid #FF6B00',
+                borderBottomRightRadius: '14px',
+              }}
+            />
+          </Box>
         </Box>
 
-        {/* Instructions Box */}
+        {/* Camera Permission Alert */}
+        {cameraError && (
+          <Box sx={{ width: '100%', maxWidth: '360px', mt: 2 }}>
+            <Alert
+              severity="warning"
+              sx={{
+                backgroundColor: 'rgba(255, 107, 0, 0.15)',
+                color: '#FFFFFF',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 107, 0, 0.3)',
+                '& .MuiAlert-icon': { color: '#FF6B00' },
+              }}
+            >
+              {cameraError}
+            </Alert>
+          </Box>
+        )}
+
+        {/* Scanning Tips Card (Identical to Driver's License) */}
         <Box
           sx={{
             width: '100%',
-            maxWidth: 360,
-            mt: 3,
-            p: 2,
+            maxWidth: '360px',
+            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            backdropFilter: 'blur(10px)',
             borderRadius: '16px',
-            border: '1px solid rgba(255,255,255,0.15)',
-            backgroundColor: 'rgba(255,255,255,0.06)',
-            color: '#FFFFFF',
+            p: 2,
+            mt: 2.5,
+            mb: 2,
+            border: '1px solid rgba(255, 255, 255, 0.12)',
           }}
         >
-          <Typography sx={{ fontSize: '13px', fontWeight: 700, mb: 1, color: '#F8FAFC' }}>
+          <Typography
+            sx={{
+              color: '#FF6B00',
+              fontWeight: 800,
+              fontSize: '13.5px',
+              mb: 1.25,
+            }}
+          >
             Para kumuha ng perpektong litrato:
           </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-            <Typography sx={{ fontSize: '12px', color: '#94A3B8' }}>
-              1. Ilagay ang iyong dokumento sa isang lugar na malinaw at maliwanag.
-            </Typography>
-            <Typography sx={{ fontSize: '12px', color: '#94A3B8' }}>
-              2. Siguraduhing kasya nang buo ang dokumento sa loob ng frame.
-            </Typography>
-            <Typography sx={{ fontSize: '12px', color: '#94A3B8' }}>
-              3. Manatiling hindi gumagalaw at pindutin ang button ng camera.
-            </Typography>
+          <Box
+            component="ul"
+            sx={{
+              margin: 0,
+              paddingLeft: '18px',
+              color: '#E2E8F0',
+              fontSize: '12.5px',
+              lineHeight: 1.6,
+              '& li': { mb: 0.5 },
+            }}
+          >
+            <li>Ilagay ang iyong dokumento sa isang lugar na malinaw at maliwanag.</li>
+            <li>Siguraduhing kasya nang buo ang dokumento sa loob ng frame.</li>
+            <li>I-tap ang capture area para mag-focus.</li>
+            <li>Manatiling hindi gumagalaw at pindutin ang button ng camera.</li>
           </Box>
         </Box>
       </Box>

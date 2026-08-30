@@ -168,7 +168,7 @@ export const DriverScanFace: React.FC = () => {
       sx={{
         width: '100%',
         height: '100%',
-        backgroundColor: '#070A10',
+        backgroundColor: '#000000',
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
@@ -319,19 +319,20 @@ export const DriverScanFace: React.FC = () => {
           sx={{
             width: '100%',
             maxWidth: 340,
-            backgroundColor: '#0F172A',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            borderRadius: '18px',
-            p: 2.25,
+            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '16px',
+            p: 2,
             mb: 2,
+            border: '1px solid rgba(255, 255, 255, 0.12)',
             zIndex: 10,
           }}
         >
           <Typography
             sx={{
+              color: '#FF6B00',
+              fontWeight: 800,
               fontSize: '13.5px',
-              fontWeight: 700,
-              color: '#FFFFFF',
               mb: 1.25,
             }}
           >
@@ -345,8 +346,8 @@ export const DriverScanFace: React.FC = () => {
                   width: 20,
                   height: 20,
                   borderRadius: '50%',
-                  backgroundColor: '#1E293B',
-                  color: '#94A3B8',
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  color: '#FFFFFF',
                   fontSize: '11px',
                   fontWeight: 700,
                   display: 'flex',
@@ -358,7 +359,7 @@ export const DriverScanFace: React.FC = () => {
               >
                 1
               </Box>
-              <Typography sx={{ fontSize: '12.5px', color: '#94A3B8', lineHeight: 1.35 }}>
+              <Typography sx={{ fontSize: '12.5px', color: '#E2E8F0', lineHeight: 1.45 }}>
                 Huwag magsuot ng sombrero, salamin, o face mask.
               </Typography>
             </Box>
@@ -369,8 +370,8 @@ export const DriverScanFace: React.FC = () => {
                   width: 20,
                   height: 20,
                   borderRadius: '50%',
-                  backgroundColor: '#1E293B',
-                  color: '#94A3B8',
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  color: '#FFFFFF',
                   fontSize: '11px',
                   fontWeight: 700,
                   display: 'flex',
@@ -382,7 +383,7 @@ export const DriverScanFace: React.FC = () => {
               >
                 2
               </Box>
-              <Typography sx={{ fontSize: '12.5px', color: '#94A3B8', lineHeight: 1.35 }}>
+              <Typography sx={{ fontSize: '12.5px', color: '#E2E8F0', lineHeight: 1.45 }}>
                 Siguraduhing maliwanag ang paligid.
               </Typography>
             </Box>
@@ -393,8 +394,8 @@ export const DriverScanFace: React.FC = () => {
                   width: 20,
                   height: 20,
                   borderRadius: '50%',
-                  backgroundColor: '#1E293B',
-                  color: '#94A3B8',
+                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                  color: '#FFFFFF',
                   fontSize: '11px',
                   fontWeight: 700,
                   display: 'flex',
@@ -406,7 +407,7 @@ export const DriverScanFace: React.FC = () => {
               >
                 3
               </Box>
-              <Typography sx={{ fontSize: '12.5px', color: '#94A3B8', lineHeight: 1.35 }}>
+              <Typography sx={{ fontSize: '12.5px', color: '#E2E8F0', lineHeight: 1.45 }}>
                 Tumingin nang diretso sa camera at panatilihing nasa gitna ang iyong mukha.
               </Typography>
             </Box>

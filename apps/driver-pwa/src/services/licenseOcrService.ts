@@ -1,5 +1,6 @@
 import { createWorker } from 'tesseract.js';
 import type { LicenseExtractedData } from './driverOnboardingCache';
+import { cropRoiCanvas } from './imageEnhancementService';
 
 export interface OcrProgressCallback {
   (progress: number, status: string): void;
@@ -23,6 +24,23 @@ function toTitleCase(text: string): string {
     .filter(Boolean)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
+}
+
+/**
+ * Normalizes any valid date string into MM-DD-YYYY format
+ */
+export function formatDateToMmDdYyyy(rawDate: string): string {
+  if (!rawDate) return '';
+  const clean = rawDate.replace(/[/.]/g, '-').trim();
+  const matchIso = clean.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (matchIso) {
+    return `${matchIso[2]}-${matchIso[3]}-${matchIso[1]}`;
+  }
+  const matchUs = clean.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (matchUs) {
+    return `${matchUs[1]}-${matchUs[2]}-${matchUs[3]}`;
+  }
+  return '';
 }
 
 /**
@@ -53,6 +71,19 @@ export function splitNameParts(rawName: string): {
     .replace(/[^A-Za-z\s,.-]/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
+
+  // If text contains pipe or comma separators (e.g. DELA CRUZ | JUAN PEDRO | GARCIA or DELA CRUZ, JUAN PEDRO GARCIA)
+  if (clean.includes('|')) {
+    const parts = clean.split('|').map((s) => s.trim()).filter(Boolean);
+    if (parts.length >= 2) {
+      lastName = toTitleCase(parts[0]);
+      firstName = toTitleCase(parts[1]);
+      if (parts.length >= 3) {
+        middleName = toTitleCase(parts[2]);
+      }
+      return { firstName, middleName, lastName, suffix };
+    }
+  }
 
   if (clean.includes(',')) {
     const commaSplit = clean.split(',').map((s) => s.trim()).filter(Boolean);
@@ -105,343 +136,152 @@ export function formatPhilippineDlName(rawName: string): string {
 }
 
 /**
- * Helper to validate ISO Date string (YYYY-MM-DD) within expected year bounds
+ * 1. Dedicated Name Parser & Validator
  */
-function validateIsoDate(rawDate: string, minYear: number, maxYear: number): string {
-  if (!rawDate) return '';
-  const clean = rawDate.replace(/[/.]/g, '-').trim();
-  const match = clean.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!match) return '';
+export function parseLicenseName(rawText: string): {
+  fullName: string;
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  suffix: string;
+} {
+  const empty = { fullName: '', firstName: '', middleName: '', lastName: '', suffix: '' };
+  if (!rawText) return empty;
 
-  const year = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10);
-  const day = parseInt(match[3], 10);
-
-  if (year >= minYear && year <= maxYear && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-    return `${match[1]}-${match[2]}-${match[3]}`;
+  const headerKeywords = ['republic', 'philippines', 'department', 'transportation', 'office', 'driver', 'license'];
+  const lower = rawText.toLowerCase();
+  if (headerKeywords.some((k) => lower.includes(k))) {
+    return empty;
   }
-  return '';
+
+  const cleanText = rawText.replace(/Last\s*Name.*Middle\s*Name/gi, '').replace(/[^A-Za-z\s,|.-]/g, ' ').trim();
+  if (cleanText.length < 3) return empty;
+
+  const split = splitNameParts(cleanText);
+  if (!split.firstName && !split.lastName) return empty;
+
+  const fullName = [split.firstName, split.middleName, split.lastName, split.suffix].filter(Boolean).join(' ');
+  return {
+    fullName,
+    firstName: split.firstName,
+    middleName: split.middleName,
+    lastName: split.lastName,
+    suffix: split.suffix,
+  };
 }
 
 /**
- * Normalizes common OCR misreadings in Philippine License Number (e.g. N01-23-456789)
+ * 2. Dedicated Address Parser & Validator
  */
-function normalizeLicenseNumber(rawNum: string): string {
-  if (!rawNum) return '';
-  let s = rawNum.toUpperCase().replace(/[\s.]+/g, '-').replace(/--+/g, '-').trim();
-  
-  // Format check: e.g. N01-23-456789 (Letter/Digit + 2 digits + 2 digits + 6 digits)
+export function parseLicenseAddress(rawText: string): string {
+  if (!rawText) return '';
+
+  const clean = rawText
+    .replace(/address[:\s]*/gi, '')
+    .replace(/license\s*no[.:\s]*[A-Z0-9-]*/gi, '')
+    .replace(/expiration\s*date[.:\s]*[0-9/-]*/gi, '')
+    .replace(/agency\s*code[.:\s]*[A-Z0-9]*/gi, '')
+    .replace(/blood\s*type[.:\s]*[A-Z0-9+-]*/gi, '')
+    .replace(/eyes\s*color[.:\s]*[A-Z]*/gi, '')
+    .replace(/restrictions[.:\s]*[A-Z0-9,\s]*/gi, '')
+    .replace(/signature.*/gi, '')
+    .replace(/[^A-Za-z0-9\s,.-]/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  // Reject garbage like "Fe Fe: -- “ie E 4" or short noise symbols
+  if (clean.length < 5 || /^[^A-Za-z0-9]+$/.test(clean) || clean.toLowerCase().includes('republic of')) {
+    return '';
+  }
+
+  return toTitleCase(clean);
+}
+
+/**
+ * 3. Dedicated License Number Parser & Validator
+ */
+export function parseLicenseNumber(rawText: string): string {
+  if (!rawText) return '';
+  const s = rawText.toUpperCase().replace(/[\s.]+/g, '-').replace(/--+/g, '-').trim();
+
+  // Philippine DL format: e.g. N03-12-123456 (Letter + 2 digits + 2 digits + 6 digits)
   const match = s.match(/([A-Z0-9])(\d{2})[-]?(\d{2})[-]?(\d{6})/);
   if (match) {
     return `${match[1]}${match[2]}-${match[3]}-${match[4]}`;
   }
-  
-  // Try fixing missing hyphens or OCR character substitutions (e.g. O -> 0, I/l -> 1)
-  let cleanChars = s.replace(/[^A-Z0-9-]/g, '');
-  if (cleanChars.length >= 11 && cleanChars.length <= 13) {
-    let digitsOnly = cleanChars.replace(/-/g, '');
-    if (digitsOnly.length === 11) {
-      const p1 = digitsOnly.charAt(0);
-      let rest = digitsOnly.slice(1);
-      // Replace O/Q -> 0, I/L -> 1, S -> 5, Z -> 2
-      rest = rest.replace(/O|Q/g, '0').replace(/I|L/g, '1').replace(/S/g, '5').replace(/Z/g, '2');
-      if (/^\d{10}$/.test(rest)) {
-        return `${p1}${rest.slice(0, 2)}-${rest.slice(2, 4)}-${rest.slice(4)}`;
-      }
+
+  const cleanChars = s.replace(/[^A-Z0-9]/g, '');
+  if (cleanChars.length === 11) {
+    const p1 = cleanChars.charAt(0);
+    let rest = cleanChars.slice(1).replace(/O|Q/g, '0').replace(/I|L/g, '1').replace(/S/g, '5');
+    if (/^\d{10}$/.test(rest)) {
+      return `${p1}${rest.slice(0, 2)}-${rest.slice(2, 4)}-${rest.slice(4)}`;
+    }
+  }
+
+  return '';
+}
+
+/**
+ * 4. Dedicated Expiration Date Parser & Validator
+ */
+export function parseLicenseExpiration(rawText: string): string {
+  if (!rawText) return '';
+  const match = rawText.match(/(\d{4}[-/.]\d{2}[-/.]\d{2})/) || rawText.match(/(\d{2}[-/.]\d{2}[-/.]\d{4})/);
+  if (!match) return '';
+
+  const clean = match[1].replace(/[/.]/g, '-');
+  const formatted = formatDateToMmDdYyyy(clean);
+
+  if (formatted) {
+    const parts = formatted.split('-');
+    const year = parseInt(parts[2], 10);
+    const currentYear = new Date().getFullYear();
+    if (year >= currentYear - 5 && year <= 2050) {
+      return formatted;
     }
   }
   return '';
 }
 
 /**
- * Parses raw text extracted from Philippine Driver's License
- * Accurately extracts FN MN LN for name and cleanly isolates ADDRESS from metadata.
+ * 5. Dedicated Restrictions Parser & Validator
  */
-export function parsePhilippineLicenseText(rawText: string): Partial<LicenseExtractedData> {
-  const result: Partial<LicenseExtractedData> = {
-    fullName: '',
-    dob: '',
-    gender: 'Male',
-    address: '',
-    licenseNumber: '',
-    dlCodes: '',
-    expirationDate: '',
-    rawOcrText: rawText,
-  };
+export function parseLicenseRestrictions(rawText: string): string {
+  if (!rawText) return '';
+  const upper = rawText.toUpperCase();
 
-  const currentYear = new Date().getFullYear();
+  const codesSet = new Set<string>();
+  const validCodes = ['A1', 'A', 'B', 'B1', 'B2', 'C', 'D', 'BE', 'CE'];
 
-  const lines = rawText
-    .split('\n')
-    .map((l) => l.trim())
-    .filter(Boolean);
-
-  // 1. License Number extraction with format validation
-  const licMatch =
-    rawText.match(/([A-Z0-9]\d{2}[-\s]?\d{2}[-\s]?\d{6})/i) ||
-    rawText.match(/License\s*No[.:\s]*([A-Z0-9-]+)/i) ||
-    rawText.match(/DL\s*No[.:\s]*([A-Z0-9-]+)/i);
-  if (licMatch) {
-    const norm = normalizeLicenseNumber(licMatch[1] || licMatch[0]);
-    if (norm) {
-      result.licenseNumber = norm;
+  // Match explicit codes (e.g. A1, B2)
+  validCodes.forEach((code) => {
+    const reg = new RegExp(`\\b${code}\\b`, 'i');
+    if (reg.test(upper)) {
+      codesSet.add(code);
     }
+  });
+
+  // Match numeric restriction codes (e.g. 1, 2)
+  if (/\b1\b/.test(upper)) codesSet.add('A1');
+  if (/\b2\b/.test(upper)) codesSet.add('A');
+  if (/\b3\b/.test(upper)) codesSet.add('B');
+  if (/\b4\b/.test(upper)) codesSet.add('B1');
+  if (/\b5\b/.test(upper)) codesSet.add('B2');
+
+  const result = Array.from(codesSet);
+  if (result.length > 0) {
+    return result.join(', ');
   }
 
-  // 2. Expiration Date (YYYY/MM/DD, YYYY-MM-DD)
-  const expMatch =
-    rawText.match(/Expiration\s*Date[:\s]*(\d{4}[-/.]\d{2}[-/.]\d{2})/i) ||
-    rawText.match(/Exp[.:\s]*(\d{4}[-/.]\d{2}[-/.]\d{2})/i) ||
-    rawText.match(/202[4-9][-/.]\d{2}[-/.]\d{2}/) ||
-    rawText.match(/203\d[-/.]\d{2}[-/.]\d{2}/);
-  if (expMatch) {
-    const validExp = validateIsoDate(expMatch[1] || expMatch[0], currentYear - 2, 2050);
-    if (validExp) {
-      result.expirationDate = validExp;
-    }
-  }
-
-  // 3. Date of Birth (YYYY/MM/DD, YYYY-MM-DD)
-  const dobMatch =
-    rawText.match(/Date\s*of\s*Birth[:\s]*(\d{4}[-/.]\d{2}[-/.]\d{2})/i) ||
-    rawText.match(/Birth\s*Date[:\s]*(\d{4}[-/.]\d{2}[-/.]\d{2})/i) ||
-    rawText.match(/DOB[:\s]*(\d{4}[-/.]\d{2}[-/.]\d{2})/i) ||
-    rawText.match(/(?:19\d{2}|200[0-8])[-/.]\d{2}[-/.]\d{2}/);
-  if (dobMatch) {
-    const validDob = validateIsoDate(dobMatch[1] || dobMatch[0], 1940, currentYear - 16);
-    if (validDob) {
-      result.dob = validDob;
-    }
-  }
-
-  // 4. Gender (Male / Female)
-  if (/\b(SEX|GENDER)[:\s]*F\b/i.test(rawText) || /\bFEMALE\b/i.test(rawText)) {
-    result.gender = 'Female';
-  } else if (/\b(SEX|GENDER)[:\s]*M\b/i.test(rawText) || /\bMALE\b/i.test(rawText)) {
-    result.gender = 'Male';
-  }
-
-  // 5. Restrictions / DL Codes (e.g. 1, 2 or A, A1, B, B1)
-  const restMatch =
-    rawText.match(/Restrictions[:\s]*([12345678,\sA-Z]+)/i) ||
-    rawText.match(/DL\s*Codes[:\s]*([12345678,\sA-Z]+)/i) ||
-    rawText.match(/\b([1-8](?:\s*,\s*[1-8])+)\b/) ||
-    rawText.match(/\b([A-E]\d?(?:\s*,\s*[A-E]\d?)+)\b/);
-  if (restMatch && restMatch[1].trim()) {
-    const cleanRest = restMatch[1].trim().replace(/\s{2,}/g, ' ');
-    if (cleanRest.length <= 15) {
-      result.dlCodes = cleanRest;
-    }
-  }
-
-  // Keywords that identify address, headers, or metadata to exclude from Name
-  const addressKeywords = [
-    'barangay',
-    'brgy',
-    'street',
-    'st.',
-    'st,',
-    'avenue',
-    'ave',
-    'highway',
-    'hwy',
-    'purok',
-    'zone',
-    'sitio',
-    'city',
-    'municipality',
-    'province',
-    'calapan',
-    'mindoro',
-    'oriental',
-    'occidental',
-    'batangas',
-    'laguna',
-    'cavite',
-    'rizal',
-    'bulacan',
-    'pampanga',
-    'manila',
-    'quezon',
-  ];
-
-  const headerKeywords = [
-    'republic',
-    'philippines',
-    'department',
-    'transportation',
-    'land',
-    'office',
-    'driver',
-    'license',
-    'non-professional',
-    'professional',
-    'student',
-    'permit',
-    'official',
-    'receipt',
-  ];
-
-  // 6. FULL NAME Extraction (Target: Last Name, First Name Middle Name -> converted to FN MN LN)
-  let rawExtractedName = '';
-
-  // Strategy A: Find line with "Last Name, First Name" or explicitly formatted "SURNAME, FIRSTNAME..."
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const lower = line.toLowerCase();
-
-    // Check for "SURNAME, GIVEN NAME" pattern (e.g. DELA CRUZ, JUAN MANALO)
-    if (
-      line.includes(',') &&
-      /^[A-Z\s,.-]+$/.test(line) &&
-      !headerKeywords.some((k) => lower.includes(k)) &&
-      !addressKeywords.some((k) => lower.includes(k))
-    ) {
-      const words = line.split(/[,\s]+/).filter((w) => w.length > 1);
-      if (words.length >= 2) {
-        rawExtractedName = line;
-        break;
-      }
-    }
-
-    if (lower.includes('last name') || lower.includes('1. last') || lower.includes('name:')) {
-      const nameParts: string[] = [];
-      const inline = line
-        .replace(/1\.\s*/g, '')
-        .replace(/Last\s*Name.*Middle\s*Name/gi, '')
-        .replace(/Last\s*Name/gi, '')
-        .replace(/NAME[:\s]*/gi, '')
-        .trim();
-      if (inline.length > 2) nameParts.push(inline);
-
-      // Collect consecutive name lines before nationality/sex/address
-      for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
-        const next = lines[j].trim();
-        const nextLower = next.toLowerCase();
-        if (
-          nextLower.includes('nationality') ||
-          nextLower.includes('sex') ||
-          nextLower.includes('birth') ||
-          nextLower.includes('address') ||
-          nextLower.includes('phl') ||
-          addressKeywords.some((k) => nextLower.includes(k))
-        ) {
-          break;
-        }
-        if (/^[A-Za-z\s,.-]+$/.test(next) && next.length > 1) {
-          nameParts.push(next);
-        }
-      }
-
-      if (nameParts.length > 0) {
-        rawExtractedName = nameParts.join(', ');
-        break;
-      }
-    }
-  }
-
-  // Strategy B: First block of uppercase words before Nationality/Sex/DOB that isn't a government header
-  if (!rawExtractedName) {
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const lower = line.toLowerCase();
-      const isHeader = headerKeywords.some((k) => lower.includes(k));
-      const isAddr = addressKeywords.some((k) => lower.includes(k));
-
-      if (!isHeader && !isAddr && /^[A-Z\s,.-]{4,}$/.test(line)) {
-        const words = line.split(/[,\s]+/).filter((w) => w.length > 1);
-        if (words.length >= 2 && !lower.includes('philippines') && !lower.includes('signature')) {
-          rawExtractedName = line;
-          break;
-        }
-      }
-    }
-  }
-
-  if (rawExtractedName) {
-    result.fullName = formatPhilippineDlName(rawExtractedName);
-    const split = splitNameParts(rawExtractedName);
-    result.firstName = split.firstName;
-    result.middleName = split.middleName;
-    result.lastName = split.lastName;
-    result.suffix = split.suffix;
-  }
-
-  // 7. ADDRESS Extraction (Strictly isolative: stop before License No, Exp Date, Agency Code)
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const lower = line.toLowerCase();
-
-    const isAddressLine =
-      lower.includes('address') ||
-      lower.includes('barangay') ||
-      lower.includes('brgy') ||
-      addressKeywords.some((k) => lower.includes(k));
-
-    if (isAddressLine && !headerKeywords.some((k) => lower.includes(k))) {
-      const addressParts: string[] = [];
-
-      let firstLine = line.replace(/address[:\s]*/gi, '').trim();
-      if (firstLine) addressParts.push(firstLine);
-
-      // Collect following address lines until reaching metadata stop keywords
-      for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
-        const next = lines[j].trim();
-        const nextLower = next.toLowerCase();
-
-        // Stop immediately at metadata boundaries
-        if (
-          /license\s*no|dl\s*no|lic\s*no|[a-z0-9]\d{2}-\d{2}-\d{6}/i.test(next) ||
-          /expiration|exp\s*date|202[4-9]|203\d/i.test(next) ||
-          /agency\s*code|agency|branch/i.test(next) ||
-          /blood\s*type|eye\s*color|height|weight/i.test(next) ||
-          /restrictions|dl\s*codes|conditions/i.test(next) ||
-          /signature\s*of\s*licensee/i.test(next) ||
-          headerKeywords.some((k) => nextLower.includes(k))
-        ) {
-          break;
-        }
-
-        if (next.length > 2) {
-          addressParts.push(next);
-        }
-      }
-
-      const joinedRaw = addressParts.join(' ');
-      // Clean any accidental metadata trailing on the line
-      let cleaned = joinedRaw
-        .replace(/Address[:\s]*/gi, '')
-        .replace(/License\s*No[.:\s]*[A-Z0-9-]*/gi, '')
-        .replace(/DL\s*No[.:\s]*[A-Z0-9-]*/gi, '')
-        .replace(/Expiration\s*Date[.:\s]*[0-9/-]*/gi, '')
-        .replace(/Exp[.:\s]*[0-9/-]*/gi, '')
-        .replace(/Agency\s*Code[.:\s]*[A-Z0-9]*/gi, '')
-        .replace(/Blood\s*Type[.:\s]*[A-Z0-9+-]*/gi, '')
-        .replace(/Eyes\s*Color[.:\s]*[A-Z]*/gi, '')
-        .replace(/Restrictions[.:\s]*[A-Z0-9,\s]*/gi, '')
-        .replace(/DL\s*Codes[.:\s]*[A-Z0-9,\s]*/gi, '')
-        .replace(/Conditions[.:\s]*[A-Z0-9]*/gi, '')
-        .replace(/Weight[.:\s]*[0-9.]*/gi, '')
-        .replace(/Height[.:\s]*[0-9.]*/gi, '')
-        .replace(/Nationality[.:\s]*[A-Z]*/gi, '')
-        .replace(/Sex[.:\s]*[MF]/gi, '')
-        .replace(/PHL/gi, '')
-        .replace(/Signature.*/gi, '')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
-
-      if (cleaned.length > 5) {
-        result.address = toTitleCase(cleaned);
-        break;
-      }
-    }
-  }
-
-  return result;
+  // Fallback to default 'A1' if numeric restriction '1' was detected
+  if (/\b1\b/.test(upper)) return 'A1';
+  return '';
 }
 
 /**
- * Executes live OCR extraction with progress telemetry.
+ * Executes live Field-by-Field ROI OCR extraction.
+ * Processes ONLY FRONT image. BACK photo is preserved for proof, but NO OCR is run on the back.
  */
 export async function performLicenseOcr(
   frontPhotoDataUrl: string,
@@ -449,39 +289,201 @@ export async function performLicenseOcr(
   onProgress?: OcrProgressCallback
 ): Promise<OcrExtractionResult> {
   let rawText = '';
+  let fullName = '';
+  let firstName = '';
+  let middleName = '';
+  let lastName = '';
+  let suffix = '';
+  let dob = '';
+  let gender = 'Male';
+  let address = '';
+  let licenseNumber = '';
+  let dlCodes = '';
+  let expirationDate = '';
 
   try {
-    onProgress?.(0.1, 'Initializing OCR Engine...');
+    onProgress?.(0.1, 'Inihahanda ang OCR engine...');
     const worker = await createWorker('eng');
 
-    onProgress?.(0.35, 'Processing front card...');
-    const frontResult = await worker.recognize(frontPhotoDataUrl);
-    rawText += `\n--- FRONT ---\n${frontResult.data.text}\n`;
+    // Create Image element from front photo data URL to crop ROIs
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('Failed to load front photo image'));
+      img.src = frontPhotoDataUrl;
+    });
 
-    if (backPhotoDataUrl) {
-      onProgress?.(0.65, 'Processing back card...');
-      const backResult = await worker.recognize(backPhotoDataUrl);
-      rawText += `\n--- BACK ---\n${backResult.data.text}\n`;
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width || 1200;
+    canvas.height = img.height || 756;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (ctx) {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      onProgress?.(0.25, 'Binabasa ang pangalan ng drayber...');
+      const nameRoi = cropRoiCanvas(canvas, 0.18, 0.22, 0.80, 0.20);
+      if (nameRoi) {
+        await worker.setParameters({
+          tessedit_pageseg_mode: '6' as any,
+          tessedit_char_whitelist: '',
+        });
+        const nameRes = await worker.recognize(nameRoi);
+        rawText += `\n--- NAME ROI ---\n${nameRes.data.text}\n`;
+        const parsedName = parseLicenseName(nameRes.data.text);
+        fullName = parsedName.fullName;
+        firstName = parsedName.firstName;
+        middleName = parsedName.middleName;
+        lastName = parsedName.lastName;
+        suffix = parsedName.suffix;
+
+        console.log('[LICENSE OCR DEBUG]', {
+          field: 'NAME',
+          region: 'x=0.18, y=0.22, w=0.80, h=0.20',
+          raw: nameRes.data.text.trim(),
+          cleaned: fullName,
+          final: { firstName, middleName, lastName, suffix },
+          confidence: nameRes.data.confidence,
+        });
+      }
+
+      onProgress?.(0.38, 'Binabasa ang kasarian at petsa ng kapanganakan...');
+      const infoRoi = cropRoiCanvas(canvas, 0.40, 0.38, 0.55, 0.16);
+      if (infoRoi) {
+        await worker.setParameters({
+          tessedit_pageseg_mode: '6' as any,
+          tessedit_char_whitelist: '',
+        });
+        const infoRes = await worker.recognize(infoRoi);
+        rawText += `\n--- PERSONAL INFO ROI ---\n${infoRes.data.text}\n`;
+        const txt = infoRes.data.text;
+
+        // Extract Sex (M -> Lalaki, F -> Babae)
+        if (/\bF\b|\bFEMALE\b|\bBABAE\b/i.test(txt)) {
+          gender = 'Babae';
+        } else if (/\bM\b|\bMALE\b|\bLALAKI\b/i.test(txt)) {
+          gender = 'Lalaki';
+        }
+
+        // Extract DOB (YYYY/MM/DD or YYYY-MM-DD or MM-DD-YYYY)
+        const dobMatch = txt.match(/(\d{4}[-/.]\d{2}[-/.]\d{2})/) || txt.match(/(\d{2}[-/.]\d{2}[-/.]\d{4})/);
+        if (dobMatch) {
+          dob = formatDateToMmDdYyyy(dobMatch[1]);
+        }
+
+        console.log('[LICENSE OCR DEBUG]', {
+          field: 'PERSONAL_INFO',
+          region: 'x=0.40, y=0.38, w=0.55, h=0.16',
+          raw: txt.trim(),
+          parsedSex: gender,
+          parsedDob: dob,
+          confidence: infoRes.data.confidence,
+        });
+      }
+
+      onProgress?.(0.50, 'Binabasa ang numero ng lisensya...');
+      const licRoi = cropRoiCanvas(canvas, 0.18, 0.67, 0.40, 0.14);
+      if (licRoi) {
+        await worker.setParameters({
+          tessedit_pageseg_mode: '7' as any,
+          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
+        });
+        const licRes = await worker.recognize(licRoi);
+        rawText += `\n--- LICENSE NO ROI ---\n${licRes.data.text}\n`;
+        licenseNumber = parseLicenseNumber(licRes.data.text);
+
+        console.log('[LICENSE OCR DEBUG]', {
+          field: 'LICENSE_NUMBER',
+          region: 'x=0.18, y=0.67, w=0.40, h=0.14',
+          raw: licRes.data.text.trim(),
+          cleaned: licenseNumber,
+          final: licenseNumber,
+          confidence: licRes.data.confidence,
+        });
+      }
+
+      onProgress?.(0.65, 'Binabasa ang petsa ng pagkapaso...');
+      const expRoi = cropRoiCanvas(canvas, 0.55, 0.67, 0.35, 0.14);
+      if (expRoi) {
+        await worker.setParameters({
+          tessedit_pageseg_mode: '7' as any,
+          tessedit_char_whitelist: '0123456789/-.',
+        });
+        const expRes = await worker.recognize(expRoi);
+        rawText += `\n--- EXPIRATION ROI ---\n${expRes.data.text}\n`;
+        expirationDate = parseLicenseExpiration(expRes.data.text);
+
+        console.log('[LICENSE OCR DEBUG]', {
+          field: 'EXPIRATION_DATE',
+          region: 'x=0.55, y=0.67, w=0.35, h=0.14',
+          raw: expRes.data.text.trim(),
+          cleaned: expirationDate,
+          final: expirationDate,
+          confidence: expRes.data.confidence,
+        });
+      }
+
+      onProgress?.(0.78, 'Binabasa ang tirahan ng drayber...');
+      const addrRoi = cropRoiCanvas(canvas, 0.18, 0.50, 0.80, 0.18);
+      if (addrRoi) {
+        await worker.setParameters({
+          tessedit_pageseg_mode: '6' as any,
+          tessedit_char_whitelist: '',
+        });
+        const addrRes = await worker.recognize(addrRoi);
+        rawText += `\n--- ADDRESS ROI ---\n${addrRes.data.text}\n`;
+        address = parseLicenseAddress(addrRes.data.text);
+
+        console.log('[LICENSE OCR DEBUG]', {
+          field: 'ADDRESS',
+          region: 'x=0.18, y=0.50, w=0.80, h=0.18',
+          raw: addrRes.data.text.trim(),
+          cleaned: address,
+          final: address,
+          confidence: addrRes.data.confidence,
+        });
+      }
+
+      onProgress?.(0.88, 'Binabasa ang restriksyon...');
+      const restRoi = cropRoiCanvas(canvas, 0.18, 0.79, 0.38, 0.16);
+      if (restRoi) {
+        await worker.setParameters({
+          tessedit_pageseg_mode: '7' as any,
+          tessedit_char_whitelist: '12345678ABCDE,',
+        });
+        const restRes = await worker.recognize(restRoi);
+        rawText += `\n--- RESTRICTIONS ROI ---\n${restRes.data.text}\n`;
+        dlCodes = parseLicenseRestrictions(restRes.data.text);
+
+        console.log('[LICENSE OCR DEBUG]', {
+          field: 'RESTRICTIONS',
+          region: 'x=0.18, y=0.79, w=0.38, h=0.16',
+          raw: restRes.data.text.trim(),
+          cleaned: dlCodes,
+          final: dlCodes,
+          confidence: restRes.data.confidence,
+        });
+      }
     }
 
-    onProgress?.(0.9, 'Parsing extracted text...');
     await worker.terminate();
   } catch (err) {
-    console.warn('[licenseOcrService] OCR Engine fallback execution:', err);
+    console.warn('[licenseOcrService] Field ROI OCR execution warning:', err);
   }
-
-  const parsed = parsePhilippineLicenseText(rawText);
 
   const finalData: LicenseExtractedData = {
     frontPhoto: frontPhotoDataUrl,
     backPhoto: backPhotoDataUrl,
-    fullName: parsed.fullName || '',
-    dob: parsed.dob || '',
-    gender: parsed.gender || 'Male',
-    address: parsed.address || '',
-    licenseNumber: parsed.licenseNumber || '',
-    dlCodes: parsed.dlCodes || '',
-    expirationDate: parsed.expirationDate || '',
+    fullName: fullName || '',
+    firstName: firstName || '',
+    middleName: middleName || '',
+    lastName: lastName || '',
+    suffix: suffix || '',
+    dob: dob || '',
+    gender: gender || 'Male',
+    address: address || '',
+    licenseNumber: licenseNumber || '',
+    dlCodes: dlCodes || 'A1',
+    expirationDate: expirationDate || '',
     rawOcrText: rawText,
     scannedAt: new Date().toISOString(),
   };
@@ -491,9 +493,7 @@ export async function performLicenseOcr(
   if (!finalData.licenseNumber) missingFields.push('License Number');
   if (!finalData.expirationDate) missingFields.push('Expiration Date');
 
-  const confidenceScore = Math.round(
-    ((7 - missingFields.length) / 7) * 100
-  );
+  const confidenceScore = Math.round(((7 - missingFields.length) / 7) * 100);
 
   return {
     data: finalData,

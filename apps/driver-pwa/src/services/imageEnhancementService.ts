@@ -177,16 +177,40 @@ export interface ScanFrameCrop {
  * Returns the exact bounding rectangle containing all 4 corners with a 6% safety margin
  * so that all 4 corners, borders, and text are 100% visible and un-clipped without over-zooming.
  */
+export interface Point2D {
+  x: number;
+  y: number;
+}
+
+export interface CardCorners {
+  tl: Point2D;
+  tr: Point2D;
+  br: Point2D;
+  bl: Point2D;
+  rect: { x: number; y: number; width: number; height: number };
+}
+
+/**
+ * Detects the 4 corner points (TL, TR, BR, BL) of a document in an image frame.
+ */
 export function detectCard4Corners(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number
-): { x: number; y: number; width: number; height: number } {
-  const fallback = {
+): CardCorners {
+  const fallbackRect = {
     x: Math.max(0, Math.round(width * 0.03)),
     y: Math.max(0, Math.round((height - (width * 0.94) / 1.586) / 2)),
     width: Math.min(width, Math.round(width * 0.94)),
     height: Math.min(height, Math.round((width * 0.94) / 1.586)),
+  };
+
+  const fallbackCorners: CardCorners = {
+    tl: { x: fallbackRect.x, y: fallbackRect.y },
+    tr: { x: fallbackRect.x + fallbackRect.width, y: fallbackRect.y },
+    br: { x: fallbackRect.x + fallbackRect.width, y: fallbackRect.y + fallbackRect.height },
+    bl: { x: fallbackRect.x, y: fallbackRect.y + fallbackRect.height },
+    rect: fallbackRect,
   };
 
   try {
@@ -198,7 +222,7 @@ export function detectCard4Corners(
     sCanvas.width = sw;
     sCanvas.height = sh;
     const sCtx = sCanvas.getContext('2d', { willReadFrequently: true });
-    if (!sCtx) return fallback;
+    if (!sCtx) return fallbackCorners;
 
     sCtx.drawImage(ctx.canvas, 0, 0, sw, sh);
     const imgData = sCtx.getImageData(0, 0, sw, sh);
@@ -255,9 +279,8 @@ export function detectCard4Corners(
     const cH = maxY - minY;
 
     if (cW > width * 0.35 && cH > height * 0.25 && (cW / cH) >= 1.1 && (cW / cH) <= 2.2) {
-      // Comfort 6% safety margin around corners so all 4 corners are completely preserved
-      const padX = Math.round(cW * 0.06);
-      const padY = Math.round(cH * 0.06);
+      const padX = Math.round(cW * 0.04);
+      const padY = Math.round(cH * 0.04);
 
       const finalX = Math.max(0, Math.round(minX - padX));
       const finalY = Math.max(0, Math.round(minY - padY));
@@ -265,26 +288,217 @@ export function detectCard4Corners(
       const finalH = Math.min(height - finalY, Math.round(cH + padY * 2));
 
       return {
-        x: finalX,
-        y: finalY,
-        width: finalW,
-        height: finalH,
+        tl: nTL,
+        tr: nTR,
+        br: nBR,
+        bl: nBL,
+        rect: {
+          x: finalX,
+          y: finalY,
+          width: finalW,
+          height: finalH,
+        },
       };
     }
   } catch (e) {
     console.warn('[detectCard4Corners] Corner search fallback:', e);
   }
 
-  return fallback;
+  return fallbackCorners;
+}
+
+/**
+ * Warps a 4-corner quad into a flat, perspective-corrected rectangle (targetW x targetH)
+ */
+export function warpPerspective(
+  sourceCtx: CanvasRenderingContext2D,
+  corners: CardCorners,
+  targetW: number,
+  targetH: number
+): HTMLCanvasElement {
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = targetW;
+  outCanvas.height = targetH;
+  const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
+  if (!outCtx) return outCanvas;
+
+  const { tl, tr, br, bl } = corners;
+  const gridX = 16;
+  const gridY = 16;
+
+  const lerpPoint = (u: number, v: number): Point2D => {
+    const topX = tl.x + u * (tr.x - tl.x);
+    const topY = tl.y + u * (tr.y - tl.y);
+    const botX = bl.x + u * (br.x - bl.x);
+    const botY = bl.y + u * (br.y - bl.y);
+    return {
+      x: topX + v * (botX - topX),
+      y: topY + v * (botY - topY),
+    };
+  };
+
+  const drawTriangle = (
+    s0: Point2D, s1: Point2D, s2: Point2D,
+    d0: Point2D, d1: Point2D, d2: Point2D
+  ) => {
+    outCtx.save();
+    outCtx.beginPath();
+    outCtx.moveTo(d0.x, d0.y);
+    outCtx.lineTo(d1.x, d1.y);
+    outCtx.lineTo(d2.x, d2.y);
+    outCtx.closePath();
+    outCtx.clip();
+
+    const denom = s0.x * (s1.y - s2.y) + s1.x * (s2.y - s0.y) + s2.x * (s0.y - s1.y);
+    if (Math.abs(denom) > 1e-5) {
+      const a = (d0.x * (s1.y - s2.y) + d1.x * (s2.y - s0.y) + d2.x * (s0.y - s1.y)) / denom;
+      const b = (d0.y * (s1.y - s2.y) + d1.y * (s2.y - s0.y) + d2.y * (s0.y - s1.y)) / denom;
+      const c = (d0.x * (s2.x - s1.x) + d1.x * (s0.x - s2.x) + d2.x * (s1.x - s0.x)) / denom;
+      const d = (d0.y * (s2.x - s1.x) + d1.y * (s0.x - s2.x) + d2.y * (s1.x - s0.x)) / denom;
+      const e = (d0.x * (s1.x * s2.y - s2.x * s1.y) + d1.x * (s2.x * s0.y - s0.x * s2.y) + d2.x * (s0.x * s1.y - s1.x * s0.y)) / denom;
+      const f = (d0.y * (s1.x * s2.y - s2.x * s1.y) + d1.y * (s2.x * s0.y - s0.x * s2.y) + d2.y * (s0.x * s1.y - s1.x * s0.y)) / denom;
+
+      outCtx.transform(a, b, c, d, e, f);
+      outCtx.drawImage(sourceCtx.canvas, 0, 0);
+    }
+    outCtx.restore();
+  };
+
+  for (let gy = 0; gy < gridY; gy++) {
+    for (let gx = 0; gx < gridX; gx++) {
+      const u0 = gx / gridX;
+      const u1 = (gx + 1) / gridX;
+      const v0 = gy / gridY;
+      const v1 = (gy + 1) / gridY;
+
+      const sTL = lerpPoint(u0, v0);
+      const sTR = lerpPoint(u1, v0);
+      const sBR = lerpPoint(u1, v1);
+      const sBL = lerpPoint(u0, v1);
+
+      const dTL = { x: u0 * targetW, y: v0 * targetH };
+      const dTR = { x: u1 * targetW, y: v0 * targetH };
+      const dBR = { x: u1 * targetW, y: v1 * targetH };
+      const dBL = { x: u0 * targetW, y: v1 * targetH };
+
+      drawTriangle(sTL, sTR, sBL, dTL, dTR, dBL);
+      drawTriangle(sTR, sBR, sBL, dTR, dBR, dBL);
+    }
+  }
+
+  return outCanvas;
+}
+
+/**
+ * Extracts a specific ROI box from a rectified document canvas as a data URL.
+ */
+export function cropRoiCanvas(
+  sourceCanvas: HTMLCanvasElement,
+  xPct: number,
+  yPct: number,
+  wPct: number,
+  hPct: number
+): string {
+  const w = sourceCanvas.width;
+  const h = sourceCanvas.height;
+
+  const sx = Math.max(0, Math.floor(w * xPct));
+  const sy = Math.max(0, Math.floor(h * yPct));
+  const sw = Math.min(w - sx, Math.ceil(w * wPct));
+  const sh = Math.min(h - sy, Math.ceil(h * hPct));
+
+  const roiCanvas = document.createElement('canvas');
+  roiCanvas.width = sw;
+  roiCanvas.height = sh;
+  const roiCtx = roiCanvas.getContext('2d', { willReadFrequently: true });
+  if (!roiCtx) return '';
+
+  roiCtx.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+  applyControlledEnhancement(roiCtx, sw, sh);
+  return roiCanvas.toDataURL('image/jpeg', 0.95);
+}
+
+/**
+ * Calculates exact pixel crop coordinates on raw source video for a guide element,
+ * accounting for object-fit (cover/contain/fill), CSS display scaling, and offsets.
+ */
+export function getSourceVideoCropRect(
+  video: HTMLVideoElement,
+  guideElem?: HTMLElement | null
+): { x: number; y: number; width: number; height: number } {
+  const vw = video.videoWidth;
+  const vh = video.videoHeight;
+  if (!vw || !vh) {
+    return { x: 0, y: 0, width: 640, height: 400 };
+  }
+
+  const videoRect = video.getBoundingClientRect();
+  const cw = videoRect.width || video.clientWidth || vw;
+  const ch = videoRect.height || video.clientHeight || vh;
+
+  let relLeft = 0;
+  let relTop = 0;
+  let relWidth = cw;
+  let relHeight = ch;
+
+  if (guideElem) {
+    const guideRect = guideElem.getBoundingClientRect();
+    if (guideRect.width > 0 && guideRect.height > 0) {
+      relLeft = Math.max(0, guideRect.left - videoRect.left);
+      relTop = Math.max(0, guideRect.top - videoRect.top);
+      relWidth = Math.min(cw - relLeft, guideRect.width);
+      relHeight = Math.min(ch - relTop, guideRect.height);
+    }
+  }
+
+  const computedStyle = window.getComputedStyle(video);
+  const objectFit = computedStyle.objectFit || 'cover';
+
+  let scale = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  if (objectFit === 'cover') {
+    scale = Math.max(cw / vw, ch / vh);
+    const renderedW = vw * scale;
+    const renderedH = vh * scale;
+    offsetX = (renderedW - cw) / 2;
+    offsetY = (renderedH - ch) / 2;
+  } else if (objectFit === 'contain') {
+    scale = Math.min(cw / vw, ch / vh);
+    const renderedW = vw * scale;
+    const renderedH = vh * scale;
+    offsetX = (cw - renderedW) / 2;
+    offsetY = (ch - renderedH) / 2;
+  } else {
+    const scaleX = cw / vw;
+    const scaleY = ch / vh;
+    const srcX = Math.max(0, Math.round(relLeft / scaleX));
+    const srcY = Math.max(0, Math.round(relTop / scaleY));
+    const srcW = Math.min(vw - srcX, Math.round(relWidth / scaleX));
+    const srcH = Math.min(vh - srcY, Math.round(relHeight / scaleY));
+    return { x: srcX, y: srcY, width: srcW, height: srcH };
+  }
+
+  let srcX = Math.round((relLeft + offsetX) / scale);
+  let srcY = Math.round((relTop + offsetY) / scale);
+  let srcW = Math.round(relWidth / scale);
+  let srcH = Math.round(relHeight / scale);
+
+  srcX = Math.max(0, Math.min(vw - 10, srcX));
+  srcY = Math.max(0, Math.min(vh - 10, srcY));
+  srcW = Math.max(10, Math.min(vw - srcX, srcW));
+  srcH = Math.max(10, Math.min(vh - srcY, srcH));
+
+  return { x: srcX, y: srcY, width: srcW, height: srcH };
 }
 
 /**
  * Preprocesses license card document (front or back) for optimal OCR extraction:
- * 1. Scans frame to locate the 4 corners of the driver's license ID card.
- * 2. Crops the document containing all 4 corners with a comfortable safety margin.
- * 3. Normalizes portrait/landscape pixel orientation to landscape (ID-1 aspect ratio).
- * 4. Checks 180° text orientation for front side.
- * 5. Applies high-definition image quality enhancement (contrast stretch & unsharp mask).
+ * 1. Crops the camera stream strictly to the visible document guide frame (handling object-fit).
+ * 2. Scans guide crop to locate 4 corners of the driver's license ID card / MTOP.
+ * 3. Perspective-warps the quadrilateral into a flat, rectified landscape canvas.
+ * 4. Applies high-definition image quality enhancement (contrast stretch & unsharp mask).
  */
 export async function preprocessLicenseImage(
   source: HTMLVideoElement | HTMLCanvasElement | HTMLImageElement,
@@ -304,42 +518,37 @@ export async function preprocessLicenseImage(
     throw new Error('Invalid source dimensions');
   }
 
-  // 1. Capture full source frame to working canvas for 4-corner scan
-  const fullCanvas = document.createElement('canvas');
-  fullCanvas.width = srcWidth;
-  fullCanvas.height = srcHeight;
-  const fullCtx = fullCanvas.getContext('2d', { willReadFrequently: true });
-  if (!fullCtx) throw new Error('Full canvas context unavailable');
-  fullCtx.drawImage(source, 0, 0, srcWidth, srcHeight);
+  // 1. Determine Source Crop Region (Guide Frame inside Video)
+  let cropX = 0;
+  let cropY = 0;
+  let cropW = srcWidth;
+  let cropH = srcHeight;
 
-  // 2. Scan 4 Corners of License Card
-  const cornerCrop = detectCard4Corners(fullCtx, srcWidth, srcHeight);
+  if (isVideo && cropOrElement && cropOrElement instanceof HTMLElement) {
+    const cropRect = getSourceVideoCropRect(source as HTMLVideoElement, cropOrElement);
+    cropX = cropRect.x;
+    cropY = cropRect.y;
+    cropW = cropRect.width;
+    cropH = cropRect.height;
+  }
 
-  // 3. Extract Card Pixels (Preserving all 4 corners)
-  const cropCanvas = document.createElement('canvas');
-  cropCanvas.width = cornerCrop.width;
-  cropCanvas.height = cornerCrop.height;
-  const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true });
-  if (!cropCtx) throw new Error('Crop canvas context unavailable');
+  // 2. Extract Guide Region to working canvas
+  const guideCanvas = document.createElement('canvas');
+  guideCanvas.width = cropW;
+  guideCanvas.height = cropH;
+  const guideCtx = guideCanvas.getContext('2d', { willReadFrequently: true });
+  if (!guideCtx) throw new Error('Guide context unavailable');
 
-  cropCtx.drawImage(
-    fullCanvas,
-    cornerCrop.x,
-    cornerCrop.y,
-    cornerCrop.width,
-    cornerCrop.height,
-    0,
-    0,
-    cornerCrop.width,
-    cornerCrop.height
-  );
+  guideCtx.drawImage(source, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
-  // 4. Normalize Document Pixel Orientation (Rotate 90° if portrait scan box)
-  let workingCanvas = cropCanvas;
-  let workW = cornerCrop.width;
-  let workH = cornerCrop.height;
+  // 3. Normalize aspect orientation for landscape cards (rotate 90° if cropW < cropH for DL cards only)
+  let workCanvas = guideCanvas;
+  let workW = cropW;
+  let workH = cropH;
 
-  if (workW < workH) {
+  const isMtop = (documentSide as string) === 'mtop';
+
+  if (workW < workH && !isMtop) {
     const rotCanvas = document.createElement('canvas');
     rotCanvas.width = workH;
     rotCanvas.height = workW;
@@ -347,89 +556,30 @@ export async function preprocessLicenseImage(
     if (rotCtx) {
       rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
       rotCtx.rotate((90 * Math.PI) / 180);
-      rotCtx.drawImage(cropCanvas, -workW / 2, -workH / 2);
-      workingCanvas = rotCanvas;
+      rotCtx.drawImage(guideCanvas, -workW / 2, -workH / 2);
+      workCanvas = rotCanvas;
       workW = rotCanvas.width;
       workH = rotCanvas.height;
     }
   }
 
-  // 5. Output Clean Resized Document to Standard OCR Resolution (1200 x 756 px)
-  const targetAspect = 1.586; // ISO/IEC 7810 ID-1 standard aspect ratio
-  const outputWidth = 1200;
-  const outputHeight = Math.round(outputWidth / targetAspect);
-  const outCanvas = document.createElement('canvas');
-  outCanvas.width = outputWidth;
-  outCanvas.height = outputHeight;
+  const workCtx = workCanvas.getContext('2d', { willReadFrequently: true });
+  if (!workCtx) throw new Error('Work context unavailable');
 
-  const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
-  if (!outCtx) throw new Error('Output canvas context unavailable');
+  // 4. Quality Enhancement ONLY (Contrast stretching, illumination normalization, mild sharpening)
+  // NO geometric warp, NO perspective deformation, NO boundary cropping.
+  applyControlledEnhancement(workCtx, workW, workH);
 
-  outCtx.drawImage(
-    workingCanvas,
-    0,
-    0,
-    workW,
-    workH,
-    0,
-    0,
-    outputWidth,
-    outputHeight
-  );
+  console.log('[LICENSE IMAGE DEBUG]', {
+    capturedDimensions: `${srcWidth}x${srcHeight}`,
+    guideCropDimensions: `${cropW}x${cropH}`,
+    finalReviewDimensions: `${workW}x${workH}`,
+    geometricWarpApplied: false,
+    finalAspectRatio: (workW / workH).toFixed(3),
+    documentSide,
+  });
 
-  // 6. Header Edge Density Check for 180° Upside Down Auto-Correction (Front side only)
-  // Philippine DL front side has top cyan header bar. Back side has barcode at bottom, so skip auto-flip for back side.
-  if (documentSide === 'front') {
-    try {
-      const imgData = outCtx.getImageData(0, 0, outputWidth, outputHeight);
-      const data = imgData.data;
-      let topEdgeSum = 0;
-      let bottomEdgeSum = 0;
-      const topLimit = Math.round(outputHeight * 0.3);
-      const bottomStart = Math.round(outputHeight * 0.7);
-
-      for (let y = 1; y < topLimit; y += 2) {
-        for (let x = 1; x < outputWidth - 1; x += 2) {
-          const idx = (y * outputWidth + x) * 4;
-          const mag = Math.abs(data[idx] - data[idx + 4]);
-          topEdgeSum += mag;
-        }
-      }
-      for (let y = bottomStart; y < outputHeight - 1; y += 2) {
-        for (let x = 1; x < outputWidth - 1; x += 2) {
-          const idx = (y * outputWidth + x) * 4;
-          const mag = Math.abs(data[idx] - data[idx + 4]);
-          bottomEdgeSum += mag;
-        }
-      }
-
-      if (bottomEdgeSum > topEdgeSum * 1.6) {
-        // Upside down front: rotate 180°
-        const flipCanvas = document.createElement('canvas');
-        flipCanvas.width = outputWidth;
-        flipCanvas.height = outputHeight;
-        const flipCtx = flipCanvas.getContext('2d');
-        if (flipCtx) {
-          flipCtx.translate(outputWidth / 2, outputHeight / 2);
-          flipCtx.rotate(Math.PI);
-          flipCtx.drawImage(outCanvas, -outputWidth / 2, -outputHeight / 2);
-          outCtx.clearRect(0, 0, outputWidth, outputHeight);
-          outCtx.drawImage(flipCanvas, 0, 0);
-        }
-      }
-    } catch (e) {
-      console.warn('[imageEnhancementService] 180-deg orientation check warning:', e);
-    }
-  }
-
-  // 7. Apply Controlled Document Enhancement Filter for OCR
-  try {
-    applyControlledEnhancement(outCtx, outputWidth, outputHeight);
-  } catch (err) {
-    console.warn('[imageEnhancementService] Preprocessing filter warning:', err);
-  }
-
-  return outCanvas.toDataURL('image/jpeg', 0.92);
+  return workCanvas.toDataURL('image/jpeg', 0.92);
 }
 
 /**
