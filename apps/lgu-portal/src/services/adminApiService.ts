@@ -1015,26 +1015,71 @@ export async function fetchIncidents(): Promise<IncidentReportRecord[]> {
       .from('incident_report')
       .select('*')
       .order('created_at', { ascending: false });
-    if (error || !data) return [];
-    return data.map((i: any) => ({
-      id: i.incident_id,
-      bookingId: i.booking_id || 'TRIP-N/A',
-      tripId: i.booking_id || 'TRIP-N/A',
-      reportedBy: 'Passenger',
-      reporterName: 'Complainant',
-      driverName: 'Tricycle Unit',
-      todaName: 'Calapan TODA',
-      vehiclePlate: 'N/A',
-      passengerName: 'Passenger',
-      submittedDate: i.created_at ? new Date(i.created_at).toLocaleDateString('en-US') : 'Recent',
-      submittedTime: i.created_at ? new Date(i.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '12:00 PM',
-      category: 'Others',
-      status: (i.status === 'Resolved' ? 'Resolved' : 'Under Investigation') as any,
-      description: i.description || 'No description provided.',
-      evidenceFiles: [],
-      relatedIncidentsCount: 0,
-      statusHistory: [],
-    }));
+
+    let liveRecords: IncidentReportRecord[] = [];
+    if (!error && data && data.length > 0) {
+      liveRecords = data.map((i: any) => ({
+        id: i.incident_id,
+        bookingId: i.booking_id || 'TRIP-N/A',
+        tripId: i.booking_id || 'TRIP-N/A',
+        reportedBy: (i.reporter_role as any) || 'Passenger',
+        reporterName: i.reporter_name || 'Passenger Complainant',
+        driverName: i.driver_name || 'Tricycle Unit',
+        todaName: 'Calapan Central TODA',
+        vehiclePlate: '773-MV',
+        passengerName: i.reporter_name || 'Passenger',
+        submittedDate: i.created_at ? new Date(i.created_at).toLocaleDateString('en-US') : 'Recent',
+        submittedTime: i.created_at ? new Date(i.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '12:00 PM',
+        category: (i.category as any) || 'Overcharging Attempt',
+        status: (i.status === 'Resolved' ? 'Resolved' : i.status === 'Dismissed' ? 'Dismissed' : i.status === 'Under Investigation' ? 'Under Investigation' : 'Pending Review') as any,
+        description: i.description || 'Disputed trip fare.',
+        evidenceFiles: [],
+        relatedIncidentsCount: 0,
+        statusHistory: [],
+      }));
+    }
+
+    // Also merge from local shared incidents
+    let localRecords: IncidentReportRecord[] = [];
+    try {
+      const raw = localStorage.getItem('sakay_shared_incidents');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        localRecords = parsed.map((i: any) => ({
+          id: i.incident_id,
+          bookingId: i.booking_id || 'TRIP-N/A',
+          tripId: i.booking_id || 'TRIP-N/A',
+          reportedBy: (i.reporter_role as any) || 'Passenger',
+          reporterName: i.reporter_name || 'Passenger Complainant',
+          driverName: i.driver_name || 'Tricycle Unit',
+          todaName: 'Calapan Central TODA',
+          vehiclePlate: '773-MV',
+          passengerName: i.reporter_name || 'Passenger',
+          submittedDate: i.reported_at ? new Date(i.reported_at).toLocaleDateString('en-US') : 'Recent',
+          submittedTime: i.reported_at ? new Date(i.reported_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '12:00 PM',
+          category: (i.category as any) || 'Overcharging Attempt',
+          status: 'Pending Review',
+          description: i.description || 'Disputed trip fare.',
+          evidenceFiles: [],
+          relatedIncidentsCount: 0,
+          statusHistory: [],
+        }));
+      }
+    } catch {
+      // ignore
+    }
+
+    // Merge unique
+    const combined = [...localRecords, ...liveRecords];
+    const seen = new Set<string>();
+    const unique = combined.filter((inc) => {
+      if (seen.has(inc.id)) return false;
+      seen.add(inc.id);
+      return true;
+    });
+
+    if (unique.length > 0) return unique;
+    return [];
   } catch (err) {
     console.error('[adminApiService] fetchIncidents error:', err);
     return [];

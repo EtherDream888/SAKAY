@@ -98,6 +98,36 @@ export function convertMmDdYyyyToIso(dateStr: string): string {
   return dateStr;
 }
 
+export function isDriverAgeValid(dobStr: string): boolean {
+  if (!dobStr) return false;
+  const iso = convertMmDdYyyyToIso(dobStr);
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return false;
+  const today = new Date();
+  let age = today.getFullYear() - d.getFullYear();
+  const m = today.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < d.getDate())) {
+    age--;
+  }
+  return age >= 18 && age <= 85;
+}
+
+export function isLicenseUnexpired(expStr: string): boolean {
+  if (!expStr) return false;
+  const iso = convertMmDdYyyyToIso(expStr);
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return d >= today;
+}
+
+export function isLicenseNumberValid(num: string): boolean {
+  if (!num) return false;
+  const clean = num.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  return clean.length === 11 && /^[A-Z]\d{10}$/.test(clean);
+}
+
 const LTO_RESTRICTION_CODES = [
   'A1',
   'A',
@@ -394,6 +424,19 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
     scannedAt: new Date().toISOString(),
   };
 
+  if (initial.fullName && (!initial.firstName || !initial.lastName)) {
+    const parts = splitNameParts(initial.fullName);
+    if (!initial.firstName) initial.firstName = parts.firstName;
+    if (!initial.middleName) initial.middleName = parts.middleName;
+    if (!initial.lastName) initial.lastName = parts.lastName;
+    if (!initial.suffix) initial.suffix = parts.suffix;
+  }
+
+  if (initial.gender === 'Male' || initial.gender === 'M') initial.gender = 'Lalaki';
+  if (initial.gender === 'Female' || initial.gender === 'F') initial.gender = 'Babae';
+  if (!initial.gender) initial.gender = 'Lalaki';
+  if (!initial.dlCodes) initial.dlCodes = 'A1';
+
   if (initial.dob) initial.dob = convertIsoToMmDdYyyy(initial.dob);
   if (initial.expirationDate) initial.expirationDate = convertIsoToMmDdYyyy(initial.expirationDate);
   if (initial.licenseNumber) initial.licenseNumber = formatDriverLicenseNumberInput(initial.licenseNumber);
@@ -403,15 +446,23 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showBackModal, setShowBackModal] = useState(false);
 
+  const isDobValid = !formData.dob || isDriverAgeValid(formData.dob);
+  const isExpValid = !formData.expirationDate || isLicenseUnexpired(formData.expirationDate);
+  const isLicNoValid = !formData.licenseNumber || isLicenseNumberValid(formData.licenseNumber);
+  const isNameValid = Boolean((formData.firstName?.trim() || formData.fullName?.trim()) && formData.lastName?.trim());
+  const isAddressValid = Boolean(formData.address?.trim() && formData.address.trim().length >= 4);
+
   const isFormValid = Boolean(
-    (formData.firstName?.trim() || formData.fullName?.trim()) &&
-    formData.lastName?.trim() &&
+    isNameValid &&
     formData.dob?.trim() &&
+    isDriverAgeValid(formData.dob) &&
     formData.gender?.trim() &&
-    formData.address?.trim() &&
+    isAddressValid &&
     formData.licenseNumber?.trim() &&
+    isLicenseNumberValid(formData.licenseNumber) &&
     formData.dlCodes?.trim() &&
-    formData.expirationDate?.trim()
+    formData.expirationDate?.trim() &&
+    isLicenseUnexpired(formData.expirationDate)
   );
 
   const [activeDateField, setActiveDateField] = useState<'dob' | 'expirationDate' | null>(null);
@@ -706,6 +757,8 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
                 isDate
                 placeholder="MM-DD-YYYY"
                 onOpenCalendar={(anchor) => handleOpenCalendar('dob', anchor)}
+                error={Boolean(formData.dob && !isDobValid)}
+                helperText={formData.dob && !isDobValid ? 'Dapat ay hindi bababa sa 18 taong gulang ang drayber.' : undefined}
               />
             </Box>
             <Box sx={{ flex: '3 3 30%', minWidth: 0 }}>
@@ -725,6 +778,8 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
             onChange={(val) => handleFieldChange('address', val)}
             multiline
             rows={2}
+            error={Boolean(formData.address && !isAddressValid)}
+            helperText={formData.address && !isAddressValid ? 'Mangyaring ilagay ang kumpletong tirahan.' : undefined}
           />
 
           {/* 6. Numero ng Lisensya (100%) */}
@@ -732,6 +787,8 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
             label="NUMERO NG LISENSYA"
             value={formData.licenseNumber}
             onChange={(val) => handleFieldChange('licenseNumber', val)}
+            error={Boolean(formData.licenseNumber && !isLicNoValid)}
+            helperText={formData.licenseNumber && !isLicNoValid ? 'Format: N03-12-123456 (1 titik + 10 tambang numero)' : undefined}
           />
 
           {/* 7. Restriksyon / Kategorya ng Lisensya (100%) */}
@@ -750,6 +807,8 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
             isDate
             placeholder="MM-DD-YYYY"
             onOpenCalendar={(anchor) => handleOpenCalendar('expirationDate', anchor)}
+            error={Boolean(formData.expirationDate && !isExpValid)}
+            helperText={formData.expirationDate && !isExpValid ? 'Paso na ang lisensya (Expired License). Hindi maaaring gamitin.' : undefined}
           />
         </Box>
       </Box>

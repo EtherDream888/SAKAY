@@ -381,9 +381,10 @@ export const DriverScanLicenseFront: React.FC = () => {
           onClick={handleTapToFocus}
           sx={{
             width: '100%',
-            maxWidth: '360px',
-            aspectRatio: '1.586/1',
-            borderRadius: '20px',
+            maxWidth: '370px',
+            aspectRatio: '1.45 / 1',
+            minHeight: '255px',
+            borderRadius: '18px',
             position: 'relative',
             overflow: 'hidden',
             backgroundColor: '#0F172A',
@@ -437,8 +438,8 @@ export const DriverScanLicenseFront: React.FC = () => {
             ref={guideRef}
             sx={{
               position: 'absolute',
-              inset: '16px 14px',
-              border: '1.5px dashed rgba(255, 255, 255, 0.6)',
+              inset: '8px',
+              border: '1.5px dashed rgba(255, 255, 255, 0.75)',
               borderRadius: '14px',
               pointerEvents: 'none',
             }}

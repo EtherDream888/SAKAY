@@ -178,7 +178,7 @@ export const DriverReviewLicenseBack: React.FC = () => {
           sx={{
             width: '100%',
             borderRadius: '20px',
-            backgroundColor: '#EFEFEF',
+            backgroundColor: '#F8FAFC',
             p: 2,
             border: '1px solid #E2E8F0',
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.06)',
@@ -194,11 +194,13 @@ export const DriverReviewLicenseBack: React.FC = () => {
             alt="Back of Driver's License"
             sx={{
               width: '100%',
-              borderRadius: '12px',
+              aspectRatio: '1.45 / 1',
+              minHeight: '250px',
+              borderRadius: '16px',
               boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
               display: 'block',
               objectFit: 'contain',
-              maxHeight: '260px',
+              backgroundColor: '#0F172A',
             }}
           />
 

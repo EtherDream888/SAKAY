@@ -40,49 +40,160 @@ export const DriverStatusMonitor: React.FC = () => {
   const [notifyEnabled, setNotifyEnabled] = useState(true);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
+  const [isDocIncomplete, setIsDocIncomplete] = useState(false);
+  const [incompleteDriverInfo, setIncompleteDriverInfo] = useState<{ phone: string; driverName: string } | null>(null);
 
   const checkStatus = async () => {
     setLoading(true);
     try {
+      let driverData: any = null;
+
+      // 1. Try by active Supabase auth user session
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         const { data } = await supabase
           .from('driver')
-          .select('driver_id, account_status, rejection_reason, rejection_comment')
+          .select(`
+            driver_id,
+            account_status,
+            full_name,
+            contact_number,
+            plate_number,
+            license_number,
+            franchise_number,
+            rejection_reason,
+            rejection_comment,
+            toda:toda_id (
+              toda_id,
+              toda_name,
+              toda_acronym
+            )
+          `)
           .eq('auth_user_id', user.id)
           .maybeSingle();
 
-        if (data) {
-          // Only route to map if EXPLICITLY LGU-verified (Stage 2 final approval).
-          // TODA endorsement alone (driver_verification.verification_status = 'Approved') is NOT enough.
-          if (data.account_status === 'Active' || data.account_status === 'Verified') {
-            navigate('/driver/home', { replace: true });
-            return;
-          }
+        if (data) driverData = data;
+      }
 
-          // Check if endorsed to LGU via driver_verification (but not yet LGU-approved)
-          if (data.driver_id && data.account_status !== 'Rejected') {
-            const { data: verif } = await supabase
-              .from('driver_verification')
-              .select('verification_status')
-              .eq('driver_id', data.driver_id)
-              .maybeSingle();
+      // 2. Fallback lookup by stored driver_id or stored phone
+      if (!driverData) {
+        const storedDriverId = localStorage.getItem('sakay_driver_id');
+        const storedPhone = localStorage.getItem('sakay_driver_phone') || state?.phone;
 
-            if (verif?.verification_status === 'Approved' ||
-                verif?.verification_status === 'TODA Approved' ||
-                verif?.verification_status === 'TODA Endorsed' ||
-                verif?.verification_status === 'Endorsed to LGU') {
-              // Endorsed to LGU but NOT yet LGU-approved → show "under LGU review" message
+        if (storedDriverId) {
+          const { data } = await supabase
+            .from('driver')
+            .select(`
+              driver_id,
+              account_status,
+              full_name,
+              contact_number,
+              plate_number,
+              license_number,
+              franchise_number,
+              rejection_reason,
+              rejection_comment,
+              toda:toda_id (
+                toda_id,
+                toda_name,
+                toda_acronym
+              )
+            `)
+            .eq('driver_id', storedDriverId)
+            .maybeSingle();
+
+          if (data) driverData = data;
+        }
+
+        if (!driverData && storedPhone) {
+          const cleanPhone = storedPhone.replace(/\D/g, '');
+          const e164 = `+63${cleanPhone.replace(/^0/, '')}`;
+          const { data } = await supabase
+            .from('driver')
+            .select(`
+              driver_id,
+              account_status,
+              full_name,
+              contact_number,
+              plate_number,
+              license_number,
+              franchise_number,
+              rejection_reason,
+              rejection_comment,
+              toda:toda_id (
+                toda_id,
+                toda_name,
+                toda_acronym
+              )
+            `)
+            .or(`contact_number.eq.${cleanPhone},contact_number.eq.${e164}`)
+            .maybeSingle();
+
+          if (data) driverData = data;
+        }
+      }
+
+      if (driverData) {
+        // Sync local profile cache
+        const todaInfo = Array.isArray(driverData.toda) ? driverData.toda[0] : driverData.toda;
+        const todaNameStr = todaInfo?.toda_name || 'Calapan Central TODA';
+        const todaAcronymStr = todaInfo?.toda_acronym || 'CCTODA';
+
+        localStorage.setItem(
+          'sakay_driver_profile',
+          JSON.stringify({
+            name: driverData.full_name,
+            phone: driverData.contact_number,
+            vehiclePlate: driverData.plate_number || 'MV-101',
+            licenseNumber: driverData.license_number || 'L01-99-123456',
+            franchiseNumber: driverData.franchise_number || 'MTOP-PENDING',
+            todaName: `${todaNameStr} (${todaAcronymStr})`,
+            rating: 5.0,
+            isOnline: false,
+            isPaused: false,
+            accountStatus: driverData.account_status,
+            verificationStage: driverData.account_status === 'Verified' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
+          })
+        );
+
+        // If approved by LGU (Active / Verified) -> Immediately transition to Active Map
+        if (driverData.account_status === 'Active' || driverData.account_status === 'Verified') {
+          navigate('/driver/home', { replace: true });
+          return;
+        }
+
+        // Check if documents have been submitted to driver_verification
+        if (driverData.driver_id && driverData.account_status !== 'Rejected') {
+          const { data: verif } = await supabase
+            .from('driver_verification')
+            .select('verification_status, submitted_license_number')
+            .eq('driver_id', driverData.driver_id)
+            .maybeSingle();
+
+          if (!verif || !verif.submitted_license_number) {
+            setIsDocIncomplete(true);
+            setIncompleteDriverInfo({
+              phone: driverData.contact_number,
+              driverName: driverData.full_name,
+            });
+          } else {
+            setIsDocIncomplete(false);
+            if (
+              verif.verification_status === 'Approved' ||
+              verif.verification_status === 'TODA Approved' ||
+              verif.verification_status === 'TODA Endorsed' ||
+              verif.verification_status === 'Endorsed to LGU'
+            ) {
               setProfileStatus('Endorsed to LGU');
               setLoading(false);
               return;
             }
           }
-
-          setProfileStatus(data.account_status || 'Pending Verification');
-          setRejectionReason(data.rejection_reason || undefined);
-          setRejectionComment(data.rejection_comment || undefined);
         }
+
+        setProfileStatus(driverData.account_status || 'Pending Verification');
+        setRejectionReason(driverData.rejection_reason || undefined);
+        setRejectionComment(driverData.rejection_comment || undefined);
       }
     } catch (err) {
       console.warn('[DriverStatusMonitor] Status check warning:', err);
@@ -375,7 +486,9 @@ export const DriverStatusMonitor: React.FC = () => {
                 mb: 1.5,
               }}
             >
-              Patuloy na sinusuri ang iyong aplikasyon.
+              {isDocIncomplete
+                ? 'Kailangan mong Ipasa ang mga Dokumento'
+                : 'Patuloy na sinusuri ang iyong aplikasyon.'}
             </Typography>
 
             <Typography
@@ -387,8 +500,37 @@ export const DriverStatusMonitor: React.FC = () => {
                 mb: 3,
               }}
             >
-              Pakihintay habang sinusuri ng TODA at LGU ang iyong mga isinumiteng impormasyon. Hindi mo muna maa-access ang iyong account at mga serbisyo habang nakabinbin pa ang pinal na pag-apruba.
+              {isDocIncomplete
+                ? 'Narehistro na ang iyong account, ngunit kailangan mo pang ipasa ang iyong Lisensya, MTOP Permit, Larawan ng Traysikel, at Selfie upang masuri ng iyong napiling TODA.'
+                : 'Pakihintay habang sinusuri ng TODA at LGU ang iyong mga isinumiteng impormasyon. Hindi mo muna maa-access ang iyong account at mga serbisyo habang nakabinbin pa ang pinal na pag-apruba.'}
             </Typography>
+
+            {isDocIncomplete && (
+              <Box sx={{ width: '100%', maxWidth: 340, mb: 3 }}>
+                <PrimaryButton
+                  fullWidth
+                  onClick={() =>
+                    navigate('/driver/prepare-documents', {
+                      state: incompleteDriverInfo || {
+                        phone: localStorage.getItem('sakay_driver_phone') || '',
+                        driverName: 'Bagong Drayber',
+                      },
+                    })
+                  }
+                  sx={{
+                    height: '52px',
+                    borderRadius: '14px',
+                    fontSize: '15px',
+                    fontWeight: 800,
+                    backgroundColor: '#FF6B00',
+                    boxShadow: 'none',
+                    '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
+                  }}
+                >
+                  Ipagpatuloy ang Pagpasa ng Dokumento
+                </PrimaryButton>
+              </Box>
+            )}
 
             {/* Status ng Rehistrasyon Card */}
             <Paper
@@ -409,9 +551,14 @@ export const DriverStatusMonitor: React.FC = () => {
                   Status ng Rehistrasyon
                 </Typography>
                 <Chip
-                  label="TODA Screening"
+                  label={isDocIncomplete ? 'Kailangan ng Dokumento' : 'TODA Screening'}
                   size="small"
-                  sx={{ backgroundColor: '#FEF3C7', color: '#B45309', fontWeight: 800, fontSize: '11px' }}
+                  sx={{
+                    backgroundColor: isDocIncomplete ? '#FEE2E2' : '#FEF3C7',
+                    color: isDocIncomplete ? '#DC2626' : '#B45309',
+                    fontWeight: 800,
+                    fontSize: '11px',
+                  }}
                 />
               </Box>
             </Paper>
@@ -509,6 +656,39 @@ export const DriverStatusMonitor: React.FC = () => {
             </Box>
           )}
         </PrimaryButton>
+
+        {/* Sign Out / Register New Account Option */}
+        <Box
+          component="button"
+          type="button"
+          onClick={async () => {
+            try {
+              await supabase.auth.signOut();
+              localStorage.removeItem('sakay_driver_phone');
+              localStorage.removeItem('sakay_driver_id');
+              localStorage.removeItem('sakay_driver_profile');
+              localStorage.removeItem('sakay_driver_toda_id');
+              localStorage.removeItem('sakay_driver_onboarding_cache');
+              sessionStorage.clear();
+            } catch {}
+            navigate('/account-selection', { replace: true });
+          }}
+          sx={{
+            mt: 1.5,
+            width: '100%',
+            py: 1,
+            background: 'none',
+            border: 'none',
+            color: '#64748B',
+            fontSize: '13.5px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            textAlign: 'center',
+            '&:hover': { color: '#0F172A', textDecoration: 'underline' },
+          }}
+        >
+          Mag-sign out / Gumawa ng Bagong Aplikasyon
+        </Box>
       </Box>
     </Box>
   );

@@ -10,3 +10,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
   },
 });
+
+// Initialize real-time cross-port and cross-device dispatch synchronization
+import { initSupabaseDispatch } from '@sakay/shared';
+initSupabaseDispatch(supabase);

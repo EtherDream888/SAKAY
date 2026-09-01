@@ -447,7 +447,6 @@ export const DriverTermsOfService: React.FC = () => {
         <PrimaryButton
           fullWidth
           onClick={handleAgree}
-          disabled={!hasScrolledToBottom}
           sx={{
             height: '56px',
             borderRadius: '16px',

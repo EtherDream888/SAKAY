@@ -62,7 +62,7 @@ export const DriverFaceResult: React.FC = () => {
       console.warn('[DriverFaceResult] Warning saving selfie:', err);
     } finally {
       setSubmitting(false);
-      const targetRoute = isEditMode ? '/driver/confirm-all-info' : '/driver/tricycle-instructions';
+      const targetRoute = '/driver/confirm-all-info';
       navigate(targetRoute, {
         replace: true,
         state: {

@@ -33,6 +33,7 @@ export interface BookingRecord {
   actual_fare?: number;
   proportionate_fare?: number;
   paired_booking_count?: number;
+  paired_passenger_name?: string;
   booking_status:
     | 'Searching Driver'
     | 'Driver Assigned'

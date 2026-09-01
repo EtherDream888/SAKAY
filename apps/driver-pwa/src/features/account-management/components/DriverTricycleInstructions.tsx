@@ -66,35 +66,36 @@ export const DriverTricycleInstructions: React.FC = () => {
           flex: 1,
           overflowY: 'auto',
           px: 3,
-          pb: 3,
+          pb: 'calc(var(--safe-area-bottom) + 110px)',
           display: 'flex',
           flexDirection: 'column',
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
           '&::-webkit-scrollbar': { display: 'none' },
         }}
       >
         {/* Step Indicator Bar */}
         <Box sx={{ mt: 1, mb: 2 }}>
           <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#64748B', mb: 1 }}>
-            Hakbang 4 ng 4
+            Hakbang 3 ng 4
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Box sx={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: '#FF6B00' }} />
             <Box sx={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: '#FF6B00' }} />
             <Box sx={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: '#FF6B00' }} />
-            <Box sx={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: '#FF6B00' }} />
+            <Box sx={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: '#E2E8F0' }} />
           </Box>
         </Box>
 
         <Typography
           sx={{
-            fontSize: '24px',
+            fontSize: '26px',
             fontWeight: 800,
             color: '#0F172A',
-            lineHeight: 1.25,
+            lineHeight: 1.2,
             letterSpacing: '-0.5px',
-            mb: 2,
+            mb: 1.5,
           }}
         >
           Ihanda ang iyong Tricycle
@@ -104,7 +105,7 @@ export const DriverTricycleInstructions: React.FC = () => {
           Para sa malinaw na larawan:
         </Typography>
 
-        <Box component="ul" sx={{ pl: 2.5, m: 0, mb: 3, color: '#64748B', '& li': { mb: 0.75, fontSize: '14px', lineHeight: 1.4 } }}>
+        <Box component="ul" sx={{ pl: 2.5, m: 0, mb: 3, color: '#64748B', fontSize: '13px', lineHeight: 1.6, '& li': { mb: 0.25 } }}>
           <li>Ilagay ang iyong tricycle sa isang maliwanag at maluwag na lugar.</li>
           <li>Siguraduhing malinaw at kita ang buong tricycle sa frame.</li>
           <li>Panatilihing hindi gumagalaw ang camera habang kumukuha ng larawan.</li>
@@ -115,47 +116,61 @@ export const DriverTricycleInstructions: React.FC = () => {
         <Box
           sx={{
             width: '100%',
-            borderRadius: '20px',
-            border: '1.5px solid #E2E8F0',
+            borderRadius: '16px',
+            overflow: 'hidden',
+            border: '1px solid #E2E8F0',
             backgroundColor: '#F8FAFC',
-            p: 3,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+            aspectRatio: '4 / 3',
+            minHeight: '220px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
-            mb: 4,
-            overflow: 'hidden',
+            p: 2,
+            mb: 3,
           }}
         >
           <Box
             component="img"
             src={mtopImg}
             alt="Tricycle Unit Sample"
+            loading="eager"
+            decoding="sync"
             sx={{
               width: '100%',
-              maxWidth: 300,
-              maxHeight: 200,
+              height: '100%',
               objectFit: 'contain',
-              borderRadius: '12px',
+              borderRadius: '10px',
+              display: 'block',
             }}
           />
         </Box>
       </Box>
 
-      {/* 3. Pinned Action Button */}
+      {/* 3. Sticky Bottom Action Bar */}
       <Box
         sx={{
-          p: 3,
-          pt: 1.5,
-          pb: 'calc(var(--safe-area-bottom) + 20px)',
-          backgroundColor: '#FFFFFF',
-          flexShrink: 0,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: '16px 24px calc(var(--safe-area-bottom) + 16px) 24px',
+          background: 'linear-gradient(to top, #FFFFFF 80%, rgba(255, 255, 255, 0.9) 90%, rgba(255, 255, 255, 0) 100%)',
+          zIndex: 15,
         }}
       >
         <PrimaryButton
           fullWidth
-          size="large"
           onClick={() => navigate('/driver/scan-tricycle', { state })}
+          sx={{
+            height: '56px',
+            borderRadius: '16px',
+            fontSize: '16px',
+            fontWeight: 800,
+            backgroundColor: '#FF6B00',
+            boxShadow: 'none',
+            '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
+          }}
         >
           Kumuha ng Larawan
         </PrimaryButton>

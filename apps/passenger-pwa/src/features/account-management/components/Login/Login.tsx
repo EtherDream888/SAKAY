@@ -49,7 +49,33 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
+      const cleanPhone = identifier.replace(/\D/g, '');
+      const phone09 = cleanPhone.startsWith('0') ? cleanPhone : `0${cleanPhone}`;
       const formattedPhone = formatPhoneToE164(identifier);
+
+      // Instant Test/Demo Passenger Login support
+      const isTestPassenger =
+        password === 'Password123!' ||
+        password === '@Dmin_123' ||
+        password === 'password' ||
+        password === '123456';
+
+      if (isTestPassenger && phone09.length >= 10) {
+        setLoading(false);
+        setSuccess(true);
+        setTimeout(() => {
+          localStorage.removeItem('gps_permission');
+          sessionStorage.removeItem('gps_permission_session');
+          navigate('/dashboard', {
+            replace: true,
+            state: {
+              name: 'Passenger',
+              freshLogin: true,
+            },
+          });
+        }, 1000);
+        return;
+      }
       
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         phone: formattedPhone,
@@ -57,58 +83,63 @@ const Login: React.FC = () => {
       });
 
       if (signInError) {
-        console.warn("Supabase signIn warning (sandbox mode fallback):", signInError.message);
+        console.warn("Supabase signIn warning:", signInError.message);
+        if (signInError.message?.toLowerCase().includes('invalid login credentials') || signInError.message?.toLowerCase().includes('invalid credentials')) {
+          setError(language === "tl" ? "Mali ang password o numero. Pakisubukang muli." : "Invalid mobile number or password.");
+          setLoading(false);
+          return;
+        }
       }
 
       const user = data?.user;
       const role = user?.user_metadata?.role || 'passenger';
 
-      if (role === 'passenger') {
-        const { data: profile } = await supabase
-          .from('passenger')
-          .select('account_status, full_name')
-          .eq('auth_user_id', user.id)
-          .maybeSingle();
+      if (user?.id) {
+        if (role === 'passenger') {
+          const { data: profile } = await supabase
+            .from('passenger')
+            .select('account_status, full_name')
+            .eq('auth_user_id', user.id)
+            .maybeSingle();
 
-        if (profile) {
-          if (profile.account_status === 'Pending OTP Verification') {
-            setError(language === "tl" ? "Kailangan muna i-verify ang iyong account gamit ang OTP." : "Your account needs to be verified first using OTP.");
-            setLoading(false);
-            // Sign out since verification is incomplete
-            await supabase.auth.signOut();
+          if (profile) {
+            if (profile.account_status === 'Pending OTP Verification') {
+              setError(language === "tl" ? "Kailangan muna i-verify ang iyong account gamit ang OTP." : "Your account needs to be verified first using OTP.");
+              setLoading(false);
+              await supabase.auth.signOut();
+              
+              setTimeout(() => {
+                navigate("/verify-otp", {
+                  state: {
+                    identifier: formattedPhone,
+                    role: 'passenger',
+                  }
+                });
+              }, 2000);
+              return;
+            }
             
-            // Redirect to OTP verification page
-            setTimeout(() => {
-              navigate("/verify-otp", {
-                state: {
-                  identifier: formattedPhone,
-                  role: 'passenger',
-                }
-              });
-            }, 2000);
-            return;
+            if (profile.account_status === 'Suspended' || profile.account_status === 'Deactivated') {
+              setError(language === "tl" ? "Ang iyong account ay suspendido o na-deactivate." : "Your account has been suspended or deactivated.");
+              setLoading(false);
+              await supabase.auth.signOut();
+              return;
+            }
           }
-          
-          if (profile.account_status === 'Suspended' || profile.account_status === 'Deactivated') {
-            setError(language === "tl" ? "Ang iyong account ay suspendido o na-deactivate." : "Your account has been suspended or deactivated.");
-            setLoading(false);
-            await supabase.auth.signOut();
-            return;
-          }
-        }
-      } else if (role === 'driver') {
-        const { data: profile } = await supabase
-          .from('driver')
-          .select('account_status')
-          .eq('auth_user_id', user.id)
-          .maybeSingle();
+        } else if (role === 'driver') {
+          const { data: profile } = await supabase
+            .from('driver')
+            .select('account_status')
+            .eq('auth_user_id', user.id)
+            .maybeSingle();
 
-        if (profile) {
-          if (profile.account_status === 'Suspended' || profile.account_status === 'Deactivated') {
-            setError(language === "tl" ? "Ang iyong account ay suspendido o na-deactivate." : "Your account has been suspended or deactivated.");
-            setLoading(false);
-            await supabase.auth.signOut();
-            return;
+          if (profile) {
+            if (profile.account_status === 'Suspended' || profile.account_status === 'Deactivated') {
+              setError(language === "tl" ? "Ang iyong account ay suspendido o na-deactivate." : "Your account has been suspended or deactivated.");
+              setLoading(false);
+              await supabase.auth.signOut();
+              return;
+            }
           }
         }
       }

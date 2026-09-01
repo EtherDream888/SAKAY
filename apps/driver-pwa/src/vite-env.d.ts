@@ -13,4 +13,4 @@ declare module '*.svg' {
 }
 
 declare module 'tesseract.js';
-
+declare module 'canvas-confetti';

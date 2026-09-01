@@ -31,6 +31,8 @@ export interface MockDispatchBooking {
   actual_fare?: number;
   proportionate_fare?: number;
   paired_booking_count?: number;
+  paired_passenger_name?: string;
+  unmatched_preference?: 'proceed' | 'cancel';
   booking_status:
     | 'Searching Driver'
     | 'Driver Assigned'
@@ -94,6 +96,33 @@ try {
   console.warn('BroadcastChannel not supported, using storage events:', e);
 }
 
+// Supabase Realtime Channel for Cross-Port & Cross-Device Sync
+let supabaseDispatchChannel: any = null;
+
+export const initSupabaseDispatch = (supabaseClient: any) => {
+  if (!supabaseClient || supabaseDispatchChannel) return;
+
+  try {
+    const channel = supabaseClient.channel('sakay_live_dispatch', {
+      config: { broadcast: { self: true } },
+    });
+
+    channel
+      .on('broadcast', { event: 'dispatch_event' }, ({ payload }: { payload: MockDispatchBooking }) => {
+        if (payload && payload.booking_id) {
+          inMemoryStore[payload.booking_id] = payload;
+          saveStore(inMemoryStore);
+          emitToSubscribers(payload);
+        }
+      })
+      .subscribe();
+
+    supabaseDispatchChannel = channel;
+  } catch (err) {
+    console.warn('[mockDispatch] Failed to initialize Supabase Realtime channel:', err);
+  }
+};
+
 type DispatchListener = (booking: MockDispatchBooking) => void;
 const subscribers = new Set<DispatchListener>();
 
@@ -139,7 +168,7 @@ if (typeof window !== 'undefined') {
 }
 
 /**
- * Broadcasts an updated booking record across the channel and storage
+ * Broadcasts an updated booking record across the channel, Supabase, and storage
  */
 const broadcastBooking = (booking: MockDispatchBooking) => {
   const store = loadStore();
@@ -153,6 +182,18 @@ const broadcastBooking = (booking: MockDispatchBooking) => {
       broadcastChannel.postMessage(booking);
     } catch (e) {
       console.warn('BroadcastChannel postMessage error:', e);
+    }
+  }
+
+  if (supabaseDispatchChannel) {
+    try {
+      supabaseDispatchChannel.send({
+        type: 'broadcast',
+        event: 'dispatch_event',
+        payload: booking,
+      });
+    } catch (e) {
+      console.warn('Supabase Realtime dispatch error:', e);
     }
   }
 };

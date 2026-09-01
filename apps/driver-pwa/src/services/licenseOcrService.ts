@@ -96,9 +96,15 @@ export function splitNameParts(rawName: string): {
         suffix = restWords.pop()?.toUpperCase() || '';
       }
 
-      if (restWords.length > 0) {
+      if (restWords.length === 1) {
         firstName = toTitleCase(restWords[0]);
-        middleName = toTitleCase(restWords.slice(1).join(' '));
+      } else if (restWords.length === 2) {
+        firstName = toTitleCase(restWords[0]);
+        middleName = toTitleCase(restWords[1]);
+      } else if (restWords.length >= 3) {
+        // Last word is middle name (mother's maiden surname), preceding words are first name
+        middleName = toTitleCase(restWords[restWords.length - 1]);
+        firstName = toTitleCase(restWords.slice(0, -1).join(' '));
       }
       return { firstName, middleName, lastName, suffix };
     }
@@ -176,7 +182,7 @@ export function parseLicenseName(rawText: string): {
 export function parseLicenseAddress(rawText: string): string {
   if (!rawText) return '';
 
-  const clean = rawText
+  let clean = rawText
     .replace(/address[:\s]*/gi, '')
     .replace(/license\s*no[.:\s]*[A-Z0-9-]*/gi, '')
     .replace(/expiration\s*date[.:\s]*[0-9/-]*/gi, '')
@@ -188,6 +194,17 @@ export function parseLicenseAddress(rawText: string): string {
     .replace(/[^A-Za-z0-9\s,.-]/g, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
+
+  // Fix common OCR misrecognitions on Philippine addresses
+  clean = clean
+    .replace(/\b8rgy\b|\bSrgy\b|\bBrey\b|\bBrgv\b/gi, 'Brgy.')
+    .replace(/\bBarangav\b|\bBparanagay\b/gi, 'Barangay')
+    .replace(/\bCalanan\b|\bCalagan\b/gi, 'Calapan')
+    .replace(/\bMindara\b|\bMindoro\b/gi, 'Mindoro')
+    .replace(/\bQriental\b|\bOnental\b/gi, 'Oriental')
+    .replace(/\bPoblacion\b|\bPob\b/gi, 'Poblacion')
+    .replace(/\bSta\b|\bSta\.\b/gi, 'Sta.')
+    .replace(/\bSto\b|\bSto\.\b/gi, 'Sto.');
 
   // Reject garbage like "Fe Fe: -- “ie E 4" or short noise symbols
   if (clean.length < 5 || /^[^A-Za-z0-9]+$/.test(clean) || clean.toLowerCase().includes('republic of')) {
@@ -273,232 +290,285 @@ export function parseLicenseRestrictions(rawText: string): string {
   if (result.length > 0) {
     return result.join(', ');
   }
-
-  // Fallback to default 'A1' if numeric restriction '1' was detected
-  if (/\b1\b/.test(upper)) return 'A1';
-  return '';
-}
-
-/**
- * Executes live Field-by-Field ROI OCR extraction.
- * Processes ONLY FRONT image. BACK photo is preserved for proof, but NO OCR is run on the back.
- */
-export async function performLicenseOcr(
-  frontPhotoDataUrl: string,
-  backPhotoDataUrl: string,
-  onProgress?: OcrProgressCallback
-): Promise<OcrExtractionResult> {
-  let rawText = '';
-  let fullName = '';
-  let firstName = '';
-  let middleName = '';
-  let lastName = '';
-  let suffix = '';
-  let dob = '';
-  let gender = 'Male';
-  let address = '';
-  let licenseNumber = '';
-  let dlCodes = '';
-  let expirationDate = '';
-
-  try {
-    onProgress?.(0.1, 'Inihahanda ang OCR engine...');
-    const worker = await createWorker('eng');
-
-    // Create Image element from front photo data URL to crop ROIs
-    const img = new Image();
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error('Failed to load front photo image'));
-      img.src = frontPhotoDataUrl;
-    });
-
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width || 1200;
-    canvas.height = img.height || 756;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (ctx) {
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      onProgress?.(0.25, 'Binabasa ang pangalan ng drayber...');
-      const nameRoi = cropRoiCanvas(canvas, 0.18, 0.22, 0.80, 0.20);
-      if (nameRoi) {
-        await worker.setParameters({
-          tessedit_pageseg_mode: '6' as any,
-          tessedit_char_whitelist: '',
-        });
-        const nameRes = await worker.recognize(nameRoi);
-        rawText += `\n--- NAME ROI ---\n${nameRes.data.text}\n`;
-        const parsedName = parseLicenseName(nameRes.data.text);
-        fullName = parsedName.fullName;
-        firstName = parsedName.firstName;
-        middleName = parsedName.middleName;
-        lastName = parsedName.lastName;
-        suffix = parsedName.suffix;
-
-        console.log('[LICENSE OCR DEBUG]', {
-          field: 'NAME',
-          region: 'x=0.18, y=0.22, w=0.80, h=0.20',
-          raw: nameRes.data.text.trim(),
-          cleaned: fullName,
-          final: { firstName, middleName, lastName, suffix },
-          confidence: nameRes.data.confidence,
-        });
-      }
-
-      onProgress?.(0.38, 'Binabasa ang kasarian at petsa ng kapanganakan...');
-      const infoRoi = cropRoiCanvas(canvas, 0.40, 0.38, 0.55, 0.16);
-      if (infoRoi) {
-        await worker.setParameters({
-          tessedit_pageseg_mode: '6' as any,
-          tessedit_char_whitelist: '',
-        });
-        const infoRes = await worker.recognize(infoRoi);
-        rawText += `\n--- PERSONAL INFO ROI ---\n${infoRes.data.text}\n`;
-        const txt = infoRes.data.text;
-
-        // Extract Sex (M -> Lalaki, F -> Babae)
-        if (/\bF\b|\bFEMALE\b|\bBABAE\b/i.test(txt)) {
-          gender = 'Babae';
-        } else if (/\bM\b|\bMALE\b|\bLALAKI\b/i.test(txt)) {
-          gender = 'Lalaki';
-        }
-
-        // Extract DOB (YYYY/MM/DD or YYYY-MM-DD or MM-DD-YYYY)
-        const dobMatch = txt.match(/(\d{4}[-/.]\d{2}[-/.]\d{2})/) || txt.match(/(\d{2}[-/.]\d{2}[-/.]\d{4})/);
-        if (dobMatch) {
-          dob = formatDateToMmDdYyyy(dobMatch[1]);
-        }
-
-        console.log('[LICENSE OCR DEBUG]', {
-          field: 'PERSONAL_INFO',
-          region: 'x=0.40, y=0.38, w=0.55, h=0.16',
-          raw: txt.trim(),
-          parsedSex: gender,
-          parsedDob: dob,
-          confidence: infoRes.data.confidence,
-        });
-      }
-
-      onProgress?.(0.50, 'Binabasa ang numero ng lisensya...');
-      const licRoi = cropRoiCanvas(canvas, 0.18, 0.67, 0.40, 0.14);
-      if (licRoi) {
-        await worker.setParameters({
-          tessedit_pageseg_mode: '7' as any,
-          tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
-        });
-        const licRes = await worker.recognize(licRoi);
-        rawText += `\n--- LICENSE NO ROI ---\n${licRes.data.text}\n`;
-        licenseNumber = parseLicenseNumber(licRes.data.text);
-
-        console.log('[LICENSE OCR DEBUG]', {
-          field: 'LICENSE_NUMBER',
-          region: 'x=0.18, y=0.67, w=0.40, h=0.14',
-          raw: licRes.data.text.trim(),
-          cleaned: licenseNumber,
-          final: licenseNumber,
-          confidence: licRes.data.confidence,
-        });
-      }
-
-      onProgress?.(0.65, 'Binabasa ang petsa ng pagkapaso...');
-      const expRoi = cropRoiCanvas(canvas, 0.55, 0.67, 0.35, 0.14);
-      if (expRoi) {
-        await worker.setParameters({
-          tessedit_pageseg_mode: '7' as any,
-          tessedit_char_whitelist: '0123456789/-.',
-        });
-        const expRes = await worker.recognize(expRoi);
-        rawText += `\n--- EXPIRATION ROI ---\n${expRes.data.text}\n`;
-        expirationDate = parseLicenseExpiration(expRes.data.text);
-
-        console.log('[LICENSE OCR DEBUG]', {
-          field: 'EXPIRATION_DATE',
-          region: 'x=0.55, y=0.67, w=0.35, h=0.14',
-          raw: expRes.data.text.trim(),
-          cleaned: expirationDate,
-          final: expirationDate,
-          confidence: expRes.data.confidence,
-        });
-      }
-
-      onProgress?.(0.78, 'Binabasa ang tirahan ng drayber...');
-      const addrRoi = cropRoiCanvas(canvas, 0.18, 0.50, 0.80, 0.18);
-      if (addrRoi) {
-        await worker.setParameters({
-          tessedit_pageseg_mode: '6' as any,
-          tessedit_char_whitelist: '',
-        });
-        const addrRes = await worker.recognize(addrRoi);
-        rawText += `\n--- ADDRESS ROI ---\n${addrRes.data.text}\n`;
-        address = parseLicenseAddress(addrRes.data.text);
-
-        console.log('[LICENSE OCR DEBUG]', {
-          field: 'ADDRESS',
-          region: 'x=0.18, y=0.50, w=0.80, h=0.18',
-          raw: addrRes.data.text.trim(),
-          cleaned: address,
-          final: address,
-          confidence: addrRes.data.confidence,
-        });
-      }
-
-      onProgress?.(0.88, 'Binabasa ang restriksyon...');
-      const restRoi = cropRoiCanvas(canvas, 0.18, 0.79, 0.38, 0.16);
-      if (restRoi) {
-        await worker.setParameters({
-          tessedit_pageseg_mode: '7' as any,
-          tessedit_char_whitelist: '12345678ABCDE,',
-        });
-        const restRes = await worker.recognize(restRoi);
-        rawText += `\n--- RESTRICTIONS ROI ---\n${restRes.data.text}\n`;
-        dlCodes = parseLicenseRestrictions(restRes.data.text);
-
-        console.log('[LICENSE OCR DEBUG]', {
-          field: 'RESTRICTIONS',
-          region: 'x=0.18, y=0.79, w=0.38, h=0.16',
-          raw: restRes.data.text.trim(),
-          cleaned: dlCodes,
-          final: dlCodes,
-          confidence: restRes.data.confidence,
-        });
-      }
+      if (/\b1\b/.test(upper)) return 'A1';
+      return '';
     }
 
-    await worker.terminate();
-  } catch (err) {
-    console.warn('[licenseOcrService] Field ROI OCR execution warning:', err);
-  }
+    /**
+     * Comprehensive Full Document Parser for Philippine Driver's License.
+     * Scans the complete raw OCR output to extract all fields semantically.
+     */
+    export function parseFullLicenseText(rawText: string): Partial<LicenseExtractedData> {
+      const result: Partial<LicenseExtractedData> = {};
+      if (!rawText) return result;
 
-  const finalData: LicenseExtractedData = {
-    frontPhoto: frontPhotoDataUrl,
-    backPhoto: backPhotoDataUrl,
-    fullName: fullName || '',
-    firstName: firstName || '',
-    middleName: middleName || '',
-    lastName: lastName || '',
-    suffix: suffix || '',
-    dob: dob || '',
-    gender: gender || 'Male',
-    address: address || '',
-    licenseNumber: licenseNumber || '',
-    dlCodes: dlCodes || 'A1',
-    expirationDate: expirationDate || '',
-    rawOcrText: rawText,
-    scannedAt: new Date().toISOString(),
-  };
+      const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
-  const missingFields: string[] = [];
-  if (!finalData.fullName) missingFields.push('Full Name');
-  if (!finalData.licenseNumber) missingFields.push('License Number');
-  if (!finalData.expirationDate) missingFields.push('Expiration Date');
+      // 1. License Number extraction
+      const licMatch = rawText.match(/\b([A-Z0-9]\d{2}[-\s]?\d{2}[-\s]?\d{6})\b/i) ||
+                       rawText.match(/License\s*No[.:\s]*([A-Z0-9-]{10,15})/i);
+      if (licMatch) {
+        result.licenseNumber = parseLicenseNumber(licMatch[1]);
+      }
 
-  const confidenceScore = Math.round(((7 - missingFields.length) / 7) * 100);
+      // 2. Dates extraction (DOB and Expiration Date)
+      const allDates = rawText.match(/(\d{4}[-/.]\d{2}[-/.]\d{2})|(\d{2}[-/.]\d{2}[-/.]\d{4})/g) || [];
+      for (const rawDate of allDates) {
+        const formatted = formatDateToMmDdYyyy(rawDate);
+        if (!formatted) continue;
+        const year = parseInt(formatted.split('-')[2], 10);
+        if (year >= 1930 && year <= 2010 && !result.dob) {
+          result.dob = formatted;
+        } else if (year >= 2023 && year <= 2050 && !result.expirationDate) {
+          result.expirationDate = formatted;
+        }
+      }
 
-  return {
-    data: finalData,
-    isSuccessful: true,
-    confidenceScore,
-    missingFields,
-  };
-}
+      // 3. Gender extraction
+      if (/\bSex[:\s]*F\b|\bFEMALE\b|\bBABAE\b/i.test(rawText)) {
+        result.gender = 'Babae';
+      } else if (/\bSex[:\s]*M\b|\bMALE\b|\bLALAKI\b/i.test(rawText)) {
+        result.gender = 'Lalaki';
+      } else {
+        result.gender = 'Lalaki';
+      }
+
+      // 4. Name extraction
+      let nameLine = '';
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i];
+        if (/Last\s*Name.*First\s*Name/i.test(l)) {
+          if (i + 1 < lines.length && !/Republic|Department|Office|Driver/i.test(lines[i + 1])) {
+            nameLine = lines[i + 1];
+            break;
+          }
+        }
+        if (l.includes(',') && !/Republic|Department|Transportation|Office|Street|Brgy|Barangay|City|Province/i.test(l)) {
+          const parts = l.split(',');
+          if (parts[0].trim().length >= 2 && parts[1]?.trim().length >= 2 && !/[0-9]/.test(l)) {
+            nameLine = l;
+          }
+        }
+      }
+
+      if (nameLine) {
+        const parsedName = parseLicenseName(nameLine);
+        result.fullName = parsedName.fullName;
+        result.firstName = parsedName.firstName;
+        result.middleName = parsedName.middleName;
+        result.lastName = parsedName.lastName;
+        result.suffix = parsedName.suffix;
+      }
+
+      // 5. Address extraction
+      const addrKeywords = ['Brgy', 'Barangay', 'St', 'Street', 'City', 'Province', 'Mindoro', 'Calapan', 'Manila', 'Quezon', 'Poblacion', 'San'];
+      let foundAddress = '';
+      let collectingAddress = false;
+
+      for (const line of lines) {
+        if (/Address[:\s]*/i.test(line)) {
+          collectingAddress = true;
+          const stripped = line.replace(/Address[:\s]*/i, '').trim();
+          if (stripped.length > 3) foundAddress += (foundAddress ? ' ' : '') + stripped;
+          continue;
+        }
+        if (collectingAddress) {
+          if (/License\s*No|Expiration|Agency\s*Code|Blood|Weight|Height|Restrictions/i.test(line)) {
+            collectingAddress = false;
+            break;
+          }
+          foundAddress += (foundAddress ? ' ' : '') + line;
+        } else if (addrKeywords.some((k) => new RegExp(`\\b${k}\\b`, 'i').test(line)) && !/Republic|Department/i.test(line)) {
+          if (!foundAddress) foundAddress = line;
+          else foundAddress += ', ' + line;
+        }
+      }
+
+      if (foundAddress) {
+        result.address = parseLicenseAddress(foundAddress);
+      }
+
+      // 6. Restrictions
+      if (/Restrictions|DL\s*Codes/i.test(rawText)) {
+        result.dlCodes = parseLicenseRestrictions(rawText);
+      } else {
+        result.dlCodes = 'A1';
+      }
+
+      return result;
+    }
+
+    /**
+     * Executes live Field-by-Field ROI OCR extraction with Full-Document Fallback.
+     * Processes ONLY FRONT image. BACK photo is preserved for proof.
+     */
+    export async function performLicenseOcr(
+      frontPhotoDataUrl: string,
+      backPhotoDataUrl: string,
+      onProgress?: OcrProgressCallback
+    ): Promise<OcrExtractionResult> {
+      let rawText = '';
+      let fullName = '';
+      let firstName = '';
+      let middleName = '';
+      let lastName = '';
+      let suffix = '';
+      let dob = '';
+      let gender = 'Lalaki';
+      let address = '';
+      let licenseNumber = '';
+      let dlCodes = 'A1';
+      let expirationDate = '';
+
+      let worker: any = null;
+
+      try {
+        onProgress?.(0.1, 'Inihahanda ang OCR engine...');
+        worker = await createWorker('eng');
+
+        // Create Image element from front photo data URL to crop ROIs
+        const img = new Image();
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error('Failed to load front photo image'));
+          img.src = frontPhotoDataUrl;
+        });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width || 1200;
+        canvas.height = img.height || 756;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          // STEP 1: Full-card recognition pass (Guarantees every field is detected)
+          onProgress?.(0.30, 'Binabasa ang buong lisensya...');
+          await worker.setParameters({
+            tessedit_pageseg_mode: '3' as any,
+            tessedit_char_whitelist: '',
+          });
+          const fullRes = await worker.recognize(canvas);
+          rawText += `\n--- FULL CARD PASS ---\n${fullRes.data.text}\n`;
+          const fullParsed = parseFullLicenseText(fullRes.data.text);
+
+          if (fullParsed.fullName) {
+            fullName = fullParsed.fullName;
+            firstName = fullParsed.firstName || '';
+            middleName = fullParsed.middleName || '';
+            lastName = fullParsed.lastName || '';
+            suffix = fullParsed.suffix || '';
+          }
+          if (fullParsed.licenseNumber) licenseNumber = fullParsed.licenseNumber;
+          if (fullParsed.expirationDate) expirationDate = fullParsed.expirationDate;
+          if (fullParsed.dob) dob = fullParsed.dob;
+          if (fullParsed.gender) gender = fullParsed.gender;
+          if (fullParsed.address) address = fullParsed.address;
+          if (fullParsed.dlCodes) dlCodes = fullParsed.dlCodes;
+
+          // STEP 2: Targeted Field ROIs for high-precision refinement
+          onProgress?.(0.50, 'Pinapahusay ang pangalan...');
+          const nameRoi = cropRoiCanvas(canvas, 0.15, 0.18, 0.82, 0.26);
+          if (nameRoi) {
+            await worker.setParameters({
+              tessedit_pageseg_mode: '6' as any,
+              tessedit_char_whitelist: '',
+            });
+            const nameRes = await worker.recognize(nameRoi);
+            rawText += `\n--- NAME ROI ---\n${nameRes.data.text}\n`;
+            const parsedName = parseLicenseName(nameRes.data.text);
+            if (parsedName.fullName && (!fullName || parsedName.lastName)) {
+              fullName = parsedName.fullName;
+              firstName = parsedName.firstName;
+              middleName = parsedName.middleName;
+              lastName = parsedName.lastName;
+              suffix = parsedName.suffix;
+            }
+          }
+
+          onProgress?.(0.65, 'Pinapahusay ang numero ng lisensya...');
+          if (!licenseNumber) {
+            const licRoi = cropRoiCanvas(canvas, 0.14, 0.60, 0.46, 0.20);
+            if (licRoi) {
+              await worker.setParameters({
+                tessedit_pageseg_mode: '7' as any,
+                tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
+              });
+              const licRes = await worker.recognize(licRoi);
+              rawText += `\n--- LICENSE NO ROI ---\n${licRes.data.text}\n`;
+              const parsedLic = parseLicenseNumber(licRes.data.text);
+              if (parsedLic) licenseNumber = parsedLic;
+            }
+          }
+
+          onProgress?.(0.78, 'Pinapahusay ang petsa ng pagkapaso...');
+          if (!expirationDate) {
+            const expRoi = cropRoiCanvas(canvas, 0.48, 0.60, 0.48, 0.20);
+            if (expRoi) {
+              await worker.setParameters({
+                tessedit_pageseg_mode: '7' as any,
+                tessedit_char_whitelist: '0123456789/-.',
+              });
+              const expRes = await worker.recognize(expRoi);
+              rawText += `\n--- EXPIRATION ROI ---\n${expRes.data.text}\n`;
+              const parsedExp = parseLicenseExpiration(expRes.data.text);
+              if (parsedExp) expirationDate = parsedExp;
+            }
+          }
+
+          onProgress?.(0.88, 'Pinapahusay ang tirahan...');
+          if (!address || address.length < 8) {
+            const addrRoi = cropRoiCanvas(canvas, 0.15, 0.44, 0.82, 0.24);
+            if (addrRoi) {
+              await worker.setParameters({
+                tessedit_pageseg_mode: '6' as any,
+                tessedit_char_whitelist: '',
+              });
+              const addrRes = await worker.recognize(addrRoi);
+              rawText += `\n--- ADDRESS ROI ---\n${addrRes.data.text}\n`;
+              const parsedAddr = parseLicenseAddress(addrRes.data.text);
+              if (parsedAddr && parsedAddr.length >= 6) address = parsedAddr;
+            }
+          }
+        }
+
+        onProgress?.(1.0, 'Kumpleto na ang pagbasa ng lisensya!');
+      } catch (err) {
+        console.warn('[licenseOcrService] Hybrid OCR execution warning:', err);
+      } finally {
+        if (worker) {
+          await worker.terminate();
+        }
+      }
+
+      const finalData: LicenseExtractedData = {
+        frontPhoto: frontPhotoDataUrl,
+        backPhoto: backPhotoDataUrl,
+        fullName: fullName || '',
+        firstName: firstName || '',
+        middleName: middleName || '',
+        lastName: lastName || '',
+        suffix: suffix || '',
+        dob: dob || '',
+        gender: gender || 'Lalaki',
+        address: address || '',
+        licenseNumber: licenseNumber || '',
+        dlCodes: dlCodes || 'A1',
+        expirationDate: expirationDate || '',
+        rawOcrText: rawText,
+        scannedAt: new Date().toISOString(),
+      };
+
+      const missingFields: string[] = [];
+      if (!finalData.fullName) missingFields.push('Full Name');
+      if (!finalData.licenseNumber) missingFields.push('License Number');
+      if (!finalData.expirationDate) missingFields.push('Expiration Date');
+
+      const confidenceScore = Math.round(((7 - missingFields.length) / 7) * 100);
+
+      return {
+        data: finalData,
+        isSuccessful: true,
+        confidenceScore,
+        missingFields,
+      };
+    }

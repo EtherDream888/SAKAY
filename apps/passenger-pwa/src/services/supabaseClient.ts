@@ -9,3 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 // Single source of truth typed Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Initialize real-time cross-port and cross-device dispatch synchronization
+import { initSupabaseDispatch } from '@sakay/shared';
+initSupabaseDispatch(supabase);

@@ -14,6 +14,12 @@ import PersonIcon from "@mui/icons-material/Person";
 import CircularProgress from "@mui/material/CircularProgress";
 import Paper from "@mui/material/Paper";
 import Alert from "@mui/material/Alert";
+import GroupsIcon from "@mui/icons-material/Groups";
+import AddIcon from "@mui/icons-material/Add";
+import RemoveIcon from "@mui/icons-material/Remove";
+import Radio from "@mui/material/Radio";
+import RadioGroup from "@mui/material/RadioGroup";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import { useLanguage } from "../../../../utils/LanguageContext";
 import { supabase } from "../../../../services/supabaseClient";
 import SuccessModal from "../../../../common/components/SuccessModal";
@@ -48,6 +54,7 @@ const BookSummary: React.FC = () => {
   const [dropoff, setDropoff] = useState<LocationState | null>(null);
   const [passengers, setPassengers] = useState<number>(1);
   const [tripType, setTripType] = useState<"Solo" | "Shared">("Solo");
+  const [unmatchedPreference, setUnmatchedPreference] = useState<"proceed" | "cancel">("proceed");
 
   // Calculation & API states
   const [loading, setLoading] = useState<boolean>(true);
@@ -80,18 +87,35 @@ const BookSummary: React.FC = () => {
     setPassengers(count);
     setTripType(type);
 
-    calculateTripData(p, d, type);
+    calculateTripData(p, d, type, count);
   }, []);
 
-  const calculateTripData = async (p: LocationState, d: LocationState, type: "Solo" | "Shared") => {
+  const calculateTripData = async (
+    p: LocationState,
+    d: LocationState,
+    type: "Solo" | "Shared",
+    passengerCount: number
+  ) => {
     setLoading(true);
     let roadDistance = 0;
     let source: "osrm" | "fallback" = "osrm";
 
-    // 1. Fetch active fare configurations from Supabase or default to test specifications
     let baseFare = 15.0; // covers first 2km
     let baseDistance = 2.0; // base km
     let succeedingRate = 1.0; // succeeding rate per km
+
+    // Read from localStorage cache first
+    try {
+      const cached = localStorage.getItem("sakay_active_fare_matrix");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.base_fare) baseFare = Number(parsed.base_fare);
+        if (parsed.base_distance_km) baseDistance = Number(parsed.base_distance_km);
+        if (parsed.succeeding_rate) succeedingRate = Number(parsed.succeeding_rate);
+      }
+    } catch {
+      // ignore
+    }
 
     try {
       const { data: activeMatrix } = await supabase
@@ -106,15 +130,13 @@ const BookSummary: React.FC = () => {
         baseFare = Number(activeMatrix.base_fare);
         baseDistance = Number(activeMatrix.base_distance_km);
         succeedingRate = Number(activeMatrix.succeeding_rate);
-        console.log("Loaded active fare matrix settings from Supabase:", { baseFare, baseDistance, succeedingRate });
+        localStorage.setItem("sakay_active_fare_matrix", JSON.stringify(activeMatrix));
       }
     } catch (err) {
-      console.warn("Could not query fare_matrix from database, using test defaults:", err);
+      console.warn("Could not query fare_matrix from database, using cached/defaults:", err);
     }
 
-    // 2. Query OSRM
     try {
-      // Query public OSRM driving service
       const res = await fetch(
         `https://router.project-osrm.org/route/v1/driving/${p.lng},${p.lat};${d.lng},${d.lat}?overview=false`
       );
@@ -122,18 +144,15 @@ const BookSummary: React.FC = () => {
       const data = await res.json();
       
       if (data.routes && data.routes.length > 0) {
-        roadDistance = data.routes[0].distance / 1000; // convert to km
+        roadDistance = data.routes[0].distance / 1000;
       } else {
         throw new Error("No routes returned by OSRM");
       }
-    } catch (err) {
-      console.warn("OSRM error, falling back to Haversine * circuity factor:", err);
-      // Straight-line distance multiplied by standard road circuit factor (1.3)
+    } catch {
       roadDistance = haversineDistance(p.lat, p.lng, d.lat, d.lng) * 1.3;
       source = "fallback";
     }
 
-    // Round distance to 2 decimal places
     roadDistance = Math.round(roadDistance * 100) / 100;
     setDistance(roadDistance);
     setDistanceSource(source);
@@ -141,14 +160,41 @@ const BookSummary: React.FC = () => {
     // Compute Seat Fare: base_fare + (max(0, distance - base_distance) * succeeding_rate)
     const extraDistance = Math.max(0, roadDistance - baseDistance);
     const computedSeatFare = baseFare + extraDistance * succeedingRate;
-    setSeatFare(Math.round(computedSeatFare * 100) / 100);
+    const roundedSeat = Math.round(computedSeatFare * 100) / 100;
+    setSeatFare(roundedSeat);
 
-    // Solo Trip: Seat Fare * 4 (regardless of passenger count entered)
-    // Shared Trip: Seat Fare (paid only for single seat)
-    const computedTotalFare = type === "Solo" ? computedSeatFare * 4 : computedSeatFare;
+    // Solo Trip: Seat Fare * 4 (exclusive tricycle capacity)
+    // Shared Trip: Seat Fare * passengerCount (proportionately divided by seat count)
+    const computedTotalFare = type === "Solo" ? roundedSeat * 4 : roundedSeat * passengerCount;
     setFare(Math.round(computedTotalFare * 100) / 100);
 
     setLoading(false);
+  };
+
+  const handleToggleTripType = (newType: "Solo" | "Shared") => {
+    setTripType(newType);
+    let newPassengers = passengers;
+    if (newType === "Shared" && passengers > 2) {
+      newPassengers = 2;
+      setPassengers(2);
+    }
+    sessionStorage.setItem("trip_type", newType);
+    sessionStorage.setItem("trip_passengers", newPassengers.toString());
+    if (seatFare > 0) {
+      const newTotal = newType === "Solo" ? seatFare * 4 : seatFare * newPassengers;
+      setFare(Math.round(newTotal * 100) / 100);
+    }
+  };
+
+  const handleChangePassengers = (delta: number) => {
+    const max = tripType === "Shared" ? 2 : 4;
+    const next = Math.max(1, Math.min(max, passengers + delta));
+    setPassengers(next);
+    sessionStorage.setItem("trip_passengers", next.toString());
+    if (seatFare > 0) {
+      const newTotal = tripType === "Solo" ? seatFare * 4 : seatFare * next;
+      setFare(Math.round(newTotal * 100) / 100);
+    }
   };
 
   const [createdBookingId, setCreatedBookingId] = useState<string>("");
@@ -326,7 +372,7 @@ const BookSummary: React.FC = () => {
 
             <Box sx={{ borderBottom: "1px solid #F1F5F9" }} />
 
-            {/* Service Type Detail */}
+            {/* Service Type Detail & Interactive Toggle */}
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <Box sx={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 <LocalTaxiIcon sx={{ color: "#FF6B00", fontSize: "20px" }} />
@@ -334,14 +380,49 @@ const BookSummary: React.FC = () => {
                   {language === "tl" ? "Uri ng Biyahe" : "Trip Type"}
                 </Typography>
               </Box>
-              <Typography sx={{ fontSize: "14px", fontWeight: 800, color: tripType === "Solo" ? "#FF6B00" : "#34A853" }}>
-                {tripType === "Solo" ? "Solo Trip" : "Shared Trip"}
-              </Typography>
+              <Box sx={{ display: "flex", gap: "6px" }}>
+                <Button
+                  size="small"
+                  onClick={() => handleToggleTripType("Solo")}
+                  startIcon={<PersonIcon sx={{ fontSize: "14px !important" }} />}
+                  sx={{
+                    borderRadius: "12px",
+                    px: "10px",
+                    py: "3px",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    textTransform: "none",
+                    backgroundColor: tripType === "Solo" ? "#FF6B00" : "#F1F5F9",
+                    color: tripType === "Solo" ? "#FFFFFF" : "#64748B",
+                    "&:hover": { backgroundColor: tripType === "Solo" ? "#E66000" : "#E2E8F0" },
+                  }}
+                >
+                  Solo
+                </Button>
+                <Button
+                  size="small"
+                  onClick={() => handleToggleTripType("Shared")}
+                  startIcon={<GroupsIcon sx={{ fontSize: "14px !important" }} />}
+                  sx={{
+                    borderRadius: "12px",
+                    px: "10px",
+                    py: "3px",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    textTransform: "none",
+                    backgroundColor: tripType === "Shared" ? "#10B981" : "#F1F5F9",
+                    color: tripType === "Shared" ? "#FFFFFF" : "#64748B",
+                    "&:hover": { backgroundColor: tripType === "Shared" ? "#059669" : "#E2E8F0" },
+                  }}
+                >
+                  Shared
+                </Button>
+              </Box>
             </Box>
 
             <Box sx={{ borderBottom: "1px solid #F1F5F9" }} />
 
-            {/* Passenger Detail */}
+            {/* Passenger Detail & Dynamic +/- Counter */}
             <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <Box sx={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 <PersonIcon sx={{ color: "#FF6B00", fontSize: "20px" }} />
@@ -349,9 +430,39 @@ const BookSummary: React.FC = () => {
                   {language === "tl" ? "Bilang ng Pasahero" : "Passenger Count"}
                 </Typography>
               </Box>
-              <Typography sx={{ fontSize: "14px", fontWeight: 800, color: "#0F172A" }}>
-                {passengers} {passengers > 1 ? "seats" : "seat"}
-              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <IconButton
+                  size="small"
+                  disabled={passengers <= 1}
+                  onClick={() => handleChangePassengers(-1)}
+                  sx={{
+                    width: 24,
+                    height: 24,
+                    backgroundColor: "#F1F5F9",
+                    color: "#0F172A",
+                    "&:hover": { backgroundColor: "#E2E8F0" },
+                  }}
+                >
+                  <RemoveIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+                <Typography sx={{ fontSize: "13px", fontWeight: 800, color: "#0F172A", minWidth: "16px", textAlign: "center" }}>
+                  {passengers}
+                </Typography>
+                <IconButton
+                  size="small"
+                  disabled={tripType === "Shared" ? passengers >= 2 : passengers >= 4}
+                  onClick={() => handleChangePassengers(1)}
+                  sx={{
+                    width: 24,
+                    height: 24,
+                    backgroundColor: "#F1F5F9",
+                    color: "#0F172A",
+                    "&:hover": { backgroundColor: "#E2E8F0" },
+                  }}
+                >
+                  <AddIcon sx={{ fontSize: 14 }} />
+                </IconButton>
+              </Box>
             </Box>
           </Paper>
 
@@ -389,7 +500,9 @@ const BookSummary: React.FC = () => {
               <Box sx={{ display: "flex", gap: "8px", alignItems: "center" }}>
                 <AccountBalanceWalletIcon sx={{ color: "#FF6B00" }} />
                 <Typography sx={{ fontSize: "14px", fontWeight: 700, color: "#94A3B8" }}>
-                  {language === "tl" ? "ESTIMASYON NG PAMASAHE" : "ESTIMATED FARE"}
+                  {tripType === "Shared"
+                    ? language === "tl" ? "SHARED FARE ESTIMATE" : "SHARED FARE ESTIMATE"
+                    : language === "tl" ? "ESTIMASYON NG PAMASAHE" : "ESTIMATED FARE"}
                 </Typography>
               </Box>
               <Box sx={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
@@ -413,12 +526,12 @@ const BookSummary: React.FC = () => {
                     <Typography>₱{seatFare.toFixed(2)}</Typography>
                   </Box>
                   <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#94A3B8" }}>
-                    <Typography>{language === "tl" ? "Solo Trip multiplier:" : "Full capacity multiplier:"}</Typography>
+                    <Typography>{language === "tl" ? "Solo Trip multiplier (Buong Kapasidad):" : "Full capacity multiplier:"}</Typography>
                     <Typography>× 4</Typography>
                   </Box>
                   <Box sx={{ display: "flex", gap: "6px", alignItems: "flex-start", marginTop: "4px", backgroundColor: "rgba(255, 107, 0, 0.08)", padding: "10px", borderRadius: "12px" }}>
                     <InfoIcon sx={{ color: "#FF6B00", fontSize: "16px", marginTop: "2px" }} />
-                    <Typography sx={{ fontSize: "10px", color: "#FF8533", lineHeight: 1.4 }}>
+                    <Typography sx={{ fontSize: "10.5px", color: "#FF8533", lineHeight: 1.4 }}>
                       {language === "tl"
                         ? "Dahil ito ay Solo Trip, sisingilin ang kabuuang pamasahe para sa buong kapasidad ng tricycle (4 na upuan), kahit ilan pa ang sumakay."
                         : "As a Solo Trip, the total fare represents the exclusive capacity of the tricycle (4 seats multiplied), regardless of passenger headcount entered."}
@@ -428,20 +541,50 @@ const BookSummary: React.FC = () => {
               ) : (
                 <>
                   <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#94A3B8" }}>
-                    <Typography>{language === "tl" ? "Bawat Upuan (Seat Fare):" : "Fare per seat:"}</Typography>
-                    <Typography>₱{seatFare.toFixed(2)}</Typography>
+                    <Typography>{language === "tl" ? "Matched Shared Fare (Kaparehas):" : "Matched Shared Fare Estimate:"}</Typography>
+                    <Typography sx={{ color: "#34A853", fontWeight: 700 }}>₱{(seatFare * passengers).toFixed(2)}</Typography>
                   </Box>
                   <Box sx={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#94A3B8" }}>
-                    <Typography>{language === "tl" ? "Bilang ng Upuan (Carpool):" : "Seats booked (Carpool):"}</Typography>
-                    <Typography>{passengers} {passengers > 1 ? "seats" : "seat"}</Typography>
+                    <Typography>{language === "tl" ? "Maximum Unmatched Fare (Solo Rate):" : "Maximum Unmatched Fare (Solo Rate):"}</Typography>
+                    <Typography sx={{ color: "#FFA726", fontWeight: 700 }}>₱{(seatFare * 4).toFixed(2)}</Typography>
                   </Box>
                   <Box sx={{ display: "flex", gap: "6px", alignItems: "flex-start", marginTop: "4px", backgroundColor: "rgba(52, 168, 83, 0.08)", padding: "10px", borderRadius: "12px" }}>
                     <InfoIcon sx={{ color: "#34A853", fontSize: "16px", marginTop: "2px" }} />
-                    <Typography sx={{ fontSize: "10px", color: "#81C784", lineHeight: 1.4 }}>
+                    <Typography sx={{ fontSize: "10.5px", color: "#81C784", lineHeight: 1.4 }}>
                       {language === "tl"
-                        ? `Makatipid sa Shared Trip! Magbabayad ka para sa ${passengers} upuan (max 2 bawat booking, hanggang 4 na pinagsamang pasahero sa biyahe). Agad itong ibabroadcast nang walang paghihintay.`
-                        : `Save with Shared Trip! You pay for ${passengers} seat(s) (max 2 per booking, up to 4 paired passengers total). Dispatched immediately without waiting room delays.`}
+                        ? `Makatipid sa Shared Trip! Magbabayad ka para sa ${passengers} upuan (₱${(seatFare * passengers).toFixed(2)}). Kung walang makitang kapares bago ang 50% ng biyahe, ang Solo Fare (₱${(seatFare * 4).toFixed(2)}) ang gagamitin.`
+                        : `Save with Shared Trip! You pay for ${passengers} seat(s) (₱${(seatFare * passengers).toFixed(2)}). If no match is found before 50% route cutoff, standard Solo Fare (₱${(seatFare * 4).toFixed(2)}) applies.`}
                     </Typography>
+                  </Box>
+
+                  {/* Unmatched preference choice */}
+                  <Box sx={{ mt: 1, p: "10px", borderRadius: "12px", backgroundColor: "rgba(255,255,255,0.05)" }}>
+                    <Typography sx={{ fontSize: "11px", fontWeight: 700, color: "#E2E8F0", mb: 0.5 }}>
+                      {language === "tl" ? "Kung Walang Makitang Kapares:" : "If No Shared Passenger Is Matched:"}
+                    </Typography>
+                    <RadioGroup
+                      value={unmatchedPreference}
+                      onChange={(e) => setUnmatchedPreference(e.target.value as "proceed" | "cancel")}
+                    >
+                      <FormControlLabel
+                        value="proceed"
+                        control={<Radio size="small" sx={{ color: "#FF6B00", "&.Mui-checked": { color: "#FF6B00" } }} />}
+                        label={
+                          <Typography sx={{ fontSize: "11px", color: "#CBD5E1" }}>
+                            {language === "tl" ? "Magpatuloy sa Solo Fare (₱" + (seatFare * 4).toFixed(2) + ")" : "Proceed at Solo Fare (₱" + (seatFare * 4).toFixed(2) + ")"}
+                          </Typography>
+                        }
+                      />
+                      <FormControlLabel
+                        value="cancel"
+                        control={<Radio size="small" sx={{ color: "#FF6B00", "&.Mui-checked": { color: "#FF6B00" } }} />}
+                        label={
+                          <Typography sx={{ fontSize: "11px", color: "#CBD5E1" }}>
+                            {language === "tl" ? "Awtomatikong kanselahin ang biyahe" : "Auto-cancel if unmatched"}
+                          </Typography>
+                        }
+                      />
+                    </RadioGroup>
                   </Box>
                 </>
               )}

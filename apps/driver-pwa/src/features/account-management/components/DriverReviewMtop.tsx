@@ -137,9 +137,11 @@ export const DriverReviewMtop: React.FC = () => {
               alt="MTOP Captured Scan"
               sx={{
                 width: '100%',
-                maxHeight: 320,
+                aspectRatio: '4 / 3',
+                minHeight: '260px',
                 objectFit: 'contain',
-                borderRadius: '12px',
+                borderRadius: '16px',
+                backgroundColor: '#0F172A',
               }}
             />
           ) : (

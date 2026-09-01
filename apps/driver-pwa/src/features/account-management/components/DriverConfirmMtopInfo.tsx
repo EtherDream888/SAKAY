@@ -185,6 +185,8 @@ const SakayMtopInput: React.FC<SakayMtopInputProps> = ({
   );
 };
 
+import { isLicenseUnexpired } from './DriverConfirmLicenseInfo';
+
 export const DriverConfirmMtopInfo: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -220,6 +222,7 @@ export const DriverConfirmMtopInfo: React.FC = () => {
   const [calendarAnchorEl, setCalendarAnchorEl] = useState<HTMLElement | null>(null);
 
   const isFieldEmpty = (val?: string) => !val || !val.trim();
+  const isExpValid = !formData.expirationDate || isLicenseUnexpired(formData.expirationDate);
 
   const isFormValid = Boolean(
     !isFieldEmpty(formData.operatorName) &&
@@ -230,6 +233,7 @@ export const DriverConfirmMtopInfo: React.FC = () => {
     !isFieldEmpty(formData.motorNumber) &&
     !isFieldEmpty(formData.orNumber) &&
     !isFieldEmpty(formData.expirationDate) &&
+    isLicenseUnexpired(formData.expirationDate) &&
     !isFieldEmpty(formData.authorizedRoute)
   );
 
@@ -530,8 +534,14 @@ export const DriverConfirmMtopInfo: React.FC = () => {
             isDate
             placeholder="MM-DD-YYYY"
             onOpenCalendar={handleOpenCalendar}
-            error={hasAttemptedSubmit && isFieldEmpty(formData.expirationDate)}
-            helperText={hasAttemptedSubmit && isFieldEmpty(formData.expirationDate) ? 'Kinakailangan ang impormasyong ito.' : ''}
+            error={(hasAttemptedSubmit && isFieldEmpty(formData.expirationDate)) || Boolean(formData.expirationDate && !isExpValid)}
+            helperText={
+              formData.expirationDate && !isExpValid
+                ? 'Paso na ang MTOP permit (Expired). Hindi maaaring gamitin.'
+                : hasAttemptedSubmit && isFieldEmpty(formData.expirationDate)
+                ? 'Kinakailangan ang impormasyong ito.'
+                : ''
+            }
           />
         </Box>
       </Box>

@@ -254,9 +254,10 @@ export const DriverScanMtop: React.FC = () => {
           ref={viewfinderRef}
           sx={{
             width: '100%',
-            maxWidth: '340px',
-            aspectRatio: '0.85/1',
-            borderRadius: '20px',
+            maxWidth: '370px',
+            aspectRatio: '4 / 3',
+            minHeight: '275px',
+            borderRadius: '18px',
             position: 'relative',
             overflow: 'hidden',
             backgroundColor: '#0F172A',
@@ -283,9 +284,9 @@ export const DriverScanMtop: React.FC = () => {
           <Box
             sx={{
               position: 'absolute',
-              inset: '16px 14px',
-              border: '1.5px dashed rgba(255, 255, 255, 0.6)',
-              borderRadius: '14px',
+              inset: '8px',
+              border: '1.5px dashed rgba(255, 255, 255, 0.75)',
+              borderRadius: '12px',
               pointerEvents: 'none',
             }}
           >
@@ -293,52 +294,52 @@ export const DriverScanMtop: React.FC = () => {
             <Box
               sx={{
                 position: 'absolute',
-                top: '-3px',
-                left: '-3px',
-                width: '32px',
-                height: '32px',
-                borderTop: '4.5px solid #FF6B00',
-                borderLeft: '4.5px solid #FF6B00',
-                borderTopLeftRadius: '14px',
+                top: '-2px',
+                left: '-2px',
+                width: '28px',
+                height: '28px',
+                borderTop: '4px solid #FF6B00',
+                borderLeft: '4px solid #FF6B00',
+                borderTopLeftRadius: '12px',
               }}
             />
             {/* Top-Right Corner L Bracket */}
             <Box
               sx={{
                 position: 'absolute',
-                top: '-3px',
-                right: '-3px',
-                width: '32px',
-                height: '32px',
-                borderTop: '4.5px solid #FF6B00',
-                borderRight: '4.5px solid #FF6B00',
-                borderTopRightRadius: '14px',
+                top: '-2px',
+                right: '-2px',
+                width: '28px',
+                height: '28px',
+                borderTop: '4px solid #FF6B00',
+                borderRight: '4px solid #FF6B00',
+                borderTopRightRadius: '12px',
               }}
             />
             {/* Bottom-Left Corner L Bracket */}
             <Box
               sx={{
                 position: 'absolute',
-                bottom: '-3px',
-                left: '-3px',
-                width: '32px',
-                height: '32px',
-                borderBottom: '4.5px solid #FF6B00',
-                borderLeft: '4.5px solid #FF6B00',
-                borderBottomLeftRadius: '14px',
+                bottom: '-2px',
+                left: '-2px',
+                width: '28px',
+                height: '28px',
+                borderBottom: '4px solid #FF6B00',
+                borderLeft: '4px solid #FF6B00',
+                borderBottomLeftRadius: '12px',
               }}
             />
             {/* Bottom-Right Corner L Bracket */}
             <Box
               sx={{
                 position: 'absolute',
-                bottom: '-3px',
-                right: '-3px',
-                width: '32px',
-                height: '32px',
-                borderBottom: '4.5px solid #FF6B00',
-                borderRight: '4.5px solid #FF6B00',
-                borderBottomRightRadius: '14px',
+                bottom: '-2px',
+                right: '-2px',
+                width: '28px',
+                height: '28px',
+                borderBottom: '4px solid #FF6B00',
+                borderRight: '4px solid #FF6B00',
+                borderBottomRightRadius: '12px',
               }}
             />
           </Box>

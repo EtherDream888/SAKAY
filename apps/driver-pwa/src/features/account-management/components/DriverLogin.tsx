@@ -62,28 +62,164 @@ export const DriverLogin: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanDigits = phone.replace(/\D/g, '');
-    if (!cleanDigits || !password) {
+    const rawDigits = phone.replace(/\D/g, '');
+    if (!rawDigits || !password) {
       setError(t.enterPhoneAndPassword || 'Mangyaring ilagay ang iyong numero at password.');
       return;
+    }
+
+    // Normalize phone format to 09XXXXXXXXX
+    let cleanPhone = rawDigits;
+    if (cleanPhone.startsWith('63') && cleanPhone.length === 12) {
+      cleanPhone = '0' + cleanPhone.slice(2);
+    } else if (!cleanPhone.startsWith('0') && cleanPhone.length === 10) {
+      cleanPhone = '0' + cleanPhone;
     }
 
     setLoading(true);
     setError('');
 
+    const phoneDigits = cleanPhone.replace(/\D/g, '');
+    const phone09 = phoneDigits.startsWith('0') ? phoneDigits : `0${phoneDigits}`;
+    const phone63 = `+63${phoneDigits.replace(/^0/, '')}`;
+    const phoneRaw = phoneDigits.replace(/^0/, '');
+
+    // Instant Verified Test Driver Login (Option A for live map & ride testing)
+    const isTestDriver =
+      (phone09 === '09171234567' || phone09 === '09181234567' || phone09 === '09123456789' || phone09 === '09999999999') &&
+      (password === 'Password123!' || password === '@Dmin_123' || password === 'password' || password === '123456');
+
+    if (isTestDriver) {
+      setLoading(false);
+      localStorage.setItem('sakay_driver_phone', phone09);
+      localStorage.setItem('sakay_driver_id', 'test-driver-001');
+      localStorage.setItem(
+        'sakay_driver_profile',
+        JSON.stringify({
+          id: 'test-driver-001',
+          name: 'Juan Dela Cruz',
+          phone: phone09,
+          vehiclePlate: 'ABC 123',
+          licenseNumber: 'N03-12-123456',
+          franchiseNumber: '1234',
+          todaName: 'Calapan Central TODA (CCTODA)',
+          selectedTodaId: 'toda-1',
+          selectedVehicleId: 'VEH-001',
+          rating: 5.0,
+          totalTrips: 142,
+          isOnline: true,
+          isPaused: false,
+          currentLat: 13.4124,
+          currentLng: 121.1834,
+          accountStatus: 'Verified',
+          verificationStage: 'Stage 2 Approved',
+        })
+      );
+      navigate('/driver/home', { replace: true });
+      return;
+    }
+
+    const driverEmail = `driver_${cleanPhone}@sakay.ph`;
+    const e164Phone = `+63${cleanPhone.slice(1)}`;
+
     try {
-      // Query driver record status from Supabase
-      const { data: driverData } = await supabase
+      // 1. Authenticate with Supabase Auth to establish live JWT session
+      let sessionUser: any = null;
+
+      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: driverEmail,
+        password: password,
+      });
+
+      if (!signInErr && signInData?.user) {
+        sessionUser = signInData.user;
+      } else {
+        // Fallback: Attempt sign-in with phone format if email identifier fails
+        const { data: phoneSignInData, error: phoneSignInErr } = await supabase.auth.signInWithPassword({
+          phone: e164Phone,
+          password: password,
+        });
+
+        if (!phoneSignInErr && phoneSignInData?.user) {
+          sessionUser = phoneSignInData.user;
+        } else {
+          console.warn('[DriverLogin] Supabase Auth sign-in note:', signInErr?.message || phoneSignInErr?.message);
+        }
+      }
+
+      // 2. Query driver record from Supabase database across all phone representations
+      const phoneDigits = cleanPhone.replace(/\D/g, '');
+      const phone09 = phoneDigits.startsWith('0') ? phoneDigits : `0${phoneDigits}`;
+      const phone63 = `+63${phoneDigits.replace(/^0/, '')}`;
+      const phoneRaw = phoneDigits.replace(/^0/, '');
+
+      let driverQuery = supabase
         .from('driver')
-        .select('account_status, full_name, rejection_reason, rejection_comment')
-        .or(`contact_number.eq.${cleanDigits},contact_number.eq.+63${cleanDigits.slice(-10)}`)
-        .maybeSingle();
+        .select(`
+          driver_id,
+          auth_user_id,
+          full_name,
+          contact_number,
+          plate_number,
+          license_number,
+          franchise_number,
+          account_status,
+          rejection_reason,
+          rejection_comment,
+          toda:toda_id (
+            toda_id,
+            toda_name,
+            toda_acronym
+          )
+        `);
+
+      if (sessionUser?.id) {
+        driverQuery = driverQuery.or(`auth_user_id.eq.${sessionUser.id},contact_number.eq.${phone09},contact_number.eq.${phone63},contact_number.eq.${phoneRaw},contact_number.eq.${cleanPhone}`);
+      } else {
+        driverQuery = driverQuery.or(`contact_number.eq.${phone09},contact_number.eq.${phone63},contact_number.eq.${phoneRaw},contact_number.eq.${cleanPhone}`);
+      }
+
+      const { data: driverData, error: dbErr } = await driverQuery.maybeSingle();
+
+      if (dbErr) {
+        console.error('[DriverLogin] Driver profile lookup error:', dbErr);
+      }
 
       setLoading(false);
 
       if (driverData) {
+        // If Supabase Auth failed with invalid password AND driver exists in database:
+        if (!sessionUser && signInErr && (signInErr.message?.toLowerCase().includes('invalid login credentials') || signInErr.message?.toLowerCase().includes('invalid credentials'))) {
+          setError('Mali ang password. Pakisubukang muli.');
+          return;
+        }
+
+        // Persist active driver session cache
+        localStorage.setItem('sakay_driver_phone', phone09);
+        localStorage.setItem('sakay_driver_id', driverData.driver_id);
+
+        const todaInfo = Array.isArray(driverData.toda) ? driverData.toda[0] : driverData.toda;
+        const todaNameStr = todaInfo?.toda_name || 'Calapan Central TODA';
+        const todaAcronymStr = todaInfo?.toda_acronym || 'CCTODA';
+
+        localStorage.setItem(
+          'sakay_driver_profile',
+          JSON.stringify({
+            name: driverData.full_name,
+            phone: driverData.contact_number || phone09,
+            vehiclePlate: driverData.plate_number || 'MV-101',
+            licenseNumber: driverData.license_number || 'L01-99-123456',
+            franchiseNumber: driverData.franchise_number || 'MTOP-PENDING',
+            todaName: `${todaNameStr} (${todaAcronymStr})`,
+            rating: 5.0,
+            isOnline: false,
+            isPaused: false,
+            accountStatus: driverData.account_status,
+            verificationStage: driverData.account_status === 'Verified' || driverData.account_status === 'Active' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
+          })
+        );
+
         // Enforce strict approval lifecycle routing:
-        // Only grant full map & dashboard access if BOTH TODA & LGU have approved (Active / Verified)
         if (driverData.account_status === 'Active' || driverData.account_status === 'Verified') {
           navigate('/driver/home', { replace: true });
         } else if (driverData.account_status === 'Rejected') {
@@ -97,32 +233,50 @@ export const DriverLogin: React.FC = () => {
             },
           });
         } else {
-          // Pending review screen (NO map access)
+          // Check if documents have been submitted to verification queue
+          const { data: verif } = await supabase
+            .from('driver_verification')
+            .select('verification_status, submitted_license_number')
+            .eq('driver_id', driverData.driver_id)
+            .maybeSingle();
+
+          // If the account was created but no documents have been submitted yet:
+          if (!verif || !verif.submitted_license_number) {
+            navigate('/driver/prepare-documents', {
+              replace: true,
+              state: {
+                phone: phone09,
+                driverName: driverData.full_name,
+              },
+            });
+            return;
+          }
+
+          const isEndorsed =
+            verif.verification_status === 'Approved' ||
+            verif.verification_status === 'TODA Approved' ||
+            verif.verification_status === 'Endorsed to LGU' ||
+            driverData.account_status === 'TODA Approved' ||
+            driverData.account_status === 'Endorsed to LGU';
+
           navigate('/driver/status', {
             replace: true,
             state: {
               driverName: driverData.full_name,
-              accountStatus: driverData.account_status || 'Pending Verification',
+              accountStatus: isEndorsed ? 'Endorsed to LGU' : 'Pending Verification',
             },
           });
         }
       } else {
-        // Default route to status monitor for unverified/pending accounts
-        navigate('/driver/status', {
-          replace: true,
-          state: {
-            accountStatus: 'Pending Verification',
-          },
-        });
+        // Account does NOT exist in the system:
+        setError(
+          'Walang nahanap na account para sa numerong ito. Mangyaring mag-register muna o suriin ang iyong numero at password.'
+        );
       }
-    } catch {
+    } catch (err: any) {
       setLoading(false);
-      navigate('/driver/status', {
-        replace: true,
-        state: {
-          accountStatus: 'Pending Verification',
-        },
-      });
+      console.error('[DriverLogin] Login exception:', err);
+      setError(err?.message || 'Hindi makakonekta sa database. Pakisubukang muli.');
     }
   };
 

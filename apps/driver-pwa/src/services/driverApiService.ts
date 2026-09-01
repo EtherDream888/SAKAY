@@ -400,9 +400,57 @@ export async function ensureDriverAuthSession(
       errorMessage: signUpError?.message || null,
     });
 
+    // Helper to ensure public.driver record is provisioned and linked to auth_user_id
+    const syncDriverProfileRecord = async (userId: string) => {
+      try {
+        const { data: existing } = await supabase
+          .from('driver')
+          .select('driver_id, toda_id')
+          .or(`auth_user_id.eq.${userId},contact_number.eq.${cleanPhone},contact_number.eq.0${cleanPhone.replace(/^0/, '')},contact_number.eq.+63${cleanPhone.replace(/^0/, '')}`)
+          .maybeSingle();
+
+        if (existing) {
+          const updateObj: Record<string, any> = {
+            auth_user_id: userId,
+            contact_number: cleanPhone,
+          };
+          if (fullName) updateObj.full_name = fullName;
+          if (todaId) updateObj.toda_id = todaId;
+
+          await supabase.from('driver').update(updateObj).eq('driver_id', existing.driver_id);
+          return existing.driver_id;
+        } else {
+          const insertObj: Record<string, any> = {
+            auth_user_id: userId,
+            contact_number: cleanPhone,
+            full_name: fullName || 'Driver Applicant',
+            account_status: 'Pending Verification',
+            availability_status: 'Offline',
+          };
+          if (todaId) insertObj.toda_id = todaId;
+
+          const { data: inserted, error: insErr } = await supabase
+            .from('driver')
+            .insert([insertObj])
+            .select('driver_id')
+            .maybeSingle();
+
+          if (insErr) {
+            console.warn('[DRIVER REGISTRATION AUTH] Direct driver insert note:', insErr.message);
+          }
+          return inserted?.driver_id || null;
+        }
+      } catch (profileSyncErr) {
+        console.warn('[DRIVER REGISTRATION AUTH] Profile sync exception:', profileSyncErr);
+        return null;
+      }
+    };
+
     // If signUp returned a live session immediately, registration auth is complete!
-    if (!signUpError && signUpData?.session) {
-      console.log('[DRIVER REGISTRATION AUTH] Fresh registration signUp SUCCESS. Session established:', signUpData.session.user.id);
+    if (!signUpError && (signUpData?.session || signUpData?.user)) {
+      const activeId = signUpData?.session?.user?.id || signUpData?.user?.id;
+      console.log('[DRIVER REGISTRATION AUTH] Fresh registration signUp SUCCESS. User:', activeId);
+      if (activeId) await syncDriverProfileRecord(activeId);
       return { success: true };
     }
 
@@ -426,9 +474,7 @@ export async function ensureDriverAuthSession(
 
       if (!signInError && signInData?.session) {
         console.log('[DRIVER REGISTRATION AUTH] Session established via signInWithPassword:', signInData.session.user.id);
-        if (todaId && signInData.user) {
-          await supabase.from('driver').update({ toda_id: todaId }).eq('auth_user_id', signInData.user.id);
-        }
+        await syncDriverProfileRecord(signInData.session.user.id);
         return { success: true };
       }
 

@@ -13,6 +13,8 @@ import {
   DialogContent,
   DialogActions,
   TextField,
+  MenuItem,
+  Alert,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PhoneIcon from '@mui/icons-material/Phone';
@@ -21,11 +23,15 @@ import StarIcon from '@mui/icons-material/Star';
 import TwoWheelerIcon from '@mui/icons-material/TwoWheeler';
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
+import GroupsIcon from '@mui/icons-material/Groups';
+import ReportProblemIcon from '@mui/icons-material/ReportProblem';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 import { getBooking, cancelBooking, updateBookingState } from '../../../services/bookingService';
 import type { BookingRecord } from '../../../services/bookingService';
 import { subscribeToDispatchEvents } from '@sakay/shared';
 import type { MockDispatchBooking } from '@sakay/shared';
+import { supabase } from '../../../services/supabaseClient';
 
 export const TripMonitoring: React.FC = () => {
   const navigate = useNavigate();
@@ -68,7 +74,15 @@ export const TripMonitoring: React.FC = () => {
   const [customSms, setCustomSms] = useState('');
   const [smsAlert, setSmsAlert] = useState<string | null>(null);
 
-  // Simulated Driver Location Refresh (every ~5 seconds matching Table 10.4 near-real-time spec)
+  // Workflow Step 12: Trip Completion & Fare Confirmation State
+  const [completionFareModalOpen, setCompletionFareModalOpen] = useState(false);
+  const [disputeModalOpen, setDisputeModalOpen] = useState(false);
+  const [disputedAmount, setDisputedAmount] = useState('');
+  const [disputeCategory, setDisputeCategory] = useState('Overcharging Attempt');
+  const [disputeReason, setDisputeReason] = useState('');
+  const [disputeSubmitted, setDisputeSubmitted] = useState(false);
+
+  // Simulated Driver Location Refresh (~5 seconds)
   const [driverPos, setDriverPos] = useState({ lat: 13.4140, lng: 121.1845 });
 
   useEffect(() => {
@@ -82,7 +96,7 @@ export const TripMonitoring: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Listen to Shared Dispatch Broker for updates from Driver PWA
+  // Listen to Shared Dispatch Broker & Supabase Realtime for updates
   useEffect(() => {
     const unsubscribe = subscribeToDispatchEvents((updatedBooking: MockDispatchBooking) => {
       if (updatedBooking.booking_id === activeBookingId) {
@@ -95,11 +109,9 @@ export const TripMonitoring: React.FC = () => {
           return merged;
         });
 
-        // If completed, automatically route to Feedback with history replacement
+        // Trigger Workflow Step 12 Simultaneous Fare Confirmation Dialog
         if (updatedBooking.booking_status === 'Completed') {
-          setTimeout(() => {
-            navigate('/feedback', { replace: true, state: { booking: updatedBooking } });
-          }, 1200);
+          setCompletionFareModalOpen(true);
         }
       }
     });
@@ -107,7 +119,7 @@ export const TripMonitoring: React.FC = () => {
     return () => {
       unsubscribe();
     };
-  }, [activeBookingId, navigate]);
+  }, [activeBookingId]);
 
   const status = booking?.booking_status || 'Searching Driver';
   const isTripActive = status !== 'Completed' && status !== 'Cancelled';
@@ -142,7 +154,7 @@ export const TripMonitoring: React.FC = () => {
   const franchiseNo = booking?.franchise_no || 'CAL-2025-0773';
   const plateNo = booking?.vehicle_plate || '773-MV';
   const todaName = booking?.toda_name || 'Calapan Central TODA';
-  const fare = booking?.proportionate_fare || booking?.estimated_fare || 18.0;
+  const passengerPayableFare = booking?.proportionate_fare || booking?.actual_fare || booking?.estimated_fare || 18.0;
 
   return (
     <Box sx={{ width: '100%', height: '100%', backgroundColor: '#0F172A', display: 'flex', flexDirection: 'column', position: 'relative' }}>
@@ -357,13 +369,28 @@ export const TripMonitoring: React.FC = () => {
           </Box>
         )}
 
+        {/* Real-time Paired Commuter Notification Banner */}
+        {Boolean(booking?.paired_passenger_name || (booking?.paired_booking_count && booking.paired_booking_count > 1)) && (
+          <Box sx={{ p: '12px 16px', borderRadius: '16px', backgroundColor: '#ECFDF5', border: '1.5px solid #10B981', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <GroupsIcon sx={{ color: '#10B981', fontSize: 26 }} />
+            <Box>
+              <Typography sx={{ fontSize: '13px', fontWeight: 800, color: '#065F46' }}>
+                🎉 May Kasabay na Commuter! ({booking?.paired_passenger_name || 'Joshua Dizon'})
+              </Typography>
+              <Typography sx={{ fontSize: '11px', color: '#047857' }}>
+                Nahati ang pamasahe! Bagong babayaran: ₱{passengerPayableFare.toFixed(2)}
+              </Typography>
+            </Box>
+          </Box>
+        )}
+
         {/* Final Fare Display */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 0.5 }}>
           <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#64748B' }}>
             {booking?.proportionate_fare ? 'Proportionate Shared Fare:' : 'Kabuuang Pamasahe:'}
           </Typography>
           <Typography sx={{ fontSize: '24px', fontWeight: 900, color: '#FF6B00' }}>
-            ₱{fare.toFixed(2)}
+            ₱{passengerPayableFare.toFixed(2)}
           </Typography>
         </Box>
       </Paper>
@@ -479,6 +506,201 @@ export const TripMonitoring: React.FC = () => {
             Pumunta sa Dashboard
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* 7. Workflow Step 12: Trip Completion & Simultaneous Fare Check Dialog */}
+      <Dialog
+        open={completionFareModalOpen}
+        fullWidth
+        maxWidth="xs"
+        slotProps={{ paper: { sx: { borderRadius: '28px', p: 2, textAlign: 'center' } } }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1, mt: 1 }}>
+          <CheckCircleIcon sx={{ fontSize: 54, color: '#10B981' }} />
+        </Box>
+        <Typography sx={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', mb: 0.5 }}>
+          Nakarating na sa Destinasyon!
+        </Typography>
+        <Typography sx={{ fontSize: '13px', color: '#64748B', mb: 2 }}>
+          Pakisuri ang siningil na pamasahe ng drayber bago magpatuloy.
+        </Typography>
+
+        <Paper elevation={0} sx={{ p: 2, borderRadius: '18px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', mb: 2.5 }}>
+          <Typography sx={{ fontSize: '11px', fontWeight: 700, color: '#64748B', letterSpacing: '0.5px' }}>
+            OPISYAL NA PAMASAHE
+          </Typography>
+          <Typography sx={{ fontSize: '32px', fontWeight: 900, color: '#FF6B00', my: 0.5 }}>
+            ₱{passengerPayableFare.toFixed(2)}
+          </Typography>
+          <Typography sx={{ fontSize: '11px', color: '#94A3B8' }}>
+            Batay sa Calapan City Ordinance No. 118
+          </Typography>
+        </Paper>
+
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+          <Button
+            variant="contained"
+            fullWidth
+            onClick={() => {
+              setCompletionFareModalOpen(false);
+              navigate('/feedback', { replace: true, state: { booking: { ...booking, actual_fare: passengerPayableFare } } });
+            }}
+            sx={{
+              height: '48px',
+              borderRadius: '14px',
+              backgroundColor: '#10B981',
+              fontWeight: 800,
+              fontSize: '14px',
+              textTransform: 'none',
+              '&:hover': { backgroundColor: '#059669' },
+            }}
+          >
+            I Paid ₱{passengerPayableFare.toFixed(2)} (Tama ang Bayad)
+          </Button>
+
+          <Button
+            variant="outlined"
+            fullWidth
+            color="error"
+            onClick={() => {
+              setCompletionFareModalOpen(false);
+              setDisputeModalOpen(true);
+            }}
+            startIcon={<ReportProblemIcon />}
+            sx={{
+              height: '44px',
+              borderRadius: '14px',
+              fontWeight: 700,
+              fontSize: '13px',
+              textTransform: 'none',
+            }}
+          >
+            Amount Doesn't Match (May Aberya)
+          </Button>
+        </Box>
+      </Dialog>
+
+      {/* 8. LGU Fare Dispute & Incident Form Dialog */}
+      <Dialog
+        open={disputeModalOpen}
+        onClose={() => setDisputeModalOpen(false)}
+        fullWidth
+        maxWidth="xs"
+        slotProps={{ paper: { sx: { borderRadius: '24px', p: 1.5 } } }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 1 }}>
+          <ReportProblemIcon sx={{ color: '#EF4444' }} />
+          <Typography sx={{ fontSize: '17px', fontWeight: 800, color: '#0F172A' }}>
+            Isumite ang Reklamo sa LGU
+          </Typography>
+        </DialogTitle>
+
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1 }}>
+          {disputeSubmitted ? (
+            <Alert severity="success" sx={{ borderRadius: '12px' }}>
+              Naisumite na ang iyong reklamo sa City LGU Transport Board (Incident #{activeBookingId}). Iimbestigahan ito agad.
+            </Alert>
+          ) : (
+            <>
+              <Typography sx={{ fontSize: '12.5px', color: '#64748B' }}>
+                Ipapadala ang ulat na ito sa City LGU Administrator sa ilalim ng Complaint & Incident Management.
+              </Typography>
+
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="Uri ng Reklamo"
+                value={disputeCategory}
+                onChange={(e) => setDisputeCategory(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+              >
+                <MenuItem value="Overcharging Attempt">Overcharging (Sobra ang singil sa pamasahe)</MenuItem>
+                <MenuItem value="Refusal to Follow Tariff">Refusal to Follow Tariff (Hindi sumunod sa taripa)</MenuItem>
+                <MenuItem value="Unauthorized Route">Unauthorized Route (Maling ruta)</MenuItem>
+                <MenuItem value="Rude Behavior">Rude Behavior (Hindi magandang asal)</MenuItem>
+              </TextField>
+
+              <TextField
+                fullWidth
+                size="small"
+                label="Halagang Siningil ng Drayber (₱)"
+                type="number"
+                placeholder="Hal. 50"
+                value={disputedAmount}
+                onChange={(e) => setDisputedAmount(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+              />
+
+              <TextField
+                fullWidth
+                size="small"
+                multiline
+                rows={3}
+                label="Paliwanag o Detalye"
+                placeholder="Pakilarawan ang nangyari..."
+                value={disputeReason}
+                onChange={(e) => setDisputeReason(e.target.value)}
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+              />
+            </>
+          )}
+        </DialogContent>
+
+        {!disputeSubmitted && (
+          <DialogActions sx={{ p: '12px 18px 18px', gap: 1 }}>
+            <Button
+              variant="outlined"
+              fullWidth
+              onClick={() => setDisputeModalOpen(false)}
+              sx={{ borderRadius: '12px', textTransform: 'none' }}
+            >
+              Kanselahin
+            </Button>
+            <Button
+              variant="contained"
+              fullWidth
+              color="error"
+              onClick={async () => {
+                const payload = {
+                  incident_id: `INC-${Date.now().toString().slice(-6)}`,
+                  booking_id: activeBookingId,
+                  driver_name: driverName,
+                  reporter_name: booking?.passenger_name || 'Passenger User',
+                  reporter_role: 'Passenger',
+                  category: disputeCategory || 'Overcharging Attempt',
+                  description: `Disputed Fare. Expected: ₱${passengerPayableFare.toFixed(2)}, Actual: ₱${disputedAmount || passengerPayableFare}. Details: ${disputeReason}`,
+                  status: 'Pending Review',
+                  reported_at: new Date().toISOString(),
+                };
+
+                try {
+                  await supabase.from('incident_report').insert([payload]);
+                } catch (err) {
+                  console.warn('[TripMonitoring] Supabase incident insert note:', err);
+                }
+
+                try {
+                  const stored = localStorage.getItem('sakay_shared_incidents') || '[]';
+                  const list = JSON.parse(stored);
+                  list.unshift(payload);
+                  localStorage.setItem('sakay_shared_incidents', JSON.stringify(list));
+                } catch (err) {
+                  console.warn('[TripMonitoring] Local incident storage note:', err);
+                }
+
+                setDisputeSubmitted(true);
+                setTimeout(() => {
+                  setDisputeModalOpen(false);
+                  navigate('/dashboard', { replace: true });
+                }, 2000);
+              }}
+              sx={{ borderRadius: '12px', fontWeight: 700, textTransform: 'none' }}
+            >
+              Isumite sa LGU
+            </Button>
+          </DialogActions>
+        )}
       </Dialog>
     </Box>
   );

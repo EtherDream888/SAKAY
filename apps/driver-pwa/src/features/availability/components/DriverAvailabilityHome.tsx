@@ -13,6 +13,7 @@ import {
   DialogContent,
   DialogActions,
   Avatar,
+  Divider,
 } from '@mui/material';
 import NavigationIcon from '@mui/icons-material/Navigation';
 import StarIcon from '@mui/icons-material/Star';
@@ -36,13 +37,38 @@ import {
   MockDispatchBooking,
 } from '@sakay/shared/mockDispatch';
 
+import { supabase } from '../../../services/supabaseClient';
+
 export const DriverAvailabilityHome: React.FC = () => {
   const navigate = useNavigate();
 
-  // Driver State
+  // Location Permission Modal State (matching iOS permission prompt)
+  const [locationPermissionOpen, setLocationPermissionOpen] = useState(() => {
+    return !localStorage.getItem('sakay_driver_location_permission');
+  });
+
+  // Driver State with resilient defaults
   const [profile, setProfile] = useState<DriverProfile>(() => {
     const saved = localStorage.getItem('sakay_driver_profile');
-    return saved ? JSON.parse(saved) : INITIAL_DRIVER_PROFILE;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return {
+          ...INITIAL_DRIVER_PROFILE,
+          ...parsed,
+          name: parsed.name || INITIAL_DRIVER_PROFILE.name,
+          rating: typeof parsed.rating === 'number' ? parsed.rating : INITIAL_DRIVER_PROFILE.rating,
+          totalTrips: typeof parsed.totalTrips === 'number' ? parsed.totalTrips : INITIAL_DRIVER_PROFILE.totalTrips,
+          currentLat: typeof parsed.currentLat === 'number' ? parsed.currentLat : INITIAL_DRIVER_PROFILE.currentLat,
+          currentLng: typeof parsed.currentLng === 'number' ? parsed.currentLng : INITIAL_DRIVER_PROFILE.currentLng,
+          selectedTodaId: parsed.selectedTodaId || INITIAL_DRIVER_PROFILE.selectedTodaId,
+          selectedVehicleId: parsed.selectedVehicleId || INITIAL_DRIVER_PROFILE.selectedVehicleId,
+        };
+      } catch (e) {
+        console.warn('Error parsing driver profile from storage:', e);
+      }
+    }
+    return INITIAL_DRIVER_PROFILE;
   });
 
   const [todaModalOpen, setTodaModalOpen] = useState(false);
@@ -52,6 +78,119 @@ export const DriverAvailabilityHome: React.FC = () => {
   // Incoming Booking Request State
   const [incomingRequest, setIncomingRequest] = useState<MockDispatchBooking | null>(null);
   const [countdown, setCountdown] = useState<number>(15);
+
+  // Load live Supabase profile on mount
+  useEffect(() => {
+    async function loadLiveDriver() {
+      try {
+        const storedId = localStorage.getItem('sakay_driver_id');
+        const storedPhone = localStorage.getItem('sakay_driver_phone');
+
+        // If active session is the verified test driver, keep on map
+        if (storedId === 'test-driver-001' || storedPhone === '09171234567' || storedPhone === '09181234567') {
+          return;
+        }
+
+        const { data: { user } } = await supabase.auth.getUser();
+
+        let query = supabase
+          .from('driver')
+          .select(`
+            driver_id,
+            full_name,
+            contact_number,
+            plate_number,
+            license_number,
+            franchise_number,
+            account_status,
+            availability_status,
+            weighted_average_rating,
+            toda:toda_id (
+              toda_id,
+              toda_name,
+              toda_acronym
+            )
+          `);
+
+        if (user?.id) {
+          query = query.eq('auth_user_id', user.id);
+        } else if (storedId) {
+          query = query.eq('driver_id', storedId);
+        } else if (storedPhone) {
+          const clean = storedPhone.replace(/\D/g, '');
+          query = query.or(`contact_number.eq.${clean},contact_number.eq.+63${clean.replace(/^0/, '')}`);
+        } else {
+          return;
+        }
+
+        const { data: driverData } = await query.maybeSingle();
+
+        if (driverData) {
+          // If driver is not verified yet, bounce back to status monitor
+          if (driverData.account_status !== 'Active' && driverData.account_status !== 'Verified') {
+            navigate('/driver/status', { replace: true });
+            return;
+          }
+
+          const todaObj = Array.isArray(driverData.toda) ? driverData.toda[0] : driverData.toda;
+          const todaNameStr = todaObj?.toda_name || 'Calapan Central TODA';
+          const todaAcronymStr = todaObj?.toda_acronym || 'CCTODA';
+
+          setProfile((prev) => ({
+            ...prev,
+            id: driverData.driver_id,
+            name: driverData.full_name || prev.name,
+            phone: driverData.contact_number || prev.phone,
+            vehiclePlate: driverData.plate_number || prev.vehiclePlate,
+            licenseNumber: driverData.license_number || prev.licenseNumber,
+            franchiseNumber: driverData.franchise_number || prev.franchiseNumber,
+            todaName: `${todaNameStr} (${todaAcronymStr})`,
+            rating: Number(driverData.weighted_average_rating) || 5.0,
+            accountStatus: driverData.account_status,
+            verificationStage: 'Stage 2 Approved',
+          }));
+        }
+      } catch (err) {
+        console.warn('[DriverAvailabilityHome] Live profile sync note:', err);
+      }
+    }
+
+    loadLiveDriver();
+  }, [navigate]);
+
+  // Real-time High-Accuracy GPS Tracking (matches Passenger live map precision)
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+
+    const storedPerm = localStorage.getItem('sakay_driver_location_permission');
+    if (storedPerm === 'denied') return;
+
+    const updateLocation = (pos: GeolocationPosition) => {
+      setProfile((prev) => ({
+        ...prev,
+        currentLat: pos.coords.latitude,
+        currentLng: pos.coords.longitude,
+      }));
+    };
+
+    // 1. Immediate position fix
+    navigator.geolocation.getCurrentPosition(
+      updateLocation,
+      (err) => console.warn('[DriverAvailabilityHome] Geolocation initial fix note:', err.message),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 1000 }
+    );
+
+    // 2. Real-time watchPosition for accurate live movement
+    const watchId = navigator.geolocation.watchPosition(
+      updateLocation,
+      (err) => console.warn('[DriverAvailabilityHome] Geolocation live watch note:', err.message),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 1000 }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('sakay_driver_profile', JSON.stringify(profile));
@@ -88,11 +227,12 @@ export const DriverAvailabilityHome: React.FC = () => {
     return () => clearInterval(timer);
   }, [incomingRequest, countdown]);
 
-  const selectedToda = ACCREDITED_TODAS.find((t) => t.id === profile.selectedTodaId);
-  const selectedVehicle = VERIFIED_TRICYCLES.find((v) => v.id === profile.selectedVehicleId);
+  const selectedToda = ACCREDITED_TODAS.find((t) => t.id === profile.selectedTodaId) || ACCREDITED_TODAS[0];
+  const selectedVehicle = VERIFIED_TRICYCLES.find((v) => v.id === profile.selectedVehicleId) || VERIFIED_TRICYCLES[0];
 
-  // Dual-Gate Hard Lock Check
-  const canGoOnline = Boolean(
+  // Dual-Gate Verification Check (Permits live verified driver or mock fallback)
+  const isDriverVerifiedInDb = profile.accountStatus === 'Active' || profile.accountStatus === 'Verified';
+  const canGoOnline = isDriverVerifiedInDb || Boolean(
     selectedToda &&
     selectedToda.status === 'Verified' &&
     selectedVehicle &&
@@ -109,16 +249,33 @@ export const DriverAvailabilityHome: React.FC = () => {
   };
 
   const handleRecenter = () => {
-    setRecenterTrigger((prev) => prev + 1);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setProfile((prev) => ({
+            ...prev,
+            currentLat: pos.coords.latitude,
+            currentLng: pos.coords.longitude,
+          }));
+          setRecenterTrigger((prev) => prev + 1);
+        },
+        () => {
+          setRecenterTrigger((prev) => prev + 1);
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    } else {
+      setRecenterTrigger((prev) => prev + 1);
+    }
   };
 
   const handleAcceptRequest = () => {
     if (!incomingRequest) return;
 
     acceptBookingByDriver(incomingRequest.booking_id, {
-      driver_id: profile.id,
-      driver_name: profile.name,
-      driver_phone: profile.phone,
+      driver_id: profile.id || 'test-driver-001',
+      driver_name: profile.name || 'Juan Dela Cruz',
+      driver_phone: profile.phone || '09171234567',
       franchise_no: selectedVehicle?.franchiseNumber || 'CAL-2025-0773',
       vehicle_plate: selectedVehicle?.plateNumber || '773-MV',
       toda_name: selectedToda?.name || 'Calapan Central TODA',
@@ -134,9 +291,46 @@ export const DriverAvailabilityHome: React.FC = () => {
   const handleDeclineRequest = () => {
     if (!incomingRequest) return;
 
-    declineBookingByDriver(incomingRequest.booking_id, profile.id, 'Driver unavailable / queue rotation timeout');
+    declineBookingByDriver(incomingRequest.booking_id, profile.id || 'test-driver-001', 'Driver unavailable / queue rotation timeout');
     setIncomingRequest(null);
   };
+
+  const handleAllowLocation = (saveAlways: boolean) => {
+    if (saveAlways) {
+      localStorage.setItem('sakay_driver_location_permission', 'always');
+    } else {
+      sessionStorage.setItem('sakay_driver_location_permission', 'once');
+    }
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setProfile((prev) => ({
+            ...prev,
+            currentLat: pos.coords.latitude,
+            currentLng: pos.coords.longitude,
+          }));
+          setRecenterTrigger((prev) => prev + 1);
+        },
+        (err) => {
+          console.warn('[DriverAvailabilityHome] Geolocation note:', err.message);
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    }
+    setLocationPermissionOpen(false);
+  };
+
+  const handleDenyLocation = () => {
+    localStorage.setItem('sakay_driver_location_permission', 'denied');
+    setLocationPermissionOpen(false);
+  };
+
+  const displayName = profile.name || 'Juan Dela Cruz';
+  const firstName = displayName.split(' ')[0] || 'Drayber';
+  const initialLetter = firstName.charAt(0) || 'D';
+  const ratingNum = typeof profile.rating === 'number' ? profile.rating : 5.0;
+  const tripsCount = typeof profile.totalTrips === 'number' ? profile.totalTrips : 124;
 
   return (
     <Box sx={{ width: '100%', height: '100%', backgroundColor: '#E3ECEF', display: 'flex', flexDirection: 'column', position: 'relative' }}>
@@ -178,19 +372,19 @@ export const DriverAvailabilityHome: React.FC = () => {
               boxShadow: '0 2px 8px rgba(255, 107, 0, 0.3)',
             }}
           >
-            {profile.name.charAt(0)}
+            {initialLetter}
           </Avatar>
           <Box>
             <Typography sx={{ color: '#0F172A', fontWeight: 800, fontSize: '14.5px', lineHeight: 1.2 }}>
-              {profile.name.split(' ')[0]}
+              {firstName}
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: '2px' }}>
               <StarIcon sx={{ fontSize: 13, color: '#FFB800' }} />
               <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>
-                {profile.rating.toFixed(1)}
+                {ratingNum.toFixed(1)}
               </Typography>
               <Typography sx={{ fontSize: '11px', color: '#64748B' }}>
-                ({profile.totalTrips} trips)
+                ({tripsCount} trips)
               </Typography>
             </Box>
           </Box>
@@ -559,6 +753,110 @@ export const DriverAvailabilityHome: React.FC = () => {
             ))}
           </Box>
         </DialogContent>
+      </Dialog>
+
+      {/* 7. Location Permission Modal matching media_1788260393583.png */}
+      <Dialog
+        open={locationPermissionOpen}
+        onClose={() => setLocationPermissionOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: '28px',
+              padding: 0,
+              backgroundColor: '#FFFFFF',
+              overflow: 'hidden',
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
+              maxWidth: '320px',
+              margin: 'auto',
+            },
+          },
+        }}
+      >
+        <Box sx={{ p: '24px 20px 18px 20px', textAlign: 'center' }}>
+          <Typography
+            sx={{
+              fontSize: '17px',
+              fontWeight: 800,
+              color: '#0F172A',
+              lineHeight: 1.35,
+              mb: '12px',
+              fontFamily: 'Poppins, sans-serif',
+            }}
+          >
+            Payagan ang “SAKAY” na gamitin ang iyong lokasyon?
+          </Typography>
+          <Typography
+            sx={{
+              fontSize: '13px',
+              fontWeight: 400,
+              color: '#475569',
+              lineHeight: 1.5,
+              fontFamily: 'Poppins, sans-serif',
+            }}
+          >
+            Ginagamit ang iyong lokasyon para makahanap ng malapit na drayber at masubaybayan ang iyong biyahe sa mapa.
+          </Typography>
+        </Box>
+
+        <Divider sx={{ borderColor: '#E2E8F0' }} />
+
+        <Button
+          fullWidth
+          onClick={() => handleAllowLocation(false)}
+          sx={{
+            py: '14px',
+            color: '#0F172A',
+            fontWeight: 600,
+            fontSize: '14px',
+            textTransform: 'none',
+            fontFamily: 'Poppins, sans-serif',
+            borderRadius: 0,
+            '&:hover': { backgroundColor: '#F8FAFC' },
+          }}
+        >
+          Payagan nang isang beses
+        </Button>
+
+        <Divider sx={{ borderColor: '#E2E8F0' }} />
+
+        <Button
+          fullWidth
+          onClick={() => handleAllowLocation(true)}
+          sx={{
+            py: '14px',
+            color: '#FF6B00',
+            fontWeight: 700,
+            fontSize: '14px',
+            textTransform: 'none',
+            fontFamily: 'Poppins, sans-serif',
+            borderRadius: 0,
+            '&:hover': { backgroundColor: '#FFF8F0' },
+          }}
+        >
+          Habang Ginagamit ang App
+        </Button>
+
+        <Divider sx={{ borderColor: '#E2E8F0' }} />
+
+        <Button
+          fullWidth
+          onClick={handleDenyLocation}
+          sx={{
+            py: '14px',
+            color: '#64748B',
+            fontWeight: 600,
+            fontSize: '14px',
+            textTransform: 'none',
+            fontFamily: 'Poppins, sans-serif',
+            borderRadius: 0,
+            '&:hover': { backgroundColor: '#F8FAFC' },
+          }}
+        >
+          Huwag Payagan
+        </Button>
       </Dialog>
     </Box>
   );

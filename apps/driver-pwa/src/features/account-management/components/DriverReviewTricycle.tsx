@@ -93,7 +93,8 @@ export const DriverReviewTricycle: React.FC = () => {
       saveTricycleScanData(tricycleData, targetPhone);
       await saveDriverTricycleVerification(currentPhoto, targetPhone);
 
-      navigate('/driver/confirm-all-info', {
+      const targetRoute = state?.isEditMode ? '/driver/confirm-all-info' : '/driver/scan-face';
+      navigate(targetRoute, {
         state: {
           ...state,
           tricycleUnit: tricycleData,
@@ -101,7 +102,8 @@ export const DriverReviewTricycle: React.FC = () => {
       });
     } catch (err) {
       console.error('[DriverReviewTricycle] Save error:', err);
-      navigate('/driver/confirm-all-info', {
+      const targetRoute = state?.isEditMode ? '/driver/confirm-all-info' : '/driver/scan-face';
+      navigate(targetRoute, {
         state: {
           ...state,
         },
@@ -203,7 +205,7 @@ export const DriverReviewTricycle: React.FC = () => {
           sx={{
             width: '100%',
             borderRadius: '20px',
-            backgroundColor: '#EFEFEF',
+            backgroundColor: '#F8FAFC',
             p: 2,
             border: '1px solid #E2E8F0',
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.06)',
@@ -213,25 +215,38 @@ export const DriverReviewTricycle: React.FC = () => {
             justifyContent: 'center',
           }}
         >
-          {currentPhoto ? (
-            <Box
-              component="img"
-              src={currentPhoto}
-              alt="Tricycle Unit Preview"
-              sx={{
-                width: '100%',
-                borderRadius: '12px',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-                display: 'block',
-                objectFit: 'contain',
-                maxHeight: '260px',
-              }}
-            />
-          ) : (
-            <Typography sx={{ color: '#64748B', fontSize: '14px', py: 4 }}>
-              Walang larawang nakuha
-            </Typography>
-          )}
+          <Box
+            sx={{
+              width: '100%',
+              aspectRatio: '4 / 3',
+              minHeight: '260px',
+              borderRadius: '16px',
+              overflow: 'hidden',
+              backgroundColor: '#0F172A',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {currentPhoto ? (
+              <Box
+                component="img"
+                src={currentPhoto}
+                alt="Tricycle Unit Preview"
+                sx={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'block',
+                  objectFit: 'contain',
+                }}
+              />
+            ) : (
+              <Typography sx={{ color: '#64748B', fontSize: '14px', py: 4 }}>
+                Walang larawang nakuha
+              </Typography>
+            )}
+          </Box>
 
           {/* Rotate Controls in the same container */}
           {currentPhoto && (

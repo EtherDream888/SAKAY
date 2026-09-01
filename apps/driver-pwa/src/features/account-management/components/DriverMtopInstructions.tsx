@@ -65,11 +65,12 @@ export const DriverMtopInstructions: React.FC = () => {
           flex: 1,
           overflowY: 'auto',
           px: 3,
-          pb: 3,
+          pb: 'calc(var(--safe-area-bottom) + 110px)',
           display: 'flex',
           flexDirection: 'column',
           WebkitOverflowScrolling: 'touch',
           scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
           '&::-webkit-scrollbar': { display: 'none' },
         }}
       >
@@ -88,12 +89,12 @@ export const DriverMtopInstructions: React.FC = () => {
 
         <Typography
           sx={{
-            fontSize: '24px',
+            fontSize: '26px',
             fontWeight: 800,
             color: '#0F172A',
-            lineHeight: 1.25,
+            lineHeight: 1.2,
             letterSpacing: '-0.5px',
-            mb: 2,
+            mb: 1.5,
           }}
         >
           Ihanda ang iyong Motorized Tricycle Operator's Permit (MTOP)
@@ -103,7 +104,7 @@ export const DriverMtopInstructions: React.FC = () => {
           Para sa malinaw na larawan:
         </Typography>
 
-        <Box component="ul" sx={{ pl: 2.5, m: 0, mb: 3, color: '#64748B', '& li': { mb: 0.75, fontSize: '14px', lineHeight: 1.4 } }}>
+        <Box component="ul" sx={{ pl: 2.5, m: 0, mb: 3, color: '#64748B', fontSize: '13px', lineHeight: 1.6, '& li': { mb: 0.25 } }}>
           <li>Kunan ang buong dokumento.</li>
           <li>Siguraduhing mababasa ang lahat ng impormasyon.</li>
           <li>Ilagay sa patag na ibabaw.</li>
@@ -111,50 +112,65 @@ export const DriverMtopInstructions: React.FC = () => {
           <li>Kumuha ng larawan sa maliwanag na lugar.</li>
         </Box>
 
-        {/* Document Graphic Card */}
+        {/* Document Graphic Card - Full Fit Preview */}
         <Box
           sx={{
             width: '100%',
-            borderRadius: '20px',
-            border: '1.5px solid #E2E8F0',
+            borderRadius: '16px',
+            overflow: 'hidden',
+            border: '1px solid #E2E8F0',
             backgroundColor: '#F8FAFC',
-            p: 2,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+            aspectRatio: '4 / 3',
+            minHeight: '220px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
-            mb: 4,
-            overflow: 'hidden',
+            p: 1.5,
+            mb: 3,
           }}
         >
           <Box
             component="img"
             src={mtopImg}
             alt="MTOP Document Sample"
+            loading="eager"
+            decoding="sync"
             sx={{
               width: '100%',
-              maxWidth: 320,
-              maxHeight: 220,
+              height: '100%',
               objectFit: 'contain',
-              borderRadius: '12px',
+              borderRadius: '10px',
+              display: 'block',
             }}
           />
         </Box>
       </Box>
 
-      {/* 3. Pinned Action Button */}
+      {/* 3. Sticky Bottom Action Bar */}
       <Box
         sx={{
-          p: 3,
-          pt: 1.5,
-          pb: 'calc(var(--safe-area-bottom) + 20px)',
-          backgroundColor: '#FFFFFF',
-          flexShrink: 0,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: '16px 24px calc(var(--safe-area-bottom) + 16px) 24px',
+          background: 'linear-gradient(to top, #FFFFFF 80%, rgba(255, 255, 255, 0.9) 90%, rgba(255, 255, 255, 0) 100%)',
+          zIndex: 15,
         }}
       >
         <PrimaryButton
           fullWidth
           onClick={() => navigate('/driver/scan-mtop', { state })}
+          sx={{
+            height: '56px',
+            borderRadius: '16px',
+            fontSize: '16px',
+            fontWeight: 800,
+            backgroundColor: '#FF6B00',
+            boxShadow: 'none',
+            '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
+          }}
         >
           Magpatuloy
         </PrimaryButton>

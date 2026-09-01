@@ -8,6 +8,10 @@ import IconButton from "@mui/material/IconButton";
 import NavigationIcon from "@mui/icons-material/Navigation";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import EventIcon from "@mui/icons-material/Event";
+import PersonIcon from "@mui/icons-material/Person";
+import GroupsIcon from "@mui/icons-material/Groups";
+import AddIcon from "@mui/icons-material/Add";
+import RemoveIcon from "@mui/icons-material/Remove";
 import Alert from "@mui/material/Alert";
 
 import MapView from "../../../../common/components/MapView";
@@ -39,6 +43,15 @@ const NewTrip: React.FC = () => {
   const [notificationsOpen, setNotificationsOpen] = useState<boolean>(false);
   const [recenterTrigger, setRecenterTrigger] = useState<number>(0);
   const [validationError, setValidationError] = useState<string>("");
+
+  // Trip Type State (Solo vs Shared) & Passenger Count
+  const [tripType, setTripType] = useState<"Solo" | "Shared">(() => {
+    return (sessionStorage.getItem("trip_type") as "Solo" | "Shared") || "Solo";
+  });
+  const [passengers, setPassengers] = useState<number>(() => {
+    const raw = sessionStorage.getItem("trip_passengers");
+    return raw ? parseInt(raw, 10) : 1;
+  });
 
   // Pickup location state
   const [pickup, setPickup] = useState<{ address: string; lat: number; lng: number }>(() => {
@@ -73,6 +86,51 @@ const NewTrip: React.FC = () => {
       lng: 0,
     };
   });
+
+  const [activeTariff, setActiveTariff] = useState<{ baseFare: number; baseKm: number; succRate: number }>(() => {
+    try {
+      const cached = localStorage.getItem("sakay_active_fare_matrix");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return {
+          baseFare: Number(parsed.base_fare) || 15.0,
+          baseKm: Number(parsed.base_distance_km) || 2.0,
+          succRate: Number(parsed.succeeding_rate) || 1.0,
+        };
+      }
+    } catch {
+      // ignore
+    }
+    return { baseFare: 15.0, baseKm: 2.0, succRate: 1.0 };
+  });
+
+  // Fetch active municipal fare matrix
+  useEffect(() => {
+    const fetchMatrix = async () => {
+      try {
+        const { data } = await supabase
+          .from("fare_matrix")
+          .select("base_fare, base_distance_km, succeeding_rate")
+          .eq("is_active", true)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (data) {
+          const formatted = {
+            baseFare: Number(data.base_fare),
+            baseKm: Number(data.base_distance_km),
+            succRate: Number(data.succeeding_rate),
+          };
+          setActiveTariff(formatted);
+          localStorage.setItem("sakay_active_fare_matrix", JSON.stringify(data));
+        }
+      } catch (err) {
+        console.warn("[NewTrip] Fare matrix fetch note:", err);
+      }
+    };
+    fetchMatrix();
+  }, []);
 
   // Fetch real reverse-geocoded address for GPS pickup if not yet labeled
   useEffect(() => {
@@ -131,6 +189,8 @@ const NewTrip: React.FC = () => {
     setValidationError("");
     sessionStorage.setItem("trip_pickup", JSON.stringify(pickup));
     sessionStorage.setItem("trip_dropoff", JSON.stringify(dropoff));
+    sessionStorage.setItem("trip_type", tripType);
+    sessionStorage.setItem("trip_passengers", passengers.toString());
     navigate("/book-summary");
   };
 
@@ -374,13 +434,168 @@ const NewTrip: React.FC = () => {
           </Box>
         </Box>
 
+        {/* Trip Type Selector (Solo vs Shared) */}
+        <Box sx={{ display: "flex", gap: "10px" }}>
+          {/* Solo Card */}
+          <Box
+            onClick={() => {
+              setTripType("Solo");
+              setValidationError("");
+            }}
+            sx={{
+              flex: 1,
+              p: "10px 12px",
+              borderRadius: "16px",
+              border: tripType === "Solo" ? "2px solid #FF6B00" : "1px solid #E2E8F0",
+              backgroundColor: tripType === "Solo" ? "#FFF8F0" : "#FFFFFF",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              boxShadow: tripType === "Solo" ? "0 4px 12px rgba(255, 107, 0, 0.12)" : "none",
+            }}
+          >
+            <PersonIcon sx={{ color: tripType === "Solo" ? "#FF6B00" : "#64748B", fontSize: 24 }} />
+            <Box>
+              <Typography sx={{ fontSize: "13px", fontWeight: 800, color: "#0F172A", lineHeight: 1.2 }}>
+                Solo Trip
+              </Typography>
+              <Typography sx={{ fontSize: "10px", color: "#64748B", mt: "2px" }}>
+                Buong Tricycle (4 seats)
+              </Typography>
+            </Box>
+          </Box>
+
+          {/* Shared Card */}
+          <Box
+            onClick={() => {
+              setTripType("Shared");
+              if (passengers > 2) setPassengers(2);
+              setValidationError("");
+            }}
+            sx={{
+              flex: 1,
+              p: "10px 12px",
+              borderRadius: "16px",
+              border: tripType === "Shared" ? "2px solid #10B981" : "1px solid #E2E8F0",
+              backgroundColor: tripType === "Shared" ? "#ECFDF5" : "#FFFFFF",
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              boxShadow: tripType === "Shared" ? "0 4px 12px rgba(16, 185, 129, 0.12)" : "none",
+            }}
+          >
+            <GroupsIcon sx={{ color: tripType === "Shared" ? "#10B981" : "#64748B", fontSize: 24 }} />
+            <Box>
+              <Typography sx={{ fontSize: "13px", fontWeight: 800, color: "#0F172A", lineHeight: 1.2 }}>
+                Shared Trip
+              </Typography>
+              <Typography sx={{ fontSize: "10px", color: "#047857", fontWeight: 600, mt: "2px" }}>
+                Makatipid (Carpool)
+              </Typography>
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Municipal Tariff Indicator Pill */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            px: "12px",
+            py: "6px",
+            backgroundColor: "rgba(255, 107, 0, 0.08)",
+            borderRadius: "10px",
+            border: "1px dashed rgba(255, 107, 0, 0.3)",
+          }}
+        >
+          <Typography sx={{ fontSize: "11px", color: "#C2410C", fontWeight: 700 }}>
+            🏛️ Taripa: Calapan City Ord. 118
+          </Typography>
+          <Typography sx={{ fontSize: "11px", color: "#9A3412", fontWeight: 600 }}>
+            ₱{activeTariff.baseFare.toFixed(2)} ({activeTariff.baseKm}km) + ₱{activeTariff.succRate.toFixed(2)}/km
+          </Typography>
+        </Box>
+
+        {/* Passenger Count Counter Row */}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            p: "8px 14px",
+            borderRadius: "14px",
+            backgroundColor: "#FFFFFF",
+            border: "1px solid #E2E8F0",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <PersonIcon sx={{ color: "#FF6B00", fontSize: 18 }} />
+            <Box>
+              <Typography sx={{ fontSize: "12.5px", fontWeight: 700, color: "#0F172A" }}>
+                Bilang ng Pasahero:
+              </Typography>
+              <Typography sx={{ fontSize: "10px", color: "#64748B" }}>
+                {tripType === "Shared" ? "Max 2 bawat shared booking" : "Hanggang 4 pasahero sa Solo"}
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+            <IconButton
+              size="small"
+              disabled={passengers <= 1}
+              onClick={() => setPassengers((prev) => Math.max(1, prev - 1))}
+              sx={{
+                width: 28,
+                height: 28,
+                backgroundColor: "#F1F5F9",
+                color: "#0F172A",
+                "&:hover": { backgroundColor: "#E2E8F0" },
+              }}
+            >
+              <RemoveIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+
+            <Typography sx={{ fontWeight: 800, fontSize: "14px", color: "#0F172A", minWidth: "16px", textAlign: "center" }}>
+              {passengers}
+            </Typography>
+
+            <IconButton
+              size="small"
+              disabled={tripType === "Shared" ? passengers >= 2 : passengers >= 4}
+              onClick={() => {
+                const max = tripType === "Shared" ? 2 : 4;
+                if (passengers < max) {
+                  setPassengers((prev) => prev + 1);
+                } else if (tripType === "Shared") {
+                  setValidationError("Ang Shared Trip ay limitado sa 2 pasahero bawat booking upang makapag-pares ng hanggang 4 na pasahero.");
+                }
+              }}
+              sx={{
+                width: 28,
+                height: 28,
+                backgroundColor: "#F1F5F9",
+                color: "#0F172A",
+                "&:hover": { backgroundColor: "#E2E8F0" },
+              }}
+            >
+              <AddIcon sx={{ fontSize: 16 }} />
+            </IconButton>
+          </Box>
+        </Box>
+
         {/* Bottom Actions Row: Schedule Calendar Button + Mag-book ng Biyahe Button */}
         <Box
           sx={{
             display: "flex",
             alignItems: "center",
             gap: "12px",
-            marginTop: "4px",
+            marginTop: "2px",
           }}
         >
           {/* Calendar Icon Button */}

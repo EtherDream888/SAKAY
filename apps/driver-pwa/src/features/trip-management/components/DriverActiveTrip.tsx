@@ -91,7 +91,9 @@ export const DriverActiveTrip: React.FC = () => {
   };
 
   const handleCompleteTrip = () => {
-    completeBookingByDriver(bookingId, currentFare);
+    // For the passenger's individual record, set their payable share (proportionate fare if carpooled)
+    const p1PayableFare = pairedPassenger ? proportionateFareP1 : currentFare;
+    completeBookingByDriver(bookingId, p1PayableFare);
     navigate('/driver/earnings', {
       replace: true,
       state: {

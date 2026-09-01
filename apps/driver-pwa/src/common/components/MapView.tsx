@@ -50,12 +50,22 @@ export const MapView: React.FC<MapViewProps> = ({
       mapInstanceRef.current = null;
     }
 
-    const effectiveCenter: [number, number] = userLocation
-      ? [userLocation.lat, userLocation.lng]
-      : [center.lat, center.lng];
+    const effectiveLat =
+      typeof userLocation?.lat === "number" && !isNaN(userLocation.lat)
+        ? userLocation.lat
+        : typeof center?.lat === "number" && !isNaN(center.lat)
+        ? center.lat
+        : DEFAULT_CALAPAN_CENTER.latitude;
+
+    const effectiveLng =
+      typeof userLocation?.lng === "number" && !isNaN(userLocation.lng)
+        ? userLocation.lng
+        : typeof center?.lng === "number" && !isNaN(center.lng)
+        ? center.lng
+        : DEFAULT_CALAPAN_CENTER.longitude;
 
     const map = L.map(mapContainerRef.current, {
-      center: effectiveCenter,
+      center: [effectiveLat, effectiveLng],
       zoom: zoom,
       zoomControl: false,
       attributionControl: false,
@@ -198,7 +208,7 @@ export const MapView: React.FC<MapViewProps> = ({
         padding: [60, 60],
         maxZoom: 16,
       });
-    } else if (userLocation) {
+    } else if (typeof userLocation?.lat === "number" && !isNaN(userLocation.lat) && typeof userLocation?.lng === "number" && !isNaN(userLocation.lng)) {
       map.panTo([userLocation.lat, userLocation.lng], { animate: true });
     }
   }, [userLocation, pickupLocation, dropoffLocation, recenterTrigger]);
@@ -208,9 +218,9 @@ export const MapView: React.FC<MapViewProps> = ({
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    if (userLocation) {
+    if (typeof userLocation?.lat === "number" && !isNaN(userLocation.lat) && typeof userLocation?.lng === "number" && !isNaN(userLocation.lng)) {
       map.flyTo([userLocation.lat, userLocation.lng], zoom, { duration: 0.8 });
-    } else if (center) {
+    } else if (typeof center?.lat === "number" && !isNaN(center.lat) && typeof center?.lng === "number" && !isNaN(center.lng)) {
       map.flyTo([center.lat, center.lng], zoom, { duration: 0.8 });
     }
   }, [recenterTrigger, zoom]);
