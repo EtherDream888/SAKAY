@@ -14,7 +14,7 @@ import tricycle from "@sakay/shared/src/assets/icons/app-icon.png";
 import { BookingIllustration, FareIllustration, SafetyIllustration } from "@sakay/shared";
 
 export const DriverSplash: React.FC = () => {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   // State to manage onboarding steps:
@@ -79,27 +79,18 @@ export const DriverSplash: React.FC = () => {
     let activeDotIdx = 0;
 
     if (step === 4) {
-      slideTitle = language === "tl" ? "Mag-book ng Biyahe" : "Accept Trip Bookings";
-      slideDesc =
-        language === "tl"
-          ? "Mabilis at madaling pag-book ng traysikel sa isang pindot lang kahit nasaan ka."
-          : "Fast and easy passenger booking requests delivered straight to your phone.";
+      slideTitle = "Tumanggap ng Biyahe";
+      slideDesc = "Mabilis at madaling pagtanggap ng mga booking ng pasahero nang direkta sa iyong telepono.";
       slideIllustration = <BookingIllustration />;
       activeDotIdx = 0;
     } else if (step === 5) {
-      slideTitle = language === "tl" ? "Tamang Pamasahe" : "Guaranteed Tariff Fares";
-      slideDesc =
-        language === "tl"
-          ? "Malinaw at tapat na presyo para sa bawat biyahe, walang hulaan."
-          : "Transparent official fares calculated automatically for every passenger trip.";
+      slideTitle = "Tamang Pamasahe";
+      slideDesc = "Malinaw at tapat na presyo para sa bawat biyahe ayon sa opisyal na taripa ng lungsod.";
       slideIllustration = <FareIllustration />;
       activeDotIdx = 1;
     } else if (step === 6) {
-      slideTitle = language === "tl" ? "Ligtas at Maaasahan" : "Safe & Accredited";
-      slideDesc =
-        language === "tl"
-          ? "Siguradong drayber na lisensyado at rehistrado sa TODA ang susundo sa iyo."
-          : "Recognized TODA franchises and verified driver profiles in Calapan City.";
+      slideTitle = "Ligtas at Rehistrado";
+      slideDesc = "Rehistradong prangkisa sa TODA at beripikadong profile ng drayber sa Lungsod ng Calapan.";
       slideIllustration = <SafetyIllustration />;
       activeDotIdx = 2;
     }
@@ -118,20 +109,16 @@ export const DriverSplash: React.FC = () => {
           paddingBottom: "calc(var(--safe-area-bottom) + 24px)",
         }}
       >
-        {/* Header Bar with Logo and Language Selector */}
+        {/* Header Bar with Centered Logo */}
         <Box
           sx={{
             width: "100%",
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
+            justifyContent: "center",
           }}
         >
-          <Box sx={{ width: "64px" }} />
           <Logo color="orange" />
-          <Box sx={{ width: "64px", display: "flex", justifyContent: "flex-end" }}>
-            <LanguageSelector />
-          </Box>
         </Box>
 
         {/* Illustration Container */}
@@ -182,7 +169,7 @@ export const DriverSplash: React.FC = () => {
         {/* Action Buttons */}
         <Box sx={{ width: "100%", display: "flex", flexDirection: "column" }}>
           <PrimaryButton fullWidth onClick={handleNextOnboarding}>
-            {t.continue}
+            Magpatuloy
           </PrimaryButton>
 
           {step !== 6 && (
@@ -202,7 +189,7 @@ export const DriverSplash: React.FC = () => {
                 },
               }}
             >
-              {t.skip}
+              Laktawan
             </Button>
           )}
         </Box>
