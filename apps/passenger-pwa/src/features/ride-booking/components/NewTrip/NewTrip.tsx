@@ -20,6 +20,7 @@ import PassengerNavigationDrawer from "../Dashboard/PassengerNavigationDrawer";
 import TulongDialog from "../Dashboard/TulongDialog";
 import NotificationsDialog from "../Dashboard/NotificationsDialog";
 import { supabase } from "../../../../services/supabaseClient";
+import { useLanguage } from "../../../../utils/LanguageContext";
 import {
   DEFAULT_CALAPAN_CENTER,
   getCurrentDevicePosition,
@@ -29,6 +30,7 @@ import {
 const NewTrip: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
 
   // Retrieve route state from location permission or dashboard
   const navState = location.state as {
@@ -63,14 +65,14 @@ const NewTrip: React.FC = () => {
 
     if (gpsLat && gpsLng) {
       return {
-        address: "Kasalukuyang Lokasyon",
+        address: language === "tl" ? "Kasalukuyang Lokasyon" : "Current Location",
         lat: gpsLat,
         lng: gpsLng,
       };
     }
 
     return {
-      address: "Pumili ng pickup location",
+      address: language === "tl" ? "Pumili ng pickup location" : "Choose pickup location",
       lat: DEFAULT_CALAPAN_CENTER.latitude,
       lng: DEFAULT_CALAPAN_CENTER.longitude,
     };
@@ -178,11 +180,19 @@ const NewTrip: React.FC = () => {
 
   const handleBookTrip = () => {
     if (!dropoff.address || dropoff.lat === 0) {
-      setValidationError("Mangyaring ilagay ang iyong destinasyon.");
+      setValidationError(
+        language === "tl"
+          ? "Mangyaring ilagay ang iyong destinasyon."
+          : "Please enter your destination."
+      );
       return;
     }
     if (!pickup.lat || pickup.lat === 0) {
-      setValidationError("Mangyaring pumili ng pickup point.");
+      setValidationError(
+        language === "tl"
+          ? "Mangyaring pumili ng pickup point."
+          : "Please select a pickup point."
+      );
       return;
     }
 
@@ -198,7 +208,7 @@ const NewTrip: React.FC = () => {
     try {
       const coords = await getCurrentDevicePosition();
       setPickup({
-        address: "Kasalukuyang Lokasyon",
+        address: language === "tl" ? "Kasalukuyang Lokasyon" : "Current Location",
         lat: coords.latitude,
         lng: coords.longitude,
       });
@@ -296,9 +306,9 @@ const NewTrip: React.FC = () => {
             fontFamily: "Poppins, sans-serif",
           }}
         >
-          Kamusta, {firstName}!{" "}
+          {language === "tl" ? `Kamusta, ${firstName}! ` : `Hello, ${firstName}! `}
           <Box component="span" sx={{ fontWeight: 800 }}>
-            Saan tayo pupunta?
+            {language === "tl" ? "Saan tayo pupunta?" : "Where are we going?"}
           </Box>
         </Typography>
 
@@ -370,7 +380,7 @@ const NewTrip: React.FC = () => {
                 textOverflow: "ellipsis",
               }}
             >
-              {pickup.address || "Pumili ng pickup location"}
+              {pickup.address || (language === "tl" ? "Pumili ng pickup location" : "Choose pickup location")}
             </Typography>
           </Box>
         </Box>
@@ -417,7 +427,7 @@ const NewTrip: React.FC = () => {
                 textTransform: "uppercase",
               }}
             >
-              DESTINASYON
+              {language === "tl" ? "DESTINASYON" : "DESTINATION"}
             </Typography>
             <Typography
               sx={{
@@ -429,7 +439,7 @@ const NewTrip: React.FC = () => {
                 textOverflow: "ellipsis",
               }}
             >
-              {dropoff.address || "I-type ang lugar"}
+              {dropoff.address || (language === "tl" ? "I-type ang lugar" : "Type a destination")}
             </Typography>
           </Box>
         </Box>
@@ -462,7 +472,7 @@ const NewTrip: React.FC = () => {
                 Solo Trip
               </Typography>
               <Typography sx={{ fontSize: "10px", color: "#64748B", mt: "2px" }}>
-                Buong Tricycle (4 seats)
+                {language === "tl" ? "Buong Tricycle (4 seats)" : "Full Tricycle (4 seats)"}
               </Typography>
             </Box>
           </Box>
@@ -494,7 +504,7 @@ const NewTrip: React.FC = () => {
                 Shared Trip
               </Typography>
               <Typography sx={{ fontSize: "10px", color: "#047857", fontWeight: 600, mt: "2px" }}>
-                Makatipid (Carpool)
+                {language === "tl" ? "Makatipid (Carpool)" : "Save Fare (Carpool)"}
               </Typography>
             </Box>
           </Box>
@@ -514,7 +524,7 @@ const NewTrip: React.FC = () => {
           }}
         >
           <Typography sx={{ fontSize: "11px", color: "#C2410C", fontWeight: 700 }}>
-            🏛️ Taripa: Calapan City Ord. 118
+            {language === "tl" ? "🏛️ Taripa: Calapan City Ord. 118" : "🏛️ Tariff: Calapan City Ord. 118"}
           </Typography>
           <Typography sx={{ fontSize: "11px", color: "#9A3412", fontWeight: 600 }}>
             ₱{activeTariff.baseFare.toFixed(2)} ({activeTariff.baseKm}km) + ₱{activeTariff.succRate.toFixed(2)}/km
@@ -537,10 +547,12 @@ const NewTrip: React.FC = () => {
             <PersonIcon sx={{ color: "#FF6B00", fontSize: 18 }} />
             <Box>
               <Typography sx={{ fontSize: "12.5px", fontWeight: 700, color: "#0F172A" }}>
-                Bilang ng Pasahero:
+                {language === "tl" ? "Bilang ng Pasahero:" : "Passenger Count:"}
               </Typography>
               <Typography sx={{ fontSize: "10px", color: "#64748B" }}>
-                {tripType === "Shared" ? "Max 2 bawat shared booking" : "Hanggang 4 pasahero sa Solo"}
+                {tripType === "Shared"
+                  ? (language === "tl" ? "Max 2 bawat shared booking" : "Max 2 per shared booking")
+                  : (language === "tl" ? "Hanggang 4 pasahero sa Solo" : "Up to 4 passengers for Solo")}
               </Typography>
             </Box>
           </Box>
@@ -573,7 +585,11 @@ const NewTrip: React.FC = () => {
                 if (passengers < max) {
                   setPassengers((prev) => prev + 1);
                 } else if (tripType === "Shared") {
-                  setValidationError("Ang Shared Trip ay limitado sa 2 pasahero bawat booking upang makapag-pares ng hanggang 4 na pasahero.");
+                  setValidationError(
+                    language === "tl"
+                      ? "Ang Shared Trip ay limitado sa 2 pasahero bawat booking upang makapag-pares ng hanggang 4 na pasahero."
+                      : "Shared Trip is limited to 2 passengers per booking to allow pairing up to 4 total passengers."
+                  );
                 }
               }}
               sx={{
@@ -633,7 +649,7 @@ const NewTrip: React.FC = () => {
               },
             }}
           >
-            Mag-book ng Biyahe
+            {language === "tl" ? "Mag-book ng Biyahe" : "Book Ride"}
           </Button>
         </Box>
       </Paper>

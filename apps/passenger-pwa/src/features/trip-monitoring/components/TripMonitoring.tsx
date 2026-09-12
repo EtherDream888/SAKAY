@@ -32,10 +32,12 @@ import type { BookingRecord } from '../../../services/bookingService';
 import { subscribeToDispatchEvents } from '@sakay/shared';
 import type { MockDispatchBooking } from '@sakay/shared';
 import { supabase } from '../../../services/supabaseClient';
+import { useLanguage } from '../../../utils/LanguageContext';
 
 export const TripMonitoring: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
 
   const stateBookingId = (location.state as { bookingId?: string })?.bookingId;
   const activeBookingId = stateBookingId || sessionStorage.getItem('current_active_booking_id') || 'BKG-DEMO-001';
@@ -290,7 +292,11 @@ export const TripMonitoring: React.FC = () => {
 
   const handleSendSms = (msg: string) => {
     if (!msg.trim()) return;
-    setSmsAlert(`Naipadala ang mensahe sa driver: "${msg}"`);
+    setSmsAlert(
+      language === 'tl'
+        ? `Naipadala ang mensahe sa drayber: "${msg}"`
+        : `Message sent to driver: "${msg}"`
+    );
     setCustomSms('');
     setTimeout(() => {
       setSmsAlert(null);
@@ -327,7 +333,7 @@ export const TripMonitoring: React.FC = () => {
           </IconButton>
           <Box>
             <Typography sx={{ fontSize: '15px', fontWeight: 800, color: '#FFFFFF' }}>
-              Pagsubaybay sa Biyahe (Trip Monitoring)
+              {language === 'tl' ? 'Pagsubaybay sa Biyahe (Trip Monitoring)' : 'Trip Monitoring'}
             </Typography>
             <Typography sx={{ fontSize: '11.5px', color: '#94A3B8' }}>
               Booking: <strong>{activeBookingId}</strong>
@@ -341,7 +347,7 @@ export const TripMonitoring: React.FC = () => {
             onClick={() => setCancelModalOpen(true)}
             sx={{ color: '#EF4444', fontWeight: 700, fontSize: '12px', textTransform: 'none' }}
           >
-            Kanselahin
+            {language === 'tl' ? 'Kanselahin' : 'Cancel'}
           </Button>
         )}
       </Box>
@@ -374,14 +380,14 @@ export const TripMonitoring: React.FC = () => {
         <Chip
           label={
             status === 'Searching Driver'
-              ? 'Naghahanap ng pinakamalapit na Tricycle...'
+              ? (language === 'tl' ? 'Naghahanap ng pinakamalapit na Tricycle...' : 'Finding nearest tricycle...')
               : status === 'Driver Assigned' || status === 'Driver En Route'
-              ? `Papunta na ang Driver • ETA: ${booking?.eta_minutes || 4} mins`
+              ? (language === 'tl' ? `Papunta na ang Driver • ETA: ${booking?.eta_minutes || 4} mins` : `Driver is en route • ETA: ${booking?.eta_minutes || 4} mins`)
               : status === 'Driver Arrived'
-              ? 'Nandito na ang Tricycle sa Pickup Point!'
+              ? (language === 'tl' ? 'Nandito na ang Tricycle sa Pickup Point!' : 'Tricycle has arrived at the pickup point!')
               : status === 'Trip Ongoing'
-              ? 'Kasalukuyang bumibiyahe patungo sa destinasyon'
-              : 'Nakumpleto na ang Biyahe!'
+              ? (language === 'tl' ? 'Kasalukuyang bumibiyahe patungo sa destinasyon' : 'Currently traveling to destination')
+              : (language === 'tl' ? 'Nakumpleto na ang Biyahe!' : 'Trip Completed!')
           }
           sx={{
             position: 'absolute',
@@ -507,8 +513,12 @@ export const TripMonitoring: React.FC = () => {
             </Typography>
             <Typography sx={{ fontSize: '11.5px', color: '#065F46', mt: '2px' }}>
               {booking.paired_booking_count && booking.paired_booking_count > 1
-                ? 'Nakatipid ka ng 25%! Nabawasan ang iyong pamasahe dahil may kasamang commuter sa ruta.'
-                : 'Makatipid kapag may karagdagang commuter sa inyong ruta (hanggang 4 pinagsamang pasahero).'}
+                ? (language === 'tl'
+                    ? 'Nakatipid ka ng 25%! Nabawasan ang iyong pamasahe dahil may kasamang commuter sa ruta.'
+                    : 'You saved 25%! Your fare was reduced with a shared commuter along the route.')
+                : (language === 'tl'
+                    ? 'Makatipid kapag may karagdagang commuter sa inyong ruta (hanggang 4 pinagsamang pasahero).'
+                    : 'Save when an additional commuter shares your route (up to 4 passengers combined).')}
             </Typography>
           </Box>
         )}
@@ -519,10 +529,12 @@ export const TripMonitoring: React.FC = () => {
             <GroupsIcon sx={{ color: '#10B981', fontSize: 26 }} />
             <Box>
               <Typography sx={{ fontSize: '13px', fontWeight: 800, color: '#065F46' }}>
-                🎉 May Kasabay na Commuter! ({booking?.paired_passenger_name || 'Joshua Dizon'})
+                🎉 {language === 'tl' ? 'May Kasabay na Commuter!' : 'Commuter Paired!'} ({booking?.paired_passenger_name || 'Joshua Dizon'})
               </Typography>
               <Typography sx={{ fontSize: '11px', color: '#047857' }}>
-                Nahati ang pamasahe! Bagong babayaran: ₱{passengerPayableFare.toFixed(2)}
+                {language === 'tl'
+                  ? `Nahati ang pamasahe! Bagong babayaran: ₱${passengerPayableFare.toFixed(2)}`
+                  : `Fare split applied! New fare: ₱${passengerPayableFare.toFixed(2)}`}
               </Typography>
             </Box>
           </Box>
@@ -531,7 +543,9 @@ export const TripMonitoring: React.FC = () => {
         {/* Final Fare Display */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 0.5 }}>
           <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#64748B' }}>
-            {booking?.proportionate_fare ? 'Proportionate Shared Fare:' : 'Kabuuang Pamasahe:'}
+            {booking?.proportionate_fare
+              ? (language === 'tl' ? 'Proportionate Shared Fare:' : 'Proportionate Shared Fare:')
+              : (language === 'tl' ? 'Kabuuang Pamasahe:' : 'Total Fare:')}
           </Typography>
           <Typography sx={{ fontSize: '24px', fontWeight: 900, color: '#FF6B00' }}>
             ₱{passengerPayableFare.toFixed(2)}
@@ -548,19 +562,21 @@ export const TripMonitoring: React.FC = () => {
         slotProps={{ paper: { sx: { borderRadius: '24px', p: 1 } } }}
       >
         <DialogTitle sx={{ fontWeight: 800, color: '#0F172A' }}>
-          Kanselahin ang Biyahe?
+          {language === 'tl' ? 'Kanselahin ang Biyahe?' : 'Cancel Trip?'}
         </DialogTitle>
         <DialogContent>
           <Typography sx={{ fontSize: '13.5px', color: '#64748B' }}>
-            Sigurado ka bang nais mong kanselahin ang booking na ito?
+            {language === 'tl'
+              ? 'Sigurado ka bang nais mong kanselahin ang booking na ito?'
+              : 'Are you sure you want to cancel this booking?'}
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: '12px 18px 18px', gap: 1 }}>
           <Button variant="outlined" fullWidth onClick={() => setCancelModalOpen(false)} sx={{ borderRadius: '12px' }}>
-            Huwag Kanselahin
+            {language === 'tl' ? 'Huwag Kanselahin' : 'Keep Trip'}
           </Button>
           <Button variant="contained" fullWidth color="error" onClick={handleCancelTrip} sx={{ borderRadius: '12px', fontWeight: 700 }}>
-            Oo, Kanselahin
+            {language === 'tl' ? 'Oo, Kanselahin' : 'Yes, Cancel'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -574,7 +590,9 @@ export const TripMonitoring: React.FC = () => {
         slotProps={{ paper: { sx: { borderRadius: '24px', p: 1 } } }}
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pb: 1 }}>
-          <Typography sx={{ fontSize: '17px', fontWeight: 800 }}>Mensahe kay Driver {driverName.split(' ')[0]}</Typography>
+          <Typography sx={{ fontSize: '17px', fontWeight: 800 }}>
+            {language === 'tl' ? `Mensahe kay Driver ${driverName.split(' ')[0]}` : `Message Driver ${driverName.split(' ')[0]}`}
+          </Typography>
           <IconButton onClick={() => setCommModalOpen(false)} size="small"><CloseIcon /></IconButton>
         </DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1 }}>
@@ -585,7 +603,10 @@ export const TripMonitoring: React.FC = () => {
           )}
 
           <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#64748B' }}>QUICK TEMPLATES</Typography>
-          {['Nandito na po ako sa labas.', 'Nasa tapat po ako ng gate.', 'Pakibilisan po ng konti. Salamat!'].map((tpl, i) => (
+          {(language === 'tl'
+            ? ['Nandito na po ako sa labas.', 'Nasa tapat po ako ng gate.', 'Pakibilisan po ng konti. Salamat!']
+            : ["I'm waiting outside.", "I'm in front of the gate.", "Please hurry if possible. Thank you!"]
+          ).map((tpl, i) => (
             <Button
               key={i}
               variant="outlined"
@@ -600,7 +621,7 @@ export const TripMonitoring: React.FC = () => {
             <TextField
               fullWidth
               size="small"
-              placeholder="I-type ang mensahe..."
+              placeholder={language === 'tl' ? "I-type ang mensahe..." : "Type a message..."}
               value={customSms}
               onChange={(e) => setCustomSms(e.target.value)}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
@@ -621,12 +642,13 @@ export const TripMonitoring: React.FC = () => {
         slotProps={{ paper: { sx: { borderRadius: '24px', p: 1 } } }}
       >
         <DialogTitle sx={{ fontWeight: 800, fontSize: '17px', color: '#0F172A' }}>
-          Kasalukuyang Aktibo ang Biyahe
+          {language === 'tl' ? 'Kasalukuyang Aktibo ang Biyahe' : 'Trip Is Currently Active'}
         </DialogTitle>
         <DialogContent>
           <Typography sx={{ fontSize: '13px', color: '#64748B', lineHeight: 1.5 }}>
-            Mayroon kang tumatakbong biyahe. Nais mo bang pumunta sa Dashboard?
-            Mananatiling aktibo ang iyong booking at maaari kang bumalik sa tracking anumang oras.
+            {language === 'tl'
+              ? 'Mayroon kang tumatakbong biyahe. Nais mo bang pumunta sa Dashboard? Mananatiling aktibo ang iyong booking at maaari kang bumalik sa tracking anumang oras.'
+              : 'You have an ongoing trip. Do you want to return to the Dashboard? Your booking will remain active and you can return to tracking anytime.'}
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -636,7 +658,7 @@ export const TripMonitoring: React.FC = () => {
             onClick={() => setLeaveConfirmModalOpen(false)}
             sx={{ borderRadius: '12px', backgroundColor: '#FF6B00', fontWeight: 700, height: '44px', textTransform: 'none', '&:hover': { backgroundColor: '#E05000' } }}
           >
-            Manatili sa Tracking
+            {language === 'tl' ? 'Manatili sa Tracking' : 'Stay on Tracking'}
           </Button>
           <Button
             variant="text"
@@ -647,7 +669,7 @@ export const TripMonitoring: React.FC = () => {
             }}
             sx={{ color: '#64748B', fontWeight: 600, textTransform: 'none' }}
           >
-            Pumunta sa Dashboard
+            {language === 'tl' ? 'Pumunta sa Dashboard' : 'Go to Dashboard'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -663,21 +685,23 @@ export const TripMonitoring: React.FC = () => {
           <CheckCircleIcon sx={{ fontSize: 54, color: '#10B981' }} />
         </Box>
         <Typography sx={{ fontSize: '18px', fontWeight: 800, color: '#0F172A', mb: 0.5 }}>
-          Nakarating na sa Destinasyon!
+          {language === 'tl' ? 'Nakarating na sa Destinasyon!' : 'Arrived at Destination!'}
         </Typography>
         <Typography sx={{ fontSize: '13px', color: '#64748B', mb: 2 }}>
-          Pakisuri ang siningil na pamasahe ng drayber bago magpatuloy.
+          {language === 'tl'
+            ? 'Pakisuri ang siningil na pamasahe ng drayber bago magpatuloy.'
+            : 'Please verify the fare charged by the driver before proceeding.'}
         </Typography>
 
         <Paper elevation={0} sx={{ p: 2, borderRadius: '18px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', mb: 2.5 }}>
           <Typography sx={{ fontSize: '11px', fontWeight: 700, color: '#64748B', letterSpacing: '0.5px' }}>
-            OPISYAL NA PAMASAHE
+            {language === 'tl' ? 'OPISYAL NA PAMASAHE' : 'OFFICIAL TARIFF FARE'}
           </Typography>
           <Typography sx={{ fontSize: '32px', fontWeight: 900, color: '#FF6B00', my: 0.5 }}>
             ₱{passengerPayableFare.toFixed(2)}
           </Typography>
           <Typography sx={{ fontSize: '11px', color: '#94A3B8' }}>
-            Batay sa Calapan City Ordinance No. 118
+            {language === 'tl' ? 'Batay sa Calapan City Ordinance No. 118' : 'Based on Calapan City Ordinance No. 118'}
           </Typography>
         </Paper>
 
@@ -699,7 +723,9 @@ export const TripMonitoring: React.FC = () => {
               '&:hover': { backgroundColor: '#059669' },
             }}
           >
-            I Paid ₱{passengerPayableFare.toFixed(2)} (Tama ang Bayad)
+            {language === 'tl'
+              ? `I Paid ₱${passengerPayableFare.toFixed(2)} (Tama ang Bayad)`
+              : `I Paid ₱${passengerPayableFare.toFixed(2)} (Fare Verified)`}
           </Button>
 
           <Button
@@ -719,7 +745,7 @@ export const TripMonitoring: React.FC = () => {
               textTransform: 'none',
             }}
           >
-            Amount Doesn't Match (May Aberya)
+            {language === 'tl' ? "Amount Doesn't Match (May Aberya)" : "Amount Doesn't Match (Dispute Fare)"}
           </Button>
         </Box>
       </Dialog>
@@ -735,42 +761,54 @@ export const TripMonitoring: React.FC = () => {
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, pb: 1 }}>
           <ReportProblemIcon sx={{ color: '#EF4444' }} />
           <Typography sx={{ fontSize: '17px', fontWeight: 800, color: '#0F172A' }}>
-            Isumite ang Reklamo sa LGU
+            {language === 'tl' ? 'Isumite ang Reklamo sa LGU' : 'Submit Dispute to City LGU'}
           </Typography>
         </DialogTitle>
 
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pt: 1 }}>
           {disputeSubmitted ? (
             <Alert severity="success" sx={{ borderRadius: '12px' }}>
-              Naisumite na ang iyong reklamo sa City LGU Transport Board (Incident #{activeBookingId}). Iimbestigahan ito agad.
+              {language === 'tl'
+                ? `Naisumite na ang iyong reklamo sa City LGU Transport Board (Incident #${activeBookingId}). Iimbestigahan ito agad.`
+                : `Your complaint has been submitted to the City LGU Transport Board (Incident #${activeBookingId}). It will be investigated promptly.`}
             </Alert>
           ) : (
             <>
               <Typography sx={{ fontSize: '12.5px', color: '#64748B' }}>
-                Ipapadala ang ulat na ito sa City LGU Administrator sa ilalim ng Complaint & Incident Management.
+                {language === 'tl'
+                  ? 'Ipapadala ang ulat na ito sa City LGU Administrator sa ilalim ng Complaint & Incident Management.'
+                  : 'This report is sent directly to the City LGU Administrator under Complaint & Incident Management.'}
               </Typography>
 
               <TextField
                 select
                 fullWidth
                 size="small"
-                label="Uri ng Reklamo"
+                label={language === 'tl' ? "Uri ng Reklamo" : "Dispute Category"}
                 value={disputeCategory}
                 onChange={(e) => setDisputeCategory(e.target.value)}
                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
               >
-                <MenuItem value="Overcharging Attempt">Overcharging (Sobra ang singil sa pamasahe)</MenuItem>
-                <MenuItem value="Refusal to Follow Tariff">Refusal to Follow Tariff (Hindi sumunod sa taripa)</MenuItem>
-                <MenuItem value="Unauthorized Route">Unauthorized Route (Maling ruta)</MenuItem>
-                <MenuItem value="Rude Behavior">Rude Behavior (Hindi magandang asal)</MenuItem>
+                <MenuItem value="Overcharging Attempt">
+                  {language === 'tl' ? 'Overcharging (Sobra ang singil sa pamasahe)' : 'Overcharging (Exceeded official tariff)'}
+                </MenuItem>
+                <MenuItem value="Refusal to Follow Tariff">
+                  {language === 'tl' ? 'Refusal to Follow Tariff (Hindi sumunod sa taripa)' : 'Refusal to Follow Tariff (Arbitrary pricing)'}
+                </MenuItem>
+                <MenuItem value="Unauthorized Route">
+                  {language === 'tl' ? 'Unauthorized Route (Maling ruta)' : 'Unauthorized Route (Unscheduled detour)'}
+                </MenuItem>
+                <MenuItem value="Rude Behavior">
+                  {language === 'tl' ? 'Rude Behavior (Hindi magandang asal)' : 'Rude Behavior / Harassment'}
+                </MenuItem>
               </TextField>
 
               <TextField
                 fullWidth
                 size="small"
-                label="Halagang Siningil ng Drayber (₱)"
+                label={language === 'tl' ? "Halagang Siningil ng Drayber (₱)" : "Amount Charged by Driver (₱)"}
                 type="number"
-                placeholder="Hal. 50"
+                placeholder={language === 'tl' ? "Hal. 50" : "e.g. 50"}
                 value={disputedAmount}
                 onChange={(e) => setDisputedAmount(e.target.value)}
                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
@@ -781,8 +819,8 @@ export const TripMonitoring: React.FC = () => {
                 size="small"
                 multiline
                 rows={3}
-                label="Paliwanag o Detalye"
-                placeholder="Pakilarawan ang nangyari..."
+                label={language === 'tl' ? "Paliwanag o Detalye" : "Explanation or Details"}
+                placeholder={language === 'tl' ? "Pakilarawan ang nangyari..." : "Please describe what happened..."}
                 value={disputeReason}
                 onChange={(e) => setDisputeReason(e.target.value)}
                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
@@ -799,7 +837,7 @@ export const TripMonitoring: React.FC = () => {
               onClick={() => setDisputeModalOpen(false)}
               sx={{ borderRadius: '12px', textTransform: 'none' }}
             >
-              Kanselahin
+              {language === 'tl' ? 'Kanselahin' : 'Cancel'}
             </Button>
             <Button
               variant="contained"
@@ -841,7 +879,7 @@ export const TripMonitoring: React.FC = () => {
               }}
               sx={{ borderRadius: '12px', fontWeight: 700, textTransform: 'none' }}
             >
-              Isumite sa LGU
+              {language === 'tl' ? 'Isumite sa LGU' : 'Submit to LGU'}
             </Button>
           </DialogActions>
         )}

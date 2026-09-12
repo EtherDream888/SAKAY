@@ -16,6 +16,7 @@ import {
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 import { supabase } from '../../../services/supabaseClient';
+import { useLanguage } from '../../../utils/LanguageContext';
 
 interface FeedbackItem {
   id: string;
@@ -33,6 +34,7 @@ const STORAGE_KEY = 'sakay_passenger_feedback_history';
 export const PassengerFeedback: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
 
   const booking = (location.state as { booking?: any })?.booking;
   const driverName = booking?.driver_name || 'Aurelio Bautista';
@@ -41,17 +43,26 @@ export const PassengerFeedback: React.FC = () => {
 
   const [tab, setTab] = useState<0 | 1>(0); // 0: Submit, 1: Past Feedback
   const [rating, setRating] = useState<number | null>(5);
-  const [selectedTags, setSelectedTags] = useState<string[]>(['Magalang na Driver', 'Ligtas Magmaneho']);
+  const [selectedTags, setSelectedTags] = useState<string[]>(() =>
+    language === 'tl' ? ['Magalang na Driver', 'Ligtas Magmaneho'] : ['Courteous Driver', 'Safe Driving']
+  );
   const [comment, setComment] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
-  const availableTags = [
+  const availableTags = language === 'tl' ? [
     'Magalang na Driver',
     'Ligtas Magmaneho',
     'Malinis na Tricycle',
     'Tamang Sukli',
     'Maagap at Mabilis',
     'Maingat sa Daan',
+  ] : [
+    'Courteous Driver',
+    'Safe Driving',
+    'Clean Tricycle',
+    'Correct Change',
+    'Prompt & Fast',
+    'Careful on the Road',
   ];
 
   const handleToggleTag = (tag: string) => {
@@ -128,15 +139,15 @@ export const PassengerFeedback: React.FC = () => {
           <ArrowBackIcon />
         </IconButton>
         <Typography sx={{ fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>
-          Puna at Rating (Feedback)
+          {language === 'tl' ? 'Puna at Rating' : 'Feedback & Rating'}
         </Typography>
       </Box>
 
       {/* Tabs */}
       <Box sx={{ backgroundColor: '#FFFFFF', px: 2, borderBottom: '1px solid #E2E8F0' }}>
         <Tabs value={tab} onChange={(_, val) => setTab(val)} textColor="inherit" indicatorColor="primary">
-          <Tab label="I-rate ang Biyahe" sx={{ fontWeight: 700, textTransform: 'none' }} />
-          <Tab label="Mga Nakaraang Rating" sx={{ fontWeight: 700, textTransform: 'none' }} />
+          <Tab label={language === 'tl' ? 'I-rate ang Biyahe' : 'Rate Trip'} sx={{ fontWeight: 700, textTransform: 'none' }} />
+          <Tab label={language === 'tl' ? 'Mga Nakaraang Rating' : 'Past Ratings'} sx={{ fontWeight: 700, textTransform: 'none' }} />
         </Tabs>
       </Box>
 
@@ -157,7 +168,7 @@ export const PassengerFeedback: React.FC = () => {
             {/* Star Rating Picker */}
             <Box sx={{ mt: 2.5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
               <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#475569' }}>
-                Kamusta ang inyong naging biyahe?
+                {language === 'tl' ? 'Kamusta ang inyong naging biyahe?' : 'How was your trip?'}
               </Typography>
               <Rating
                 value={rating}
@@ -171,7 +182,7 @@ export const PassengerFeedback: React.FC = () => {
           {/* Compliment Tags */}
           <Box>
             <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', mb: 1 }}>
-              Mga Papuri at Katangian (Compliments)
+              {language === 'tl' ? 'Mga Papuri at Katangian (Compliments)' : 'Compliments & Badges'}
             </Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
               {availableTags.map((tag) => {
@@ -198,13 +209,13 @@ export const PassengerFeedback: React.FC = () => {
           {/* Written Feedback */}
           <Box>
             <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', mb: 1 }}>
-              Karagdagang Komento (Optional)
+              {language === 'tl' ? 'Karagdagang Komento (Optional)' : 'Additional Comments (Optional)'}
             </Typography>
             <TextField
               fullWidth
               multiline
               rows={3}
-              placeholder="Ibahagi ang iyong opinyon tungkol sa serbisyo..."
+              placeholder={language === 'tl' ? 'Ibahagi ang iyong opinyon tungkol sa serbisyo...' : 'Share your thoughts about the service...'}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               sx={{ backgroundColor: '#FFFFFF', '& .MuiOutlinedInput-root': { borderRadius: '16px' } }}
@@ -214,7 +225,7 @@ export const PassengerFeedback: React.FC = () => {
           {submitted ? (
             <Paper sx={{ p: 2, borderRadius: '14px', backgroundColor: '#E6F4EA', border: '1px solid #A7F3D0', textAlign: 'center' }}>
               <Typography sx={{ color: '#1E8E3E', fontWeight: 800 }}>
-                ✓ Maraming salamat sa iyong rating at suporta sa TODA!
+                {language === 'tl' ? '✓ Maraming salamat sa iyong rating at suporta sa TODA!' : '✓ Thank you so much for your rating and supporting TODA!'}
               </Typography>
             </Paper>
           ) : (
@@ -231,7 +242,7 @@ export const PassengerFeedback: React.FC = () => {
                 '&:hover': { backgroundColor: '#E66000' },
               }}
             >
-              Isumite ang Rating (Submit Feedback)
+              {language === 'tl' ? 'Isumite ang Rating' : 'Submit Feedback'}
             </Button>
           )}
         </Box>

@@ -17,6 +17,7 @@ import TwoWheelerIcon from '@mui/icons-material/TwoWheeler';
 import GroupsIcon from '@mui/icons-material/Groups';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { fetchDriverTrips } from '../../../services/driverApiService';
+import { useLanguage } from '../../../utils/LanguageContext';
 
 interface TripItem {
   id: string;
@@ -33,6 +34,7 @@ interface TripItem {
 }
 
 export const DriverEarnings: React.FC = () => {
+  const { language } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as {
@@ -104,7 +106,7 @@ export const DriverEarnings: React.FC = () => {
           <ArrowBackIcon />
         </IconButton>
         <Typography sx={{ fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>
-          Kita at Kasaysayan ng Biyahe (Earnings)
+          {language === 'tl' ? 'Kita at Kasaysayan ng Biyahe' : 'Earnings & Trip History'}
         </Typography>
       </Box>
 
@@ -114,7 +116,9 @@ export const DriverEarnings: React.FC = () => {
           <Paper elevation={0} sx={{ p: 2.5, borderRadius: '20px', backgroundColor: '#E6F4EA', border: '1px solid #A7F3D0' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#1E8E3E', mb: 1 }}>
               <CheckCircleIcon />
-              <Typography sx={{ fontWeight: 800, fontSize: '15px' }}>Matagumpay na Nakumpleto ang Biyahe!</Typography>
+              <Typography sx={{ fontWeight: 800, fontSize: '15px' }}>
+                {language === 'tl' ? 'Matagumpay na Nakumpleto ang Biyahe!' : 'Trip Successfully Completed!'}
+              </Typography>
             </Box>
             <Typography sx={{ fontSize: '13px', color: '#334155' }}>
               Booking: <strong>{justCompleted.bookingCode}</strong> • {justCompleted.passengerName}
@@ -126,7 +130,9 @@ export const DriverEarnings: React.FC = () => {
             )}
             <Divider sx={{ my: 1.5, borderColor: '#A7F3D0' }} />
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>Kabuuang Nakolekta (Gross):</Typography>
+              <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>
+                {language === 'tl' ? 'Kabuuang Nakolekta (Gross):' : 'Total Collected (Gross):'}
+              </Typography>
               <Typography sx={{ fontSize: '24px', fontWeight: 900, color: '#1E8E3E' }}>₱{justCompleted.fareAmount.toFixed(2)}</Typography>
             </Box>
           </Paper>
@@ -137,7 +143,9 @@ export const DriverEarnings: React.FC = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <AccountBalanceWalletIcon sx={{ color: '#FF6B00' }} />
-              <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#94A3B8' }}>KABUUANG KITA NGAYONG ARAW</Typography>
+              <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#94A3B8' }}>
+                {language === 'tl' ? 'KABUUANG KITA NGAYONG ARAW' : "TODAY'S TOTAL EARNINGS"}
+              </Typography>
             </Box>
             <Chip label="Live Total" size="small" sx={{ backgroundColor: 'rgba(255, 107, 0, 0.2)', color: '#FF8533', fontWeight: 700, fontSize: '10.5px' }} />
           </Box>
@@ -146,19 +154,25 @@ export const DriverEarnings: React.FC = () => {
             ₱{todayTotal > 0 ? todayTotal.toFixed(2) : '680.00'}
           </Typography>
           <Typography sx={{ fontSize: '12px', color: '#94A3B8', mt: 0.5 }}>
-            {completedList.length > 0 ? completedList.length : 8} nakumpletong biyahe ngayong araw
+            {completedList.length > 0 ? completedList.length : 8} {language === 'tl' ? 'nakumpletong biyahe ngayong araw' : 'completed trips today'}
           </Typography>
 
           <Divider sx={{ my: 2, borderColor: 'rgba(255, 255, 255, 0.1)' }} />
 
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box>
-              <Typography sx={{ fontSize: '11px', color: '#94A3B8' }}>Kita sa Linggong Ito</Typography>
+              <Typography sx={{ fontSize: '11px', color: '#94A3B8' }}>
+                {language === 'tl' ? 'Kita sa Linggong Ito' : "This Week's Earnings"}
+              </Typography>
               <Typography sx={{ fontSize: '16px', fontWeight: 800, color: '#FFFFFF' }}>₱{weekTotal.toFixed(2)}</Typography>
             </Box>
             <Box sx={{ textAlign: 'right' }}>
-              <Typography sx={{ fontSize: '11px', color: '#94A3B8' }}>Kabuuang Biyahe (Linggo)</Typography>
-              <Typography sx={{ fontSize: '16px', fontWeight: 800, color: '#34D399' }}>{completedList.length + 41} biyahe</Typography>
+              <Typography sx={{ fontSize: '11px', color: '#94A3B8' }}>
+                {language === 'tl' ? 'Kabuuang Biyahe (Linggo)' : 'Total Trips (Week)'}
+              </Typography>
+              <Typography sx={{ fontSize: '16px', fontWeight: 800, color: '#34D399' }}>
+                {completedList.length + 41} {language === 'tl' ? 'biyahe' : 'trips'}
+              </Typography>
             </Box>
           </Box>
         </Paper>
@@ -166,7 +180,7 @@ export const DriverEarnings: React.FC = () => {
         {/* Recent Completed Trips Breakdown List */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <Typography sx={{ fontSize: '14px', fontWeight: 800, color: '#0F172A', px: 0.5 }}>
-            Mga Nakaraang Biyahe (Completed Trips)
+            {language === 'tl' ? 'Mga Nakaraang Biyahe' : 'Recent Completed Trips'}
           </Typography>
 
           {completedList.slice(0, 6).map((trip, idx) => (
@@ -235,7 +249,7 @@ export const DriverEarnings: React.FC = () => {
             '&:hover': { backgroundColor: '#1E293B' },
           }}
         >
-          Bumalik sa Driver Dashboard
+          {language === 'tl' ? 'Bumalik sa Driver Dashboard' : 'Return to Driver Dashboard'}
         </Button>
       </Box>
     </Box>

@@ -17,6 +17,7 @@ import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import ExitToAppIcon from "@mui/icons-material/ExitToApp";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
+import { useLanguage } from "../../../../utils/LanguageContext";
 
 export interface PassengerNavigationDrawerProps {
   isOpen: boolean;
@@ -40,6 +41,7 @@ const PassengerNavigationDrawer: React.FC<PassengerNavigationDrawerProps> = ({
   onLogout,
 }) => {
   const navigate = useNavigate();
+  const { language } = useLanguage();
 
   const handleProfileClick = () => {
     onClose();
@@ -197,7 +199,7 @@ const PassengerNavigationDrawer: React.FC<PassengerNavigationDrawerProps> = ({
                   <Typography
                     sx={{ fontSize: "16px", fontWeight: 600, color: "#0F172A" }}
                   >
-                    Nai-save na Lugar
+                    {language === "tl" ? "Nai-save na Lugar" : "Saved Places"}
                   </Typography>
                 }
               />
@@ -250,7 +252,7 @@ const PassengerNavigationDrawer: React.FC<PassengerNavigationDrawerProps> = ({
                   <Typography
                     sx={{ fontSize: "16px", fontWeight: 600, color: "#0F172A" }}
                   >
-                    Puna at Rating (Feedback)
+                    {language === "tl" ? "Puna at Rating (Feedback)" : "Feedback & Rating"}
                   </Typography>
                 }
               />
@@ -275,7 +277,7 @@ const PassengerNavigationDrawer: React.FC<PassengerNavigationDrawerProps> = ({
                   <Typography
                     sx={{ fontSize: "16px", fontWeight: 600, color: "#DC2626" }}
                   >
-                    I-ulat ang Insidente
+                    {language === "tl" ? "I-ulat ang Insidente" : "Report Incident"}
                   </Typography>
                 }
               />

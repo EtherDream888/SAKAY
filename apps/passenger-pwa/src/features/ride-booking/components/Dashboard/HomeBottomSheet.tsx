@@ -64,7 +64,7 @@ const HomeBottomSheet: React.FC<HomeBottomSheetProps> = ({
           fontFamily: "Poppins, sans-serif",
         }}
       >
-        Kamusta, {firstName}!{" "}
+        {language === "tl" ? `Kamusta, ${firstName}! ` : `Hello, ${firstName}! `}
         <Box component="span" sx={{ fontWeight: 800 }}>
           {language === "tl" ? "Saan tayo pupunta?" : "Where are we going?"}
         </Box>

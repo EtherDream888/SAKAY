@@ -39,8 +39,10 @@ import {
 } from '@sakay/shared/mockDispatch';
 
 import { supabase } from '../../../services/supabaseClient';
+import { useLanguage } from '../../../utils/LanguageContext';
 
 export const DriverAvailabilityHome: React.FC = () => {
+  const { language } = useLanguage();
   const navigate = useNavigate();
 
   // Location Permission Modal State (matching iOS permission prompt)
@@ -543,9 +545,9 @@ export const DriverAvailabilityHome: React.FC = () => {
         label={
           profile.isOnline
             ? profile.isPaused
-              ? 'Dispatch Paused'
-              : 'Searching for nearby passengers...'
-            : 'Offline • Go online to receive trips'
+              ? (language === 'tl' ? 'Naka-pause ang Dispatch' : 'Dispatch Paused')
+              : (language === 'tl' ? 'Naghahanap ng mga pasahero...' : 'Searching for nearby passengers...')
+            : (language === 'tl' ? 'Offline • Mag-online para makatanggap ng biyahe' : 'Offline • Go online to receive trips')
         }
         sx={{
           position: 'absolute',
@@ -646,7 +648,9 @@ export const DriverAvailabilityHome: React.FC = () => {
         {!canGoOnline && (
           <Box sx={{ p: '10px 14px', borderRadius: '12px', backgroundColor: '#FEF3C7', border: '1px solid #FDE68A', display: 'flex', alignItems: 'center', gap: 1 }}>
             <Typography sx={{ fontSize: '11.5px', color: '#B45309', fontWeight: 700 }}>
-              Please select a Verified TODA and Tricycle Unit before going Online.
+              {language === 'tl'
+                ? 'Pumili muna ng beripikadong TODA at Tricycle Unit bago mag-Online.'
+                : 'Please select a Verified TODA and Tricycle Unit before going Online.'}
             </Typography>
           </Box>
         )}
@@ -669,10 +673,10 @@ export const DriverAvailabilityHome: React.FC = () => {
         >
           <Box>
             <Typography sx={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-              Active TODA Affiliation
+              {language === 'tl' ? 'Kinabibilangang TODA' : 'Active TODA Affiliation'}
             </Typography>
             <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', mt: '2px' }}>
-              {selectedToda ? `${selectedToda.name} (${selectedToda.acronym})` : 'Select TODA...'}
+              {selectedToda ? `${selectedToda.name} (${selectedToda.acronym})` : (language === 'tl' ? 'Pumili ng TODA...' : 'Select TODA...')}
             </Typography>
           </Box>
           <ArrowForwardIosIcon sx={{ fontSize: 14, color: '#94A3B8' }} />
@@ -696,10 +700,12 @@ export const DriverAvailabilityHome: React.FC = () => {
         >
           <Box>
             <Typography sx={{ fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-              Tricycle Unit in Use
+              {language === 'tl' ? 'Gamit na Tricycle Unit' : 'Tricycle Unit in Use'}
             </Typography>
             <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', mt: '2px' }}>
-              {selectedVehicle ? `Plate: ${selectedVehicle.plateNumber} • Franchise: ${selectedVehicle.franchiseNumber}` : 'Select Tricycle Unit...'}
+              {selectedVehicle
+                ? `${language === 'tl' ? 'Plaka' : 'Plate'}: ${selectedVehicle.plateNumber} • Franchise: ${selectedVehicle.franchiseNumber}`
+                : (language === 'tl' ? 'Pumili ng Tricycle Unit...' : 'Select Tricycle Unit...')}
             </Typography>
           </Box>
           <ArrowForwardIosIcon sx={{ fontSize: 14, color: '#94A3B8' }} />
@@ -724,12 +730,18 @@ export const DriverAvailabilityHome: React.FC = () => {
           }}
         >
           <DialogTitle sx={{ textAlign: 'center', pb: 1, pt: 2 }}>
-            <Chip label={`New Booking Request (${countdown}s)`} color="warning" sx={{ fontWeight: 800, fontSize: '12px' }} />
+            <Chip
+              label={language === 'tl' ? `Bagong Booking Request (${countdown}s)` : `New Booking Request (${countdown}s)`}
+              color="warning"
+              sx={{ fontWeight: 800, fontSize: '12px' }}
+            />
             <Typography sx={{ fontSize: '19px', fontWeight: 800, color: '#0F172A', mt: 1 }}>
-              {incomingRequest.is_shared_trip ? 'Shared Commuter Ride' : 'Solo Charter Ride'}
+              {incomingRequest.is_shared_trip
+                ? (language === 'tl' ? 'Shared Commuter Ride' : 'Shared Commuter Ride')
+                : (language === 'tl' ? 'Solo Charter Ride' : 'Solo Charter Ride')}
             </Typography>
             <Typography sx={{ fontSize: '13px', color: '#64748B' }}>
-              Passenger: <strong>{incomingRequest.passenger_name}</strong> • {incomingRequest.passenger_count} passenger(s)
+              {language === 'tl' ? 'Pasahero:' : 'Passenger:'} <strong>{incomingRequest.passenger_name}</strong> • {incomingRequest.passenger_count} {language === 'tl' ? 'pasahero' : 'passenger(s)'}
             </Typography>
           </DialogTitle>
 
@@ -738,7 +750,9 @@ export const DriverAvailabilityHome: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 1.5 }}>
                 <LocationOnIcon sx={{ color: '#10B981', fontSize: 20 }} />
                 <Box>
-                  <Typography sx={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700 }}>PICKUP LOCATION</Typography>
+                  <Typography sx={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700 }}>
+                    {language === 'tl' ? 'LOKASYON NG PICKUP' : 'PICKUP LOCATION'}
+                  </Typography>
                   <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>{incomingRequest.pickup_address}</Typography>
                 </Box>
               </Box>
@@ -746,7 +760,9 @@ export const DriverAvailabilityHome: React.FC = () => {
               <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
                 <LocationOnIcon sx={{ color: '#EF4444', fontSize: 20 }} />
                 <Box>
-                  <Typography sx={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700 }}>DESTINATION</Typography>
+                  <Typography sx={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700 }}>
+                    {language === 'tl' ? 'DESTINASYON' : 'DESTINATION'}
+                  </Typography>
                   <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A' }}>{incomingRequest.dropoff_address}</Typography>
                 </Box>
               </Box>
@@ -754,11 +770,15 @@ export const DriverAvailabilityHome: React.FC = () => {
 
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 1 }}>
               <Box>
-                <Typography sx={{ fontSize: '11.5px', color: '#64748B' }}>Estimated Distance</Typography>
+                <Typography sx={{ fontSize: '11.5px', color: '#64748B' }}>
+                  {language === 'tl' ? 'Tinatayang Distansya' : 'Estimated Distance'}
+                </Typography>
                 <Typography sx={{ fontSize: '15px', fontWeight: 700, color: '#0F172A' }}>{incomingRequest.estimated_distance_km} km</Typography>
               </Box>
               <Box sx={{ textAlign: 'right' }}>
-                <Typography sx={{ fontSize: '11.5px', color: '#64748B' }}>Fare</Typography>
+                <Typography sx={{ fontSize: '11.5px', color: '#64748B' }}>
+                  {language === 'tl' ? 'Pamasahe' : 'Fare'}
+                </Typography>
                 <Typography sx={{ fontSize: '24px', fontWeight: 900, color: '#FF6B00' }}>₱{incomingRequest.estimated_fare.toFixed(2)}</Typography>
               </Box>
             </Box>
@@ -772,7 +792,7 @@ export const DriverAvailabilityHome: React.FC = () => {
               onClick={handleDeclineRequest}
               sx={{ height: 48, borderRadius: '14px', fontWeight: 700, color: '#64748B', textTransform: 'none' }}
             >
-              Decline
+              {language === 'tl' ? 'Tanggihan' : 'Decline'}
             </Button>
 
             <Button
@@ -790,7 +810,7 @@ export const DriverAvailabilityHome: React.FC = () => {
                 '&:hover': { backgroundColor: '#137333' },
               }}
             >
-              Accept
+              {language === 'tl' ? 'Tanggapin' : 'Accept'}
             </Button>
           </DialogActions>
         </Dialog>
@@ -798,7 +818,9 @@ export const DriverAvailabilityHome: React.FC = () => {
 
       {/* 5. TODA Selection Modal */}
       <Dialog open={todaModalOpen} onClose={() => setTodaModalOpen(false)} fullWidth maxWidth="xs" slotProps={{ paper: { sx: { borderRadius: '20px' } } }}>
-        <DialogTitle sx={{ fontWeight: 800, color: '#0F172A' }}>Select Active TODA</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800, color: '#0F172A' }}>
+          {language === 'tl' ? 'Pumili ng Aktibong TODA' : 'Select Active TODA'}
+        </DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
             {ACCREDITED_TODAS.map((toda) => (
@@ -828,7 +850,9 @@ export const DriverAvailabilityHome: React.FC = () => {
 
       {/* 6. Vehicle Selection Modal */}
       <Dialog open={vehicleModalOpen} onClose={() => setVehicleModalOpen(false)} fullWidth maxWidth="xs" slotProps={{ paper: { sx: { borderRadius: '20px' } } }}>
-        <DialogTitle sx={{ fontWeight: 800, color: '#0F172A' }}>Select Tricycle Unit</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 800, color: '#0F172A' }}>
+          {language === 'tl' ? 'Pumili ng Tricycle Unit' : 'Select Tricycle Unit'}
+        </DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
             {VERIFIED_TRICYCLES.map((veh) => (
@@ -887,7 +911,7 @@ export const DriverAvailabilityHome: React.FC = () => {
               fontFamily: 'Poppins, sans-serif',
             }}
           >
-            Payagan ang “SAKAY” na gamitin ang iyong lokasyon?
+            {language === 'tl' ? 'Payagan ang “SAKAY” na gamitin ang iyong lokasyon?' : 'Allow “SAKAY” to use your location?'}
           </Typography>
           <Typography
             sx={{
@@ -898,7 +922,9 @@ export const DriverAvailabilityHome: React.FC = () => {
               fontFamily: 'Poppins, sans-serif',
             }}
           >
-            Ginagamit ang iyong lokasyon para makahanap ng malapit na drayber at masubaybayan ang iyong biyahe sa mapa.
+            {language === 'tl'
+              ? 'Ginagamit ang iyong lokasyon para makahanap ng malapit na pasahero at masubaybayan ang iyong biyahe sa mapa.'
+              : 'Your location is used to find nearby passengers and track your trip on the map.'}
           </Typography>
         </Box>
 
@@ -918,7 +944,7 @@ export const DriverAvailabilityHome: React.FC = () => {
             '&:hover': { backgroundColor: '#F8FAFC' },
           }}
         >
-          Payagan nang isang beses
+          {language === 'tl' ? 'Payagan nang isang beses' : 'Allow Once'}
         </Button>
 
         <Divider sx={{ borderColor: '#E2E8F0' }} />
@@ -937,7 +963,7 @@ export const DriverAvailabilityHome: React.FC = () => {
             '&:hover': { backgroundColor: '#FFF8F0' },
           }}
         >
-          Habang Ginagamit ang App
+          {language === 'tl' ? 'Habang Ginagamit ang App' : 'While Using the App'}
         </Button>
 
         <Divider sx={{ borderColor: '#E2E8F0' }} />
@@ -956,7 +982,7 @@ export const DriverAvailabilityHome: React.FC = () => {
             '&:hover': { backgroundColor: '#F8FAFC' },
           }}
         >
-          Huwag Payagan
+          {language === 'tl' ? 'Huwag Payagan' : "Don't Allow"}
         </Button>
       </Dialog>
     </Box>

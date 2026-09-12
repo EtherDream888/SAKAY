@@ -13,6 +13,8 @@ import NotificationsIcon from '@mui/icons-material/Notifications';
 import HistoryIcon from '@mui/icons-material/History';
 import PersonIcon from '@mui/icons-material/Person';
 
+import { useLanguage } from '../../utils/LanguageContext';
+
 interface NavTabItem {
   key: string;
   label: string;
@@ -21,6 +23,7 @@ interface NavTabItem {
 }
 
 export const DriverMobileAppShell: React.FC = () => {
+  const { language } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname;
@@ -43,13 +46,13 @@ export const DriverMobileAppShell: React.FC = () => {
     },
     {
       key: 'earnings',
-      label: 'Kita',
+      label: language === 'tl' ? 'Kita' : 'Earnings',
       path: '/driver/earnings',
       icon: <AccountBalanceWalletIcon sx={{ fontSize: 22 }} />,
     },
     {
       key: 'notifications',
-      label: 'Abiso',
+      label: language === 'tl' ? 'Abiso' : 'Alerts',
       path: '/driver/notifications',
       icon: (
         <Badge badgeContent={1} color="error" variant="dot">
@@ -59,7 +62,7 @@ export const DriverMobileAppShell: React.FC = () => {
     },
     {
       key: 'history',
-      label: 'Biyahe',
+      label: language === 'tl' ? 'Biyahe' : 'Trips',
       path: '/driver/history',
       icon: <HistoryIcon sx={{ fontSize: 22 }} />,
     },

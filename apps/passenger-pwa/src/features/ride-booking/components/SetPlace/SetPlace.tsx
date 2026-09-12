@@ -17,10 +17,12 @@ import {
   searchPlaces,
   DEFAULT_CALAPAN_CENTER,
 } from "../../../../services/locationService";
+import { useLanguage } from "../../../../utils/LanguageContext";
 
 const SetPlace: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
 
   const navState = location.state as {
     target?: "pickup" | "dropoff";
@@ -192,7 +194,7 @@ const SetPlace: React.FC = () => {
                   value={pickupText}
                   onChange={(e) => setPickupText(e.target.value)}
                   onFocus={() => setActiveTarget("pickup")}
-                  placeholder="Saan ka susunduin?"
+                  placeholder={language === "tl" ? "Saan ka susunduin?" : "Where should we pick you up?"}
                   sx={{
                     color: "#FFFFFF",
                     fontSize: "14px",
@@ -246,13 +248,13 @@ const SetPlace: React.FC = () => {
                     fontFamily: "Poppins, sans-serif",
                   }}
                 >
-                  DESTINASYON
+                  {language === "tl" ? "DESTINASYON" : "DESTINATION"}
                 </Typography>
                 <InputBase
                   value={dropoffText}
                   onChange={(e) => setDropoffText(e.target.value)}
                   onFocus={() => setActiveTarget("dropoff")}
-                  placeholder="I-type ang lugar"
+                  placeholder={language === "tl" ? "I-type ang lugar" : "Type a destination"}
                   autoFocus={initialTarget === "dropoff"}
                   sx={{
                     color: "#FFFFFF",

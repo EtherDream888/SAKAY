@@ -22,8 +22,10 @@ import {
   DEFAULT_CALAPAN_CENTER,
   getCurrentDevicePosition,
 } from "../../../../services/locationService";
+import { useLanguage } from "../../../../utils/LanguageContext";
 
 const Dashboard: React.FC = () => {
+  const { language } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -119,7 +121,7 @@ const Dashboard: React.FC = () => {
       setPermissionModalOpen(false);
       setPermissionRequesting(false);
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : "Hindi makuha ang iyong lokasyon.";
+      const errMsg = err instanceof Error ? err.message : (language === 'tl' ? "Hindi makuha ang iyong lokasyon." : "Unable to get your location.");
       setPermissionError(errMsg);
       setPermissionRequesting(false);
       localStorage.setItem("gps_permission", "false");
@@ -268,7 +270,7 @@ const Dashboard: React.FC = () => {
             />
             <Box>
               <Typography sx={{ fontSize: "12px", fontWeight: 700, color: "#FF6B00" }}>
-                Aktibong Biyahe: {activeBooking.booking_status}
+                {language === 'tl' ? 'Aktibong Biyahe:' : 'Active Trip:'} {activeBooking.booking_status}
               </Typography>
               <Typography sx={{ fontSize: "11px", color: "#94A3B8" }}>
                 {activeBooking.pickup_address.split(',')[0]} ➜ {activeBooking.dropoff_address.split(',')[0]}
@@ -276,7 +278,7 @@ const Dashboard: React.FC = () => {
             </Box>
           </Box>
           <Typography sx={{ fontSize: "12px", fontWeight: 800, color: "#FFFFFF" }}>
-            Subaybayan ➜
+            {language === 'tl' ? 'Subaybayan ➜' : 'Track ➜'}
           </Typography>
         </Paper>
       )}
@@ -379,7 +381,7 @@ const Dashboard: React.FC = () => {
                   fontFamily: "Poppins, sans-serif",
                 }}
               >
-                Payagan ang “SAKAY” na gamitin ang iyong lokasyon?
+                {language === 'tl' ? 'Payagan ang “SAKAY” na gamitin ang iyong lokasyon?' : 'Allow “SAKAY” to use your location?'}
               </Typography>
               <Typography
                 sx={{
@@ -390,14 +392,16 @@ const Dashboard: React.FC = () => {
                   fontFamily: "Poppins, sans-serif",
                 }}
               >
-                Ginagamit ang iyong lokasyon para makahanap ng malapit na drayber at masubaybayan ang iyong biyahe sa mapa.
+                {language === 'tl'
+                  ? 'Ginagamit ang iyong lokasyon para makahanap ng malapit na drayber at masubaybayan ang iyong biyahe sa mapa.'
+                  : 'Your location is used to find nearby drivers and track your ride on the map.'}
               </Typography>
 
               {permissionRequesting && (
                 <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", marginTop: "12px" }}>
                   <CircularProgress size={16} sx={{ color: "#FF6B00" }} />
                   <Typography sx={{ fontSize: "12px", color: "#FF6B00", fontWeight: 600 }}>
-                    Humihingi ng pahintulot sa browser...
+                    {language === 'tl' ? 'Humihingi ng pahintulot sa browser...' : 'Requesting browser permission...'}
                   </Typography>
                 </Box>
               )}
@@ -424,7 +428,7 @@ const Dashboard: React.FC = () => {
                 "&:hover": { backgroundColor: "#F8FAFC" },
               }}
             >
-              Payagan nang isang beses
+              {language === 'tl' ? 'Payagan nang isang beses' : 'Allow Once'}
             </Button>
 
             <Divider sx={{ borderColor: "#E2E8F0" }} />
@@ -442,7 +446,7 @@ const Dashboard: React.FC = () => {
                 "&:hover": { backgroundColor: "#F8FAFC" },
               }}
             >
-              Habang Ginagamit ang App
+              {language === 'tl' ? 'Habang Ginagamit ang App' : 'While Using the App'}
             </Button>
 
             <Divider sx={{ borderColor: "#E2E8F0" }} />
@@ -460,7 +464,7 @@ const Dashboard: React.FC = () => {
                 "&:hover": { backgroundColor: "#F8FAFC", color: "#EF4444" },
               }}
             >
-              Huwag Payagan
+              {language === 'tl' ? 'Huwag Payagan' : "Don't Allow"}
             </Button>
           </Paper>
         </Box>

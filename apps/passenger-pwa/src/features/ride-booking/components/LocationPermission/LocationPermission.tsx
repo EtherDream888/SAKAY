@@ -11,8 +11,10 @@ import CircularProgress from "@mui/material/CircularProgress";
 import MapView from "../../../../common/components/MapView";
 import HomeHeader from "../Dashboard/HomeHeader";
 import { getCurrentDevicePosition } from "../../../../services/locationService";
+import { useLanguage } from "../../../../utils/LanguageContext";
 
 const LocationPermission: React.FC = () => {
+  const { language } = useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   const destination = (location.state as { from?: string })?.from || "/new-trip";
@@ -46,7 +48,7 @@ const LocationPermission: React.FC = () => {
         },
       });
     } catch (err: unknown) {
-      const errMsg = err instanceof Error ? err.message : "Hindi makuha ang iyong lokasyon.";
+      const errMsg = err instanceof Error ? err.message : (language === 'tl' ? "Hindi makuha ang iyong lokasyon." : "Unable to get your location.");
       setErrorMessage(errMsg);
       setRequesting(false);
 
@@ -134,7 +136,7 @@ const LocationPermission: React.FC = () => {
                 fontFamily: "Poppins, sans-serif",
               }}
             >
-              Payagan ang “SAKAY” na gamitin ang iyong lokasyon?
+              {language === 'tl' ? 'Payagan ang “SAKAY” na gamitin ang iyong lokasyon?' : 'Allow “SAKAY” to use your location?'}
             </Typography>
             <Typography
               sx={{
@@ -145,7 +147,9 @@ const LocationPermission: React.FC = () => {
                 fontFamily: "Poppins, sans-serif",
               }}
             >
-              Ginagamit ang iyong lokasyon para makahanap ng malapit na drayber at masubaybayan ang iyong biyahe.
+              {language === 'tl'
+                ? 'Ginagamit ang iyong lokasyon para makahanap ng malapit na drayber at masubaybayan ang iyong biyahe.'
+                : 'Your location is used to find nearby drivers and track your trip.'}
             </Typography>
 
             {/* Live feedback alert during permission request or denial */}
@@ -153,7 +157,7 @@ const LocationPermission: React.FC = () => {
               <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "8px", marginTop: "12px" }}>
                 <CircularProgress size={16} sx={{ color: "#FF6B00" }} />
                 <Typography sx={{ fontSize: "12px", color: "#FF6B00", fontWeight: 600 }}>
-                  Humihingi ng pahintulot sa browser...
+                  {language === 'tl' ? 'Humihingi ng pahintulot sa browser...' : 'Requesting browser permission...'}
                 </Typography>
               </Box>
             )}
@@ -183,7 +187,7 @@ const LocationPermission: React.FC = () => {
               "&:hover": { backgroundColor: "#F8FAFC" },
             }}
           >
-            Payagan nang isang beses
+            {language === 'tl' ? 'Payagan nang isang beses' : 'Allow Once'}
           </Button>
 
           <Divider sx={{ borderColor: "#E2E8F0" }} />
@@ -204,7 +208,7 @@ const LocationPermission: React.FC = () => {
               "&:hover": { backgroundColor: "#F8FAFC" },
             }}
           >
-            Payagan Habang Ginagamit ang App
+            {language === 'tl' ? 'Payagan Habang Ginagamit ang App' : 'While Using the App'}
           </Button>
 
           <Divider sx={{ borderColor: "#E2E8F0" }} />
@@ -225,7 +229,7 @@ const LocationPermission: React.FC = () => {
               "&:hover": { backgroundColor: "#F8FAFC" },
             }}
           >
-            Huwag payagan
+            {language === 'tl' ? 'Huwag payagan' : "Don't Allow"}
           </Button>
         </Paper>
       </Box>

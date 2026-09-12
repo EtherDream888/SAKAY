@@ -16,8 +16,10 @@ import Rating from "@mui/material/Rating";
 
 import type { HistoryTrip } from "../../../services/tripService";
 import { fetchTripHistory } from "../../../services/tripService";
+import { useLanguage } from "../../../utils/LanguageContext";
 
 const PassengerHistory: React.FC = () => {
+  const { language } = useLanguage();
   const navigate = useNavigate();
   const [trips, setTrips] = useState<HistoryTrip[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -132,7 +134,7 @@ const PassengerHistory: React.FC = () => {
                     fontFamily: "Poppins, sans-serif",
                   }}
                 >
-                  NGAYONG ARAW
+                  {language === 'tl' ? 'NGAYONG ARAW' : 'TODAY'}
                 </Typography>
 
                 {todayTrips.map((trip) => (
@@ -339,7 +341,7 @@ const PassengerHistory: React.FC = () => {
                     fontFamily: "Poppins, sans-serif",
                   }}
                 >
-                  NAKARAANG ARAW
+                  {language === 'tl' ? 'NAKARAANG MGA BIYAHE' : 'PAST TRIPS'}
                 </Typography>
 
                 {pastTrips.map((trip) => (
@@ -550,14 +552,14 @@ const PassengerHistory: React.FC = () => {
         {selectedDetails && (
           <>
             <DialogTitle sx={{ fontWeight: 800, fontSize: "16px", color: "#0F172A" }}>
-              Detalye ng Biyahe
+              {language === 'tl' ? 'Detalye ng Biyahe' : 'Trip Details'}
             </DialogTitle>
             <DialogContent sx={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               <Typography sx={{ fontSize: "12px", color: "#64748B" }}>
                 ID: <strong>{selectedDetails.id}</strong>
               </Typography>
               <Typography sx={{ fontSize: "12px", color: "#64748B" }}>
-                Petsa: <strong>{selectedDetails.dateString} ({selectedDetails.time})</strong>
+                {language === 'tl' ? 'Petsa:' : 'Date:'} <strong>{selectedDetails.dateString} ({selectedDetails.time})</strong>
               </Typography>
               <Typography sx={{ fontSize: "12px", color: "#64748B" }}>
                 Pickup: <strong>{selectedDetails.pickup}</strong>
@@ -567,7 +569,7 @@ const PassengerHistory: React.FC = () => {
               </Typography>
               {selectedDetails.driverName && (
                 <Typography sx={{ fontSize: "12px", color: "#64748B" }}>
-                  Drayber: <strong>{selectedDetails.driverName} ({selectedDetails.bodyNumber})</strong>
+                  {language === 'tl' ? 'Drayber:' : 'Driver:'} <strong>{selectedDetails.driverName} ({selectedDetails.bodyNumber})</strong>
                 </Typography>
               )}
               {selectedDetails.type === "Share" && (
@@ -576,18 +578,20 @@ const PassengerHistory: React.FC = () => {
                     ✓ Final Proportionate Shared Tariff Applied
                   </Typography>
                   <Typography sx={{ fontSize: "10.5px", color: "#065F46" }}>
-                    Pinagsamang carpool fare base sa aktwal na sakay sa ruta.
+                    {language === 'tl'
+                      ? 'Pinagsamang carpool fare base sa aktwal na sakay sa ruta.'
+                      : 'Combined carpool fare based on actual riders on route.'}
                   </Typography>
                 </Box>
               )}
               <Typography sx={{ fontSize: "14px", fontWeight: 800, color: "#FF6B00", marginTop: "6px" }}>
-                Bayad: {selectedDetails.price} ({selectedDetails.type === "Share" ? "Shared Ride" : "Solo Charter"})
+                {language === 'tl' ? 'Bayad:' : 'Fare:'} {selectedDetails.price} ({selectedDetails.type === "Share" ? (language === 'tl' ? "Shared Ride" : "Shared Ride") : (language === 'tl' ? "Solo Charter" : "Solo Charter")})
               </Typography>
 
               {/* Previously Submitted Rating & Feedback */}
               <Box sx={{ p: 1.5, borderRadius: "12px", backgroundColor: "#FFF8F0", border: "1px solid #FFD6B3", mt: 0.5 }}>
                 <Typography sx={{ fontSize: "11px", color: "#FF6B00", fontWeight: 800, textTransform: "uppercase" }}>
-                  Iyong Naibigay na Rating at Feedback
+                  {language === 'tl' ? 'Iyong Naibigay na Rating at Feedback' : 'Your Rating & Feedback'}
                 </Typography>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1, my: 0.5 }}>
                   <Rating value={5} readOnly size="small" />
@@ -596,7 +600,9 @@ const PassengerHistory: React.FC = () => {
                   </Typography>
                 </Box>
                 <Typography sx={{ fontSize: "11px", color: "#475569", fontStyle: "italic" }}>
-                  "Ligtas at maayos ang biyahe. Mabait at magalang ang drayber."
+                  {language === 'tl'
+                    ? '"Ligtas at maayos ang biyahe. Mabait at magalang ang drayber."'
+                    : '"Safe and smooth ride. The driver was kind and courteous."'}
                 </Typography>
               </Box>
             </DialogContent>
@@ -616,13 +622,13 @@ const PassengerHistory: React.FC = () => {
                 }}
                 sx={{ color: "#EF4444", fontWeight: 600, fontSize: "11.5px", textTransform: "none" }}
               >
-                I-ulat ang Biyahe
+                {language === 'tl' ? 'I-ulat ang Biyahe' : 'Report Trip'}
               </Button>
               <Button
                 onClick={() => setSelectedDetails(null)}
                 sx={{ color: "#FF6B00", fontWeight: 700 }}
               >
-                Isara
+                {language === 'tl' ? 'Isara' : 'Close'}
               </Button>
             </DialogActions>
           </>

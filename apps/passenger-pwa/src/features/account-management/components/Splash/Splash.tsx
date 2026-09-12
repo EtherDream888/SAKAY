@@ -14,14 +14,14 @@ import tricycle from "@sakay/shared/src/assets/icons/app-icon.png";
 import { BookingIllustration, FareIllustration, SafetyIllustration } from "@sakay/shared";
 
 const Splash: React.FC = () => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const navigate = useNavigate();
 
   // State to manage onboarding steps:
   // 1: Animated splash sequence (tricycle rides in/out, logo fades in)
-  // 4: Onboarding Slide 1 (Mag-book ng Biyahe)
-  // 5: Onboarding Slide 2 (Tamang Pamasahe)
-  // 6: Onboarding Slide 3 (Ligtas at Maaasahan)
+  // 4: Onboarding Slide 1 (Mag-book ng Biyahe / Book a Ride)
+  // 5: Onboarding Slide 2 (Tamang Pamasahe / Fair Fares)
+  // 6: Onboarding Slide 3 (Ligtas at Maaasahan / Safe & Reliable)
   // 7: Main welcome landing page
   const [step, setStep] = useState(1);
 
@@ -79,18 +79,27 @@ const Splash: React.FC = () => {
     let activeDotIdx = 0;
 
     if (step === 4) {
-      slideTitle = "Mag-book ng Biyahe";
-      slideDesc = "Mabilis at madaling pag-book ng traysikel sa isang pindot lang kahit nasaan ka.";
+      slideTitle = language === "tl" ? "Mag-book ng Biyahe" : "Book a Ride";
+      slideDesc =
+        language === "tl"
+          ? "Mabilis at madaling pag-book ng traysikel sa isang pindot lang kahit nasaan ka."
+          : "Fast and easy tricycle booking in just one tap wherever you are in Calapan.";
       slideIllustration = <BookingIllustration />;
       activeDotIdx = 0;
     } else if (step === 5) {
-      slideTitle = "Tamang Pamasahe";
-      slideDesc = "Malinaw at tapat na presyo para sa bawat byahe, walang hulaan.";
+      slideTitle = language === "tl" ? "Tamang Pamasahe" : "Fair & Transparent Fares";
+      slideDesc =
+        language === "tl"
+          ? "Malinaw at tapat na presyo para sa bawat byahe, walang hulaan."
+          : "Clear and upfront pricing for every trip, based on official city tariffs.";
       slideIllustration = <FareIllustration />;
       activeDotIdx = 1;
     } else if (step === 6) {
-      slideTitle = "Ligtas at Maaasahan";
-      slideDesc = "Siguradong driver na lisensyado at rehistrado sa TODA ang susundo sa iyo.";
+      slideTitle = language === "tl" ? "Ligtas at Maaasahan" : "Safe & Reliable";
+      slideDesc =
+        language === "tl"
+          ? "Siguradong driver na lisensyado at rehistrado sa TODA ang susundo sa iyo."
+          : "Only licensed and TODA-registered drivers will pick you up.";
       slideIllustration = <SafetyIllustration />;
       activeDotIdx = 2;
     }
@@ -109,9 +118,20 @@ const Splash: React.FC = () => {
           paddingBottom: "calc(var(--safe-area-bottom) + 24px)",
         }}
       >
-        {/* Header Logo */}
-        <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
+        {/* Header Bar with Logo and Language Selector */}
+        <Box
+          sx={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <Box sx={{ width: "64px" }} />
           <Logo color="orange" />
+          <Box sx={{ width: "64px", display: "flex", justifyContent: "flex-end" }}>
+            <LanguageSelector />
+          </Box>
         </Box>
 
         {/* Illustration Container */}
@@ -162,7 +182,7 @@ const Splash: React.FC = () => {
         {/* Action Buttons */}
         <Box sx={{ width: "100%", display: "flex", flexDirection: "column" }}>
           <PrimaryButton fullWidth onClick={handleNextOnboarding}>
-            Magpatuloy
+            {t.continue}
           </PrimaryButton>
 
           {step !== 6 && (
@@ -182,7 +202,7 @@ const Splash: React.FC = () => {
                 },
               }}
             >
-              Laktawan
+              {t.skip}
             </Button>
           )}
         </Box>

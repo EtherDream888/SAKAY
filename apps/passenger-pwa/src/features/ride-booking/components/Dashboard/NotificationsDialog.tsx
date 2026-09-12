@@ -75,7 +75,7 @@ const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ open, onClose
                 fontFamily: "Poppins, sans-serif",
               }}
             >
-              Maligayang Pagdating sa SAKAY!
+              {language === "tl" ? "Maligayang Pagdating sa SAKAY!" : "Welcome to SAKAY!"}
             </Typography>
             <Typography
               sx={{
@@ -85,7 +85,9 @@ const NotificationsDialog: React.FC<NotificationsDialogProps> = ({ open, onClose
                 fontFamily: "Poppins, sans-serif",
               }}
             >
-              Mabilis at tapat na pamasahe sa tricycle saan man sa Calapan City.
+              {language === "tl"
+                ? "Mabilis at tapat na pamasahe sa tricycle saan man sa Calapan City."
+                : "Fast and fair tricycle fares anywhere in Calapan City."}
             </Typography>
           </Paper>
         </Box>

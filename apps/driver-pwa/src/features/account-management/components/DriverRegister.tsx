@@ -207,7 +207,7 @@ const RegisterInput: React.FC<RegisterInputProps> = ({
 
 export const DriverRegister: React.FC = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
@@ -289,10 +289,22 @@ export const DriverRegister: React.FC = () => {
   const fullName = [firstName.trim(), middleName.trim(), lastName.trim(), suffix.trim()].filter(Boolean).join(' ');
 
   const criteriaList = [
-    { label: 'Subukan ang hindi bababa sa 8 karakter', met: password.length >= 8 },
-    { label: 'Isama ang malalaking titik (A-Z) at maliliit na titik (a-z)', met: /[A-Z]/.test(password) && /[a-z]/.test(password) },
-    { label: 'Isama ang numero (0-9)', met: /\d/.test(password) },
-    { label: 'Isama ang simbolo (@, #, $, atbp.)', met: /[^A-Za-z0-9]/.test(password) },
+    {
+      label: language === 'tl' ? 'Subukan ang hindi bababa sa 8 karakter' : 'Try at least 8 characters',
+      met: password.length >= 8,
+    },
+    {
+      label: language === 'tl' ? 'Isama ang malalaking titik (A-Z) at maliliit na titik (a-z)' : 'Include uppercase (A-Z) and lowercase (a-z)',
+      met: /[A-Z]/.test(password) && /[a-z]/.test(password),
+    },
+    {
+      label: language === 'tl' ? 'Isama ang numero (0-9)' : 'Include a number (0-9)',
+      met: /\d/.test(password),
+    },
+    {
+      label: language === 'tl' ? 'Isama ang simbolo (@, #, $, atbp.)' : 'Include a symbol (@, #, $, etc.)',
+      met: /[^A-Za-z0-9]/.test(password),
+    },
   ];
 
   const metCount = criteriaList.filter((item) => item.met).length;
@@ -308,9 +320,9 @@ export const DriverRegister: React.FC = () => {
 
   const getStrengthLabel = () => {
     if (password.length === 0) return '';
-    if (metCount <= 2) return 'Mahina';
-    if (metCount === 3) return 'Katamtaman';
-    return 'Malakas';
+    if (metCount <= 2) return language === 'tl' ? 'Mahina' : 'Weak';
+    if (metCount === 3) return language === 'tl' ? 'Katamtaman' : 'Medium';
+    return language === 'tl' ? 'Malakas' : 'Strong';
   };
 
   const isPasswordMatched = confirmPassword.length > 0 && password === confirmPassword;
@@ -350,7 +362,7 @@ export const DriverRegister: React.FC = () => {
     const sessionResult = await ensureDriverAuthSession(cleanPhoneDigits, password, fullName, selectedTodaId);
     if (!sessionResult.success) {
       setSubmitted(false);
-      setAccountError(sessionResult.error || 'Hindi maihanda ang inyong account. Pakisubukang muli.');
+      setAccountError(sessionResult.error || (language === 'tl' ? 'Hindi maihanda ang inyong account. Pakisubukang muli.' : 'Unable to prepare your account. Please try again.'));
       return;
     }
 
@@ -433,7 +445,7 @@ export const DriverRegister: React.FC = () => {
           flexDirection: 'column',
         }}
       >
-        {/* Tagalog Title & Subtitle */}
+        {/* Title & Subtitle */}
         <Box sx={{ mb: 3.5, mt: 1 }}>
           <Typography
             sx={{
@@ -444,7 +456,7 @@ export const DriverRegister: React.FC = () => {
               letterSpacing: '-0.5px',
             }}
           >
-            Gumawa ng Account ng Drayber
+            {language === 'tl' ? 'Gumawa ng Account ng Drayber' : 'Create Driver Account'}
           </Typography>
           <Typography
             sx={{
@@ -454,7 +466,7 @@ export const DriverRegister: React.FC = () => {
               fontWeight: 500,
             }}
           >
-            Ilagay ang inyong impormasyon upang magparehistro.
+            {language === 'tl' ? 'Ilagay ang inyong impormasyon upang magparehistro.' : 'Enter your information to register.'}
           </Typography>
         </Box>
 
@@ -466,18 +478,18 @@ export const DriverRegister: React.FC = () => {
 
         {/* Input Fields Stack */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
-          {/* Stacked Name Fields: Unang Pangalan, Gitnang Pangalan, then Apelyido & Suffix */}
+          {/* Stacked Name Fields */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <RegisterInput
-              label="UNANG PANGALAN"
+              label={language === 'tl' ? "UNANG PANGALAN" : "FIRST NAME"}
               value={firstName}
               onChange={setFirstName}
               error={hasAttemptedSubmit && !firstName.trim()}
-              helperText={hasAttemptedSubmit && !firstName.trim() ? 'Kailangan ang unang pangalan.' : ''}
+              helperText={hasAttemptedSubmit && !firstName.trim() ? (language === 'tl' ? 'Kailangan ang unang pangalan.' : 'First name is required.') : ''}
             />
 
             <RegisterInput
-              label="GITNANG PANGALAN"
+              label={language === 'tl' ? "GITNANG PANGALAN" : "MIDDLE NAME"}
               value={middleName}
               onChange={setMiddleName}
             />
@@ -485,11 +497,11 @@ export const DriverRegister: React.FC = () => {
             <Box sx={{ display: 'flex', gap: 1.5 }}>
               <Box sx={{ flex: '7 7 70%', minWidth: 0 }}>
                 <RegisterInput
-                  label="APELYIDO"
+                  label={language === 'tl' ? "APELYIDO" : "LAST NAME"}
                   value={lastName}
                   onChange={setLastName}
                   error={hasAttemptedSubmit && !lastName.trim()}
-                  helperText={hasAttemptedSubmit && !lastName.trim() ? 'Kailangan ang apelyido.' : ''}
+                  helperText={hasAttemptedSubmit && !lastName.trim() ? (language === 'tl' ? 'Kailangan ang apelyido.' : 'Last name is required.') : ''}
                 />
               </Box>
               <Box sx={{ flex: '3 3 30%', minWidth: 0 }}>
@@ -552,7 +564,7 @@ export const DriverRegister: React.FC = () => {
                   zIndex: 1,
                 }}
               >
-                TODA NA KINABABILANGAN
+                {language === 'tl' ? 'TODA NA KINABABILANGAN' : 'AFFILIATED TODA'}
               </Typography>
               <Select
                 value={selectedTodaId}
@@ -585,7 +597,7 @@ export const DriverRegister: React.FC = () => {
                 }}
               >
                 <MenuItem value="" disabled sx={{ color: '#94A3B8', fontSize: '14px' }}>
-                  Piliin ang inyong TODA
+                  {language === 'tl' ? 'Piliin ang inyong TODA' : 'Select your TODA'}
                 </MenuItem>
                 {todaList.map((toda) => (
                   <MenuItem key={toda.id} value={toda.id} sx={{ fontSize: '14px', fontWeight: 500 }}>
@@ -596,20 +608,20 @@ export const DriverRegister: React.FC = () => {
             </Box>
             {hasAttemptedSubmit && !selectedTodaId && (
               <Typography sx={{ color: '#DC2626', fontSize: '12px', mt: 0.5, px: 1, fontWeight: 500 }}>
-                Pakipili muna ang inyong TODA.
+                {language === 'tl' ? 'Pakipili muna ang inyong TODA.' : 'Please select your TODA.'}
               </Typography>
             )}
           </Box>
 
           <SakayPhoneInput
-            label="NUMERO NG TELEPONO"
+            label={language === 'tl' ? "NUMERO NG TELEPONO" : "MOBILE NUMBER"}
             value={phone}
             onChange={(fullVal) => setPhone(fullVal)}
             required
             error={hasAttemptedSubmit && cleanPhoneDigits.length !== 11}
             helperText={
               hasAttemptedSubmit && cleanPhoneDigits.length !== 11
-                ? 'Pakikumpleto ang 10-digit mobile number na nagsisimula sa 9.'
+                ? (language === 'tl' ? 'Pakikumpleto ang 10-digit mobile number na nagsisimula sa 9.' : 'Please enter an 11-digit mobile number starting with 09.')
                 : ''
             }
           />
@@ -637,7 +649,7 @@ export const DriverRegister: React.FC = () => {
             <Box sx={{ mt: -0.5, mb: 1, px: 0.5 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
                 <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>
-                  Lakas ng Password:
+                  {language === 'tl' ? 'Lakas ng Password:' : 'Password Strength:'}
                 </Typography>
                 <Typography sx={{ fontSize: '12px', fontWeight: 700, color: getStrengthColor() }}>
                   {getStrengthLabel()}
@@ -682,14 +694,14 @@ export const DriverRegister: React.FC = () => {
           )}
 
           <RegisterInput
-            label="KUMPIRMAHIN ANG PASSWORD"
+            label={language === 'tl' ? "KUMPIRMAHIN ANG PASSWORD" : "CONFIRM PASSWORD"}
             type={showConfirmPassword ? 'text' : 'password'}
             value={confirmPassword}
             onChange={(val) => setConfirmPassword(val)}
             error={hasAttemptedSubmit && (isPasswordMismatched || !confirmPassword)}
             helperText={
               hasAttemptedSubmit && isPasswordMismatched
-                ? 'Hindi magkatugma ang inyong password.'
+                ? (language === 'tl' ? 'Hindi magkatugma ang inyong password.' : 'Passwords do not match.')
                 : ''
             }
             endAdornment={
@@ -706,7 +718,7 @@ export const DriverRegister: React.FC = () => {
 
           {showMatchSuccess && (
             <Typography sx={{ color: '#16A34A', fontSize: '12px', fontWeight: 600, px: 0.5, mt: -1 }}>
-              Magkatugma ang password!
+              {language === 'tl' ? 'Magkatugma ang password!' : 'Passwords match!'}
             </Typography>
           )}
         </Box>
@@ -746,7 +758,7 @@ export const DriverRegister: React.FC = () => {
             },
           }}
         >
-          Magpatuloy
+          {t.continue}
         </PrimaryButton>
 
         <Typography
@@ -761,7 +773,7 @@ export const DriverRegister: React.FC = () => {
             '&:hover': { color: '#0F172A' },
           }}
         >
-          May account ka na?{' '}
+          {language === 'tl' ? 'May account ka na?' : 'Already have an account?'}{' '}
           <Box
             component="span"
             sx={{
@@ -771,7 +783,7 @@ export const DriverRegister: React.FC = () => {
               '&:hover': { textDecoration: 'underline' },
             }}
           >
-            Mag-log in
+            {language === 'tl' ? 'Mag-log in' : 'Log in'}
           </Box>
         </Typography>
       </Box>
