@@ -5,9 +5,12 @@ import { Box, Typography } from '@mui/material';
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
 import { clearOnboardingCache } from '../../../services/driverOnboardingCache';
+import { useLanguage } from '../../../utils/LanguageContext';
 
 export const DriverRegistrationComplete: React.FC = () => {
   const navigate = useNavigate();
+  const { language } = useLanguage();
+  const isTagalog = language === 'tl';
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Native confetti particle burst constrained strictly to inner canvas inside PWA mobile container
@@ -147,7 +150,9 @@ export const DriverRegistrationComplete: React.FC = () => {
             mb: 1.5,
           }}
         >
-          Matagumpay ang iyong pagpaparehistro!
+          {isTagalog
+            ? 'Matagumpay ang iyong pagpaparehistro!'
+            : 'Registration Completed Successfully!'}
         </Typography>
 
         {/* Body Description */}
@@ -161,7 +166,9 @@ export const DriverRegistrationComplete: React.FC = () => {
             maxWidth: 320,
           }}
         >
-          Natanggap na namin ang iyong mga dokumento. Sisimulan na namin ang pag-review ng iyong account. Karaniwang tumatagal ito ng hanggang 24 oras.
+          {isTagalog
+            ? 'Natanggap na namin ang iyong mga dokumento. Sisimulan na namin ang pag-review ng iyong account. Karaniwang tumatagal ito ng hanggang 24 oras.'
+            : 'We have received your documents and will start reviewing your account. This usually takes up to 24 hours.'}
         </Typography>
       </Box>
 
@@ -176,7 +183,7 @@ export const DriverRegistrationComplete: React.FC = () => {
         }}
       >
         <PrimaryButton fullWidth onClick={handleBackToLogin}>
-          Bumalik sa Pag-login
+          {isTagalog ? 'Bumalik sa Pag-login' : 'Back to Login'}
         </PrimaryButton>
       </Box>
     </Box>

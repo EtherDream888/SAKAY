@@ -73,7 +73,11 @@ export const DriverScanTricycle: React.FC = () => {
     }
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setCameraError(t.useRearCameraError || 'Hindi mabuksan ang camera. Pakisubukang muli.');
+      setCameraError(
+        isTagalog
+          ? 'Hindi mabuksan ang camera. Pakisubukang muli.'
+          : 'Unable to access the camera. Please try again.'
+      );
       return;
     }
 
@@ -156,9 +160,13 @@ export const DriverScanTricycle: React.FC = () => {
       }
     } catch (err: unknown) {
       console.warn('[DriverScanTricycle] Camera stream error:', err);
-      setCameraError(t.useRearCameraError || 'Hindi mabuksan ang camera. Pakisubukang muli.');
+      setCameraError(
+        isTagalog
+          ? 'Hindi mabuksan ang camera. Pakisubukang muli.'
+          : 'Unable to access the camera. Please try again.'
+      );
     }
-  }, [t.useRearCameraError]);
+  }, [isTagalog]);
 
   useEffect(() => {
     startCamera(facingMode);
@@ -363,11 +371,23 @@ export const DriverScanTricycle: React.FC = () => {
             mb: 2,
           }}
         >
-          {t.scanFrontPromptPrefix || 'I-scan ang '}
-          <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>
-            Tricycle Unit
-          </Box>
-          {t.scanPromptSuffix || ' sa frame'}
+          {isTagalog ? (
+            <>
+              I-scan ang{' '}
+              <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>
+                Tricycle Unit
+              </Box>{' '}
+              sa frame
+            </>
+          ) : (
+            <>
+              Scan the{' '}
+              <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>
+                Tricycle Unit
+              </Box>{' '}
+              in the frame
+            </>
+          )}
         </Typography>
 
         {/* Viewfinder Target Area with Boundary & 4 Corner L-Brackets */}
@@ -423,7 +443,7 @@ export const DriverScanTricycle: React.FC = () => {
             >
               <VideocamOffOutlinedIcon sx={{ fontSize: 44, color: '#64748B' }} />
               <Typography sx={{ fontSize: '13px', color: '#94A3B8', textAlign: 'center' }}>
-                Camera stream offline
+                {isTagalog ? 'Hindi aktibo ang camera stream' : 'Camera stream offline'}
               </Typography>
             </Box>
           )}
@@ -512,7 +532,7 @@ export const DriverScanTricycle: React.FC = () => {
             >
               <CircularProgress size={38} sx={{ color: '#FF6B00', thickness: 4.5 }} />
               <Typography sx={{ color: '#FFFFFF', fontSize: '14.5px', fontWeight: 700, textAlign: 'center' }}>
-                {t.analyzingImageQuality || 'Sinusuri ang kalidad ng larawan...'}
+                {isTagalog ? 'Sinusuri ang kalidad ng larawan...' : 'Analyzing photo quality...'}
               </Typography>
             </Box>
           )}
@@ -583,7 +603,7 @@ export const DriverScanTricycle: React.FC = () => {
               gap: 1,
             }}
           >
-            {t.tipsTitle || 'PARA KUMUHA NG PERPEKTONG LITRATO:'}
+            {isTagalog ? 'PARA KUMUHA NG PERPEKTONG LITRATO:' : 'TIPS FOR TAKING A CLEAR PHOTO:'}
           </Typography>
           <Box
             component="ul"
@@ -596,10 +616,26 @@ export const DriverScanTricycle: React.FC = () => {
               '& li': { mb: 0.5 },
             }}
           >
-            <li>Ilagay ang iyong tricycle sa isang maliwanag at maluwag na lugar.</li>
-            <li>Siguraduhing malinaw at kita ang buong tricycle sa frame.</li>
-            <li>Panatilihing hindi gumagalaw ang camera habang kumukuha ng larawan.</li>
-            <li>Siguraduhing kita ang numero ng plaka sa tricycle unit.</li>
+            <li>
+              {isTagalog
+                ? 'Ilagay ang iyong tricycle sa isang maliwanag at maluwag na lugar.'
+                : 'Place your tricycle in a well-lit and spacious area.'}
+            </li>
+            <li>
+              {isTagalog
+                ? 'Siguraduhing malinaw at kita ang buong tricycle sa frame.'
+                : 'Make sure the entire tricycle is clearly visible in the frame.'}
+            </li>
+            <li>
+              {isTagalog
+                ? 'Panatilihing hindi gumagalaw ang camera habang kumukuha ng larawan.'
+                : 'Keep the camera steady while capturing the photo.'}
+            </li>
+            <li>
+              {isTagalog
+                ? 'Siguraduhing kita ang numero ng plaka sa tricycle unit.'
+                : 'Ensure the plate number on the tricycle unit is visible.'}
+            </li>
           </Box>
         </Box>
 
@@ -710,12 +746,14 @@ export const DriverScanTricycle: React.FC = () => {
         </Box>
 
         <DialogTitle sx={{ fontWeight: 800, color: '#0F172A', fontSize: '19px', p: 0, mb: 1 }}>
-          {t.qualityWarningTitle || 'Maayos ba ang Kuha?'}
+          {isTagalog ? 'Maayos ba ang Kuha?' : 'Does the photo look good?'}
         </DialogTitle>
 
         <DialogContent sx={{ p: 0, px: 1, mb: 2.5 }}>
           <Typography sx={{ color: '#475569', fontSize: '14px', lineHeight: 1.5, mb: 1 }}>
-            {t.qualityWarningDesc || 'Medyo malabo o madilim ang nakuha mong larawan. Siguraduhing malinaw ang kuha.'}
+            {isTagalog
+              ? 'Medyo malabo o madilim ang nakuha mong larawan. Siguraduhing malinaw ang kuha.'
+              : 'The captured photo appears blurry or dark. Please ensure the shot is clear and sharp.'}
           </Typography>
           {qualityAssessment?.issues && qualityAssessment.issues.length > 0 && (
             <Typography sx={{ color: '#DC2626', fontSize: '12px', fontWeight: 600 }}>
@@ -741,7 +779,7 @@ export const DriverScanTricycle: React.FC = () => {
               '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
             }}
           >
-            {t.qualityRetakeBtn || 'Kuhanan Muli'}
+            {isTagalog ? 'Kuhanan Muli' : 'Retake Photo'}
           </PrimaryButton>
 
           <Button
@@ -761,7 +799,7 @@ export const DriverScanTricycle: React.FC = () => {
               '&:hover': { backgroundColor: '#E2E8F0' },
             }}
           >
-            {t.useThisPhoto || 'Ipagpatuloy Pa Rin'}
+            {isTagalog ? 'Ipagpatuloy Pa Rin' : 'Use This Photo'}
           </Button>
         </DialogActions>
       </Dialog>

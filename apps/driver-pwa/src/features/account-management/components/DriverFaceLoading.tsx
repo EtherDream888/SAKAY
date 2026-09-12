@@ -115,5 +115,5 @@ export const DriverFaceLoading: React.FC = () => {
     executeFaceComparison();
   }, []);
 
-  return <DriverProgressLoader progress={displayedPct / 100} flowType="face" statusText={statusText} />;
+  return <DriverProgressLoader progress={displayedPct / 100} flowType="face" />;
 };

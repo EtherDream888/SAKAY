@@ -12,6 +12,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
+import { useLanguage } from '../../../utils/LanguageContext';
 import {
   getCachedLicenseData,
   getCachedMtopData,
@@ -74,6 +75,9 @@ const ReviewFieldRow: React.FC<ReviewFieldRowProps> = ({ label, value }) => (
 export const DriverConfirmAllInfo: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
+  const isTagalog = language === 'tl';
+
   const state = location.state as {
     phone?: string;
     driverName?: string;
@@ -153,11 +157,20 @@ export const DriverConfirmAllInfo: React.FC = () => {
         console.log('[DriverConfirmAllInfo] Registration submitted successfully!');
         navigate('/driver/registration-complete', { replace: true });
       } else {
-        setSubmitError(res.error || 'Hindi na-proseso ang huling submission. Pakisubukang muli.');
+        setSubmitError(
+          res.error ||
+          (isTagalog
+            ? 'Hindi na-proseso ang huling submission. Pakisubukang muli.'
+            : 'Could not process final submission. Please try again.')
+        );
       }
     } catch (err: any) {
       console.error('[DriverConfirmAllInfo] Exception during submission:', err);
-      setSubmitError('Nagkaroon ng hindi inaasahang problema. Pakisubukang muli.');
+      setSubmitError(
+        isTagalog
+          ? 'Nagkaroon ng hindi inaasahang problema. Pakisubukang muli.'
+          : 'An unexpected error occurred. Please try again.'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -229,7 +242,7 @@ export const DriverConfirmAllInfo: React.FC = () => {
             mb: 0.75,
           }}
         >
-          Kumpirmahin ang lahat ng iyong Impormasyon
+          {isTagalog ? 'Kumpirmahin ang lahat ng iyong Impormasyon' : 'Confirm All Your Information'}
         </Typography>
 
         <Typography
@@ -241,14 +254,16 @@ export const DriverConfirmAllInfo: React.FC = () => {
             mb: 2.5,
           }}
         >
-          Pakisuri kung tama ang lahat ng detalye mula sa bawat hakbang.
+          {isTagalog
+            ? 'Pakisuri kung tama ang lahat ng detalye mula sa bawat hakbang.'
+            : 'Please review and ensure all details from each step are correct.'}
         </Typography>
 
         {/* SECTION A: Personal na Impormasyon */}
         <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', mb: 1.5 }}>
             <Typography sx={{ flex: 1, minWidth: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
-              Personal na Impormasyon
+              {isTagalog ? 'Personal na Impormasyon' : 'Personal Information'}
             </Typography>
             <Typography
               onClick={() => navigate('/driver/confirm-license-info', { state: { ...state, isEditMode: true } })}
@@ -274,18 +289,18 @@ export const DriverConfirmAllInfo: React.FC = () => {
                 },
               }}
             >
-              I-edit
+              {isTagalog ? 'I-edit' : 'Edit'}
             </Typography>
           </Box>
 
-          <ReviewFieldRow label="UNANG PANGALAN" value={firstName} />
-          <ReviewFieldRow label="GITNANG PANGALAN" value={middleName || 'N/A'} />
-          <ReviewFieldRow label="APELYIDO" value={lastName} />
+          <ReviewFieldRow label={isTagalog ? "UNANG PANGALAN" : "FIRST NAME"} value={firstName} />
+          <ReviewFieldRow label={isTagalog ? "GITNANG PANGALAN" : "MIDDLE NAME"} value={middleName || 'N/A'} />
+          <ReviewFieldRow label={isTagalog ? "APELYIDO" : "LAST NAME"} value={lastName} />
           <ReviewFieldRow label="SUFFIX" value={suffix || 'N/A'} />
-          <ReviewFieldRow label="PETSA NG KAPANGANAKAN" value={licenseData.dob} />
-          <ReviewFieldRow label="KASARIAN" value={licenseData.gender} />
-          <ReviewFieldRow label="TIRAHAN" value={licenseData.address} />
-          <ReviewFieldRow label="KINABABALIKANG TODA" value={todaName} />
+          <ReviewFieldRow label={isTagalog ? "PETSA NG KAPANGANAKAN" : "DATE OF BIRTH"} value={licenseData.dob} />
+          <ReviewFieldRow label={isTagalog ? "KASARIAN" : "GENDER"} value={licenseData.gender} />
+          <ReviewFieldRow label={isTagalog ? "TIRAHAN" : "ADDRESS"} value={licenseData.address} />
+          <ReviewFieldRow label={isTagalog ? "KINABABALIKANG TODA" : "AFFILIATED TODA"} value={todaName} />
           <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
         </Box>
 
@@ -319,13 +334,13 @@ export const DriverConfirmAllInfo: React.FC = () => {
                 },
               }}
             >
-              I-edit
+              {isTagalog ? 'I-edit' : 'Edit'}
             </Typography>
           </Box>
 
-          <ReviewFieldRow label="NUMERO NG LISENSYA" value={licenseData.licenseNumber} />
-          <ReviewFieldRow label="RESTRIKSYON / KATEGORYA" value={licenseData.dlCodes} />
-          <ReviewFieldRow label="PETSA NG PAGKAPASO (EXPIRATION)" value={licenseData.expirationDate} />
+          <ReviewFieldRow label={isTagalog ? "NUMERO NG LISENSYA" : "DRIVER'S LICENSE NUMBER"} value={licenseData.licenseNumber} />
+          <ReviewFieldRow label={isTagalog ? "RESTRIKSYON / KATEGORYA" : "RESTRICTIONS / CODES"} value={licenseData.dlCodes} />
+          <ReviewFieldRow label={isTagalog ? "PETSA NG PAGKAPASO (EXPIRATION)" : "EXPIRATION DATE"} value={licenseData.expirationDate} />
           <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
         </Box>
 
@@ -333,7 +348,7 @@ export const DriverConfirmAllInfo: React.FC = () => {
         <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', mb: 1.5 }}>
             <Typography sx={{ flex: 1, minWidth: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
-              Motorcycle Tricycle Operator's Permit
+              {isTagalog ? "Permiso ng Prangkisa (MTOP)" : "Motorized Tricycle Operator's Permit (MTOP)"}
             </Typography>
             <Typography
               onClick={() => navigate('/driver/confirm-mtop-info', { state: { ...state, isEditMode: true } })}
@@ -359,19 +374,20 @@ export const DriverConfirmAllInfo: React.FC = () => {
                 },
               }}
             >
-              I-edit
+              {isTagalog ? 'I-edit' : 'Edit'}
             </Typography>
           </Box>
 
-          <ReviewFieldRow label="REHISTRADONG MAY-ARI / OPERATOR" value={mtopData.operatorName} />
-          <ReviewFieldRow label="PRANGKISA" value={mtopData.franchiseNumber} />
+          <ReviewFieldRow label={isTagalog ? "REHISTRADONG MAY-ARI / OPERATOR" : "REGISTERED OWNER / OPERATOR"} value={mtopData.operatorName} />
+          <ReviewFieldRow label={isTagalog ? "PRANGKISA" : "FRANCHISE NO."} value={mtopData.franchiseNumber} />
           <ReviewFieldRow label="PLATE NUMBER" value={mtopData.plateNumber} />
           <ReviewFieldRow label="CHASSIS NUMBER" value={mtopData.chassisNumber} />
           <ReviewFieldRow label="MOTOR NUMBER" value={mtopData.motorNumber} />
           <ReviewFieldRow label="VEHICLE MAKE" value={mtopData.vehicleMake} />
+          <ReviewFieldRow label="YEAR MODEL" value={mtopData.yearModel || 'N/A'} />
           <ReviewFieldRow label="OR NUMBER" value={mtopData.orNumber} />
-          <ReviewFieldRow label="AUTHORIZED ROUTE / ZONE" value={mtopData.authorizedRoute} />
-          <ReviewFieldRow label="PETSA NG PAGKAPASO (EXPIRATION)" value={mtopData.expirationDate} />
+          <ReviewFieldRow label={isTagalog ? "AWTORISADONG RUTA / ZONA" : "AUTHORIZED ROUTE / ZONE"} value={mtopData.authorizedRoute} />
+          <ReviewFieldRow label={isTagalog ? "PETSA NG PAGKAPASO (EXPIRATION)" : "EXPIRATION DATE"} value={mtopData.expirationDate} />
           <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
         </Box>
 
@@ -379,7 +395,7 @@ export const DriverConfirmAllInfo: React.FC = () => {
         <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', mb: 1.5 }}>
             <Typography sx={{ flex: 1, minWidth: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
-              Unit ng Tricycle
+              {isTagalog ? 'Unit ng Tricycle' : 'Tricycle Unit'}
             </Typography>
             <Typography
               onClick={() => navigate('/driver/tricycle-instructions', { state: { ...state, isEditMode: true } })}
@@ -405,11 +421,11 @@ export const DriverConfirmAllInfo: React.FC = () => {
                 },
               }}
             >
-              I-edit
+              {isTagalog ? 'I-edit' : 'Edit'}
             </Typography>
           </Box>
 
-          <ReviewFieldRow label="LARAWAN NG TRICYCLE" value="Nakuha (Na-verify)" />
+          <ReviewFieldRow label={isTagalog ? "LARAWAN NG TRICYCLE" : "TRICYCLE PHOTO"} value={isTagalog ? "Nakuha (Na-verify)" : "Captured (Verified)"} />
           <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
         </Box>
 
@@ -417,7 +433,7 @@ export const DriverConfirmAllInfo: React.FC = () => {
         <Box sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', mb: 1.5 }}>
             <Typography sx={{ flex: 1, minWidth: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
-              Beripikasyon ng Mukha
+              {isTagalog ? 'Beripikasyon ng Mukha' : 'Face Verification'}
             </Typography>
             <Typography
               onClick={() => navigate('/driver/scan-face', { state: { ...state, isEditMode: true } })}
@@ -443,11 +459,11 @@ export const DriverConfirmAllInfo: React.FC = () => {
                 },
               }}
             >
-              I-edit
+              {isTagalog ? 'I-edit' : 'Edit'}
             </Typography>
           </Box>
 
-          <ReviewFieldRow label="STATUS NG MATCH" value="Magkatugma (Na-verify)" />
+          <ReviewFieldRow label={isTagalog ? "STATUS NG MATCH" : "MATCH STATUS"} value={isTagalog ? "Magkatugma (Na-verify)" : "Matched (Verified)"} />
           <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
         </Box>
 
@@ -468,7 +484,9 @@ export const DriverConfirmAllInfo: React.FC = () => {
             }
             label={
               <Typography sx={{ fontSize: '12.5px', fontWeight: 600, color: '#0F172A', lineHeight: 1.35 }}>
-                Kinukumpirma kong tama ang lahat ng impormasyong aking isinumite.
+                {isTagalog
+                  ? 'Kinukumpirma kong tama ang lahat ng impormasyong aking isinumite.'
+                  : 'I confirm that all the information I submitted is correct.'}
               </Typography>
             }
             sx={{ m: 0, alignItems: 'flex-start' }}
@@ -497,7 +515,9 @@ export const DriverConfirmAllInfo: React.FC = () => {
           disabled={!confirmed || submitting}
           onClick={handleFinalSubmit}
         >
-          {submitting ? 'Isina-save...' : 'Magpatuloy'}
+          {submitting
+            ? (isTagalog ? 'Isina-save...' : 'Saving...')
+            : (isTagalog ? 'Magpatuloy' : 'Submit Application')}
         </PrimaryButton>
       </Box>
     </Box>

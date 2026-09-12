@@ -6,15 +6,17 @@ import {
   IconButton,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import DirectionsBikeIcon from '@mui/icons-material/DirectionsBike';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
+import { useLanguage } from '../../../utils/LanguageContext';
 import mtopImg from '../../../../../../packages/shared/src/assets/images/mtop.png';
 
 export const DriverTricycleInstructions: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
+  const isTagalog = language === 'tl';
   const state = location.state;
 
   return (
@@ -78,7 +80,7 @@ export const DriverTricycleInstructions: React.FC = () => {
         {/* Step Indicator Bar */}
         <Box sx={{ mt: 1, mb: 2 }}>
           <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#64748B', mb: 1 }}>
-            Hakbang 3 ng 4
+            {isTagalog ? 'Hakbang 3 ng 4' : 'Step 3 of 4'}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Box sx={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: '#FF6B00' }} />
@@ -98,18 +100,18 @@ export const DriverTricycleInstructions: React.FC = () => {
             mb: 1.5,
           }}
         >
-          Ihanda ang iyong Tricycle
+          {isTagalog ? 'Ihanda ang iyong Tricycle' : 'Prepare your Tricycle'}
         </Typography>
 
         <Typography sx={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', mb: 1 }}>
-          Para sa malinaw na larawan:
+          {isTagalog ? 'Para sa malinaw na larawan:' : 'For a clear photo:'}
         </Typography>
 
         <Box component="ul" sx={{ pl: 2.5, m: 0, mb: 3, color: '#64748B', fontSize: '13px', lineHeight: 1.6, '& li': { mb: 0.25 } }}>
-          <li>Ilagay ang iyong tricycle sa isang maliwanag at maluwag na lugar.</li>
-          <li>Siguraduhing malinaw at kita ang buong tricycle sa frame.</li>
-          <li>Panatilihing hindi gumagalaw ang camera habang kumukuha ng larawan.</li>
-          <li>Siguraduhing kita ang numero ng plaka sa tricycle unit.</li>
+          <li>{isTagalog ? 'Ilagay ang iyong tricycle sa isang maliwanag at maluwag na lugar.' : 'Park your tricycle in a well-lit, open area.'}</li>
+          <li>{isTagalog ? 'Siguraduhing malinaw at kita ang buong tricycle sa frame.' : 'Ensure the entire tricycle unit is clearly visible inside the frame.'}</li>
+          <li>{isTagalog ? 'Panatilihing hindi gumagalaw ang camera habang kumukuha ng larawan.' : 'Hold the camera steady while capturing the photo.'}</li>
+          <li>{isTagalog ? 'Siguraduhing kita ang numero ng plaka sa tricycle unit.' : 'Make sure the plate number or body number is visible.'}</li>
         </Box>
 
         {/* Vehicle Graphic Card */}
@@ -172,7 +174,7 @@ export const DriverTricycleInstructions: React.FC = () => {
             '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
           }}
         >
-          Kumuha ng Larawan
+          {isTagalog ? 'Kumuha ng Larawan' : 'Take Photo'}
         </PrimaryButton>
       </Box>
     </Box>

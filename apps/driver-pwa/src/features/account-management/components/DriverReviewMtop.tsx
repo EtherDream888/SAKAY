@@ -10,10 +10,13 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
+import { useLanguage } from '../../../utils/LanguageContext';
 
 export const DriverReviewMtop: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
+  const isTagalog = language === 'tl';
   const state = location.state as {
     phone?: string;
     driverName?: string;
@@ -99,7 +102,7 @@ export const DriverReviewMtop: React.FC = () => {
             mb: 1.25,
           }}
         >
-          Maayos na ba ang kuha?
+          {isTagalog ? 'Maayos na ba ang kuha?' : 'Does the photo look good?'}
         </Typography>
 
         <Typography
@@ -111,7 +114,9 @@ export const DriverReviewMtop: React.FC = () => {
             mb: 3,
           }}
         >
-          Siguraduhing malinaw at mababasa ang lahat ng impormasyon sa iyong MTOP.
+          {isTagalog
+            ? 'Siguraduhing malinaw at mababasa ang lahat ng impormasyon sa iyong MTOP.'
+            : 'Make sure all information on your MTOP is clear and readable.'}
         </Typography>
 
         {/* Captured Document Preview Card */}
@@ -155,7 +160,7 @@ export const DriverReviewMtop: React.FC = () => {
                 fontWeight: 600,
               }}
             >
-              Walang nahanap na larawan ng MTOP
+              {isTagalog ? 'Walang nahanap na larawan ng MTOP' : 'No MTOP photo found'}
             </Box>
           )}
         </Box>
@@ -175,7 +180,7 @@ export const DriverReviewMtop: React.FC = () => {
         }}
       >
         <PrimaryButton fullWidth onClick={handleConfirmImage}>
-          Gamitin ang Larawang Ito
+          {isTagalog ? 'Gamitin ang Larawang Ito' : 'Use This Photo'}
         </PrimaryButton>
 
         <Button
@@ -193,7 +198,7 @@ export const DriverReviewMtop: React.FC = () => {
             '&:hover': { backgroundColor: '#E2E8F0' },
           }}
         >
-          Kuhanan Muli
+          {isTagalog ? 'Kuhanan Muli' : 'Retake Photo'}
         </Button>
       </Box>
     </Box>

@@ -9,11 +9,14 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
+import { useLanguage } from '../../../utils/LanguageContext';
 import mtopImg from '../../../../../../packages/shared/src/assets/images/mtop.png';
 
 export const DriverMtopInstructions: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
+  const isTagalog = language === 'tl';
   const state = location.state;
 
   return (
@@ -77,7 +80,7 @@ export const DriverMtopInstructions: React.FC = () => {
         {/* Step Indicator Bar */}
         <Box sx={{ mt: 1, mb: 2 }}>
           <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#64748B', mb: 1 }}>
-            Hakbang 2 ng 4
+            {isTagalog ? 'Hakbang 2 ng 4' : 'Step 2 of 4'}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Box sx={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: '#FF6B00' }} />
@@ -97,19 +100,21 @@ export const DriverMtopInstructions: React.FC = () => {
             mb: 1.5,
           }}
         >
-          Ihanda ang iyong Motorized Tricycle Operator's Permit (MTOP)
+          {isTagalog
+            ? "Ihanda ang iyong Motorized Tricycle Operator's Permit (MTOP)"
+            : "Prepare your Motorized Tricycle Operator's Permit (MTOP)"}
         </Typography>
 
         <Typography sx={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', mb: 1 }}>
-          Para sa malinaw na larawan:
+          {isTagalog ? 'Para sa malinaw na larawan:' : 'For a clear photo:'}
         </Typography>
 
         <Box component="ul" sx={{ pl: 2.5, m: 0, mb: 3, color: '#64748B', fontSize: '13px', lineHeight: 1.6, '& li': { mb: 0.25 } }}>
-          <li>Kunan ang buong dokumento.</li>
-          <li>Siguraduhing mababasa ang lahat ng impormasyon.</li>
-          <li>Ilagay sa patag na ibabaw.</li>
-          <li>Iwasan ang silaw, tiklop, at anino.</li>
-          <li>Kumuha ng larawan sa maliwanag na lugar.</li>
+          <li>{isTagalog ? 'Kunan ang buong dokumento.' : 'Capture the entire document.'}</li>
+          <li>{isTagalog ? 'Siguraduhing mababasa ang lahat ng impormasyon.' : 'Ensure all details and text are clearly legible.'}</li>
+          <li>{isTagalog ? 'Ilagay sa patag na ibabaw.' : 'Place on a flat, even surface.'}</li>
+          <li>{isTagalog ? 'Iwasan ang silaw, tiklop, at anino.' : 'Avoid glare, creases, and shadows.'}</li>
+          <li>{isTagalog ? 'Kumuha ng larawan sa maliwanag na lugar.' : 'Take the photo in a well-lit area.'}</li>
         </Box>
 
         {/* Document Graphic Card - Full Fit Preview */}
@@ -172,7 +177,7 @@ export const DriverMtopInstructions: React.FC = () => {
             '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
           }}
         >
-          Magpatuloy
+          {isTagalog ? 'Magpatuloy' : 'Continue'}
         </PrimaryButton>
       </Box>
     </Box>

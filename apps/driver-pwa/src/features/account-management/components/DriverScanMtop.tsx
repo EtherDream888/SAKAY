@@ -12,6 +12,7 @@ import FlashOnIcon from '@mui/icons-material/FlashOn';
 import FlashOffIcon from '@mui/icons-material/FlashOff';
 
 import Logo from '../../../common/components/Logo';
+import { useLanguage } from '../../../utils/LanguageContext';
 import {
   enhanceLicenseDocument,
   captureRawFrame,
@@ -20,6 +21,8 @@ import {
 export const DriverScanMtop: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
+  const isTagalog = language === 'tl';
   const state = location.state;
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -42,7 +45,11 @@ export const DriverScanMtop: React.FC = () => {
     }
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setCameraError('Hindi ma-access ang camera sa aparatong ito.');
+      setCameraError(
+        isTagalog
+          ? 'Hindi ma-access ang camera sa aparatong ito.'
+          : 'Cannot access camera on this device.'
+      );
       return;
     }
 
@@ -70,10 +77,14 @@ export const DriverScanMtop: React.FC = () => {
           videoRef.current.srcObject = fallbackStream;
         }
       } catch (fallbackErr) {
-        setCameraError('Pakipahintulutan ang access sa camera upang ma-scan ang iyong MTOP.');
+        setCameraError(
+          isTagalog
+            ? 'Pakipahintulutan ang access sa camera upang ma-scan ang iyong MTOP.'
+            : 'Please allow camera access to scan your MTOP.'
+        );
       }
     }
-  }, [stream]);
+  }, [stream, isTagalog]);
 
   useEffect(() => {
     startCamera(facingMode);
@@ -242,11 +253,11 @@ export const DriverScanMtop: React.FC = () => {
             mb: 2,
           }}
         >
-          I-scan ang{' '}
+          {isTagalog ? 'I-scan ang ' : 'Scan your '}
           <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>
             Motorized Tricycle Operator's Permit (MTOP)
           </Box>{' '}
-          sa frame
+          {isTagalog ? 'sa frame' : 'in the frame'}
         </Typography>
 
         {/* Viewfinder Target Area with Dashed Frame & 4 Corner L-Brackets */}
@@ -385,7 +396,7 @@ export const DriverScanMtop: React.FC = () => {
               mb: 1.25,
             }}
           >
-            Para kumuha ng perpektong litrato:
+            {isTagalog ? 'Para kumuha ng perpektong litrato:' : 'Tips for taking a clear photo:'}
           </Typography>
           <Box
             component="ul"
@@ -398,10 +409,10 @@ export const DriverScanMtop: React.FC = () => {
               '& li': { mb: 0.5 },
             }}
           >
-            <li>Ilagay ang iyong dokumento sa isang lugar na malinaw at maliwanag.</li>
-            <li>Siguraduhing kasya nang buo ang dokumento sa loob ng frame.</li>
-            <li>I-tap ang capture area para mag-focus.</li>
-            <li>Manatiling hindi gumagalaw at pindutin ang button ng camera.</li>
+            <li>{isTagalog ? 'Ilagay ang iyong dokumento sa isang lugar na malinaw at maliwanag.' : 'Place your document on a flat, well-lit surface.'}</li>
+            <li>{isTagalog ? 'Siguraduhing kasya nang buo ang dokumento sa loob ng frame.' : 'Make sure the entire document fits within the frame.'}</li>
+            <li>{isTagalog ? 'I-tap ang capture area para mag-focus.' : 'Tap the capture area to focus.'}</li>
+            <li>{isTagalog ? 'Manatiling hindi gumagalaw at pindutin ang button ng camera.' : 'Hold steady and press the camera button.'}</li>
           </Box>
         </Box>
       </Box>

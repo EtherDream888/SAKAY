@@ -328,6 +328,18 @@ export const DriverRegister: React.FC = () => {
   const isPasswordMatched = confirmPassword.length > 0 && password === confirmPassword;
   const isPasswordMismatched = confirmPassword.length > 0 && password !== confirmPassword;
   const [showMatchSuccess, setShowMatchSuccess] = useState(false);
+  const [showPasswordStrength, setShowPasswordStrength] = useState(true);
+
+  useEffect(() => {
+    if (!isPasswordValid) {
+      setShowPasswordStrength(true);
+    } else {
+      const timer = setTimeout(() => {
+        setShowPasswordStrength(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isPasswordValid]);
 
   useEffect(() => {
     if (confirmPassword.length > 0 && password === confirmPassword) {
@@ -645,7 +657,7 @@ export const DriverRegister: React.FC = () => {
           />
 
           {/* Password Strength Indicator */}
-          {password.length > 0 && (
+          {password.length > 0 && showPasswordStrength && (
             <Box sx={{ mt: -0.5, mb: 1, px: 0.5 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
                 <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>

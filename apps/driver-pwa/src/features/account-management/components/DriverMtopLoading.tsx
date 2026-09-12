@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useLanguage } from '../../../utils/LanguageContext';
 import { parseMtopImage } from '../../../services/mtopOcrService';
 import DriverProgressLoader from './DriverProgressLoader';
 
 export const DriverMtopLoading: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
   const state = location.state as {
     phone?: string;
     driverName?: string;
@@ -13,7 +15,9 @@ export const DriverMtopLoading: React.FC = () => {
     rawMtopPhoto?: string;
   } | undefined;
 
-  const [ocrStatus, setOcrStatus] = useState('Inihahanda ang larawan...');
+  const [ocrStatus, setOcrStatus] = useState(
+    language === 'tl' ? 'Inihahanda ang larawan...' : 'Preparing document photo...'
+  );
   const [displayedPct, setDisplayedPct] = useState(0);
 
   const targetPctRef = useRef(0);

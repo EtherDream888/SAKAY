@@ -17,7 +17,8 @@ import driversLicenseBack from '../../../../../../packages/shared/src/assets/ima
 export const DriverPrepareLicense: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isTagalog = language === 'tl';
   const state = location.state as { phone?: string; driverName?: string } | undefined;
 
   // Preload license sample images to prevent layout shift
@@ -118,7 +119,7 @@ export const DriverPrepareLicense: React.FC = () => {
               mb: 0.75,
             }}
           >
-            Hakbang 1 ng 4
+            {t.step1Of4 || (isTagalog ? 'Hakbang 1 ng 4' : 'Step 1 of 4')}
           </Typography>
 
           {/* 4-segment Progress Bar */}

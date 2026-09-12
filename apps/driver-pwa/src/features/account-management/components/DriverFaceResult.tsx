@@ -7,6 +7,7 @@ import ErrorIcon from '@mui/icons-material/Error';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
+import { useLanguage } from '../../../utils/LanguageContext';
 import { FaceMatchResult } from '../../../services/faceMatchingService';
 import { saveSelfieScanData } from '../../../services/driverOnboardingCache';
 import { saveDriverSelfieVerification } from '../../../services/driverApiService';
@@ -14,6 +15,8 @@ import { saveDriverSelfieVerification } from '../../../services/driverApiService
 export const DriverFaceResult: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
+  const isTagalog = language === 'tl';
   const state = location.state as {
     phone?: string;
     driverName?: string;
@@ -168,7 +171,9 @@ export const DriverFaceResult: React.FC = () => {
               }}
             />
           ) : (
-            <Typography sx={{ color: '#94A3B8', fontSize: '13px' }}>Walang larawan</Typography>
+            <Typography sx={{ color: '#94A3B8', fontSize: '13px' }}>
+              {isTagalog ? 'Walang larawan' : 'No photo'}
+            </Typography>
           )}
         </Box>
 
@@ -192,7 +197,9 @@ export const DriverFaceResult: React.FC = () => {
             <ErrorIcon sx={{ fontSize: 20, color: '#DC2626' }} />
           )}
           <Typography sx={{ fontSize: '14px', fontWeight: 800 }}>
-            {result.match ? 'Magkatugma ang mga larawan' : 'Hindi magkatugma ang mga larawan'}
+            {result.match
+              ? (isTagalog ? 'Magkatugma ang mga larawan' : 'Face Matched Successfully')
+              : (isTagalog ? 'Hindi magkatugma ang mga larawan' : 'Faces Do Not Match')}
           </Typography>
         </Box>
 
@@ -208,8 +215,12 @@ export const DriverFaceResult: React.FC = () => {
           }}
         >
           {result.match
-            ? 'Ang iyong selfie ay tumutugma sa larawan sa iyong lisensya.'
-            : 'Pakisigurong malinaw ang iyong mukha at subukang muli.'}
+            ? (isTagalog
+                ? 'Ang iyong selfie ay tumutugma sa larawan sa iyong lisensya.'
+                : 'Your selfie matches the photo on your driver’s license.')
+            : (isTagalog
+                ? 'Pakisigurong malinaw ang iyong mukha at subukang muli.'
+                : 'Please ensure your face is clear and well-lit, then try again.')}
         </Typography>
       </Box>
 
@@ -233,7 +244,11 @@ export const DriverFaceResult: React.FC = () => {
             },
           }}
         >
-          {submitting ? 'Isina-save...' : result.match ? 'Magpatuloy' : 'Subukang Muli'}
+          {submitting
+            ? (isTagalog ? 'Isina-save...' : 'Saving...')
+            : result.match
+            ? (isTagalog ? 'Magpatuloy' : 'Continue')
+            : (isTagalog ? 'Subukang Muli' : 'Try Again')}
         </PrimaryButton>
       </Box>
     </Box>

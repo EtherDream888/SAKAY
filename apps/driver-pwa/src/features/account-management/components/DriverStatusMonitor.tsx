@@ -23,7 +23,8 @@ import { supabase } from '../../../services/supabaseClient';
 export const DriverStatusMonitor: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const isTagalog = language === 'tl';
   const state = location.state as {
     driverName?: string;
     phone?: string;
@@ -210,8 +211,12 @@ export const DriverStatusMonitor: React.FC = () => {
     setNotifyEnabled(checked);
     setSnackbarMsg(
       checked
-        ? 'Naka-turn on na ang mga abiso kapag nagbago ang status ng rehistrasyon.'
-        : 'Naka-off na ang mga abiso sa pagbago ng status.'
+        ? (isTagalog
+            ? 'Naka-turn on na ang mga abiso kapag nagbago ang status ng rehistrasyon.'
+            : 'Notifications turned on for registration status updates.')
+        : (isTagalog
+            ? 'Naka-off na ang mga abiso sa pagbago ng status.'
+            : 'Status notifications turned off.')
     );
     setSnackbarOpen(true);
   };
@@ -304,7 +309,7 @@ export const DriverStatusMonitor: React.FC = () => {
                 mb: 1.5,
               }}
             >
-              Hindi Na-aprubahan ang Aplikasyon
+              {isTagalog ? 'Hindi Na-aprubahan ang Aplikasyon' : 'Application Not Approved'}
             </Typography>
 
             <Typography
@@ -316,7 +321,9 @@ export const DriverStatusMonitor: React.FC = () => {
                 mb: 3,
               }}
             >
-              Ang iyong rehistrasyon ay tinanggihan ng TODA Administrator matapos ang masusing pagsusuri.
+              {isTagalog
+                ? 'Ang iyong rehistrasyon ay tinanggihan ng TODA Administrator matapos ang masusing pagsusuri.'
+                : 'Your registration was rejected by the TODA Administrator after careful review.'}
             </Typography>
 
             <Paper
@@ -333,14 +340,14 @@ export const DriverStatusMonitor: React.FC = () => {
               }}
             >
               <Typography sx={{ fontSize: '11px', fontWeight: 800, color: '#BE123C', letterSpacing: '0.5px', textTransform: 'uppercase', mb: 1 }}>
-                Dahilan ng Pagtanggi:
+                {isTagalog ? 'Dahilan ng Pagtanggi:' : 'Reason for Rejection:'}
               </Typography>
               <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#9F1239', mb: 1 }}>
-                {rejectionReason || 'Hindi natagpuan sa Master Roster ng TODA.'}
+                {rejectionReason || (isTagalog ? 'Hindi natagpuan sa Master Roster ng TODA.' : 'Not found in TODA Master Roster.')}
               </Typography>
               {rejectionComment && (
                 <Typography sx={{ fontSize: '13px', color: '#881337', lineHeight: 1.4 }}>
-                  Paliwanag: "{rejectionComment}"
+                  {isTagalog ? 'Paliwanag:' : 'Comment:'} "{rejectionComment}"
                 </Typography>
               )}
             </Paper>
@@ -374,7 +381,7 @@ export const DriverStatusMonitor: React.FC = () => {
                 mb: 1.5,
               }}
             >
-              Nasa LGU Admin na ang Aplikasyon
+              {isTagalog ? 'Nasa LGU Admin na ang Aplikasyon' : 'Application Endorsed to LGU Admin'}
             </Typography>
 
             <Typography
@@ -386,7 +393,9 @@ export const DriverStatusMonitor: React.FC = () => {
                 mb: 3,
               }}
             >
-              Matagumpay na na-endorse ng iyong TODA ang iyong aplikasyon sa City LGU Franchising Office. Pakihintay ang huling pagsusuri at pag-apruba ng LGU. Hindi mo pa maa-access ang iyong account hanggang sa mabigyan ka ng pinal na pahintulot.
+              {isTagalog
+                ? 'Matagumpay na na-endorse ng iyong TODA ang iyong aplikasyon sa City LGU Franchising Office. Pakihintay ang huling pagsusuri at pag-apruba ng LGU. Hindi mo pa maa-access ang iyong account hanggang sa mabigyan ka ng pinal na pahintulot.'
+                : 'Your application has been endorsed by your TODA to the City LGU Franchising Office. Please wait for the final review and approval of the LGU. You will not be able to access your account until final approval is granted.'}
             </Typography>
 
             {/* Status ng Rehistrasyon Card */}
@@ -405,7 +414,7 @@ export const DriverStatusMonitor: React.FC = () => {
             >
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Typography sx={{ fontSize: '12px', fontWeight: 800, color: '#1E40AF', textTransform: 'uppercase' }}>
-                  Status ng Rehistrasyon
+                  {isTagalog ? 'Status ng Rehistrasyon' : 'Registration Status'}
                 </Typography>
                 <Chip
                   label="LGU Screening"
@@ -415,7 +424,7 @@ export const DriverStatusMonitor: React.FC = () => {
               </Box>
             </Paper>
 
-            {/* Tagalog Notification Switch Preference Card */}
+            {/* Tagalog/English Notification Switch Preference Card */}
             <Paper
               elevation={0}
               sx={{
@@ -438,10 +447,10 @@ export const DriverStatusMonitor: React.FC = () => {
                 />
                 <Box sx={{ textAlign: 'left' }}>
                   <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>
-                    I-notify ako kapag nagbago ang status
+                    {isTagalog ? 'I-notify ako kapag nagbago ang status' : 'Notify me when status changes'}
                   </Typography>
                   <Typography sx={{ fontSize: '11.5px', color: '#64748B', fontWeight: 500, mt: '2px' }}>
-                    Magpapadala ng SMS kapag na-aprubahan ng LGU
+                    {isTagalog ? 'Magpapadala ng SMS kapag na-aprubahan ng LGU' : 'SMS will be sent upon LGU approval'}
                   </Typography>
                 </Box>
               </Box>
@@ -487,8 +496,8 @@ export const DriverStatusMonitor: React.FC = () => {
               }}
             >
               {isDocIncomplete
-                ? 'Kailangan mong Ipasa ang mga Dokumento'
-                : 'Patuloy na sinusuri ang iyong aplikasyon.'}
+                ? (isTagalog ? 'Kailangan mong Ipasa ang mga Dokumento' : 'Document Submission Required')
+                : (isTagalog ? 'Patuloy na sinusuri ang iyong aplikasyon.' : 'Your application is currently under review.')}
             </Typography>
 
             <Typography
@@ -501,8 +510,12 @@ export const DriverStatusMonitor: React.FC = () => {
               }}
             >
               {isDocIncomplete
-                ? 'Narehistro na ang iyong account, ngunit kailangan mo pang ipasa ang iyong Lisensya, MTOP Permit, Larawan ng Traysikel, at Selfie upang masuri ng iyong napiling TODA.'
-                : 'Pakihintay habang sinusuri ng TODA at LGU ang iyong mga isinumiteng impormasyon. Hindi mo muna maa-access ang iyong account at mga serbisyo habang nakabinbin pa ang pinal na pag-apruba.'}
+                ? (isTagalog
+                    ? 'Narehistro na ang iyong account, ngunit kailangan mo pang ipasa ang iyong Lisensya, MTOP Permit, Larawan ng Traysikel, at Selfie upang masuri ng iyong napiling TODA.'
+                    : 'Your account is registered, but you still need to submit your License, MTOP Permit, Tricycle Photo, and Selfie for review by your TODA.')
+                : (isTagalog
+                    ? 'Pakihintay habang sinusuri ng TODA at LGU ang iyong mga isinumiteng impormasyon. Hindi mo muna maa-access ang iyong account at mga serbisyo habang nakabinbin pa ang pinal na pag-apruba.'
+                    : 'Please wait while TODA and LGU review your submitted details. Account and service access remain restricted while pending final approval.')}
             </Typography>
 
             {isDocIncomplete && (
@@ -513,7 +526,7 @@ export const DriverStatusMonitor: React.FC = () => {
                     navigate('/driver/prepare-documents', {
                       state: incompleteDriverInfo || {
                         phone: localStorage.getItem('sakay_driver_phone') || '',
-                        driverName: 'Bagong Drayber',
+                        driverName: isTagalog ? 'Bagong Drayber' : 'New Driver',
                       },
                     })
                   }
@@ -527,7 +540,7 @@ export const DriverStatusMonitor: React.FC = () => {
                     '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
                   }}
                 >
-                  Ipagpatuloy ang Pagpasa ng Dokumento
+                  {isTagalog ? 'Ipagpatuloy ang Pagpasa ng Dokumento' : 'Continue Document Submission'}
                 </PrimaryButton>
               </Box>
             )}
@@ -548,10 +561,14 @@ export const DriverStatusMonitor: React.FC = () => {
             >
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Typography sx={{ fontSize: '12px', fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>
-                  Status ng Rehistrasyon
+                  {isTagalog ? 'Status ng Rehistrasyon' : 'Registration Status'}
                 </Typography>
                 <Chip
-                  label={isDocIncomplete ? 'Kailangan ng Dokumento' : 'TODA Screening'}
+                  label={
+                    isDocIncomplete
+                      ? (isTagalog ? 'Kailangan ng Dokumento' : 'Documents Required')
+                      : 'TODA Screening'
+                  }
                   size="small"
                   sx={{
                     backgroundColor: isDocIncomplete ? '#FEE2E2' : '#FEF3C7',
@@ -563,7 +580,7 @@ export const DriverStatusMonitor: React.FC = () => {
               </Box>
             </Paper>
 
-            {/* Tagalog Notification Switch Preference Card */}
+            {/* Notification Switch Preference Card */}
             <Paper
               elevation={0}
               sx={{
@@ -586,10 +603,10 @@ export const DriverStatusMonitor: React.FC = () => {
                 />
                 <Box sx={{ textAlign: 'left' }}>
                   <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>
-                    I-notify ako kapag nagbago ang status
+                    {isTagalog ? 'I-notify ako kapag nagbago ang status' : 'Notify me when status changes'}
                   </Typography>
                   <Typography sx={{ fontSize: '11.5px', color: '#64748B', fontWeight: 500, mt: '2px' }}>
-                    Magpapadala ng SMS kapag na-aprubahan
+                    {isTagalog ? 'Magpapadala ng SMS kapag na-aprubahan' : 'SMS will be sent once approved'}
                   </Typography>
                 </Box>
               </Box>
@@ -646,13 +663,13 @@ export const DriverStatusMonitor: React.FC = () => {
           }}
         >
           {loading ? (
-            'Kinukumpirma...'
+            isTagalog ? 'Kinukumpirma...' : 'Checking...'
           ) : isRejected ? (
-            'Mag-rehistro Muli'
+            isTagalog ? 'Mag-rehistro Muli' : 'Register Again'
           ) : (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <RefreshIcon sx={{ fontSize: 18 }} />
-              I-refresh ang Status
+              {isTagalog ? 'I-refresh ang Status' : 'Refresh Status'}
             </Box>
           )}
         </PrimaryButton>
@@ -687,7 +704,7 @@ export const DriverStatusMonitor: React.FC = () => {
             '&:hover': { color: '#0F172A', textDecoration: 'underline' },
           }}
         >
-          Mag-sign out / Gumawa ng Bagong Aplikasyon
+          {isTagalog ? 'Mag-sign out / Gumawa ng Bagong Aplikasyon' : 'Sign Out / New Application'}
         </Box>
       </Box>
     </Box>

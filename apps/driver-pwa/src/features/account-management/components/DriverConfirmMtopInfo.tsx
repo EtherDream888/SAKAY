@@ -18,10 +18,12 @@ import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
+import { useLanguage } from '../../../utils/LanguageContext';
 import { DateCalendarPopover } from '../../../components/common/DateCalendarPopover';
 import {
   MtopExtractedData,
   getCachedMtopData,
+  getCachedLicenseData,
   saveMtopScanData,
 } from '../../../services/driverOnboardingCache';
 import { saveDriverMtopVerification } from '../../../services/driverApiService';
@@ -190,23 +192,28 @@ import { isLicenseUnexpired } from './DriverConfirmLicenseInfo';
 export const DriverConfirmMtopInfo: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
+  const isTagalog = language === 'tl';
   const state = location.state as {
     phone?: string;
     driverName?: string;
     mtopExtracted?: MtopExtractedData;
     isEditMode?: boolean;
+    extracted?: { plateNumber?: string };
   } | undefined;
 
   const isEditMode = Boolean(state?.isEditMode);
   const cached = getCachedMtopData();
+  const cachedLicense = getCachedLicenseData();
   const initial: MtopExtractedData = state?.mtopExtracted || cached || {
     photoUrl: '',
     operatorName: state?.driverName || '',
     franchiseNumber: '',
-    plateNumber: '',
+    plateNumber: state?.extracted?.plateNumber || cachedLicense?.plateNumber || '',
     chassisNumber: '',
     vehicleMake: '',
     motorNumber: '',
+    yearModel: '',
     orNumber: '',
     expirationDate: '',
     authorizedRoute: 'City of Calapan, Oriental Mindoro',
@@ -288,11 +295,17 @@ export const DriverConfirmMtopInfo: React.FC = () => {
           },
         });
       } else {
-        setSubmitError(saveRes.error || 'May problema sa pag-save ng MTOP. Pakisubukang muli.');
+        setSubmitError(
+          saveRes.error ||
+          (isTagalog ? 'May problema sa pag-save ng MTOP. Pakisubukang muli.' : 'Error saving MTOP record. Please try again.')
+        );
       }
     } catch (err: any) {
       console.error('[DriverConfirmMtopInfo] Save error:', err);
-      setSubmitError(err.message || 'May hindi inaasahang problema. Pakisubukang muli.');
+      setSubmitError(
+        err.message ||
+        (isTagalog ? 'May hindi inaasahang problema. Pakisubukang muli.' : 'An unexpected error occurred. Please try again.')
+      );
     } finally {
       setSubmitting(false);
     }
@@ -326,11 +339,13 @@ export const DriverConfirmMtopInfo: React.FC = () => {
         }}
       >
         <DialogTitle sx={{ fontWeight: 800, fontSize: '18px', color: '#0F172A', pb: 1 }}>
-          Bumalik sa Pagkuha ng MTOP?
+          {isTagalog ? 'Bumalik sa Pagkuha ng MTOP?' : 'Retake MTOP Photo?'}
         </DialogTitle>
         <DialogContent sx={{ py: 1 }}>
           <Typography sx={{ fontSize: '14px', color: '#64748B', lineHeight: 1.45 }}>
-            Babalik ka sa pagkuha ng iyong MTOP. Kakailanganin mong kunan muli ang larawan.
+            {isTagalog
+              ? 'Babalik ka sa pagkuha ng iyong MTOP. Kakailanganin mong kunan muli ang larawan.'
+              : 'You will return to MTOP instructions. You will need to take the photo again.'}
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 2, pb: 2, pt: 1, display: 'flex', gap: 1 }}>
@@ -348,7 +363,7 @@ export const DriverConfirmMtopInfo: React.FC = () => {
               '&:hover': { backgroundColor: '#E2E8F0' },
             }}
           >
-            Manatili
+            {isTagalog ? 'Manatili' : 'Stay'}
           </Button>
           <Button
             onClick={handleConfirmBackModal}
@@ -364,7 +379,7 @@ export const DriverConfirmMtopInfo: React.FC = () => {
               '&:hover': { backgroundColor: '#E05000' },
             }}
           >
-            Bumalik
+            {isTagalog ? 'Bumalik' : 'Go Back'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -423,7 +438,9 @@ export const DriverConfirmMtopInfo: React.FC = () => {
             mb: 1.25,
           }}
         >
-          {isEditMode ? "Motorized Tricycle Operator's Permit (MTOP)" : "Kumpirmahin ang Iyong Impormasyon"}
+          {isEditMode
+            ? (isTagalog ? "Permiso ng Prangkisa (MTOP)" : "Motorized Tricycle Operator's Permit (MTOP)")
+            : (isTagalog ? "Kumpirmahin ang Impormasyon ng MTOP" : "Confirm MTOP Information")}
         </Typography>
 
         <Typography
@@ -435,7 +452,9 @@ export const DriverConfirmMtopInfo: React.FC = () => {
             mb: 2.5,
           }}
         >
-          {isEditMode ? "Pakisuri at i-update ang impormasyon ng iyong MTOP." : "Pakisuri kung tama ang lahat ng detalye."}
+          {isEditMode
+            ? (isTagalog ? "Pakisuri at i-update ang impormasyon ng iyong MTOP." : "Please review and update your MTOP permit details.")
+            : (isTagalog ? "Pakisuri kung tama ang lahat ng detalye mula sa MTOP bago magpatuloy." : "Please review and verify that all details from the MTOP are correct.")}
         </Typography>
 
         {submitError && (
@@ -448,31 +467,31 @@ export const DriverConfirmMtopInfo: React.FC = () => {
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {/* ROW 1: REHISTRADONG MAY-ARI / OPERATOR (Full Width) */}
           <SakayMtopInput
-            label="REHISTRADONG MAY-ARI / OPERATOR"
+            label={isTagalog ? "REHISTRADONG MAY-ARI / OPERATOR" : "REGISTERED OWNER / OPERATOR"}
             value={formData.operatorName}
             onChange={(val) => handleFieldChange('operatorName', val)}
             error={hasAttemptedSubmit && isFieldEmpty(formData.operatorName)}
-            helperText={hasAttemptedSubmit && isFieldEmpty(formData.operatorName) ? 'Kinakailangan ang impormasyong ito.' : ''}
+            helperText={hasAttemptedSubmit && isFieldEmpty(formData.operatorName) ? (isTagalog ? 'Kinakailangan ang impormasyong ito.' : 'This information is required.') : ''}
           />
 
           {/* ROW 2: PRANGKISA (50%) + PLATE NUMBER (50%) */}
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <Box sx={{ flex: '1 1 50%', minWidth: 0 }}>
               <SakayMtopInput
-                label="PRANGKISA"
+                label={isTagalog ? "PRANGKISA" : "FRANCHISE NO."}
                 value={formData.franchiseNumber}
-                onChange={(val) => handleFieldChange('franchiseNumber', val.replace(/\D/g, '').slice(0, 4))}
-                error={hasAttemptedSubmit && (isFieldEmpty(formData.franchiseNumber) || formData.franchiseNumber.length !== 4)}
-                helperText={hasAttemptedSubmit && (isFieldEmpty(formData.franchiseNumber) || formData.franchiseNumber.length !== 4) ? 'Kailangan ng 4 na numero.' : ''}
+                onChange={(val) => handleFieldChange('franchiseNumber', val.replace(/\D/g, '').slice(0, 6))}
+                error={hasAttemptedSubmit && (isFieldEmpty(formData.franchiseNumber) || formData.franchiseNumber.length < 3)}
+                helperText={hasAttemptedSubmit && (isFieldEmpty(formData.franchiseNumber) || formData.franchiseNumber.length < 3) ? (isTagalog ? 'Kailangan ng numero ng prangkisa.' : 'Franchise number is required.') : ''}
               />
             </Box>
             <Box sx={{ flex: '1 1 50%', minWidth: 0 }}>
               <SakayMtopInput
                 label="PLATE NUMBER"
                 value={formData.plateNumber}
-                onChange={(val) => handleFieldChange('plateNumber', val.toUpperCase().slice(0, 7))}
+                onChange={(val) => handleFieldChange('plateNumber', val.toUpperCase().slice(0, 8))}
                 error={hasAttemptedSubmit && isFieldEmpty(formData.plateNumber)}
-                helperText={hasAttemptedSubmit && isFieldEmpty(formData.plateNumber) ? 'Kinakailangan ang impormasyong ito.' : ''}
+                helperText={hasAttemptedSubmit && isFieldEmpty(formData.plateNumber) ? (isTagalog ? 'Kinakailangan ang impormasyong ito.' : 'This information is required.') : ''}
               />
             </Box>
           </Box>
@@ -481,21 +500,21 @@ export const DriverConfirmMtopInfo: React.FC = () => {
           <SakayMtopInput
             label="CHASSIS NUMBER"
             value={formData.chassisNumber}
-            onChange={(val) => handleFieldChange('chassisNumber', val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17))}
+            onChange={(val) => handleFieldChange('chassisNumber', val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 18))}
             error={hasAttemptedSubmit && isFieldEmpty(formData.chassisNumber)}
-            helperText={hasAttemptedSubmit && isFieldEmpty(formData.chassisNumber) ? 'Kinakailangan ang impormasyong ito.' : ''}
+            helperText={hasAttemptedSubmit && isFieldEmpty(formData.chassisNumber) ? (isTagalog ? 'Kinakailangan ang impormasyong ito.' : 'This information is required.') : ''}
           />
 
           {/* ROW 4: MOTOR NUMBER (Full Width) */}
           <SakayMtopInput
             label="MOTOR NUMBER"
             value={formData.motorNumber}
-            onChange={(val) => handleFieldChange('motorNumber', val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10))}
+            onChange={(val) => handleFieldChange('motorNumber', val.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 18))}
             error={hasAttemptedSubmit && isFieldEmpty(formData.motorNumber)}
-            helperText={hasAttemptedSubmit && isFieldEmpty(formData.motorNumber) ? 'Kinakailangan ang impormasyong ito.' : ''}
+            helperText={hasAttemptedSubmit && isFieldEmpty(formData.motorNumber) ? (isTagalog ? 'Kinakailangan ang impormasyong ito.' : 'This information is required.') : ''}
           />
 
-          {/* ROW 5: VEHICLE MAKE (50%) + OR NUMBER (50%) */}
+          {/* ROW 5: VEHICLE MAKE (50%) + YEAR MODEL (50%) */}
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <Box sx={{ flex: '1 1 50%', minWidth: 0 }}>
               <SakayMtopInput
@@ -503,32 +522,40 @@ export const DriverConfirmMtopInfo: React.FC = () => {
                 value={formData.vehicleMake}
                 onChange={(val) => handleFieldChange('vehicleMake', val)}
                 error={hasAttemptedSubmit && isFieldEmpty(formData.vehicleMake)}
-                helperText={hasAttemptedSubmit && isFieldEmpty(formData.vehicleMake) ? 'Kinakailangan ang impormasyong ito.' : ''}
+                helperText={hasAttemptedSubmit && isFieldEmpty(formData.vehicleMake) ? (isTagalog ? 'Kinakailangan ang impormasyong ito.' : 'This information is required.') : ''}
               />
             </Box>
             <Box sx={{ flex: '1 1 50%', minWidth: 0 }}>
               <SakayMtopInput
-                label="OR NUMBER"
-                value={formData.orNumber}
-                onChange={(val) => handleFieldChange('orNumber', val.replace(/\D/g, '').slice(0, 7))}
-                error={hasAttemptedSubmit && (isFieldEmpty(formData.orNumber) || formData.orNumber.length !== 7)}
-                helperText={hasAttemptedSubmit && (isFieldEmpty(formData.orNumber) || formData.orNumber.length !== 7) ? 'Kailangan ng 7 numero.' : ''}
+                label="YEAR MODEL"
+                value={formData.yearModel || ''}
+                onChange={(val) => handleFieldChange('yearModel', val.replace(/\D/g, '').slice(0, 4))}
+                placeholder="YYYY"
               />
             </Box>
           </Box>
 
-          {/* ROW 6: AUTHORIZED ROUTE / ZONE OF OPERATION (Full Width) */}
+          {/* ROW 6: OR NUMBER (Full Width) */}
           <SakayMtopInput
-            label="AUTHORIZED ROUTE / ZONE OF OPERATION"
+            label="OR NUMBER"
+            value={formData.orNumber}
+            onChange={(val) => handleFieldChange('orNumber', val.replace(/\D/g, '').slice(0, 12))}
+            error={hasAttemptedSubmit && (isFieldEmpty(formData.orNumber) || formData.orNumber.length < 5)}
+            helperText={hasAttemptedSubmit && (isFieldEmpty(formData.orNumber) || formData.orNumber.length < 5) ? (isTagalog ? 'Kailangan ng wastong OR number.' : 'Valid OR number is required.') : ''}
+          />
+
+          {/* ROW 7: AUTHORIZED ROUTE / ZONE OF OPERATION (Full Width) */}
+          <SakayMtopInput
+            label={isTagalog ? "AWTORISADONG RUTA / ZONA NG OPERASYON" : "AUTHORIZED ROUTE / ZONE OF OPERATION"}
             value={formData.authorizedRoute}
             onChange={(val) => handleFieldChange('authorizedRoute', val)}
             error={hasAttemptedSubmit && isFieldEmpty(formData.authorizedRoute)}
-            helperText={hasAttemptedSubmit && isFieldEmpty(formData.authorizedRoute) ? 'Kinakailangan ang impormasyong ito.' : ''}
+            helperText={hasAttemptedSubmit && isFieldEmpty(formData.authorizedRoute) ? (isTagalog ? 'Kinakailangan ang impormasyong ito.' : 'This information is required.') : ''}
           />
 
           {/* ROW 7: PETSA NG PAGKAPASO (EXPIRATION) (Full Width) */}
           <SakayMtopInput
-            label="PETSA NG PAGKAPASO (EXPIRATION)"
+            label={isTagalog ? "PETSA NG PAGKAPASO (EXPIRATION)" : "EXPIRATION DATE"}
             value={formData.expirationDate}
             onChange={(val) => handleFieldChange('expirationDate', val)}
             isDate
@@ -537,9 +564,9 @@ export const DriverConfirmMtopInfo: React.FC = () => {
             error={(hasAttemptedSubmit && isFieldEmpty(formData.expirationDate)) || Boolean(formData.expirationDate && !isExpValid)}
             helperText={
               formData.expirationDate && !isExpValid
-                ? 'Paso na ang MTOP permit (Expired). Hindi maaaring gamitin.'
+                ? (isTagalog ? 'Paso na ang MTOP permit (Expired). Hindi maaaring gamitin.' : 'MTOP permit is expired.')
                 : hasAttemptedSubmit && isFieldEmpty(formData.expirationDate)
-                ? 'Kinakailangan ang impormasyong ito.'
+                ? (isTagalog ? 'Kinakailangan ang impormasyong ito.' : 'This information is required.')
                 : ''
             }
           />
@@ -576,7 +603,11 @@ export const DriverConfirmMtopInfo: React.FC = () => {
           disabled={submitting || !isFormValid}
           onClick={handleContinue}
         >
-          {submitting ? 'Isina-save...' : isEditMode ? 'Kumpirmahin' : 'Magpatuloy'}
+          {submitting
+            ? (isTagalog ? 'Isina-save...' : 'Saving...')
+            : isEditMode
+            ? (isTagalog ? 'Kumpirmahin' : 'Confirm Changes')
+            : (isTagalog ? 'Magpatuloy' : 'Continue')}
         </PrimaryButton>
       </Box>
     </Box>

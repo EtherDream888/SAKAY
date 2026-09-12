@@ -20,6 +20,8 @@ export interface LicenseExtractedData {
   licenseNumber: string;
   dlCodes: string;
   expirationDate: string;
+  plateNumber?: string;
+  vehicleDetails?: string;
   rawOcrText?: string;
   scannedAt: string;
 }
@@ -33,6 +35,7 @@ export interface MtopExtractedData {
   chassisNumber: string;
   vehicleMake: string;
   motorNumber: string;
+  yearModel?: string;
   orNumber: string;
   expirationDate: string;
   authorizedRoute: string;

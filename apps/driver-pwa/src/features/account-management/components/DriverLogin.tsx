@@ -46,7 +46,7 @@ export const formatMobileNumber = (value: string): string => {
 
 export const DriverLogin: React.FC = () => {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   // Input fields start EMPTY (no prefilled default credentials)
   const [phone, setPhone] = useState('');
@@ -64,7 +64,12 @@ export const DriverLogin: React.FC = () => {
     e.preventDefault();
     const rawDigits = phone.replace(/\D/g, '');
     if (!rawDigits || !password) {
-      setError(t.enterPhoneAndPassword || 'Mangyaring ilagay ang iyong numero at password.');
+      setError(
+        t.enterPhoneAndPassword ||
+          (language === 'tl'
+            ? 'Mangyaring ilagay ang iyong numero at password.'
+            : 'Please enter your mobile number and password.')
+      );
       return;
     }
 
@@ -270,13 +275,20 @@ export const DriverLogin: React.FC = () => {
       } else {
         // Account does NOT exist in the system:
         setError(
-          'Walang nahanap na account para sa numerong ito. Mangyaring mag-register muna o suriin ang iyong numero at password.'
+          language === 'tl'
+            ? 'Walang nahanap na account para sa numerong ito. Mangyaring mag-register muna o suriin ang iyong numero at password.'
+            : 'No account found for this mobile number. Please register first or check your number and password.'
         );
       }
     } catch (err: any) {
       setLoading(false);
       console.error('[DriverLogin] Login exception:', err);
-      setError(err?.message || 'Hindi makakonekta sa database. Pakisubukang muli.');
+      setError(
+        err?.message ||
+          (language === 'tl'
+            ? 'Hindi makakonekta sa database. Pakisubukang muli.'
+            : 'Unable to connect to the database. Please try again.')
+      );
     }
   };
 

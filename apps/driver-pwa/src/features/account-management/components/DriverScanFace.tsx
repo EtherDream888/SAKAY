@@ -8,12 +8,15 @@ import FlashOffIcon from '@mui/icons-material/FlashOff';
 import FaceIcon from '@mui/icons-material/Face';
 
 import Logo from '../../../common/components/Logo';
+import { useLanguage } from '../../../utils/LanguageContext';
 import { captureRawFrame } from '../../../services/imageEnhancementService';
 import { detectFaceInCanvas } from '../../../services/faceMatchingService';
 
 export const DriverScanFace: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
+  const isTagalog = language === 'tl';
   const state = location.state as {
     phone?: string;
     driverName?: string;
@@ -55,7 +58,9 @@ export const DriverScanFace: React.FC = () => {
     } catch (err: any) {
       console.warn('[DriverScanFace] Camera stream error:', err);
       setCameraError(
-        'Hindi mabuksan ang camera. Siguraduhing pinayagan ang access sa camera.'
+        isTagalog
+          ? 'Hindi mabuksan ang camera. Siguraduhing pinayagan ang access sa camera.'
+          : 'Unable to access camera. Please make sure camera permissions are allowed.'
       );
     }
   };
@@ -237,11 +242,23 @@ export const DriverScanFace: React.FC = () => {
             zIndex: 10,
           }}
         >
-          Ilagay ang iyong{' '}
-          <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>
-            mukha
-          </Box>{' '}
-          sa loob ng frame at tumingin nang diretso sa camera.
+          {isTagalog ? (
+            <>
+              Ilagay ang iyong{' '}
+              <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>
+                mukha
+              </Box>{' '}
+              sa loob ng frame at tumingin nang diretso sa camera.
+            </>
+          ) : (
+            <>
+              Position your{' '}
+              <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>
+                face
+              </Box>{' '}
+              inside the frame and look straight at the camera.
+            </>
+          )}
         </Typography>
 
         {cameraError && (
@@ -336,7 +353,7 @@ export const DriverScanFace: React.FC = () => {
               mb: 1.25,
             }}
           >
-            Para kumuha ng perpektong litrato:
+            {isTagalog ? 'Para kumuha ng perpektong litrato:' : 'Tips for a clear photo:'}
           </Typography>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -360,7 +377,7 @@ export const DriverScanFace: React.FC = () => {
                 1
               </Box>
               <Typography sx={{ fontSize: '12.5px', color: '#E2E8F0', lineHeight: 1.45 }}>
-                Huwag magsuot ng sombrero, salamin, o face mask.
+                {isTagalog ? 'Huwag magsuot ng sombrero, salamin, o face mask.' : 'Do not wear a hat, glasses, or face mask.'}
               </Typography>
             </Box>
 
@@ -384,7 +401,7 @@ export const DriverScanFace: React.FC = () => {
                 2
               </Box>
               <Typography sx={{ fontSize: '12.5px', color: '#E2E8F0', lineHeight: 1.45 }}>
-                Siguraduhing maliwanag ang paligid.
+                {isTagalog ? 'Siguraduhing maliwanag ang paligid.' : 'Ensure your surroundings are well-lit.'}
               </Typography>
             </Box>
 
@@ -408,7 +425,9 @@ export const DriverScanFace: React.FC = () => {
                 3
               </Box>
               <Typography sx={{ fontSize: '12.5px', color: '#E2E8F0', lineHeight: 1.45 }}>
-                Tumingin nang diretso sa camera at panatilihing nasa gitna ang iyong mukha.
+                {isTagalog
+                  ? 'Tumingin nang diretso sa camera at panatilihing nasa gitna ang iyong mukha.'
+                  : 'Look straight at the camera and keep your face centered.'}
               </Typography>
             </Box>
           </Box>

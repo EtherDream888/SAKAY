@@ -21,6 +21,7 @@ import CheckIcon from '@mui/icons-material/Check';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
+import { useLanguage } from '../../../utils/LanguageContext';
 import { DateCalendarPopover } from '../../../components/common/DateCalendarPopover';
 import {
   getCachedLicenseData,
@@ -174,6 +175,8 @@ const SakayFormInput: React.FC<SakayFormInputProps> = ({
   error,
   helperText,
 }) => {
+  const { language } = useLanguage();
+  const isTagalog = language === 'tl';
   const [focused, setFocused] = useState(false);
   const isFloating = focused || Boolean(value) || isGender || isRestriction;
 
@@ -257,8 +260,8 @@ const SakayFormInput: React.FC<SakayFormInputProps> = ({
                 '& .MuiSelect-select': { py: 0, pr: '24px !important', lineHeight: 1.2 },
               }}
             >
-              <MenuItem value="Lalaki" sx={{ fontSize: '15px', fontWeight: 600 }}>Lalaki</MenuItem>
-              <MenuItem value="Babae" sx={{ fontSize: '15px', fontWeight: 600 }}>Babae</MenuItem>
+              <MenuItem value="Lalaki" sx={{ fontSize: '15px', fontWeight: 600 }}>{isTagalog ? 'Lalaki' : 'Male'}</MenuItem>
+              <MenuItem value="Babae" sx={{ fontSize: '15px', fontWeight: 600 }}>{isTagalog ? 'Babae' : 'Female'}</MenuItem>
             </Select>
           ) : isRestriction ? (
             <Select
@@ -398,6 +401,9 @@ const SakayFormInput: React.FC<SakayFormInputProps> = ({
 export const DriverConfirmLicenseInfo: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
+  const isTagalog = language === 'tl';
+
   const state = location.state as {
     phone?: string;
     driverName?: string;
@@ -557,11 +563,21 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
           },
         });
       } else {
-        setSubmitError(saveRes.error || 'May problema sa pag-save ng rekord ng beripikasyon. Pakisubukang muli.');
+        setSubmitError(
+          saveRes.error ||
+          (isTagalog
+            ? 'May problema sa pag-save ng rekord ng beripikasyon. Pakisubukang muli.'
+            : 'Error saving verification record. Please try again.')
+        );
       }
     } catch (err: any) {
       console.error('[DriverConfirmLicenseInfo] Save error:', err);
-      setSubmitError(err.message || 'May hindi inaasahang problema. Pakisubukang muli.');
+      setSubmitError(
+        err.message ||
+        (isTagalog
+          ? 'May hindi inaasahang problema. Pakisubukang muli.'
+          : 'An unexpected error occurred. Please try again.')
+      );
     } finally {
       setSubmitting(false);
     }
@@ -594,11 +610,13 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
         }}
       >
         <DialogTitle sx={{ fontWeight: 800, fontSize: '18px', color: '#0F172A', pb: 1 }}>
-          Bumalik sa Pagkuha ng Lisensya?
+          {isTagalog ? 'Bumalik sa Pagkuha ng Lisensya?' : "Retake Driver's License?"}
         </DialogTitle>
         <DialogContent sx={{ py: 1 }}>
           <Typography sx={{ fontSize: '14px', color: '#64748B', lineHeight: 1.45 }}>
-            Babalik ka sa pagkuha ng iyong lisensya. Kakailanganin mong kunan muli ang larawan.
+            {isTagalog
+              ? 'Babalik ka sa pagkuha ng iyong lisensya. Kakailanganin mong kunan muli ang larawan.'
+              : 'You will return to capturing your license. You will need to take the photos again.'}
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 2, pb: 2, pt: 1, display: 'flex', gap: 1 }}>
@@ -616,7 +634,7 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
               '&:hover': { backgroundColor: '#E2E8F0' },
             }}
           >
-            Manatili
+            {isTagalog ? 'Manatili' : 'Stay'}
           </Button>
           <Button
             onClick={handleConfirmBackModal}
@@ -632,7 +650,7 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
               '&:hover': { backgroundColor: '#E05000' },
             }}
           >
-            Bumalik
+            {isTagalog ? 'Bumalik' : 'Go Back'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -691,7 +709,9 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
             mb: 1.25,
           }}
         >
-          {isEditMode ? 'Lisensya sa Pagmamaneho' : 'Kumpirmahin ang Iyong Impormasyon'}
+          {isEditMode
+            ? (isTagalog ? 'Lisensya sa Pagmamaneho' : "Driver's License")
+            : (isTagalog ? 'Kumpirmahin ang Iyong Impormasyon' : 'Confirm Your Information')}
         </Typography>
 
         <Typography
@@ -704,8 +724,12 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
           }}
         >
           {isEditMode
-            ? 'Pakisuri at i-update ang impormasyon ng iyong lisensya.'
-            : 'Pakisuri at kumpirmahin ang impormasyon ng iyong lisensya bago magpatuloy.'}
+            ? (isTagalog
+              ? 'Pakisuri at i-update ang impormasyon ng iyong lisensya.'
+              : 'Please review and update your driver\'s license details.')
+            : (isTagalog
+              ? 'Pakisuri at kumpirmahin ang impormasyon ng iyong lisensya bago magpatuloy.'
+              : 'Please review and confirm your license details before proceeding.')}
         </Typography>
 
         {submitError && (
@@ -717,14 +741,14 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {/* 1. Unang Pangalan (100%) */}
           <SakayFormInput
-            label="UNANG PANGALAN"
+            label={isTagalog ? "UNANG PANGALAN" : "FIRST NAME"}
             value={formData.firstName || ''}
             onChange={(val) => handleFieldChange('firstName', val)}
           />
 
           {/* 2. Gitnang Pangalan (100%) */}
           <SakayFormInput
-            label="GITNANG PANGALAN"
+            label={isTagalog ? "GITNANG PANGALAN" : "MIDDLE NAME"}
             value={formData.middleName || ''}
             onChange={(val) => handleFieldChange('middleName', val)}
           />
@@ -733,7 +757,7 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <Box sx={{ flex: '7 7 70%', minWidth: 0 }}>
               <SakayFormInput
-                label="APELYIDO"
+                label={isTagalog ? "APELYIDO" : "LAST NAME"}
                 value={formData.lastName || ''}
                 onChange={(val) => handleFieldChange('lastName', val)}
               />
@@ -751,20 +775,20 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
           <Box sx={{ display: 'flex', gap: 1.5 }}>
             <Box sx={{ flex: '7 7 70%', minWidth: 0 }}>
               <SakayFormInput
-                label="PETSA NG KAPANGANAKAN"
+                label={isTagalog ? "PETSA NG KAPANGANAKAN" : "DATE OF BIRTH"}
                 value={formData.dob}
                 onChange={(val) => handleFieldChange('dob', val)}
                 isDate
                 placeholder="MM-DD-YYYY"
                 onOpenCalendar={(anchor) => handleOpenCalendar('dob', anchor)}
                 error={Boolean(formData.dob && !isDobValid)}
-                helperText={formData.dob && !isDobValid ? 'Dapat ay hindi bababa sa 18 taong gulang ang drayber.' : undefined}
+                helperText={formData.dob && !isDobValid ? (isTagalog ? 'Dapat ay hindi bababa sa 18 taong gulang ang drayber.' : 'Driver must be at least 18 years old.') : undefined}
               />
             </Box>
             <Box sx={{ flex: '3 3 30%', minWidth: 0 }}>
               <SakayFormInput
-                label="KASARIAN"
-                value={formData.gender || 'Lalaki'}
+                label={isTagalog ? "KASARIAN" : "GENDER"}
+                value={formData.gender || (isTagalog ? 'Lalaki' : 'Male')}
                 onChange={(val) => handleFieldChange('gender', val)}
                 isGender
               />
@@ -773,27 +797,27 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
 
           {/* 5. Tirahan (100%) */}
           <SakayFormInput
-            label="TIRAHAN"
+            label={isTagalog ? "TIRAHAN" : "ADDRESS"}
             value={formData.address}
             onChange={(val) => handleFieldChange('address', val)}
             multiline
             rows={2}
             error={Boolean(formData.address && !isAddressValid)}
-            helperText={formData.address && !isAddressValid ? 'Mangyaring ilagay ang kumpletong tirahan.' : undefined}
+            helperText={formData.address && !isAddressValid ? (isTagalog ? 'Mangyaring ilagay ang kumpletong tirahan.' : 'Please enter complete residential address.') : undefined}
           />
 
           {/* 6. Numero ng Lisensya (100%) */}
           <SakayFormInput
-            label="NUMERO NG LISENSYA"
+            label={isTagalog ? "NUMERO NG LISENSYA" : "LICENSE NUMBER"}
             value={formData.licenseNumber}
             onChange={(val) => handleFieldChange('licenseNumber', val)}
             error={Boolean(formData.licenseNumber && !isLicNoValid)}
-            helperText={formData.licenseNumber && !isLicNoValid ? 'Format: N03-12-123456 (1 titik + 10 tambang numero)' : undefined}
+            helperText={formData.licenseNumber && !isLicNoValid ? (isTagalog ? 'Format: N03-12-123456 (1 titik + 10 tambang numero)' : 'Format: N03-12-123456 (1 letter + 10 digits)') : undefined}
           />
 
           {/* 7. Restriksyon / Kategorya ng Lisensya (100%) */}
           <SakayFormInput
-            label="RESTRIKSYON / KATEGORYA NG LISENSYA"
+            label={isTagalog ? "RESTRIKSYON / KATEGORYA NG LISENSYA" : "LICENSE RESTRICTIONS"}
             value={formData.dlCodes}
             onChange={(val) => handleFieldChange('dlCodes', val)}
             isRestriction
@@ -801,14 +825,14 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
 
           {/* 8. Petsa ng Pagkapaso (100%) */}
           <SakayFormInput
-            label="PETSA NG PAGKAPASO (EXPIRATION)"
+            label={isTagalog ? "PETSA NG PAGKAPASO (EXPIRATION)" : "EXPIRATION DATE"}
             value={formData.expirationDate}
             onChange={(val) => handleFieldChange('expirationDate', val)}
             isDate
             placeholder="MM-DD-YYYY"
             onOpenCalendar={(anchor) => handleOpenCalendar('expirationDate', anchor)}
             error={Boolean(formData.expirationDate && !isExpValid)}
-            helperText={formData.expirationDate && !isExpValid ? 'Paso na ang lisensya (Expired License). Hindi maaaring gamitin.' : undefined}
+            helperText={formData.expirationDate && !isExpValid ? (isTagalog ? 'Paso na ang lisensya (Expired License). Hindi maaaring gamitin.' : 'License is expired and cannot be accepted.') : undefined}
           />
         </Box>
       </Box>
@@ -855,7 +879,7 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
             },
           }}
         >
-          {isEditMode ? 'Kumpirmahin' : 'Magpatuloy'}
+          {isEditMode ? (isTagalog ? 'Kumpirmahin' : 'Confirm Changes') : (isTagalog ? 'Magpatuloy' : 'Continue')}
         </PrimaryButton>
       </Box>
     </Box>

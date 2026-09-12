@@ -5,10 +5,13 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
+import { useLanguage } from '../../../utils/LanguageContext';
 
 export const DriverReviewFace: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { language } = useLanguage();
+  const isTagalog = language === 'tl';
   const state = location.state as {
     phone?: string;
     driverName?: string;
@@ -94,7 +97,7 @@ export const DriverReviewFace: React.FC = () => {
             mb: 1,
           }}
         >
-          Maayos na ba ang kuha?
+          {isTagalog ? 'Maayos na ba ang kuha?' : 'Does the photo look clear?'}
         </Typography>
 
         <Typography
@@ -106,7 +109,9 @@ export const DriverReviewFace: React.FC = () => {
             mb: 3,
           }}
         >
-          Siguraduhing malinaw ang iyong mukha at walang takip.
+          {isTagalog
+            ? 'Siguraduhing malinaw ang iyong mukha at walang takip.'
+            : 'Make sure your face is clearly visible and uncovered.'}
         </Typography>
 
         {/* Circular Selfie Preview Container */}
@@ -138,7 +143,9 @@ export const DriverReviewFace: React.FC = () => {
               }}
             />
           ) : (
-            <Typography sx={{ color: '#94A3B8', fontSize: '13px' }}>Walang larawan</Typography>
+            <Typography sx={{ color: '#94A3B8', fontSize: '13px' }}>
+              {isTagalog ? 'Walang larawan' : 'No photo'}
+            </Typography>
           )}
         </Box>
       </Box>
@@ -156,7 +163,7 @@ export const DriverReviewFace: React.FC = () => {
         }}
       >
         <PrimaryButton fullWidth onClick={handleConfirmPhoto}>
-          Gamitin ang Larawang Ito
+          {isTagalog ? 'Gamitin ang Larawang Ito' : 'Use This Photo'}
         </PrimaryButton>
 
         <PrimaryButton
@@ -170,7 +177,7 @@ export const DriverReviewFace: React.FC = () => {
             '&:hover': { backgroundColor: '#F8FAFC', borderColor: '#94A3B8' },
           }}
         >
-          Kuhanan Muli
+          {isTagalog ? 'Kuhanan Muli' : 'Retake Photo'}
         </PrimaryButton>
       </Box>
     </Box>

@@ -395,6 +395,30 @@ export function parseLicenseRestrictions(rawText: string): string {
         result.dlCodes = 'A1';
       }
 
+      // 7. Plate Number or Vehicle Details if present on license/temporary permit
+      const plateMatch =
+        rawText.match(/(?:Plate|Vehicle|MV\s*File)\s*(?:No\.?|#)?[:\s]*([A-Z0-9\s-]{4,10})/i) ||
+        rawText.match(/\b([A-Z]{2,3}\s*\d{3,4})\b/i) ||
+        rawText.match(/\b(\d{3}[A-Z]{3})\b/i);
+
+      if (plateMatch) {
+        const pCandidate = plateMatch[1].trim().toUpperCase();
+        if (!pCandidate.includes(result.licenseNumber || 'XYZ') && !/^(REPUBLIC|PHILIPPINES|DRIVER)$/i.test(pCandidate)) {
+          result.plateNumber = pCandidate;
+        }
+      }
+
+      // 8. Vehicle Details description based on restrictions
+      if (result.dlCodes) {
+        const details: string[] = [];
+        if (result.dlCodes.includes('A1')) details.push('Tricycle (A1)');
+        if (result.dlCodes.includes('A')) details.push('Motorcycle (A)');
+        if (result.dlCodes.includes('B')) details.push('Passenger Car (B)');
+        if (details.length > 0) {
+          result.vehicleDetails = details.join(', ');
+        }
+      }
+
       return result;
     }
 
@@ -419,6 +443,8 @@ export function parseLicenseRestrictions(rawText: string): string {
       let licenseNumber = '';
       let dlCodes = 'A1';
       let expirationDate = '';
+      let plateNumber = '';
+      let vehicleDetails = '';
 
       let worker: any = null;
 
@@ -464,6 +490,8 @@ export function parseLicenseRestrictions(rawText: string): string {
           if (fullParsed.gender) gender = fullParsed.gender;
           if (fullParsed.address) address = fullParsed.address;
           if (fullParsed.dlCodes) dlCodes = fullParsed.dlCodes;
+          if (fullParsed.plateNumber) plateNumber = fullParsed.plateNumber;
+          if (fullParsed.vehicleDetails) vehicleDetails = fullParsed.vehicleDetails;
 
           // STEP 2: Targeted Field ROIs for high-precision refinement
           onProgress?.(0.50, 'Pinapahusay ang pangalan...');
@@ -554,6 +582,8 @@ export function parseLicenseRestrictions(rawText: string): string {
         licenseNumber: licenseNumber || '',
         dlCodes: dlCodes || 'A1',
         expirationDate: expirationDate || '',
+        plateNumber: plateNumber || undefined,
+        vehicleDetails: vehicleDetails || undefined,
         rawOcrText: rawText,
         scannedAt: new Date().toISOString(),
       };

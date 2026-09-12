@@ -533,17 +533,38 @@ export const DriverPrivacyPolicy: React.FC = () => {
           zIndex: 15,
         }}
       >
+        {!hasScrolledToBottom && (
+          <Typography
+            sx={{
+              fontSize: '12px',
+              color: '#64748B',
+              textAlign: 'center',
+              mb: 1,
+              fontWeight: 600,
+            }}
+          >
+            {isTagalog
+              ? 'Mag-scroll pababa sa dulo upang magpatuloy'
+              : 'Scroll down to the bottom to continue'}
+          </Typography>
+        )}
         <PrimaryButton
           fullWidth
+          disabled={!hasScrolledToBottom}
           onClick={handleAgree}
           sx={{
             height: '56px',
             borderRadius: '16px',
             fontSize: '16px',
             fontWeight: 800,
-            backgroundColor: '#FF6B00',
+            backgroundColor: hasScrolledToBottom ? '#FF6B00' : '#CBD5E1',
+            color: '#FFFFFF',
+            cursor: hasScrolledToBottom ? 'pointer' : 'not-allowed',
             boxShadow: 'none',
-            '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
+            '&:hover': {
+              backgroundColor: hasScrolledToBottom ? '#E66000' : '#CBD5E1',
+              boxShadow: 'none',
+            },
           }}
         >
           {t.iAgree}

@@ -15,120 +15,224 @@ export interface MtopOcrExtractionResult {
 }
 
 /**
- * 1. Operator Name Parser
+/**
+ * Normalizes text lines to recover wrapped or broken words from OCR scans
+ */
+export function normalizeMtopText(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/Decembe\s*\n[^\n]*\s*r/gi, 'December')
+    .replace(/Januar\s*\n[^\n]*\s*y/gi, 'January')
+    .replace(/Februar\s*\n[^\n]*\s*y/gi, 'February')
+    .replace(/Novembe\s*\n[^\n]*\s*r/gi, 'November')
+    .replace(/Octobe\s*\n[^\n]*\s*r/gi, 'October')
+    .replace(/Septembe\s*\n[^\n]*\s*r/gi, 'September');
+}
+
+/**
+ * 1. Operator / Owner Name Parser (Supports MTOP, OR, and CR)
  */
 export function parseMtopOperator(text: string): string {
   if (!text) return '';
-  const match = text.match(/Granted\s+to\s+([A-Za-z\s,.-]+?)(?=,|\s+residing|\s+to\s+operate|\s+with|$)/i) ||
-    text.match(/(?:Owner|Operator|Granted\s+to|Name\s+of\s+Operator)[:\s]*([A-Za-z\s,.-]{4,45})/i);
+  const normalized = normalizeMtopText(text);
 
-  if (match) {
-    let name = match[1]
-      .replace(/residing.*/i, '')
-      .replace(/to\s+operate.*/i, '')
+  // Check "Granted to ..." patterns in MTOP
+  const grantedMatch =
+    normalized.match(/Granted\s+to\s+([A-Za-z\s,.-]+?)\s+residing/i) ||
+    normalized.match(/Granted\s+to\s+([A-Za-z\s,.-]+?)(?=\s+to\s+operate|\s+with|$)/i);
+
+  if (grantedMatch) {
+    const clean = grantedMatch[1]
       .replace(/[^A-Za-z\s,.-]/g, ' ')
       .replace(/\s{2,}/g, ' ')
       .trim();
-    if (name.length > 4 && !name.toLowerCase().includes('republic') && !name.toLowerCase().includes('permit')) {
-      return name.toUpperCase();
+    if (clean.length > 3 && !/^(REPUBLIC|PERMIT|SECTION|BOARD|CALAPAN)$/i.test(clean)) {
+      return clean.toUpperCase();
     }
   }
+
+  // Check LTO OR / CR patterns: "REGISTERED OWNER", "COMPLETE OWNER'S NAME", "OPERATOR"
+  const ownerMatch =
+    normalized.match(/(?:COMPLETE\s*OWNER'?S?\s*NAME|REGISTERED\s*OWNER|NAME\s*OF\s*OWNER|OPERATOR|OWNER)[:\s]*([A-Za-z\s,.-]{4,50})/i);
+
+  if (ownerMatch) {
+    const clean = ownerMatch[1]
+      .replace(/ADDRESS.*/i, '')
+      .replace(/[^A-Za-z\s,.-]/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    if (clean.length > 3 && !/^(REPUBLIC|PERMIT|SECTION|BOARD|CALAPAN|LTO)$/i.test(clean)) {
+      return clean.toUpperCase();
+    }
+  }
+
   return '';
 }
 
 /**
- * 2. Franchise Number Parser
+ * 2. Franchise Number Parser (Supports MTOP, Franchise, Permit, Case No.)
  */
 export function parseMtopFranchiseNumber(text: string): string {
   if (!text) return '';
-  const match = text.match(/(?:Franchise|Permit|MTOP|Case)\s*(?:No\.?|#)?[:\s]*([A-Z0-9-]{3,15})/i) ||
-    text.match(/\b(202[0-9]-\d{3,6})\b/) ||
-    text.match(/\b(\d{3,6})\b/);
+  const normalized = normalizeMtopText(text);
 
-  if (match) {
-    const num = match[1].trim();
-    if (/^[A-Z0-9-]{3,15}$/.test(num)) {
-      return num;
+  // Exact word boundary to avoid matching "FRANCHISING"
+  const franMatch =
+    normalized.match(/\bFranchise\s*(?:No\.?|#)?[:\s]*([A-Z0-9-]{3,15})/i) ||
+    normalized.match(/\b(?:MTOP|Permit|Case)\s*(?:No\.?|#)?[:\s]*([A-Z0-9-]{3,15})/i);
+
+  if (franMatch) {
+    const candidate = franMatch[1].trim();
+    if (!/^(AND|THE|REGULATORY|BOARD|PERMIT|SECTION|REGISTRATION)$/i.test(candidate)) {
+      return candidate;
     }
   }
+
+  // Common franchise year-code or numeric patterns
+  const yearCodeMatch = normalized.match(/\b(202[0-9]-\d{3,6})\b/);
+  if (yearCodeMatch) return yearCodeMatch[1];
+
   return '';
 }
 
 /**
- * 3. Make Parser
+ * 3. Make Parser (Supports MTOP, OR, and CR)
  */
 export function parseMtopMake(text: string): string {
   if (!text) return '';
-  const match = text.match(/\b(YAMAHA|HONDA|KAWASAKI|SUZUKI|BAJAJ|TVS|SYM|RUSI|EURO|MOTORSTAR|RATO)\b/i);
+  const normalized = normalizeMtopText(text);
+  const match = normalized.match(/\b(KAWASAKI|HONDA|YAMAHA|SUZUKI|BAJAJ|TVS|SYM|RUSI|EURO|MOTORSTAR|RATO|KYMCO|BENELLI)\b/i);
   if (match) {
     return match[1].toUpperCase();
   }
+
+  const fieldMatch = normalized.match(/MAKE[:\s]*([A-Za-z]{3,15})/i);
+  if (fieldMatch) {
+    return fieldMatch[1].trim().toUpperCase();
+  }
+
   return '';
 }
 
 /**
- * 4. Motor Number Parser
+ * 4. Year Model Parser (Supports MTOP, OR, and CR)
+ */
+export function parseMtopYearModel(text: string): string {
+  if (!text) return '';
+  const normalized = normalizeMtopText(text);
+
+  const yearMatch =
+    normalized.match(/(?:YEAR\s*MODEL|MODEL\s*YEAR|YEAR)[:\s]*(\d{4})/i) ||
+    normalized.match(/\b(?:MODEL)\s*[:\s]*(\d{4})\b/i);
+
+  if (yearMatch) {
+    const yr = parseInt(yearMatch[1], 10);
+    if (yr >= 1990 && yr <= 2035) {
+      return yearMatch[1];
+    }
+  }
+
+  return '';
+}
+
+/**
+ * 5. Motor / Engine Number Parser (Supports MTOP, OR, and CR)
  */
 export function parseMtopMotorNumber(text: string): string {
   if (!text) return '';
-  const match = text.match(/(?:MOTOR\s*NO\.?|ENGINE\s*NO\.?)[\s\S]{1,40}?([A-Z0-9-]{6,18})/i) ||
-    text.match(/(?:MOTOR|ENGINE)\s*(?:NO\.?|#)?[:\s]*([A-Z0-9-]{5,18})/i) ||
-    text.match(/\b([A-Z0-9]{2,4}\d{4,10}[A-Z0-9]*)\b/i) ||
-    text.match(/\b([A-Z]\d[A-Z]\d{5,10})\b/i);
-  if (match) {
-    const res = (match[1] || match[0]).trim();
-    if (res.length >= 5 && /[0-9]/.test(res)) {
-      return res.toUpperCase();
-    }
-  }
-  return '';
-}
+  const normalized = normalizeMtopText(text);
 
-/**
- * 5. Chassis Number Parser
- */
-export function parseMtopChassisNumber(text: string): string {
-  if (!text) return '';
-  const match = text.match(/(?:CHASSIS\s*NO\.?)[\s\S]{1,40}?([A-Z0-9-]{10,22})/i) ||
-    text.match(/CHASSIS\s*(?:NO\.?|#)?[:\s]*([A-Z0-9-]{6,20})/i) ||
-    text.match(/\b([A-Z0-9]{12,20})\b/);
-  if (match) {
-    const res = (match[1] || match[0]).trim();
-    if (res.length >= 8 && /[0-9]/.test(res)) {
-      return res.toUpperCase();
-    }
-  }
-  return '';
-}
+  const match =
+    normalized.match(/(?:MOTOR\s*NO\.?|ENGINE\s*NO\.?)[\s\S]{1,40}?([A-Z0-9-]{6,18})/i) ||
+    normalized.match(/(?:MOTOR|ENGINE)\s*(?:NO\.?|#)?[:\s]*([A-Z0-9-]{5,18})/i);
 
-/**
- * 6. Plate Number Parser
- */
-export function parseMtopPlateNumber(text: string): string {
-  if (!text) return '';
-  const match = text.match(/(?:PLATE\s*NO\.?)[\s\S]{1,60}?(?:\|\s*)?([A-Z0-9\s-]{4,10})/i) ||
-    text.match(/PLATE\s*(?:NO\.?|#)?[:\s]*([A-Z0-9\s-]{4,10})/i) ||
-    text.match(/\b([A-Z]{2,3}[-\s]?\d{3,5})\b/i) ||
-    text.match(/\b(\d{3,4}[-\s]?[A-Z]{2,3})\b/i);
   if (match) {
-    const res = match[1].replace(/^[|\s]+/, '').trim().toUpperCase();
-    if (res.length >= 4) {
+    const res = match[1].trim().toUpperCase();
+    if (res.length >= 6 && /[0-9]/.test(res) && !/^(NUMBER|ENGINE|MOTOR|CHASSIS)$/i.test(res)) {
       return res;
     }
   }
+
+  const codeMatch = normalized.match(/\b([A-Z]{3,7}\d{5,8})\b/i);
+  if (codeMatch) {
+    return codeMatch[1].toUpperCase();
+  }
+
   return '';
 }
 
 /**
- * 7. Expiration Date Parser (Extracts END DATE of validity statement -> MM-DD-YYYY)
+ * 6. Chassis Number / VIN Parser (Supports MTOP, OR, and CR)
+ */
+export function parseMtopChassisNumber(text: string): string {
+  if (!text) return '';
+  const normalized = normalizeMtopText(text);
+
+  const match =
+    normalized.match(/(?:CHASSIS\s*NO\.?|VIN)[\s\S]{1,40}?([A-Z0-9-]{10,22})/i) ||
+    normalized.match(/CHASSIS\s*(?:NO\.?|#)?[:\s]*([A-Z0-9-]{6,20})/i);
+
+  if (match) {
+    const res = match[1].trim().toUpperCase();
+    if (res.length >= 10 && /[0-9]/.test(res) && !/^(NUMBER|CHASSIS|MOTOR)$/i.test(res)) {
+      return res;
+    }
+  }
+
+  const vinMatch = normalized.match(/\b([A-Z0-9]{15,18})\b/);
+  if (vinMatch && /[A-Z]/.test(vinMatch[1]) && /[0-9]/.test(vinMatch[1])) {
+    return vinMatch[1].toUpperCase();
+  }
+
+  return '';
+}
+
+/**
+ * 7. Plate Number Parser (Supports Philippine Tricycle / Motorcycle Formats)
+ */
+export function parseMtopPlateNumber(text: string): string {
+  if (!text) return '';
+  const normalized = normalizeMtopText(text);
+
+  const labelMatch =
+    normalized.match(/(?:PLATE\s*NO\.?|MV\s*FILE\s*NO\.?)[\s\S]{1,60}?(?:\|\s*)?([A-Z0-9\s-]{4,10})/i) ||
+    normalized.match(/PLATE\s*(?:NO\.?|#)?[:\s]*([A-Z0-9\s-]{4,10})/i);
+
+  if (labelMatch) {
+    const candidate = labelMatch[1].replace(/^[|\s]+/, '').trim().toUpperCase();
+    if (candidate.length >= 4 && !/^(NUMBER|MAKE|MOTOR|CHASSIS)$/i.test(candidate)) {
+      return candidate;
+    }
+  }
+
+  // 1. Format: 3 digits + 3 letters (e.g. 261VPI from MTOP_SAMPLE.jpg)
+  const d3L3 = normalized.match(/\b(\d{3}[A-Z]{3})\b/);
+  if (d3L3) return d3L3[1].toUpperCase();
+
+  // 2. Format: 2-3 letters + 3-4 digits (e.g. AB 1234 or ABC 123)
+  const l23D34 = normalized.match(/\b([A-Z]{2,3}\s*\d{3,4})\b/);
+  if (l23D34) return l23D34[1].replace(/\s+/g, ' ').toUpperCase();
+
+  // 3. Format: 4 digits + 2 letters (e.g. 1234AB)
+  const d4L2 = normalized.match(/\b(\d{4}[A-Z]{2})\b/);
+  if (d4L2) return d4L2[1].toUpperCase();
+
+  return '';
+}
+
+/**
+ * 8. Expiration Date Parser (Supports MTOP, OR, and CR -> MM-DD-YYYY)
  */
 export function parseMtopExpiration(text: string): string {
   if (!text) return '';
+  const normalized = normalizeMtopText(text);
 
   // 1. Text Month dates: e.g. "to December 31, 2026" or "December 31, 2026"
-  const textMonthMatch = text.match(/to\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i) ||
-    text.match(/(?:Expiration|Expiry|Valid\s+until|Valid\s+to)[:\s]*([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i) ||
-    text.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/i);
+  const textMonthMatch =
+    normalized.match(/to\s+([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i) ||
+    normalized.match(/December\s+31,?\s+(\d{4})/i) ||
+    normalized.match(/(?:Expiration|Expiry|Valid\s+until|Valid\s+to)[:\s]*([A-Za-z]+\s+\d{1,2},?\s+\d{4})/i) ||
+    normalized.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/i);
 
   if (textMonthMatch) {
     const rawDateStr = textMonthMatch[1] || textMonthMatch[0];
@@ -139,8 +243,8 @@ export function parseMtopExpiration(text: string): string {
     }
   }
 
-  // 2. Numeric dates in year range 2024-2040
-  const allDates = text.match(/(\d{4}[-/.]\d{2}[-/.]\d{2})|(\d{2}[-/.]\d{2}[-/.]\d{4})/g) || [];
+  // 2. Numeric dates in year range 2023-2040
+  const allDates = normalized.match(/(\d{4}[-/.]\d{2}[-/.]\d{2})|(\d{2}[-/.]\d{2}[-/.]\d{4})/g) || [];
   for (const rawDate of allDates) {
     const formatted = formatDateToMmDdYyyy(rawDate);
     if (formatted) {
@@ -156,30 +260,36 @@ export function parseMtopExpiration(text: string): string {
 }
 
 /**
- * 8. OR Number Parser
+ * 9. OR Number Parser (Extracts OR Number from MTOP / OR)
  */
 export function parseMtopOrNumber(text: string): string {
   if (!text) return '';
-  const match = text.match(/(?:under\s+)?OR\s*(?:Number|No\.?|#)?[:\s]*([A-Z0-9-]{4,15})/i) ||
-    text.match(/(?:OR|Official\s*Receipt)\s*(?:Number|No\.?|#)?[:\s]*([A-Z0-9-]{4,15})/i) ||
-    text.match(/OR\s*#?\s*(\d{5,12})/i);
+  const normalized = normalizeMtopText(text);
+
+  const match =
+    normalized.match(/OR[.\s]*(?:Number|No\.?|#)?[:\s]*(\d{5,12})/i) ||
+    normalized.match(/(?:Official\s*Receipt)[.\s]*(?:Number|No\.?|#)?[:\s]*(\d{5,12})/i) ||
+    normalized.match(/\bOR\s*#?\s*(\d{5,12})\b/i);
+
   if (match) {
-    const num = match[1].replace(/amounting.*/i, '').trim();
-    if (/^\d{4,12}$/.test(num)) {
-      return num;
-    }
+    return match[1].trim();
   }
+
   return '';
 }
 
 /**
- * 9. Authorized Route / Zone Parser
+ * 10. Authorized Route / Zone Parser
  */
 export function parseMtopAuthorizedRoute(text: string): string {
-  if (!text) return 'City of Calapan, Oriental Mindoro';
-  const match = text.match(/within\s+the\s+jurisdiction\s+of\s+([A-Za-z0-9\s,.-]+?)(?=\.|\s+Subject|\s+under|$)/i) ||
-    text.match(/jurisdiction\s+of\s+([A-Za-z0-9\s,.-]+?)(?=\.|\s+Subject|\s+under|$)/i) ||
-    text.match(/(?:Route|Zone)[:\s]*([A-Za-z0-9\s,.-]{6,60})/i);
+  const fallback = 'City of Calapan, Oriental Mindoro';
+  if (!text) return fallback;
+  const normalized = normalizeMtopText(text);
+
+  const match =
+    normalized.match(/within\s+the\s+jurisdiction\s+of\s+([A-Za-z0-9\s,.-]+?)(?=\.\s*(?:Subject|under|\n|$)|$)/i) ||
+    normalized.match(/jurisdiction\s+of\s+([A-Za-z0-9\s,.-]+?)(?=\.\s*(?:Subject|under|\n|$)|$)/i) ||
+    normalized.match(/(?:Route|Zone)[:\s]*([A-Za-z0-9\s,.-]{6,60})/i);
 
   if (match) {
     let route = match[1]
@@ -187,12 +297,65 @@ export function parseMtopAuthorizedRoute(text: string): string {
       .replace(/Subject\s+to.*/i, '')
       .replace(/^the\s+/i, '')
       .replace(/\.$/, '')
+      .replace(/\bOr\.\s*Mindoro\b/i, 'Oriental Mindoro')
+      .replace(/\bOr\.\b/i, 'Oriental')
       .trim();
     if (route.length > 4 && !route.toLowerCase().includes('granted to')) {
       return route;
     }
   }
-  return 'City of Calapan, Oriental Mindoro';
+  return fallback;
+}
+
+/**
+ * 11. Table Row Parser (Extracts Make, Motor No, Chassis No, Year Model, Plate No from table row)
+ */
+export function parseMtopTableLine(text: string, currentMake: string): {
+  make?: string;
+  motorNumber?: string;
+  chassisNumber?: string;
+  yearModel?: string;
+  plateNumber?: string;
+} {
+  const result: {
+    make?: string;
+    motorNumber?: string;
+    chassisNumber?: string;
+    yearModel?: string;
+    plateNumber?: string;
+  } = {};
+
+  if (!text) return result;
+  const lines = text.split('\n');
+
+  for (const line of lines) {
+    const upper = line.toUpperCase();
+    const targetBrand = currentMake || 'KAWASAKI';
+    if (upper.includes(targetBrand) || /HONDA|YAMAHA|SUZUKI|BAJAJ|TVS|SYM|RUSI|EURO|MOTORSTAR|RATO/.test(upper)) {
+      const tokens = line.split(/[|\s]+/).map((t) => t.trim()).filter(Boolean);
+      for (const tok of tokens) {
+        const cleanTok = tok.toUpperCase();
+        if (/KAWASAKI|HONDA|YAMAHA|SUZUKI|BAJAJ|TVS|SYM|RUSI|EURO|MOTORSTAR|RATO/.test(cleanTok)) {
+          if (!result.make) result.make = cleanTok;
+          continue;
+        }
+        if (/^\d{4}$/.test(cleanTok)) {
+          const yr = parseInt(cleanTok, 10);
+          if (yr >= 1990 && yr <= 2035) {
+            result.yearModel = cleanTok;
+          }
+        } else if (/^[A-Z0-9]{15,18}$/.test(cleanTok) && /[A-Z]/.test(cleanTok) && /[0-9]/.test(cleanTok)) {
+          result.chassisNumber = cleanTok;
+        } else if (/^[A-Z0-9]{8,14}$/.test(cleanTok) && /[0-9]/.test(cleanTok)) {
+          result.motorNumber = cleanTok;
+        } else if (/^(\d{3}[A-Z]{3}|[A-Z]{2,3}\d{3,4}|\d{4}[A-Z]{2})$/.test(cleanTok)) {
+          result.plateNumber = cleanTok;
+        }
+      }
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -210,6 +373,7 @@ export async function parseMtopImage(
   let chassisNumber = '';
   let vehicleMake = '';
   let motorNumber = '';
+  let yearModel = '';
   let orNumber = '';
   let expirationDate = '';
   let authorizedRoute = '';
@@ -234,48 +398,66 @@ export async function parseMtopImage(
     if (ctx) {
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      // STEP 1: Full-document sparse semantic pass (PSM 11 extracts all text including watermark-covered table cells)
-      onProgress?.(30, 'Binabasa ang buong MTOP permit...');
+      // STEP 1: Full-document standard pass (PSM 3 accurately parses multi-column blocks and tables)
+      onProgress?.(30, 'Binabasa ang buong dokumento...');
       await worker.setParameters({
-        tessedit_pageseg_mode: '11' as any,
+        tessedit_pageseg_mode: '3' as any,
         tessedit_char_whitelist: '',
       });
-      const fullRes = await worker.recognize(canvas);
-      const fullTxt = fullRes.data.text;
-      rawText += `\n--- FULL MTOP PASS (PSM 11) ---\n${fullTxt}\n`;
+      const psm3Res = await worker.recognize(canvas);
+      const psm3Txt = normalizeMtopText(psm3Res.data.text);
+      rawText += `\n--- FULL PASS (PSM 3) ---\n${psm3Txt}\n`;
 
-      franchiseNumber = parseMtopFranchiseNumber(fullTxt);
-      operatorName = parseMtopOperator(fullTxt);
-      plateNumber = parseMtopPlateNumber(fullTxt);
-      vehicleMake = parseMtopMake(fullTxt);
-      motorNumber = parseMtopMotorNumber(fullTxt);
-      chassisNumber = parseMtopChassisNumber(fullTxt);
-      expirationDate = parseMtopExpiration(fullTxt);
-      orNumber = parseMtopOrNumber(fullTxt);
-      authorizedRoute = parseMtopAuthorizedRoute(fullTxt);
+      franchiseNumber = parseMtopFranchiseNumber(psm3Txt);
+      operatorName = parseMtopOperator(psm3Txt);
+      vehicleMake = parseMtopMake(psm3Txt);
+      yearModel = parseMtopYearModel(psm3Txt);
+      motorNumber = parseMtopMotorNumber(psm3Txt);
+      chassisNumber = parseMtopChassisNumber(psm3Txt);
+      plateNumber = parseMtopPlateNumber(psm3Txt);
+      expirationDate = parseMtopExpiration(psm3Txt);
+      orNumber = parseMtopOrNumber(psm3Txt);
+      authorizedRoute = parseMtopAuthorizedRoute(psm3Txt);
 
-      // STEP 1.5: If any key field missing, run standard PSM 3 pass
-      if (!operatorName || !franchiseNumber || !expirationDate) {
+      // Table line extraction for unit description row
+      const tableData = parseMtopTableLine(psm3Txt, vehicleMake);
+      if (tableData.make && !vehicleMake) vehicleMake = tableData.make;
+      if (tableData.yearModel && !yearModel) yearModel = tableData.yearModel;
+      if (tableData.motorNumber && !motorNumber) motorNumber = tableData.motorNumber;
+      if (tableData.chassisNumber && !chassisNumber) chassisNumber = tableData.chassisNumber;
+      if (tableData.plateNumber && !plateNumber) plateNumber = tableData.plateNumber;
+
+      // STEP 1.5: If key fields missing, run PSM 11 (sparse text pass)
+      if (!operatorName || !franchiseNumber || !plateNumber || !expirationDate) {
+        onProgress?.(50, 'Sinusuri ang bawat bahagi ng dokumento...');
         await worker.setParameters({
-          tessedit_pageseg_mode: '3' as any,
+          tessedit_pageseg_mode: '11' as any,
           tessedit_char_whitelist: '',
         });
-        const psm3Res = await worker.recognize(canvas);
-        const psm3Txt = psm3Res.data.text;
-        rawText += `\n--- FULL MTOP PASS (PSM 3) ---\n${psm3Txt}\n`;
+        const psm11Res = await worker.recognize(canvas);
+        const psm11Txt = normalizeMtopText(psm11Res.data.text);
+        rawText += `\n--- FULL PASS (PSM 11) ---\n${psm11Txt}\n`;
 
-        if (!operatorName) operatorName = parseMtopOperator(psm3Txt);
-        if (!franchiseNumber) franchiseNumber = parseMtopFranchiseNumber(psm3Txt);
-        if (!plateNumber) plateNumber = parseMtopPlateNumber(psm3Txt);
-        if (!vehicleMake) vehicleMake = parseMtopMake(psm3Txt);
-        if (!motorNumber) motorNumber = parseMtopMotorNumber(psm3Txt);
-        if (!chassisNumber) chassisNumber = parseMtopChassisNumber(psm3Txt);
-        if (!expirationDate) expirationDate = parseMtopExpiration(psm3Txt);
-        if (!orNumber) orNumber = parseMtopOrNumber(psm3Txt);
+        if (!operatorName) operatorName = parseMtopOperator(psm11Txt);
+        if (!franchiseNumber) franchiseNumber = parseMtopFranchiseNumber(psm11Txt);
+        if (!vehicleMake) vehicleMake = parseMtopMake(psm11Txt);
+        if (!yearModel) yearModel = parseMtopYearModel(psm11Txt);
+        if (!motorNumber) motorNumber = parseMtopMotorNumber(psm11Txt);
+        if (!chassisNumber) chassisNumber = parseMtopChassisNumber(psm11Txt);
+        if (!plateNumber) plateNumber = parseMtopPlateNumber(psm11Txt);
+        if (!expirationDate) expirationDate = parseMtopExpiration(psm11Txt);
+        if (!orNumber) orNumber = parseMtopOrNumber(psm11Txt);
+
+        const tableData11 = parseMtopTableLine(psm11Txt, vehicleMake);
+        if (tableData11.make && !vehicleMake) vehicleMake = tableData11.make;
+        if (tableData11.yearModel && !yearModel) yearModel = tableData11.yearModel;
+        if (tableData11.motorNumber && !motorNumber) motorNumber = tableData11.motorNumber;
+        if (tableData11.chassisNumber && !chassisNumber) chassisNumber = tableData11.chassisNumber;
+        if (tableData11.plateNumber && !plateNumber) plateNumber = tableData11.plateNumber;
       }
 
       // STEP 2: Targeted Field Refinements
-      onProgress?.(55, 'Pinapahusay ang numero ng prangkisa...');
+      onProgress?.(70, 'Pinapahusay ang numero ng prangkisa...');
       if (!franchiseNumber) {
         const franRoi = cropRoiCanvas(canvas, 0.55, 0.15, 0.44, 0.16);
         if (franRoi) {
@@ -287,29 +469,40 @@ export async function parseMtopImage(
         }
       }
 
-      onProgress?.(75, 'Pinapahusay ang detalye ng sasakyan...');
-      if (!plateNumber || !motorNumber || !chassisNumber) {
-        const tableRoi = cropRoiCanvas(canvas, 0.05, 0.40, 0.90, 0.25);
+      onProgress?.(85, 'Pinapahusay ang detalye ng sasakyan...');
+      if (!plateNumber || !motorNumber || !chassisNumber || !yearModel) {
+        const tableRoi = cropRoiCanvas(canvas, 0.05, 0.38, 0.90, 0.28);
         if (tableRoi) {
           await worker.setParameters({ tessedit_pageseg_mode: '6' as any, tessedit_char_whitelist: '' });
           const tableRes = await worker.recognize(tableRoi);
-          rawText += `\n--- TABLE ROI ---\n${tableRes.data.text}\n`;
-          if (!vehicleMake) vehicleMake = parseMtopMake(tableRes.data.text);
-          if (!motorNumber) motorNumber = parseMtopMotorNumber(tableRes.data.text);
-          if (!chassisNumber) chassisNumber = parseMtopChassisNumber(tableRes.data.text);
-          if (!plateNumber) plateNumber = parseMtopPlateNumber(tableRes.data.text);
+          const tableTxt = normalizeMtopText(tableRes.data.text);
+          rawText += `\n--- TABLE ROI ---\n${tableTxt}\n`;
+
+          const tableRoiData = parseMtopTableLine(tableTxt, vehicleMake);
+          if (tableRoiData.make && !vehicleMake) vehicleMake = tableRoiData.make;
+          if (tableRoiData.yearModel && !yearModel) yearModel = tableRoiData.yearModel;
+          if (tableRoiData.motorNumber && !motorNumber) motorNumber = tableRoiData.motorNumber;
+          if (tableRoiData.chassisNumber && !chassisNumber) chassisNumber = tableRoiData.chassisNumber;
+          if (tableRoiData.plateNumber && !plateNumber) plateNumber = tableRoiData.plateNumber;
+
+          if (!vehicleMake) vehicleMake = parseMtopMake(tableTxt);
+          if (!yearModel) yearModel = parseMtopYearModel(tableTxt);
+          if (!motorNumber) motorNumber = parseMtopMotorNumber(tableTxt);
+          if (!chassisNumber) chassisNumber = parseMtopChassisNumber(tableTxt);
+          if (!plateNumber) plateNumber = parseMtopPlateNumber(tableTxt);
         }
       }
 
-      onProgress?.(90, 'Pinapahusay ang petsa at resibo...');
+      onProgress?.(95, 'Pinapahusay ang petsa at resibo...');
       if (!expirationDate || !orNumber) {
-        const botRoi = cropRoiCanvas(canvas, 0.05, 0.60, 0.90, 0.20);
+        const botRoi = cropRoiCanvas(canvas, 0.05, 0.58, 0.90, 0.24);
         if (botRoi) {
           await worker.setParameters({ tessedit_pageseg_mode: '6' as any, tessedit_char_whitelist: '' });
           const botRes = await worker.recognize(botRoi);
-          rawText += `\n--- BOTTOM LINE ROI ---\n${botRes.data.text}\n`;
-          if (!expirationDate) expirationDate = parseMtopExpiration(botRes.data.text);
-          if (!orNumber) orNumber = parseMtopOrNumber(botRes.data.text);
+          const botTxt = normalizeMtopText(botRes.data.text);
+          rawText += `\n--- BOTTOM LINE ROI ---\n${botTxt}\n`;
+          if (!expirationDate) expirationDate = parseMtopExpiration(botTxt);
+          if (!orNumber) orNumber = parseMtopOrNumber(botTxt);
         }
       }
     }
@@ -331,6 +524,7 @@ export async function parseMtopImage(
     chassisNumber: chassisNumber || '',
     vehicleMake: vehicleMake || '',
     motorNumber: motorNumber || '',
+    yearModel: yearModel || '',
     orNumber: orNumber || '',
     expirationDate: expirationDate || '',
     authorizedRoute: authorizedRoute || '',
@@ -342,7 +536,7 @@ export async function parseMtopImage(
   if (!parsedData.franchiseNumber) missingFields.push('Franchise Number');
   if (!parsedData.operatorName) missingFields.push('Operator Name');
 
-  const confidenceScore = Math.round(((9 - missingFields.length) / 9) * 100);
+  const confidenceScore = Math.round(((10 - missingFields.length) / 10) * 100);
 
   return {
     data: parsedData,

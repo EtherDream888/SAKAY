@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 import appIcon from '../../../../../../packages/shared/src/assets/icons/app-icon.png';
+import { useLanguage } from '../../../utils/LanguageContext';
 
 export type FlowType = 'license' | 'mtop' | 'face';
 
@@ -13,8 +14,11 @@ interface DriverProgressLoaderProps {
 export function getFlowProgressMilestoneText(
   pct: number,
   flowType: FlowType = 'license',
-  customStatusText?: string
+  customStatusText?: string,
+  language: 'tl' | 'en' = 'tl'
 ): string {
+  const isTagalog = language === 'tl';
+
   if (
     customStatusText &&
     !customStatusText.includes('Sandali lang habang') &&
@@ -23,33 +27,38 @@ export function getFlowProgressMilestoneText(
     !customStatusText.includes('Binabasa ang') &&
     !customStatusText.includes('Tinutukoy ang') &&
     !customStatusText.includes('Inihahambing sa') &&
-    !customStatusText.includes('Tinatapos ang')
+    !customStatusText.includes('Tinatapos ang') &&
+    !customStatusText.includes('Preparing') &&
+    !customStatusText.includes('Analyzing') &&
+    !customStatusText.includes('Reading') &&
+    !customStatusText.includes('Verifying') &&
+    !customStatusText.includes('Finalizing')
   ) {
     return customStatusText;
   }
 
   if (flowType === 'mtop') {
-    if (pct < 20) return 'Inihahanda ang larawan...';
-    if (pct < 40) return 'Sinusuri ang MTOP...';
-    if (pct < 60) return 'Binabasa ang impormasyon...';
-    if (pct < 80) return 'Sinusuri ang mga detalye...';
-    return 'Tinatapos ang pag-verify...';
+    if (pct < 20) return isTagalog ? 'Inihahanda ang larawan...' : 'Preparing document photo...';
+    if (pct < 40) return isTagalog ? 'Sinusuri ang MTOP permit...' : 'Analyzing MTOP permit...';
+    if (pct < 60) return isTagalog ? 'Binabasa ang impormasyon...' : 'Reading document details...';
+    if (pct < 80) return isTagalog ? 'Sinusuri ang mga detalye ng prangkisa...' : 'Verifying franchise details...';
+    return isTagalog ? 'Tinatapos ang pag-verify...' : 'Finalizing verification...';
   }
 
   if (flowType === 'face') {
-    if (pct < 20) return 'Inihahanda ang larawan...';
-    if (pct < 40) return 'Sinusuri ang iyong mukha...';
-    if (pct < 60) return 'Tinutukoy ang mga detalye...';
-    if (pct < 80) return 'Inihahambing sa lisensya...';
-    return 'Tinatapos ang pag-verify...';
+    if (pct < 20) return isTagalog ? 'Inihahanda ang larawan...' : 'Preparing selfie photo...';
+    if (pct < 40) return isTagalog ? 'Sinusuri ang iyong mukha...' : 'Analyzing facial features...';
+    if (pct < 60) return isTagalog ? 'Tinutukoy ang mga detalye...' : 'Verifying biometric points...';
+    if (pct < 80) return isTagalog ? 'Inihahambing sa lisensya...' : "Matching with driver's license...";
+    return isTagalog ? 'Tinatapos ang pag-verify...' : 'Finalizing verification...';
   }
 
   // Default / Driver's License ('license')
-  if (pct < 20) return 'Inihahanda ang larawan...';
-  if (pct < 40) return 'Sinusuri ang lisensya...';
-  if (pct < 60) return 'Binabasa ang impormasyon...';
-  if (pct < 80) return 'Sinusuri ang mga detalye...';
-  return 'Tinatapos ang pag-verify...';
+  if (pct < 20) return isTagalog ? 'Inihahanda ang larawan...' : 'Preparing license photo...';
+  if (pct < 40) return isTagalog ? 'Sinusuri ang lisensya...' : "Analyzing driver's license...";
+  if (pct < 60) return isTagalog ? 'Binabasa ang impormasyon...' : 'Reading license details...';
+  if (pct < 80) return isTagalog ? 'Sinusuri ang mga detalye...' : 'Verifying extracted information...';
+  return isTagalog ? 'Tinatapos ang pag-verify...' : 'Finalizing verification...';
 }
 
 export const DriverProgressLoader: React.FC<DriverProgressLoaderProps> = ({
@@ -57,6 +66,8 @@ export const DriverProgressLoader: React.FC<DriverProgressLoaderProps> = ({
   flowType = 'license',
   statusText,
 }) => {
+  const { language } = useLanguage();
+
   // Convert 0.0-1.0 or 0-100 progress into 0-100 float percentage
   const currentPct = progress <= 1 ? progress * 100 : Math.min(100, Math.max(0, progress));
   const roundedPct = Math.round(currentPct);
@@ -64,8 +75,8 @@ export const DriverProgressLoader: React.FC<DriverProgressLoaderProps> = ({
   // Width of the tricycle image icon in pixels
   const TRICYCLE_WIDTH_PX = 68;
 
-  // Active milestone status text based on flowType and current percentage
-  const activeStatus = getFlowProgressMilestoneText(roundedPct, flowType, statusText);
+  // Active milestone status text based on flowType, language, and current percentage
+  const activeStatus = getFlowProgressMilestoneText(roundedPct, flowType, statusText, language);
 
   return (
     <Box
