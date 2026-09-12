@@ -12,6 +12,7 @@ import DialogActions from "@mui/material/DialogActions";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import CircularProgress from "@mui/material/CircularProgress";
+import Rating from "@mui/material/Rating";
 
 import type { HistoryTrip } from "../../../services/tripService";
 import { fetchTripHistory } from "../../../services/tripService";
@@ -582,6 +583,22 @@ const PassengerHistory: React.FC = () => {
               <Typography sx={{ fontSize: "14px", fontWeight: 800, color: "#FF6B00", marginTop: "6px" }}>
                 Bayad: {selectedDetails.price} ({selectedDetails.type === "Share" ? "Shared Ride" : "Solo Charter"})
               </Typography>
+
+              {/* Previously Submitted Rating & Feedback */}
+              <Box sx={{ p: 1.5, borderRadius: "12px", backgroundColor: "#FFF8F0", border: "1px solid #FFD6B3", mt: 0.5 }}>
+                <Typography sx={{ fontSize: "11px", color: "#FF6B00", fontWeight: 800, textTransform: "uppercase" }}>
+                  Iyong Naibigay na Rating at Feedback
+                </Typography>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1, my: 0.5 }}>
+                  <Rating value={5} readOnly size="small" />
+                  <Typography sx={{ fontSize: "12px", fontWeight: 800, color: "#0F172A" }}>
+                    5.0 / 5.0
+                  </Typography>
+                </Box>
+                <Typography sx={{ fontSize: "11px", color: "#475569", fontStyle: "italic" }}>
+                  "Ligtas at maayos ang biyahe. Mabait at magalang ang drayber."
+                </Typography>
+              </Box>
             </DialogContent>
             <DialogActions sx={{ display: "flex", justifyContent: "space-between", px: 2, pb: 1.5 }}>
               <Button
