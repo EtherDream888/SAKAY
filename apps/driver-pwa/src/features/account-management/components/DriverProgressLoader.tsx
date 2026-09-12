@@ -21,13 +21,17 @@ export function getFlowProgressMilestoneText(
 
   if (
     customStatusText &&
+    !customStatusText.toLowerCase().includes('ocr') &&
+    !customStatusText.toLowerCase().includes('engine') &&
     !customStatusText.includes('Sandali lang habang') &&
-    !customStatusText.includes('Inihahanda ang larawan...') &&
+    !customStatusText.includes('Inihahanda ang') &&
     !customStatusText.includes('Sinusuri ang') &&
     !customStatusText.includes('Binabasa ang') &&
+    !customStatusText.includes('Pinapahusay ang') &&
     !customStatusText.includes('Tinutukoy ang') &&
     !customStatusText.includes('Inihahambing sa') &&
     !customStatusText.includes('Tinatapos ang') &&
+    !customStatusText.includes('Kumpleto na') &&
     !customStatusText.includes('Preparing') &&
     !customStatusText.includes('Analyzing') &&
     !customStatusText.includes('Reading') &&

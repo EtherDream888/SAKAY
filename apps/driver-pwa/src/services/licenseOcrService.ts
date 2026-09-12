@@ -3,7 +3,7 @@ import type { LicenseExtractedData } from './driverOnboardingCache';
 import { cropRoiCanvas } from './imageEnhancementService';
 
 export interface OcrProgressCallback {
-  (progress: number, status: string): void;
+  (progress: number, status?: string): void;
 }
 
 export interface OcrExtractionResult {
@@ -219,15 +219,30 @@ export function parseLicenseAddress(rawText: string): string {
  */
 export function parseLicenseNumber(rawText: string): string {
   if (!rawText) return '';
-  const s = rawText.toUpperCase().replace(/[\s.]+/g, '-').replace(/--+/g, '-').trim();
 
-  // Philippine DL format: e.g. N03-12-123456 (Letter + 2 digits + 2 digits + 6 digits)
-  const match = s.match(/([A-Z0-9])(\d{2})[-]?(\d{2})[-]?(\d{6})/);
-  if (match) {
-    return `${match[1]}${match[2]}-${match[3]}-${match[4]}`;
+  // 1. Direct regex matching Philippine DL formats:
+  // Matches: D02-12-123456, D 02-12-123456, D02 12 123456, License No.: D02-12-123456
+  // Formatted strictly as: D02-12-123456 (NO space after the initial letter)
+  const m1 = rawText.match(/(?:License\s*(?:No\.?|Number)?[:\s]*)?([A-Z])[\s-]?(\d{2})[\s-]?(\d{2})[\s-]?(\d{6})\b/i);
+  if (m1) {
+    return `${m1[1].toUpperCase()}${m1[2]}-${m1[3]}-${m1[4]}`;
   }
 
-  const cleanChars = s.replace(/[^A-Z0-9]/g, '');
+  // 2. Handle cases where first character might be misread as digit 0 instead of D:
+  const m2 = rawText.match(/(?:License\s*(?:No\.?|Number)?[:\s]+)([0-9A-Z])[\s-]?(\d{2})[\s-]?(\d{2})[\s-]?(\d{6})\b/i);
+  if (m2) {
+    let letter = m2[1].toUpperCase();
+    if (letter === '0') letter = 'D';
+    return `${letter}${m2[2]}-${m2[3]}-${m2[4]}`;
+  }
+
+  // 3. Fallback: match any 1 letter followed by 10 digits with any spaces/hyphens
+  const m3 = rawText.match(/\b([A-Z])[\s-]*(\d{2})[\s-]*(\d{2})[\s-]*(\d{6})\b/i);
+  if (m3) {
+    return `${m3[1].toUpperCase()}${m3[2]}-${m3[3]}-${m3[4]}`;
+  }
+
+  const cleanChars = rawText.toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (cleanChars.length === 11) {
     const p1 = cleanChars.charAt(0);
     let rest = cleanChars.slice(1).replace(/O|Q/g, '0').replace(/I|L/g, '1').replace(/S/g, '5');
@@ -305,10 +320,9 @@ export function parseLicenseRestrictions(rawText: string): string {
       const lines = rawText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
       // 1. License Number extraction
-      const licMatch = rawText.match(/\b([A-Z0-9]\d{2}[-\s]?\d{2}[-\s]?\d{6})\b/i) ||
-                       rawText.match(/License\s*No[.:\s]*([A-Z0-9-]{10,15})/i);
-      if (licMatch) {
-        result.licenseNumber = parseLicenseNumber(licMatch[1]);
+      const parsedLic = parseLicenseNumber(rawText);
+      if (parsedLic) {
+        result.licenseNumber = parsedLic;
       }
 
       // 2. Dates extraction (DOB and Expiration Date)
@@ -449,7 +463,7 @@ export function parseLicenseRestrictions(rawText: string): string {
       let worker: any = null;
 
       try {
-        onProgress?.(0.1, 'Inihahanda ang OCR engine...');
+        onProgress?.(0.1);
         worker = await createWorker('eng');
 
         // Create Image element from front photo data URL to crop ROIs
@@ -468,7 +482,7 @@ export function parseLicenseRestrictions(rawText: string): string {
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
           // STEP 1: Full-card recognition pass (Guarantees every field is detected)
-          onProgress?.(0.30, 'Binabasa ang buong lisensya...');
+          onProgress?.(0.30);
           await worker.setParameters({
             tessedit_pageseg_mode: '3' as any,
             tessedit_char_whitelist: '',
@@ -494,7 +508,7 @@ export function parseLicenseRestrictions(rawText: string): string {
           if (fullParsed.vehicleDetails) vehicleDetails = fullParsed.vehicleDetails;
 
           // STEP 2: Targeted Field ROIs for high-precision refinement
-          onProgress?.(0.50, 'Pinapahusay ang pangalan...');
+          onProgress?.(0.50);
           const nameRoi = cropRoiCanvas(canvas, 0.15, 0.18, 0.82, 0.26);
           if (nameRoi) {
             await worker.setParameters({
@@ -513,13 +527,13 @@ export function parseLicenseRestrictions(rawText: string): string {
             }
           }
 
-          onProgress?.(0.65, 'Pinapahusay ang numero ng lisensya...');
+          onProgress?.(0.65);
           if (!licenseNumber) {
-            const licRoi = cropRoiCanvas(canvas, 0.14, 0.60, 0.46, 0.20);
+            const licRoi = cropRoiCanvas(canvas, 0.12, 0.55, 0.50, 0.25);
             if (licRoi) {
               await worker.setParameters({
-                tessedit_pageseg_mode: '7' as any,
-                tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
+                tessedit_pageseg_mode: '6' as any,
+                tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-: .',
               });
               const licRes = await worker.recognize(licRoi);
               rawText += `\n--- LICENSE NO ROI ---\n${licRes.data.text}\n`;
@@ -528,7 +542,7 @@ export function parseLicenseRestrictions(rawText: string): string {
             }
           }
 
-          onProgress?.(0.78, 'Pinapahusay ang petsa ng pagkapaso...');
+          onProgress?.(0.78);
           if (!expirationDate) {
             const expRoi = cropRoiCanvas(canvas, 0.48, 0.60, 0.48, 0.20);
             if (expRoi) {
@@ -543,7 +557,7 @@ export function parseLicenseRestrictions(rawText: string): string {
             }
           }
 
-          onProgress?.(0.88, 'Pinapahusay ang tirahan...');
+          onProgress?.(0.88);
           if (!address || address.length < 8) {
             const addrRoi = cropRoiCanvas(canvas, 0.15, 0.44, 0.82, 0.24);
             if (addrRoi) {
@@ -559,7 +573,7 @@ export function parseLicenseRestrictions(rawText: string): string {
           }
         }
 
-        onProgress?.(1.0, 'Kumpleto na ang pagbasa ng lisensya!');
+        onProgress?.(1.0);
       } catch (err) {
         console.warn('[licenseOcrService] Hybrid OCR execution warning:', err);
       } finally {

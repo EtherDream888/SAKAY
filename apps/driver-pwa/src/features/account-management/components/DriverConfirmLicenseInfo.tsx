@@ -44,7 +44,7 @@ export function formatDriverLicenseNumberInput(val: string): string {
 
   let result = letter;
   if (digits.length > 0) {
-    result += ' ' + digits.slice(0, 2);
+    result += digits.slice(0, 2);
   }
   if (digits.length > 2) {
     result += '-' + digits.slice(2, 4);
@@ -815,9 +815,9 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
             helperText={formData.licenseNumber && !isLicNoValid ? (isTagalog ? 'Format: N03-12-123456 (1 titik + 10 tambang numero)' : 'Format: N03-12-123456 (1 letter + 10 digits)') : undefined}
           />
 
-          {/* 7. Restriksyon / Kategorya ng Lisensya (100%) */}
+          {/* 7. RESTRICTIONS (100%) */}
           <SakayFormInput
-            label={isTagalog ? "RESTRIKSYON / KATEGORYA NG LISENSYA" : "LICENSE RESTRICTIONS"}
+            label="RESTRICTIONS"
             value={formData.dlCodes}
             onChange={(val) => handleFieldChange('dlCodes', val)}
             isRestriction

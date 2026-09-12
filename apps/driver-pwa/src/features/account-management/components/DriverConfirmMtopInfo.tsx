@@ -238,7 +238,6 @@ export const DriverConfirmMtopInfo: React.FC = () => {
     !isFieldEmpty(formData.chassisNumber) &&
     !isFieldEmpty(formData.vehicleMake) &&
     !isFieldEmpty(formData.motorNumber) &&
-    !isFieldEmpty(formData.orNumber) &&
     !isFieldEmpty(formData.expirationDate) &&
     isLicenseUnexpired(formData.expirationDate) &&
     !isFieldEmpty(formData.authorizedRoute)
@@ -535,14 +534,6 @@ export const DriverConfirmMtopInfo: React.FC = () => {
             </Box>
           </Box>
 
-          {/* ROW 6: OR NUMBER (Full Width) */}
-          <SakayMtopInput
-            label="OR NUMBER"
-            value={formData.orNumber}
-            onChange={(val) => handleFieldChange('orNumber', val.replace(/\D/g, '').slice(0, 12))}
-            error={hasAttemptedSubmit && (isFieldEmpty(formData.orNumber) || formData.orNumber.length < 5)}
-            helperText={hasAttemptedSubmit && (isFieldEmpty(formData.orNumber) || formData.orNumber.length < 5) ? (isTagalog ? 'Kailangan ng wastong OR number.' : 'Valid OR number is required.') : ''}
-          />
 
           {/* ROW 7: AUTHORIZED ROUTE / ZONE OF OPERATION (Full Width) */}
           <SakayMtopInput

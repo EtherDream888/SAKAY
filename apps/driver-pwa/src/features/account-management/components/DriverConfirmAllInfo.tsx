@@ -339,7 +339,7 @@ export const DriverConfirmAllInfo: React.FC = () => {
           </Box>
 
           <ReviewFieldRow label={isTagalog ? "NUMERO NG LISENSYA" : "DRIVER'S LICENSE NUMBER"} value={licenseData.licenseNumber} />
-          <ReviewFieldRow label={isTagalog ? "RESTRIKSYON / KATEGORYA" : "RESTRICTIONS / CODES"} value={licenseData.dlCodes} />
+          <ReviewFieldRow label="RESTRICTIONS" value={licenseData.dlCodes} />
           <ReviewFieldRow label={isTagalog ? "PETSA NG PAGKAPASO (EXPIRATION)" : "EXPIRATION DATE"} value={licenseData.expirationDate} />
           <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
         </Box>
@@ -385,7 +385,6 @@ export const DriverConfirmAllInfo: React.FC = () => {
           <ReviewFieldRow label="MOTOR NUMBER" value={mtopData.motorNumber} />
           <ReviewFieldRow label="VEHICLE MAKE" value={mtopData.vehicleMake} />
           <ReviewFieldRow label="YEAR MODEL" value={mtopData.yearModel || 'N/A'} />
-          <ReviewFieldRow label="OR NUMBER" value={mtopData.orNumber} />
           <ReviewFieldRow label={isTagalog ? "AWTORISADONG RUTA / ZONA" : "AUTHORIZED ROUTE / ZONE"} value={mtopData.authorizedRoute} />
           <ReviewFieldRow label={isTagalog ? "PETSA NG PAGKAPASO (EXPIRATION)" : "EXPIRATION DATE"} value={mtopData.expirationDate} />
           <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />

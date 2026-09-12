@@ -15,9 +15,6 @@ export const DriverMtopLoading: React.FC = () => {
     rawMtopPhoto?: string;
   } | undefined;
 
-  const [ocrStatus, setOcrStatus] = useState(
-    language === 'tl' ? 'Inihahanda ang larawan...' : 'Preparing document photo...'
-  );
   const [displayedPct, setDisplayedPct] = useState(0);
 
   const targetPctRef = useRef(0);
@@ -71,9 +68,8 @@ export const DriverMtopLoading: React.FC = () => {
         if (photoToProcess) {
           targetPctRef.current = 30;
 
-          const ocrResult = await parseMtopImage(photoToProcess, (pct, status) => {
+          const ocrResult = await parseMtopImage(photoToProcess, (pct) => {
             targetPctRef.current = Math.max(30, Math.min(90, Math.round(pct)));
-            if (status) setOcrStatus(status);
           });
 
           targetPctRef.current = 100;
@@ -108,7 +104,7 @@ export const DriverMtopLoading: React.FC = () => {
             chassisNumber: 'AB1CDEFGHIJK23456',
             vehicleMake: 'Yamaha',
             motorNumber: 'A1B2345678',
-            orNumber: '1234567',
+            orNumber: '',
             expirationDate: '2027-12-31',
             authorizedRoute: 'City of Calapan, Oriental Mindoro',
             scannedAt: new Date().toISOString(),
@@ -120,5 +116,5 @@ export const DriverMtopLoading: React.FC = () => {
     executeOcrPipeline();
   }, []);
 
-  return <DriverProgressLoader progress={displayedPct / 100} flowType="mtop" statusText={ocrStatus} />;
+  return <DriverProgressLoader progress={displayedPct / 100} flowType="mtop" />;
 };
