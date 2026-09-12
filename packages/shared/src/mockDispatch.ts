@@ -96,26 +96,89 @@ try {
   console.warn('BroadcastChannel not supported, using storage events:', e);
 }
 
-// Supabase Realtime Channel for Cross-Port & Cross-Device Sync
+// Supabase Realtime Channel & Client Instance for Cross-Port & Cross-Device Sync
 let supabaseDispatchChannel: any = null;
+let supabaseClientInstance: any = null;
 
 export const initSupabaseDispatch = (supabaseClient: any) => {
-  if (!supabaseClient || supabaseDispatchChannel) return;
+  if (!supabaseClient) return;
+  supabaseClientInstance = supabaseClient;
+
+  if (supabaseDispatchChannel) return;
 
   try {
     const channel = supabaseClient.channel('sakay_live_dispatch', {
-      config: { broadcast: { self: true } },
+      config: { broadcast: { self: true, ack: false } },
     });
 
+    // 1. Ephemeral Realtime Broadcast (instant cross-device and cross-network event bus)
     channel
       .on('broadcast', { event: 'dispatch_event' }, ({ payload }: { payload: MockDispatchBooking }) => {
         if (payload && payload.booking_id) {
-          inMemoryStore[payload.booking_id] = payload;
-          saveStore(inMemoryStore);
-          emitToSubscribers(payload);
+          const store = loadStore();
+          store[payload.booking_id] = {
+            ...(store[payload.booking_id] || {}),
+            ...payload,
+          };
+          saveStore(store);
+          emitToSubscribers(store[payload.booking_id]);
         }
       })
-      .subscribe();
+      // 2. Database Postgres Changes (triggers whenever a row in public.booking changes)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'booking' },
+        (payload: any) => {
+          const row = payload.new;
+          if (row && row.booking_id) {
+            const store = loadStore();
+            const existing = store[row.booking_id] || ({} as MockDispatchBooking);
+
+            let mappedStatus: MockDispatchBooking['booking_status'] = existing.booking_status || 'Searching Driver';
+            if (row.booking_status === 'Pending') {
+              mappedStatus = 'Searching Driver';
+            } else if (row.booking_status) {
+              mappedStatus = row.booking_status as any;
+            }
+
+            const updatedFromDb: MockDispatchBooking = {
+              ...existing,
+              booking_id: row.booking_id,
+              passenger_id: row.passenger_id || existing.passenger_id || 'passenger-demo',
+              passenger_name: existing.passenger_name || 'Calapan Commuter',
+              passenger_phone: existing.passenger_phone || '+63 917 123 4567',
+              driver_id: row.driver_id || existing.driver_id,
+              driver_name: existing.driver_name,
+              driver_phone: existing.driver_phone,
+              franchise_no: existing.franchise_no,
+              vehicle_plate: existing.vehicle_plate,
+              toda_name: existing.toda_name,
+              booking_type: row.booking_type || existing.booking_type || 'Immediate',
+              is_shared_trip: row.is_shared_trip !== undefined ? row.is_shared_trip : existing.is_shared_trip,
+              passenger_count: row.passenger_count || existing.passenger_count || 1,
+              pickup_address: row.pickup_address || existing.pickup_address || 'Pickup Point',
+              pickup_latitude: row.pickup_latitude || existing.pickup_latitude || 13.4117,
+              pickup_longitude: row.pickup_longitude || existing.pickup_longitude || 121.1803,
+              dropoff_address: row.dropoff_address || existing.dropoff_address || 'Destination',
+              dropoff_latitude: row.dropoff_latitude || existing.dropoff_latitude || 13.4150,
+              dropoff_longitude: row.dropoff_longitude || existing.dropoff_longitude || 121.1825,
+              estimated_distance_km: row.estimated_distance_km || existing.estimated_distance_km || 1.5,
+              estimated_fare: Number(row.estimated_fare) || existing.estimated_fare || 18,
+              actual_fare: row.actual_fare !== null && row.actual_fare !== undefined ? Number(row.actual_fare) : existing.actual_fare,
+              booking_status: mappedStatus,
+              created_at: row.created_at || existing.created_at || new Date().toISOString(),
+              updated_at: row.updated_at || new Date().toISOString(),
+            };
+
+            store[row.booking_id] = updatedFromDb;
+            saveStore(store);
+            emitToSubscribers(updatedFromDb);
+          }
+        }
+      )
+      .subscribe((status: string) => {
+        console.log('[mockDispatch] Supabase Realtime channel status:', status);
+      });
 
     supabaseDispatchChannel = channel;
   } catch (err) {
@@ -241,6 +304,26 @@ export const acceptBookingByDriver = (
   };
 
   broadcastBooking(updated);
+
+  // Sync state mutation with Supabase PostgreSQL booking table
+  if (supabaseClientInstance) {
+    const updatePayload: any = {
+      booking_status: 'Driver Assigned',
+      accepted_at: new Date().toISOString(),
+    };
+    if (driver.driver_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(driver.driver_id)) {
+      updatePayload.driver_id = driver.driver_id;
+    }
+    supabaseClientInstance
+      .from('booking')
+      .update(updatePayload)
+      .eq('booking_id', bookingId)
+      .then(({ error }: any) => {
+        if (error) console.warn('[mockDispatch] acceptBooking Supabase update note:', error.message);
+      })
+      .catch((err: any) => console.warn('[mockDispatch] acceptBooking Supabase exception:', err));
+  }
+
   return updated;
 };
 
@@ -281,16 +364,63 @@ export const updateTripStage = (
   const existing = store[bookingId];
   if (!existing) return null;
 
+  const nowIso = new Date().toISOString();
   const updated: MockDispatchBooking = {
     ...existing,
     booking_status: stage,
     eta_minutes: etaMinutes !== undefined ? etaMinutes : existing.eta_minutes,
     ...extra,
+    updated_at: nowIso,
+  };
+
+  broadcastBooking(updated);
+
+  // Sync state mutation with Supabase PostgreSQL booking table
+  if (supabaseClientInstance) {
+    const updateData: any = {
+      booking_status: stage === 'Searching Driver' ? 'Pending' : stage,
+    };
+    if (stage === 'Driver Arrived') {
+      updateData.arrived_at = nowIso;
+    } else if (stage === 'Trip Ongoing') {
+      updateData.trip_started_at = nowIso;
+    } else if (stage === 'Completed') {
+      updateData.trip_completed_at = nowIso;
+      if (extra?.actual_fare) updateData.actual_fare = extra.actual_fare;
+    }
+    supabaseClientInstance
+      .from('booking')
+      .update(updateData)
+      .eq('booking_id', bookingId)
+      .then(({ error }: any) => {
+        if (error) console.warn('[mockDispatch] updateTripStage Supabase note:', error.message);
+      })
+      .catch((err: any) => console.warn('[mockDispatch] updateTripStage Supabase exception:', err));
+  }
+
+  return updated;
+};
+
+/**
+ * Broadcasts driver real-time GPS coordinates to passenger live map
+ */
+export const updateDriverLocation = (
+  bookingId: string,
+  latitude: number,
+  longitude: number
+) => {
+  const store = loadStore();
+  const existing = store[bookingId];
+  if (!existing) return;
+
+  const updated: MockDispatchBooking = {
+    ...existing,
+    driver_latitude: latitude,
+    driver_longitude: longitude,
     updated_at: new Date().toISOString(),
   };
 
   broadcastBooking(updated);
-  return updated;
 };
 
 /**
@@ -304,14 +434,31 @@ export const completeBookingByDriver = (
   const existing = store[bookingId];
   if (!existing) return null;
 
+  const nowIso = new Date().toISOString();
   const updated: MockDispatchBooking = {
     ...existing,
     booking_status: 'Completed',
     actual_fare: actualFare,
-    updated_at: new Date().toISOString(),
+    updated_at: nowIso,
   };
 
   broadcastBooking(updated);
+
+  if (supabaseClientInstance) {
+    supabaseClientInstance
+      .from('booking')
+      .update({
+        booking_status: 'Completed',
+        actual_fare: actualFare,
+        trip_completed_at: nowIso,
+      })
+      .eq('booking_id', bookingId)
+      .then(({ error }: any) => {
+        if (error) console.warn('[mockDispatch] completeBooking Supabase note:', error.message);
+      })
+      .catch((err: any) => console.warn('[mockDispatch] completeBooking Supabase exception:', err));
+  }
+
   return updated;
 };
 

@@ -20,7 +20,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 import MapView from '../../../common/components/MapView';
 import { DriverCommunicationModal } from '../../communication/components/DriverCommunicationModal';
-import { getMockBookingById, updateTripStage } from '@sakay/shared/mockDispatch';
+import { getMockBookingById, updateTripStage, updateDriverLocation } from '@sakay/shared/mockDispatch';
+import { supabase } from '../../../services/supabaseClient';
 
 export const DriverNavigation: React.FC = () => {
   const navigate = useNavigate();
@@ -28,6 +29,7 @@ export const DriverNavigation: React.FC = () => {
   const bookingId = (location.state as { bookingId?: string })?.bookingId || 'BKG-9011';
 
   const [booking, setBooking] = useState(() => getMockBookingById(bookingId));
+  const [driverLocation, setDriverLocation] = useState({ lat: 13.4117, lng: 121.1803 });
   const [commModalOpen, setCommModalOpen] = useState(false);
   const [exitGuardOpen, setExitGuardOpen] = useState(false);
   const [eta, setEta] = useState(4);
@@ -36,16 +38,50 @@ export const DriverNavigation: React.FC = () => {
     // Notify broker that driver is en route
     updateTripStage(bookingId, 'Driver En Route', 3);
 
+    // Watch real-time GPS position and broadcast to passenger
+    let watchId: number | null = null;
+    if (navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setDriverLocation({ lat, lng });
+          updateDriverLocation(bookingId, lat, lng);
+        },
+        (err) => console.warn('[DriverNavigation] Geolocation watch error:', err.message),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 2000 }
+      );
+    }
+
     // Simulate ETA countdown
     const interval = setInterval(() => {
       setEta((prev) => (prev > 1 ? prev - 1 : 1));
     }, 4000);
 
-    return () => clearInterval(interval);
+    return () => {
+      if (watchId !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+      clearInterval(interval);
+    };
   }, [bookingId]);
 
-  const handleArrivedAtPickup = () => {
+  const handleArrivedAtPickup = async () => {
     updateTripStage(bookingId, 'Driver Arrived', 0);
+
+    // Sync arrival with Supabase
+    try {
+      await supabase
+        .from('booking')
+        .update({
+          booking_status: 'Driver Arrived',
+          arrived_at: new Date().toISOString(),
+        })
+        .eq('booking_id', bookingId);
+    } catch (err) {
+      console.warn('[DriverNavigation] Arrived Supabase update note:', err);
+    }
+
     navigate('/driver/active-trip', { replace: true, state: { bookingId } });
   };
 
@@ -63,8 +99,11 @@ export const DriverNavigation: React.FC = () => {
     <Box sx={{ width: '100%', height: '100%', backgroundColor: '#E3ECEF', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* 1. Leaflet OpenStreetMap Surface with Driver and Pickup markers */}
       <MapView
-        userLocation={{ lat: 13.4117, lng: 121.1803 }}
-        pickupLocation={{ lat: 13.4150, lng: 121.1825 }}
+        userLocation={driverLocation}
+        pickupLocation={{
+          lat: booking?.pickup_latitude || 13.4150,
+          lng: booking?.pickup_longitude || 121.1825,
+        }}
       />
 
       {/* 2. Top Floating Turn-by-Turn Instruction Banner */}

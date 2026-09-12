@@ -19,7 +19,8 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import LocalTaxiIcon from '@mui/icons-material/LocalTaxi';
 
 import MapView from '../../../common/components/MapView';
-import { getMockBookingById, updateTripStage, completeBookingByDriver } from '@sakay/shared/mockDispatch';
+import { getMockBookingById, updateTripStage, completeBookingByDriver, updateDriverLocation } from '@sakay/shared/mockDispatch';
+import { supabase } from '../../../services/supabaseClient';
 
 export const DriverActiveTrip: React.FC = () => {
   const navigate = useNavigate();
@@ -39,6 +40,33 @@ export const DriverActiveTrip: React.FC = () => {
   // Fare calculations
   const [currentFare, setCurrentFare] = useState(booking?.estimated_fare || 18.0);
   const [proportionateFareP1, setProportionateFareP1] = useState(booking?.estimated_fare || 18.0);
+  const [driverLocation, setDriverLocation] = useState({
+    lat: booking?.pickup_latitude || 13.4117,
+    lng: booking?.pickup_longitude || 121.1803,
+  });
+
+  // Real-time GPS broadcasting during active trip
+  useEffect(() => {
+    let watchId: number | null = null;
+    if (navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setDriverLocation({ lat, lng });
+          updateDriverLocation(bookingId, lat, lng);
+        },
+        (err) => console.warn('[DriverActiveTrip] Geolocation watch error:', err.message),
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 2000 }
+      );
+    }
+
+    return () => {
+      if (watchId !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
+  }, [bookingId]);
 
   // Simulated Trip Progress Timer
   useEffect(() => {
@@ -65,12 +93,25 @@ export const DriverActiveTrip: React.FC = () => {
     return () => clearInterval(interval);
   }, [tripStarted, hasPromptedShared, booking?.is_shared_trip]);
 
-  const handleStartTrip = () => {
+  const handleStartTrip = async () => {
     setTripStarted(true);
     updateTripStage(bookingId, 'Trip Ongoing', 5);
+
+    // Sync trip start with Supabase
+    try {
+      await supabase
+        .from('booking')
+        .update({
+          booking_status: 'Trip Ongoing',
+          trip_started_at: new Date().toISOString(),
+        })
+        .eq('booking_id', bookingId);
+    } catch (err) {
+      console.warn('[DriverActiveTrip] startTrip Supabase update note:', err);
+    }
   };
 
-  const handleAcceptSharedPassenger = () => {
+  const handleAcceptSharedPassenger = async () => {
     setPairedPassenger('Joshua Dizon (San Vicente High)');
     // Recalculate proportionate carpool fare: Base fare split + combined volume
     const newP1 = Math.round(currentFare * 0.75 * 100) / 100;
@@ -84,16 +125,42 @@ export const DriverActiveTrip: React.FC = () => {
       paired_booking_count: 2,
       proportionate_fare: newP1,
     });
+
+    try {
+      await supabase
+        .from('booking')
+        .update({
+          is_shared_trip: true,
+        })
+        .eq('booking_id', bookingId);
+    } catch (err) {
+      console.warn('[DriverActiveTrip] acceptShared Supabase update note:', err);
+    }
   };
 
   const handleDeclineSharedPassenger = () => {
     setSharedPromptOpen(false);
   };
 
-  const handleCompleteTrip = () => {
+  const handleCompleteTrip = async () => {
     // For the passenger's individual record, set their payable share (proportionate fare if carpooled)
     const p1PayableFare = pairedPassenger ? proportionateFareP1 : currentFare;
     completeBookingByDriver(bookingId, p1PayableFare);
+
+    // Sync completion with Supabase
+    try {
+      await supabase
+        .from('booking')
+        .update({
+          booking_status: 'Completed',
+          actual_fare: p1PayableFare,
+          trip_completed_at: new Date().toISOString(),
+        })
+        .eq('booking_id', bookingId);
+    } catch (err) {
+      console.warn('[DriverActiveTrip] completeTrip Supabase update note:', err);
+    }
+
     navigate('/driver/earnings', {
       replace: true,
       state: {
@@ -122,9 +189,15 @@ export const DriverActiveTrip: React.FC = () => {
     <Box sx={{ width: '100%', height: '100%', backgroundColor: '#E3ECEF', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* 1. Leaflet OpenStreetMap Surface with Pickup and Dropoff markers */}
       <MapView
-        pickupLocation={{ lat: 13.4117, lng: 121.1803 }}
-        dropoffLocation={{ lat: 13.4180, lng: 121.1850 }}
-        userLocation={{ lat: 13.4135, lng: 121.1818 }}
+        pickupLocation={{
+          lat: booking?.pickup_latitude || 13.4117,
+          lng: booking?.pickup_longitude || 121.1803,
+        }}
+        dropoffLocation={{
+          lat: booking?.dropoff_latitude || 13.4180,
+          lng: booking?.dropoff_longitude || 121.1850,
+        }}
+        userLocation={driverLocation}
       />
 
       {/* 2. Top Floating Navigation Header */}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -20,13 +20,13 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import PhoneIcon from '@mui/icons-material/Phone';
 import MessageIcon from '@mui/icons-material/Message';
 import StarIcon from '@mui/icons-material/Star';
-import TwoWheelerIcon from '@mui/icons-material/TwoWheeler';
 import CloseIcon from '@mui/icons-material/Close';
 import SendIcon from '@mui/icons-material/Send';
 import GroupsIcon from '@mui/icons-material/Groups';
 import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
+import MapView from '../../../common/components/MapView';
 import { getBooking, cancelBooking, updateBookingState } from '../../../services/bookingService';
 import type { BookingRecord } from '../../../services/bookingService';
 import { subscribeToDispatchEvents } from '@sakay/shared';
@@ -82,19 +82,117 @@ export const TripMonitoring: React.FC = () => {
   const [disputeReason, setDisputeReason] = useState('');
   const [disputeSubmitted, setDisputeSubmitted] = useState(false);
 
-  // Simulated Driver Location Refresh (~5 seconds)
-  const [driverPos, setDriverPos] = useState({ lat: 13.4140, lng: 121.1845 });
+  // Driver Location Telemetry
+  const [driverPos, setDriverPos] = useState({
+    lat: booking?.driver_latitude || 13.4140,
+    lng: booking?.driver_longitude || 121.1845,
+  });
+  const hasLiveDriverGpsRef = useRef(false);
 
+  // Simulated Driver Location Refresh (~5 seconds) when live GPS is not broadcasting
   useEffect(() => {
     const interval = setInterval(() => {
-      setDriverPos((prev) => ({
-        lat: prev.lat + (Math.random() - 0.5) * 0.0004,
-        lng: prev.lng + (Math.random() - 0.5) * 0.0004,
-      }));
+      if (!hasLiveDriverGpsRef.current) {
+        setDriverPos((prev) => ({
+          lat: prev.lat + (Math.random() - 0.5) * 0.0004,
+          lng: prev.lng + (Math.random() - 0.5) * 0.0004,
+        }));
+      }
     }, 5000);
 
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch initial booking details from Supabase if activeBookingId exists
+  useEffect(() => {
+    if (!activeBookingId) return;
+
+    const fetchBookingFromDb = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('booking')
+          .select(`
+            booking_id,
+            passenger_id,
+            booking_status,
+            pickup_address,
+            pickup_latitude,
+            pickup_longitude,
+            dropoff_address,
+            dropoff_latitude,
+            dropoff_longitude,
+            estimated_fare,
+            actual_fare,
+            estimated_distance_km,
+            is_shared_trip,
+            passenger_count,
+            driver_id,
+            driver:driver_id (
+              driver_id,
+              full_name,
+              contact_number,
+              body_number,
+              plate_number,
+              toda:toda_id (toda_name)
+            )
+          `)
+          .eq('booking_id', activeBookingId)
+          .maybeSingle();
+
+        if (!error && data) {
+          const d = data as any;
+          const driverInfo = Array.isArray(d.driver) ? d.driver[0] : d.driver;
+          const todaInfo = driverInfo?.toda ? (Array.isArray(driverInfo.toda) ? driverInfo.toda[0] : driverInfo.toda) : null;
+
+          const mappedStatus = d.booking_status === 'Pending' ? 'Searching Driver'
+            : d.booking_status === 'Accepted' || d.booking_status === 'Driver Assigned' ? 'Driver Assigned'
+            : d.booking_status === 'In Transit' || d.booking_status === 'Trip Ongoing' ? 'Trip Ongoing'
+            : d.booking_status === 'Arrived at Pickup' || d.booking_status === 'Driver Arrived' ? 'Driver Arrived'
+            : d.booking_status === 'Completed' ? 'Completed'
+            : d.booking_status === 'Cancelled' ? 'Cancelled'
+            : (d.booking_status || 'Searching Driver');
+
+          setBooking((prev) => {
+            const updated: BookingRecord = {
+              ...(prev || ({} as any)),
+              booking_id: d.booking_id,
+              passenger_id: d.passenger_id || prev?.passenger_id || 'PSG-001',
+              passenger_name: prev?.passenger_name || 'Juan Dela Cruz',
+              passenger_phone: prev?.passenger_phone || '+63 917 123 4567',
+              driver_id: d.driver_id || prev?.driver_id,
+              driver_name: driverInfo?.full_name || prev?.driver_name || 'Aurelio Bautista',
+              driver_phone: driverInfo?.contact_number || prev?.driver_phone || '+63 917 111 0201',
+              franchise_no: driverInfo?.body_number || prev?.franchise_no || 'CAL-2025-0773',
+              vehicle_plate: driverInfo?.plate_number || prev?.vehicle_plate || '773-MV',
+              toda_name: todaInfo?.toda_name || prev?.toda_name || 'Calapan Central TODA',
+              booking_status: mappedStatus as any,
+              pickup_address: d.pickup_address || prev?.pickup_address || '',
+              dropoff_address: d.dropoff_address || prev?.dropoff_address || '',
+              pickup_latitude: d.pickup_latitude ?? prev?.pickup_latitude ?? 13.4124,
+              pickup_longitude: d.pickup_longitude ?? prev?.pickup_longitude ?? 121.1834,
+              dropoff_latitude: d.dropoff_latitude ?? prev?.dropoff_latitude ?? 13.4150,
+              dropoff_longitude: d.dropoff_longitude ?? prev?.dropoff_longitude ?? 121.1810,
+              estimated_fare: Number(d.estimated_fare) || prev?.estimated_fare || 18,
+              actual_fare: d.actual_fare !== null && d.actual_fare !== undefined ? Number(d.actual_fare) : prev?.actual_fare || 18,
+              is_shared_trip: Boolean(d.is_shared_trip),
+              passenger_count: Number(d.passenger_count) || 1,
+              created_at: prev?.created_at || new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+            updateBookingState(activeBookingId, updated);
+            if (mappedStatus === 'Completed') {
+              setCompletionFareModalOpen(true);
+            }
+            return updated;
+          });
+        }
+      } catch (err) {
+        console.warn('[TripMonitoring] fetchBookingFromDb note:', err);
+      }
+    };
+
+    fetchBookingFromDb();
+  }, [activeBookingId]);
 
   // Listen to Shared Dispatch Broker & Supabase Realtime for updates
   useEffect(() => {
@@ -109,6 +207,15 @@ export const TripMonitoring: React.FC = () => {
           return merged;
         });
 
+        // Live driver GPS coordinates
+        if (updatedBooking.driver_latitude && updatedBooking.driver_longitude) {
+          hasLiveDriverGpsRef.current = true;
+          setDriverPos({
+            lat: updatedBooking.driver_latitude,
+            lng: updatedBooking.driver_longitude,
+          });
+        }
+
         // Trigger Workflow Step 12 Simultaneous Fare Confirmation Dialog
         if (updatedBooking.booking_status === 'Completed') {
           setCompletionFareModalOpen(true);
@@ -116,8 +223,50 @@ export const TripMonitoring: React.FC = () => {
       }
     });
 
+    // Secondary direct Supabase Realtime channel specifically for activeBookingId
+    const channel = supabase
+      .channel(`passenger_trip_${activeBookingId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'booking',
+          filter: `booking_id=eq.${activeBookingId}`,
+        },
+        (payload: any) => {
+          const row = payload.new;
+          if (row && row.booking_id === activeBookingId) {
+            setBooking((prev) => {
+              const mappedStatus = row.booking_status === 'Pending' ? 'Searching Driver'
+                : row.booking_status === 'Accepted' || row.booking_status === 'Driver Assigned' ? 'Driver Assigned'
+                : row.booking_status === 'In Transit' || row.booking_status === 'Trip Ongoing' ? 'Trip Ongoing'
+                : row.booking_status === 'Arrived at Pickup' || row.booking_status === 'Driver Arrived' ? 'Driver Arrived'
+                : row.booking_status === 'Completed' ? 'Completed'
+                : row.booking_status === 'Cancelled' ? 'Cancelled'
+                : (row.booking_status || prev?.booking_status);
+
+              const merged: BookingRecord = {
+                ...(prev || ({} as any)),
+                booking_status: mappedStatus as any,
+                actual_fare: row.actual_fare !== null && row.actual_fare !== undefined ? Number(row.actual_fare) : prev?.actual_fare,
+                updated_at: row.updated_at || new Date().toISOString(),
+              };
+              updateBookingState(activeBookingId, merged);
+
+              if (mappedStatus === 'Completed') {
+                setCompletionFareModalOpen(true);
+              }
+              return merged;
+            });
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [activeBookingId]);
 
@@ -197,20 +346,30 @@ export const TripMonitoring: React.FC = () => {
         )}
       </Box>
 
-      {/* 2. Live Map Surface (Radar / Vehicle Simulation) */}
+      {/* 2. Live Map Surface (Leaflet OpenStreetMap with Driver, Pickup, and Destination) */}
       <Box
         sx={{
           flex: 1,
           position: 'relative',
-          backgroundColor: '#1E293B',
-          backgroundImage: 'radial-gradient(#334155 1px, transparent 1px)',
-          backgroundSize: '24px 24px',
+          backgroundColor: '#E3ECEF',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           overflow: 'hidden',
         }}
       >
+        <MapView
+          pickupLocation={{
+            lat: booking?.pickup_latitude || 13.4124,
+            lng: booking?.pickup_longitude || 121.1834,
+          }}
+          dropoffLocation={{
+            lat: booking?.dropoff_latitude || 13.4150,
+            lng: booking?.dropoff_longitude || 121.1810,
+          }}
+          driverLocation={status !== 'Searching Driver' ? driverPos : null}
+        />
+
         {/* Status Pill Badge */}
         <Chip
           label={
@@ -251,7 +410,9 @@ export const TripMonitoring: React.FC = () => {
               width: 180,
               height: 180,
               borderRadius: '50%',
-              border: '2px solid rgba(255, 107, 0, 0.4)',
+              border: '2px solid rgba(255, 107, 0, 0.5)',
+              zIndex: 5,
+              pointerEvents: 'none',
               animation: 'pulse 2s infinite ease-out',
               '@keyframes pulse': {
                 '0%': { transform: 'scale(0.8)', opacity: 1 },
@@ -261,38 +422,21 @@ export const TripMonitoring: React.FC = () => {
           />
         )}
 
-        {/* Live Tricycle Icon Marker */}
-        <Box
-          sx={{
-            width: 56,
-            height: 56,
-            borderRadius: '50%',
-            backgroundColor: '#FF6B00',
-            color: '#FFFFFF',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-            border: '3px solid #FFFFFF',
-            zIndex: 10,
-          }}
-        >
-          <TwoWheelerIcon sx={{ fontSize: 32 }} />
-        </Box>
-
-        {/* Refresh Badge */}
+        {/* Refresh / Telemetry Badge */}
         <Typography
           sx={{
             position: 'absolute',
             bottom: 16,
             fontSize: '10.5px',
-            color: '#94A3B8',
-            backgroundColor: 'rgba(15, 23, 42, 0.8)',
-            padding: '4px 10px',
+            color: '#FFFFFF',
+            backgroundColor: 'rgba(15, 23, 42, 0.82)',
+            padding: '5px 12px',
             borderRadius: '999px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            zIndex: 10,
           }}
         >
-          Live Driver GPS: {driverPos.lat.toFixed(4)}, {driverPos.lng.toFixed(4)} (~5s refresh)
+          Live Driver GPS: {driverPos.lat.toFixed(4)}, {driverPos.lng.toFixed(4)} {hasLiveDriverGpsRef.current ? '• Live Watch' : '(~5s refresh)'}
         </Typography>
       </Box>
 

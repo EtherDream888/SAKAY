@@ -10,6 +10,7 @@ export interface MapViewProps {
   userLocation?: { lat: number; lng: number } | null;
   pickupLocation?: { lat: number; lng: number } | null;
   dropoffLocation?: { lat: number; lng: number } | null;
+  driverLocation?: { lat: number; lng: number } | null;
   recenterTrigger?: number;
   height?: string;
   width?: string;
@@ -26,6 +27,7 @@ export const MapView: React.FC<MapViewProps> = ({
   userLocation,
   pickupLocation,
   dropoffLocation,
+  driverLocation,
   recenterTrigger = 0,
   height = "100%",
   width = "100%",
@@ -173,14 +175,44 @@ export const MapView: React.FC<MapViewProps> = ({
       L.marker([dropoffLocation.lat, dropoffLocation.lng], { icon: dropoffIcon }).addTo(markersLayer);
     }
 
-    // 4. Draw Clean Route Polyline & Fit Bounds if both points exist
+    // 4. Driver Tricycle Marker (Live GPS Position)
+    if (driverLocation && typeof driverLocation.lat === "number" && !isNaN(driverLocation.lat)) {
+      const driverIcon = L.divIcon({
+        className: "leaflet-driver-marker",
+        html: `
+          <div style="
+            width: 38px;
+            height: 38px;
+            background-color: #FF6B00;
+            border: 3px solid #FFFFFF;
+            border-radius: 50%;
+            box-shadow: 0 4px 14px rgba(255, 107, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+          ">🛺</div>
+        `,
+        iconSize: [38, 38],
+        iconAnchor: [19, 19],
+      });
+
+      L.marker([driverLocation.lat, driverLocation.lng], { icon: driverIcon }).addTo(markersLayer);
+    }
+
+    // 5. Draw Clean Route Polyline & Fit Bounds
+    const points: [number, number][] = [];
+    if (pickupLocation && pickupLocation.lat !== 0) points.push([pickupLocation.lat, pickupLocation.lng]);
+    if (dropoffLocation && dropoffLocation.lat !== 0) points.push([dropoffLocation.lat, dropoffLocation.lng]);
+    if (driverLocation && driverLocation.lat !== 0) points.push([driverLocation.lat, driverLocation.lng]);
+
     if (pickupLocation && pickupLocation.lat !== 0 && dropoffLocation && dropoffLocation.lat !== 0) {
-      const latlngs: [number, number][] = [
+      const routePoints: [number, number][] = [
         [pickupLocation.lat, pickupLocation.lng],
         [dropoffLocation.lat, dropoffLocation.lng],
       ];
 
-      const polyline = L.polyline(latlngs, {
+      const polyline = L.polyline(routePoints, {
         color: "#FF6B00",
         weight: 4,
         opacity: 0.9,
@@ -189,15 +221,17 @@ export const MapView: React.FC<MapViewProps> = ({
 
       routePolylineRef.current = polyline;
 
-      const bounds = L.latLngBounds(latlngs);
+      const bounds = L.latLngBounds(points.length >= 2 ? points : routePoints);
       map.fitBounds(bounds, {
         padding: [60, 60],
         maxZoom: 16,
       });
+    } else if (driverLocation) {
+      map.panTo([driverLocation.lat, driverLocation.lng], { animate: true });
     } else if (userLocation) {
       map.panTo([userLocation.lat, userLocation.lng], { animate: true });
     }
-  }, [userLocation, pickupLocation, dropoffLocation, recenterTrigger]);
+  }, [userLocation, pickupLocation, dropoffLocation, driverLocation, recenterTrigger]);
 
   // Recenter trigger listener
   useEffect(() => {

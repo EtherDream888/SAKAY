@@ -34,6 +34,7 @@ import {
   subscribeToDispatchEvents,
   acceptBookingByDriver,
   declineBookingByDriver,
+  getAllActiveBookings,
   MockDispatchBooking,
 } from '@sakay/shared/mockDispatch';
 
@@ -196,13 +197,40 @@ export const DriverAvailabilityHome: React.FC = () => {
     localStorage.setItem('sakay_driver_profile', JSON.stringify(profile));
   }, [profile]);
 
+  // Synthesized Web Audio alert chime for incoming booking dispatch
+  const playIncomingAlert = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+        osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12); // A5
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.35);
+      }
+      if ('vibrate' in navigator) {
+        navigator.vibrate([200, 100, 200]);
+      }
+    } catch {
+      // Audio autoplay policy fallback
+    }
+  };
+
   // Subscribe to Shared Dispatch Broker for incoming ride requests
   useEffect(() => {
     const unsubscribe = subscribeToDispatchEvents((booking) => {
-      // Only receive if Driver is Online, not paused, and matching TODA
+      // Only receive if Driver is Online, not paused
       if (profile.isOnline && !profile.isPaused && booking.booking_status === 'Searching Driver') {
         setIncomingRequest(booking);
         setCountdown(15);
+        playIncomingAlert();
       }
     });
 
@@ -210,6 +238,59 @@ export const DriverAvailabilityHome: React.FC = () => {
       unsubscribe();
     };
   }, [profile.isOnline, profile.isPaused]);
+
+  // Immediate check for waiting pending bookings upon toggling online or unpausing
+  useEffect(() => {
+    if (!profile.isOnline || profile.isPaused || incomingRequest) return;
+
+    // 1. Check local broker cache
+    const activeWaiting = getAllActiveBookings().find((b) => b.booking_status === 'Searching Driver');
+    if (activeWaiting) {
+      setIncomingRequest(activeWaiting);
+      setCountdown(15);
+      playIncomingAlert();
+      return;
+    }
+
+    // 2. Query Supabase for waiting pending bookings across devices
+    Promise.resolve(
+      supabase
+        .from('booking')
+        .select('*')
+        .eq('booking_status', 'Pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    )
+      .then(({ data }: any) => {
+        if (data && profile.isOnline && !profile.isPaused && !incomingRequest) {
+          const mapped: MockDispatchBooking = {
+            booking_id: data.booking_id,
+            passenger_id: data.passenger_id || 'passenger-demo',
+            passenger_name: 'Calapan Commuter',
+            passenger_phone: '+63 917 123 4567',
+            booking_type: data.booking_type || 'Immediate',
+            is_shared_trip: Boolean(data.is_shared_trip),
+            passenger_count: data.passenger_count || 1,
+            pickup_address: data.pickup_address,
+            pickup_latitude: data.pickup_latitude,
+            pickup_longitude: data.pickup_longitude,
+            dropoff_address: data.dropoff_address,
+            dropoff_latitude: data.dropoff_latitude,
+            dropoff_longitude: data.dropoff_longitude,
+            estimated_distance_km: data.estimated_distance_km || 1.5,
+            estimated_fare: Number(data.estimated_fare) || 18,
+            booking_status: 'Searching Driver',
+            created_at: data.created_at,
+            updated_at: data.created_at,
+          };
+          setIncomingRequest(mapped);
+          setCountdown(15);
+          playIncomingAlert();
+        }
+      })
+      .catch((err: any) => console.warn('[DriverAvailabilityHome] Pending booking query note:', err));
+  }, [profile.isOnline, profile.isPaused, incomingRequest]);
 
   // Request Countdown Timer
   useEffect(() => {
@@ -272,14 +353,34 @@ export const DriverAvailabilityHome: React.FC = () => {
   const handleAcceptRequest = () => {
     if (!incomingRequest) return;
 
-    acceptBookingByDriver(incomingRequest.booking_id, {
+    const driverPayload = {
       driver_id: profile.id || 'test-driver-001',
       driver_name: profile.name || 'Juan Dela Cruz',
       driver_phone: profile.phone || '09171234567',
       franchise_no: selectedVehicle?.franchiseNumber || 'CAL-2025-0773',
       vehicle_plate: selectedVehicle?.plateNumber || '773-MV',
       toda_name: selectedToda?.name || 'Calapan Central TODA',
-    });
+    };
+
+    acceptBookingByDriver(incomingRequest.booking_id, driverPayload);
+
+    // Explicit Supabase update
+    Promise.resolve(
+      supabase
+        .from('booking')
+        .update({
+          booking_status: 'Driver Assigned',
+          accepted_at: new Date().toISOString(),
+          ...(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(driverPayload.driver_id)
+            ? { driver_id: driverPayload.driver_id }
+            : {}),
+        })
+        .eq('booking_id', incomingRequest.booking_id)
+    )
+      .then(({ error }: any) => {
+        if (error) console.warn('[DriverAvailabilityHome] acceptBooking DB sync warning:', error.message);
+      })
+      .catch((err: any) => console.warn('[DriverAvailabilityHome] acceptBooking DB sync exception:', err));
 
     const activeId = incomingRequest.booking_id;
     setIncomingRequest(null);

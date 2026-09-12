@@ -109,9 +109,46 @@ export const createBooking = async (payload: CreateBookingPayload): Promise<Book
   const now = new Date().toISOString();
   let generatedId = `BKG-${Date.now().toString().slice(-6)}`;
 
+  let validPassengerId = payload.passenger_id;
+
+  // 1. Resolve passenger UUID from active session if available
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.id) {
+      const { data: pData } = await supabase
+        .from('passenger')
+        .select('passenger_id, full_name, contact_number')
+        .eq('auth_user_id', user.id)
+        .maybeSingle();
+      if (pData) {
+        validPassengerId = pData.passenger_id;
+        if (!payload.passenger_name && pData.full_name) payload.passenger_name = pData.full_name;
+        if (!payload.passenger_phone && pData.contact_number) payload.passenger_phone = pData.contact_number;
+      }
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // 2. If validPassengerId is still not a valid UUID, look up first registered passenger in Supabase
+  if (!validPassengerId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(validPassengerId)) {
+    try {
+      const { data: firstP } = await supabase
+        .from('passenger')
+        .select('passenger_id, full_name, contact_number')
+        .limit(1)
+        .maybeSingle();
+      if (firstP?.passenger_id) {
+        validPassengerId = firstP.passenger_id;
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
   const newBooking: BookingRecord = {
     booking_id: generatedId,
-    passenger_id: payload.passenger_id || 'PSG-DEMO-001',
+    passenger_id: validPassengerId || payload.passenger_id || 'PSG-DEMO-001',
     passenger_name: payload.passenger_name || 'Juan Dela Cruz',
     passenger_phone: payload.passenger_phone || '+63 917 123 4567',
     booking_type: payload.booking_type || 'Immediate',
@@ -133,32 +170,42 @@ export const createBooking = async (payload: CreateBookingPayload): Promise<Book
     updated_at: now,
   };
 
-  // Attempt database insertion
+  // 3. Attempt database insertion into public.booking
   try {
+    const insertPayload: any = {
+      pickup_address: payload.pickup_address,
+      pickup_latitude: payload.pickup_latitude,
+      pickup_longitude: payload.pickup_longitude,
+      dropoff_address: payload.dropoff_address,
+      dropoff_latitude: payload.dropoff_latitude,
+      dropoff_longitude: payload.dropoff_longitude,
+      estimated_distance_km: payload.estimated_distance_km,
+      estimated_fare: payload.estimated_fare,
+      actual_fare: payload.estimated_fare,
+      is_shared_trip: Boolean(payload.is_shared_trip),
+      passenger_count: Math.min(Math.max(Number(payload.passenger_count) || 1, 1), 4),
+      booking_type: payload.booking_type || 'Immediate',
+      booking_status: 'Pending',
+      fare_confirmation_status: 'Matched',
+      created_at: now,
+    };
+
+    if (validPassengerId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(validPassengerId)) {
+      insertPayload.passenger_id = validPassengerId;
+    }
+
     const { data: dbData, error } = await supabase
       .from('booking')
-      .insert([
-        {
-          pickup_location_address: payload.pickup_address,
-          pickup_latitude: payload.pickup_latitude,
-          pickup_longitude: payload.pickup_longitude,
-          dropoff_location_address: payload.dropoff_address,
-          dropoff_latitude: payload.dropoff_latitude,
-          dropoff_longitude: payload.dropoff_longitude,
-          estimated_fare: payload.estimated_fare,
-          final_fare: payload.estimated_fare,
-          route_distance_km: payload.estimated_distance_km,
-          trip_type: payload.is_shared_trip ? 'shared' : 'solo',
-          booking_status: 'Driver Assigned',
-          created_at: now,
-        },
-      ])
+      .insert([insertPayload])
       .select()
       .single();
 
     if (!error && dbData) {
       generatedId = dbData.booking_id;
       newBooking.booking_id = generatedId;
+      console.log('[bookingService] Successfully persisted booking in Supabase:', generatedId);
+    } else if (error) {
+      console.warn('[bookingService] Supabase insert warning:', error.message);
     }
   } catch (dbErr) {
     console.warn('[bookingService] Supabase insert note:', dbErr);
@@ -171,7 +218,7 @@ export const createBooking = async (payload: CreateBookingPayload): Promise<Book
   // Set as current active trip
   sessionStorage.setItem('current_active_booking_id', generatedId);
 
-  // Publish to shared broker for Driver PWA
+  // Publish to shared broker for Driver PWA (Realtime + BroadcastChannel)
   try {
     publishBookingRequest(newBooking as any);
   } catch (e) {
