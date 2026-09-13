@@ -12,12 +12,7 @@ import { createClient } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
 import { getOnboardingCache } from './driverOnboardingCache';
 import type { LicenseExtractedData, MtopExtractedData } from './driverOnboardingCache';
-import {
-  CURRENT_DRIVER_PROFILE,
-  MOCK_DRIVER_TRIPS,
-  MOCK_DRIVER_NOTIFICATIONS,
-  MOCK_PENDING_BOOKING_REQUEST,
-} from '../mockData/driverMockData';
+
 
 export const DEFAULT_DRIVER_ID = 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b22';
 
@@ -174,19 +169,16 @@ export async function lookupDriverByPhoneSecure(phone: string): Promise<any | nu
 // 1. REGISTRATION & PROFILE
 // ============================================================================
 
-export async function fetchAccreditedTodas(): Promise<Array<{ id: string; name: string; acronym: string; barangay: string }>> {
+export async function fetchAccreditedTodas(): Promise<Array<{ id: string; name: string; acronym: string; barangay: string; terminalLocation: string }>> {
   try {
-    const { data, error } = await supabase
+    const client = await getSecureLookupClient();
+    const { data, error } = await client
       .from('toda')
-      .select('toda_id, toda_name, toda_acronym, barangay')
-      .eq('account_status', 'Active');
+      .select('toda_id, toda_name, toda_acronym, barangay, service_coverage_area')
+      .order('toda_name', { ascending: true });
 
     if (error || !data || data.length === 0) {
-      return [
-        { id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', name: 'Calapan Central TODA', acronym: 'CCTODA', barangay: 'San Vicente Central' },
-        { id: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', name: 'Balite-Lumangbayan TODA', acronym: 'BLTODA', barangay: 'Balite' },
-        { id: 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', name: 'San Vicente East Drivers Association', acronym: 'SVEDA', barangay: 'San Vicente East' },
-      ];
+      return [];
     }
 
     return data.map((t: any) => ({
@@ -194,12 +186,11 @@ export async function fetchAccreditedTodas(): Promise<Array<{ id: string; name: 
       name: t.toda_name,
       acronym: t.toda_acronym || 'TODA',
       barangay: t.barangay || 'Calapan City',
+      terminalLocation: t.service_coverage_area || t.barangay || 'Calapan City',
     }));
   } catch (err) {
     console.error('[driverApiService] fetchAccreditedTodas error:', err);
-    return [
-      { id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', name: 'Calapan Central TODA', acronym: 'CCTODA', barangay: 'San Vicente Central' },
-    ];
+    return [];
   }
 }
 
@@ -229,35 +220,63 @@ export async function registerDriver(payload: {
   return data;
 }
 
-export async function fetchDriverProfile(driverId: string = DEFAULT_DRIVER_ID) {
+export async function fetchDriverProfile(driverId?: string) {
   try {
-    const { data, error } = await supabase
+    const activeId = driverId || (typeof window !== 'undefined' ? localStorage.getItem('sakay_driver_id') : null);
+    if (!activeId) return null;
+
+    const client = await getSecureLookupClient();
+    const { data, error } = await client
       .from('driver')
       .select('*, toda:toda_id(*)')
-      .eq('driver_id', driverId)
+      .eq('driver_id', activeId)
       .maybeSingle();
 
-    if (error || !data) return CURRENT_DRIVER_PROFILE;
+    if (error || !data) return null;
+
+    // Check verification record if plate/license/franchise are null in driver table
+    let plateNumber = data.plate_number;
+    let licenseNumber = data.license_number;
+    let franchiseNumber = data.franchise_number;
+
+    if (!plateNumber || !licenseNumber || !franchiseNumber) {
+      const { data: verif } = await client
+        .from('driver_verification')
+        .select('submitted_plate_number, submitted_license_number, submitted_franchise_number, ocr_plate_number, ocr_license_number, ocr_franchise_number')
+        .eq('driver_id', data.driver_id)
+        .maybeSingle();
+
+      if (verif) {
+        plateNumber = plateNumber || verif.submitted_plate_number || verif.ocr_plate_number || '';
+        licenseNumber = licenseNumber || verif.submitted_license_number || verif.ocr_license_number || '';
+        franchiseNumber = franchiseNumber || verif.submitted_franchise_number || verif.ocr_franchise_number || '';
+      }
+    }
+
+    const todaObj = Array.isArray(data.toda) ? data.toda[0] : data.toda;
 
     return {
       id: data.driver_id,
       name: data.full_name,
       phone: data.contact_number,
-      vehiclePlate: data.plate_number || 'MV-101',
-      licenseNumber: data.license_number || 'L01-99-123456',
-      franchiseNumber: data.franchise_number || 'MTOP-2024-001',
-      todaName: data.toda?.toda_name || 'Calapan Central TODA',
-      todaAcronym: data.toda?.toda_acronym || 'CCTODA',
-      todaId: data.toda_id,
+      email: data.email || '',
+      vehiclePlate: plateNumber || '',
+      licenseNumber: licenseNumber || '',
+      franchiseNumber: franchiseNumber || '',
+      todaName: todaObj?.toda_name || '',
+      todaAcronym: todaObj?.toda_acronym || '',
+      todaId: data.toda_id || '',
       rating: Number(data.weighted_average_rating) || 5.0,
       accountStatus: data.account_status,
-      isOnline: false,
-      isPaused: false,
-      verificationStage: data.account_status === 'Verified' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
+      isOnline: data.availability_status === 'Online',
+      isPaused: data.availability_status === 'Paused',
+      verificationStage: data.account_status === 'Verified' || data.account_status === 'Active' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
+      currentLat: data.current_latitude ? Number(data.current_latitude) : 13.4117,
+      currentLng: data.current_longitude ? Number(data.current_longitude) : 121.1803,
     };
   } catch (err) {
     console.error('[driverApiService] fetchDriverProfile error:', err);
-    return CURRENT_DRIVER_PROFILE;
+    return null;
   }
 }
 
@@ -278,7 +297,12 @@ export async function updateDriverProfile(driverId: string = DEFAULT_DRIVER_ID, 
 // ============================================================================
 
 export async function updateDriverAvailability(driverId: string, isOnline: boolean, isPaused: boolean = false) {
-  // In live production, sets driver online status in Supabase or Redis
+  try {
+    const availability_status = isPaused ? 'Paused' : isOnline ? 'Online' : 'Offline';
+    await supabase.from('driver').update({ availability_status }).eq('driver_id', driverId);
+  } catch (e) {
+    console.warn('[driverApiService] updateDriverAvailability sync note:', e);
+  }
   return { success: true, isOnline, isPaused };
 }
 
@@ -286,37 +310,47 @@ export async function updateDriverAvailability(driverId: string, isOnline: boole
 // 3. BOOKINGS & ACTIVE TRIPS
 // ============================================================================
 
-export async function fetchDriverTrips(driverId: string = DEFAULT_DRIVER_ID) {
+export async function fetchDriverTrips(driverId?: string) {
   try {
-    const { data, error } = await supabase
+    const activeId = driverId || (typeof window !== 'undefined' ? localStorage.getItem('sakay_driver_id') : null);
+    if (!activeId) return [];
+
+    const client = await getSecureLookupClient();
+    const { data, error } = await client
       .from('booking')
       .select('*, passenger:passenger_id(*)')
+      .eq('driver_id', activeId)
       .order('created_at', { ascending: false });
 
-    if (error || !data || data.length === 0) return MOCK_DRIVER_TRIPS;
+    if (error || !data || data.length === 0) return [];
 
-    return data.map((b: any) => ({
-      id: b.booking_id,
-      bookingCode: `BKG-${b.booking_id.slice(0, 8).toUpperCase()}`,
-      passengerName: b.passenger?.full_name || 'Calapan Commuter',
-      passengerPhone: b.passenger?.contact_number || '+63 917 000 0000',
-      pickupLocation: b.pickup_location_address || 'Calapan Public Market',
-      pickupLat: b.pickup_latitude || 13.4115,
-      pickupLng: b.pickup_longitude || 121.1803,
-      dropoffLocation: b.dropoff_location_address || 'Provincial Capitol',
-      dropoffLat: b.dropoff_latitude || 13.4145,
-      dropoffLng: b.dropoff_longitude || 121.1785,
-      distanceKm: Number(b.route_distance_km) || 2.4,
-      fareAmount: Number(b.final_fare || b.estimated_fare) || 20,
-      tripMode: (b.trip_type === 'shared' ? 'Shared Ride' : 'Single Commuter') as any,
-      status: (b.booking_status === 'Completed' ? 'Completed' : b.booking_status.includes('Cancel') ? 'Cancelled' : 'In Progress') as any,
-      date: b.created_at ? new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent',
-      time: b.created_at ? new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '10:00 AM',
-      rating: 5,
-    }));
+    return data.map((b: any) => {
+      const p = Array.isArray(b.passenger) ? b.passenger[0] : b.passenger;
+      return {
+        id: b.booking_id,
+        bookingCode: `BKG-${b.booking_id.slice(0, 8).toUpperCase()}`,
+        passengerName: p?.full_name || 'Calapan Commuter',
+        passengerPhone: p?.contact_number || '',
+        pickupLocation: b.pickup_address || b.pickup_location_address || 'Calapan City',
+        pickupLat: Number(b.pickup_latitude) || 13.4115,
+        pickupLng: Number(b.pickup_longitude) || 121.1803,
+        dropoffLocation: b.dropoff_address || b.dropoff_location_address || 'Calapan City',
+        dropoffLat: Number(b.dropoff_latitude) || 13.4145,
+        dropoffLng: Number(b.dropoff_longitude) || 121.1785,
+        distanceKm: Number(b.route_distance_km || b.estimated_distance_km) || 0,
+        fareAmount: Number(b.actual_fare || b.final_fare || b.estimated_fare) || 0,
+        tripMode: (b.is_shared_trip || b.trip_type === 'shared' ? 'Shared Ride' : 'Single Commuter') as any,
+        status: (b.booking_status === 'Completed' ? 'Completed' : b.booking_status?.includes('Cancel') ? 'Cancelled' : 'In Progress') as any,
+        date: b.created_at ? new Date(b.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
+        time: b.created_at ? new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+        rating: 5,
+        createdAt: b.created_at,
+        completedAt: b.trip_completed_at || b.completed_at || b.updated_at,
+      };
+    });
   } catch (err) {
     console.error('[driverApiService] fetchDriverTrips error:', err);
-    return MOCK_DRIVER_TRIPS;
+    return [];
   }
 }
 
@@ -339,25 +373,41 @@ export async function updateTripStatus(bookingId: string, status: string, finalF
 // 4. EARNINGS & NOTIFICATIONS
 // ============================================================================
 
-export async function fetchDriverEarnings(driverId: string = DEFAULT_DRIVER_ID) {
+export async function fetchDriverEarnings(driverId?: string) {
   try {
     const trips = await fetchDriverTrips(driverId);
     const completedTrips = trips.filter((t: any) => t.status === 'Completed');
-    const totalEarnings = completedTrips.reduce((sum: number, t: any) => sum + (t.fareAmount || 0), 0);
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const sevenDaysAgo = startOfToday - 6 * 24 * 60 * 60 * 1000;
+
+    const todayTripsList = completedTrips.filter((t: any) => {
+      const tripTime = t.createdAt ? new Date(t.createdAt).getTime() : 0;
+      return tripTime >= startOfToday;
+    });
+
+    const weeklyTripsList = completedTrips.filter((t: any) => {
+      const tripTime = t.createdAt ? new Date(t.createdAt).getTime() : 0;
+      return tripTime >= sevenDaysAgo;
+    });
+
+    const todayEarnings = todayTripsList.reduce((sum: number, t: any) => sum + (t.fareAmount || 0), 0);
+    const weeklyEarnings = weeklyTripsList.reduce((sum: number, t: any) => sum + (t.fareAmount || 0), 0);
 
     return {
-      todayEarnings: Math.round(totalEarnings * 0.4) || 240,
-      todayTrips: Math.max(1, Math.round(completedTrips.length * 0.4)),
-      weeklyEarnings: totalEarnings || 1280,
-      weeklyTrips: completedTrips.length || 28,
+      todayEarnings: Math.round(todayEarnings * 100) / 100,
+      todayTrips: todayTripsList.length,
+      weeklyEarnings: Math.round(weeklyEarnings * 100) / 100,
+      weeklyTrips: weeklyTripsList.length,
       recentTrips: completedTrips.slice(0, 10),
     };
   } catch {
     return {
-      todayEarnings: 240,
-      todayTrips: 6,
-      weeklyEarnings: 1280,
-      weeklyTrips: 28,
+      todayEarnings: 0,
+      todayTrips: 0,
+      weeklyEarnings: 0,
+      weeklyTrips: 0,
       recentTrips: [],
     };
   }
@@ -365,23 +415,26 @@ export async function fetchDriverEarnings(driverId: string = DEFAULT_DRIVER_ID) 
 
 export async function fetchDriverNotifications(): Promise<any[]> {
   try {
-    const { data, error } = await supabase
+    const client = await getSecureLookupClient();
+    const { data, error } = await client
       .from('announcement')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error || !data || data.length === 0) return MOCK_DRIVER_NOTIFICATIONS;
+    if (error || !data || data.length === 0) return [];
 
     return data.map((a: any) => ({
       id: a.announcement_id,
       title: a.title,
-      message: a.message,
+      message: a.message || a.content || '',
+      category: a.category || (a.urgency === 'Urgent' ? 'Dispatch Alert' : 'TODA Announcement'),
       type: a.urgency === 'Urgent' ? 'alert' : 'announcement',
+      time: a.created_at ? new Date(a.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recent',
       timestamp: a.created_at ? new Date(a.created_at).toLocaleDateString('en-US') : 'Recent',
       read: false,
     }));
   } catch {
-    return MOCK_DRIVER_NOTIFICATIONS;
+    return [];
   }
 }
 

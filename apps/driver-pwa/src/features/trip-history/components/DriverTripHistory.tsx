@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -12,16 +12,60 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  CircularProgress,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
+import TwoWheelerIcon from '@mui/icons-material/TwoWheeler';
 
-import { MOCK_DRIVER_HISTORY, DriverEarningRecord } from '../../../mockData/driverMockData';
+import { fetchDriverTrips } from '../../../services/driverApiService';
+import { useLanguage } from '../../../utils/LanguageContext';
+
+export interface TripRecord {
+  id: string;
+  bookingCode: string;
+  passengerName: string;
+  pickupLocation: string;
+  dropoffLocation: string;
+  distanceKm: number;
+  fareAmount: number;
+  tripMode: 'Single Commuter' | 'Shared Ride';
+  status: string;
+  date: string;
+  time: string;
+}
 
 export const DriverTripHistory: React.FC = () => {
   const navigate = useNavigate();
-  const [selectedTrip, setSelectedTrip] = useState<DriverEarningRecord | null>(null);
+  const { language } = useLanguage();
+  const [trips, setTrips] = useState<TripRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedTrip, setSelectedTrip] = useState<TripRecord | null>(null);
+
+  useEffect(() => {
+    const driverId = localStorage.getItem('sakay_driver_id') || undefined;
+    fetchDriverTrips(driverId)
+      .then((data) => {
+        const mapped: TripRecord[] = (data || []).map((b: any) => ({
+          id: b.id,
+          bookingCode: b.bookingCode || `BKG-${b.id.slice(0, 8)}`,
+          passengerName: b.passengerName || 'Calapan Commuter',
+          pickupLocation: b.pickupLocation || 'Calapan City',
+          dropoffLocation: b.dropoffLocation || 'Calapan City',
+          distanceKm: b.distanceKm || 0,
+          fareAmount: b.fareAmount || 0,
+          tripMode: b.tripMode || 'Single Commuter',
+          status: b.status || 'Completed',
+          date: b.date || 'Recent',
+          time: b.time || '',
+        }));
+        setTrips(mapped);
+      })
+      .catch((err) => console.warn('[DriverTripHistory] Fetch error:', err))
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <Box sx={{ width: '100%', height: '100%', backgroundColor: '#F8FAFC', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
@@ -31,71 +75,99 @@ export const DriverTripHistory: React.FC = () => {
           <ArrowBackIcon />
         </IconButton>
         <Typography sx={{ fontSize: '18px', fontWeight: 800, color: '#0F172A' }}>
-          Trip History
+          {language === 'tl' ? 'Kasaysayan ng Biyahe' : 'Trip History'}
         </Typography>
       </Box>
 
       <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-        {MOCK_DRIVER_HISTORY.map((trip) => (
+        {loading ? (
+          <Box sx={{ p: 4, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <CircularProgress size={32} sx={{ color: '#FF6B00' }} />
+          </Box>
+        ) : trips.length === 0 ? (
           <Paper
-            key={trip.tripId}
             elevation={0}
-            onClick={() => setSelectedTrip(trip)}
             sx={{
-              p: 2,
+              p: 4,
               borderRadius: '16px',
-              border: '1px solid #E2E8F0',
               backgroundColor: '#FFFFFF',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 1,
-              cursor: 'pointer',
-              transition: 'transform 0.15s ease',
-              '&:hover': {
-                transform: 'scale(1.01)',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-              },
+              border: '1px solid #E2E8F0',
+              textAlign: 'center',
+              mt: 2,
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography sx={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>
-                  {trip.bookingCode}
-                </Typography>
-                <Chip
-                  label={trip.tripType}
-                  size="small"
-                  sx={{
-                    fontSize: '10px',
-                    fontWeight: 700,
-                    backgroundColor: trip.tripType === 'Shared' ? '#E6F4EA' : '#FFF8F0',
-                    color: trip.tripType === 'Shared' ? '#1E8E3E' : '#FF6B00',
-                  }}
-                />
-              </Box>
-              <Typography sx={{ fontSize: '16px', fontWeight: 900, color: '#FF6B00' }}>
-                ₱{trip.fareAmount.toFixed(2)}
-              </Typography>
-            </Box>
-
-            <Typography sx={{ fontSize: '12px', color: '#64748B' }}>
-              Passenger: <strong>{trip.passengerName}</strong> • {trip.distanceKm} km • {trip.date}, {trip.time}
+            <TwoWheelerIcon sx={{ fontSize: 44, color: '#CBD5E1', mb: 1 }} />
+            <Typography sx={{ fontSize: '15px', fontWeight: 700, color: '#0F172A', mb: 0.5 }}>
+              {language === 'tl' ? 'Walang nahanap na biyahe' : 'No trips found yet'}
             </Typography>
-
-            <Divider sx={{ my: 0.5 }} />
-
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <LocationOnIcon sx={{ color: '#34A853', fontSize: 16 }} />
-                <Typography sx={{ fontSize: '12px', color: '#334155' }}>{trip.pickup}</Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <LocationOnIcon sx={{ color: '#EF4444', fontSize: 16 }} />
-                <Typography sx={{ fontSize: '12px', color: '#334155' }}>{trip.dropoff}</Typography>
-              </Box>
-            </Box>
+            <Typography sx={{ fontSize: '12px', color: '#64748B' }}>
+              {language === 'tl'
+                ? 'Lilitaw dito ang kumpletong rekord ng iyong mga natapos na biyahe.'
+                : 'Your completed trip records will appear here once you finish a ride.'}
+            </Typography>
           </Paper>
-        ))}
+        ) : (
+          trips.map((trip) => (
+            <Paper
+              key={trip.id}
+              elevation={0}
+              onClick={() => setSelectedTrip(trip)}
+              sx={{
+                p: 2,
+                borderRadius: '16px',
+                border: '1px solid #E2E8F0',
+                backgroundColor: '#FFFFFF',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 1,
+                cursor: 'pointer',
+                transition: 'transform 0.15s ease',
+                '&:hover': {
+                  transform: 'scale(1.01)',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography sx={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>
+                    {trip.bookingCode}
+                  </Typography>
+                  <Chip
+                    label={trip.tripMode}
+                    size="small"
+                    sx={{
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      backgroundColor: trip.tripMode === 'Shared Ride' ? '#E6F4EA' : '#FFF8F0',
+                      color: trip.tripMode === 'Shared Ride' ? '#1E8E3E' : '#FF6B00',
+                    }}
+                  />
+                </Box>
+                <Typography sx={{ fontSize: '16px', fontWeight: 900, color: '#FF6B00' }}>
+                  ₱{trip.fareAmount.toFixed(2)}
+                </Typography>
+              </Box>
+
+              <Typography sx={{ fontSize: '12px', color: '#64748B' }}>
+                {language === 'tl' ? 'Pasahero:' : 'Passenger:'} <strong>{trip.passengerName}</strong> {trip.distanceKm > 0 ? `• ${trip.distanceKm} km` : ''} • {trip.date}{trip.time ? `, ${trip.time}` : ''}
+              </Typography>
+
+              <Divider sx={{ my: 0.5 }} />
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <LocationOnIcon sx={{ color: '#34A853', fontSize: 16 }} />
+                  <Typography sx={{ fontSize: '12px', color: '#334155' }}>{trip.pickupLocation}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <LocationOnIcon sx={{ color: '#EF4444', fontSize: 16 }} />
+                  <Typography sx={{ fontSize: '12px', color: '#334155' }}>{trip.dropoffLocation}</Typography>
+                </Box>
+              </Box>
+            </Paper>
+          ))
+        )}
       </Box>
 
       {/* Trip Details Dialog Modal */}
@@ -122,7 +194,7 @@ export const DriverTripHistory: React.FC = () => {
               </Typography>
             </Box>
             <Chip
-              label={selectedTrip.tripType}
+              label={selectedTrip.tripMode}
               size="small"
               sx={{ backgroundColor: '#FF6B00', color: '#FFFFFF', fontWeight: 800 }}
             />
@@ -132,7 +204,7 @@ export const DriverTripHistory: React.FC = () => {
               <Typography sx={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>BOOKING CODE</Typography>
               <Typography sx={{ fontSize: '15px', fontWeight: 800, color: '#0F172A' }}>{selectedTrip.bookingCode}</Typography>
               <Typography sx={{ fontSize: '12px', color: '#64748B', mt: 0.5 }}>
-                Date: {selectedTrip.date} • {selectedTrip.time}
+                Date: {selectedTrip.date} {selectedTrip.time ? `• ${selectedTrip.time}` : ''}
               </Typography>
             </Box>
 
@@ -147,10 +219,10 @@ export const DriverTripHistory: React.FC = () => {
               ROUTE & DISTANCE
             </Typography>
             <Typography sx={{ fontSize: '13px', color: '#334155', mb: 0.5 }}>
-              <strong>From:</strong> {selectedTrip.pickup}
+              <strong>From:</strong> {selectedTrip.pickupLocation}
             </Typography>
             <Typography sx={{ fontSize: '13px', color: '#334155', mb: 1.5 }}>
-              <strong>To:</strong> {selectedTrip.dropoff} ({selectedTrip.distanceKm} km)
+              <strong>To:</strong> {selectedTrip.dropoffLocation} {selectedTrip.distanceKm > 0 ? `(${selectedTrip.distanceKm} km)` : ''}
             </Typography>
 
             <Divider sx={{ my: 1.5 }} />

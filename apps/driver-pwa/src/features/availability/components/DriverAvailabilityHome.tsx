@@ -24,12 +24,7 @@ import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 
 import MapView from '../../../common/components/MapView';
-import {
-  INITIAL_DRIVER_PROFILE,
-  ACCREDITED_TODAS,
-  VERIFIED_TRICYCLES,
-  DriverProfile,
-} from '../../../mockData/driverMockData';
+import type { DriverProfile } from '../../../mockData/driverMockData';
 import {
   subscribeToDispatchEvents,
   acceptBookingByDriver,
@@ -39,6 +34,7 @@ import {
 } from '@sakay/shared/mockDispatch';
 
 import { supabase } from '../../../services/supabaseClient';
+import { fetchAccreditedTodas } from '../../../services/driverApiService';
 import { useLanguage } from '../../../utils/LanguageContext';
 
 export const DriverAvailabilityHome: React.FC = () => {
@@ -46,32 +42,69 @@ export const DriverAvailabilityHome: React.FC = () => {
   const navigate = useNavigate();
 
   // Location Permission Modal State (matching iOS permission prompt)
+  // Shows immediately upon entering interface after login or if not yet granted
   const [locationPermissionOpen, setLocationPermissionOpen] = useState(() => {
-    return !localStorage.getItem('sakay_driver_location_permission');
+    const justLoggedIn = sessionStorage.getItem('sakay_driver_just_logged_in') === 'true';
+    const dismissedInSession = sessionStorage.getItem('sakay_driver_location_prompt_dismissed') === 'true';
+    if (justLoggedIn) return true;
+    if (dismissedInSession) return false;
+    return localStorage.getItem('sakay_driver_location_permission') !== 'always';
   });
 
-  // Driver State with resilient defaults
+  const [availableTodas, setAvailableTodas] = useState<Array<{ id: string; name: string; acronym: string; barangay: string; terminalLocation: string }>>([]);
+
+  // Driver State with real database defaults (no mock placeholders)
   const [profile, setProfile] = useState<DriverProfile>(() => {
     const saved = localStorage.getItem('sakay_driver_profile');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         return {
-          ...INITIAL_DRIVER_PROFILE,
-          ...parsed,
-          name: parsed.name || INITIAL_DRIVER_PROFILE.name,
-          rating: typeof parsed.rating === 'number' ? parsed.rating : INITIAL_DRIVER_PROFILE.rating,
-          totalTrips: typeof parsed.totalTrips === 'number' ? parsed.totalTrips : INITIAL_DRIVER_PROFILE.totalTrips,
-          currentLat: typeof parsed.currentLat === 'number' ? parsed.currentLat : INITIAL_DRIVER_PROFILE.currentLat,
-          currentLng: typeof parsed.currentLng === 'number' ? parsed.currentLng : INITIAL_DRIVER_PROFILE.currentLng,
-          selectedTodaId: parsed.selectedTodaId || INITIAL_DRIVER_PROFILE.selectedTodaId,
-          selectedVehicleId: parsed.selectedVehicleId || INITIAL_DRIVER_PROFILE.selectedVehicleId,
+          id: parsed.id || '',
+          name: parsed.name || '',
+          phone: parsed.phone || '',
+          email: parsed.email || '',
+          licenseNo: parsed.licenseNumber || parsed.licenseNo || '',
+          licenseExpiry: parsed.licenseExpiry || '',
+          avatarUrl: '',
+          rating: typeof parsed.rating === 'number' ? parsed.rating : 5.0,
+          totalTrips: typeof parsed.totalTrips === 'number' ? parsed.totalTrips : 0,
+          accountStatus: parsed.accountStatus || 'Verified',
+          selectedTodaId: parsed.selectedTodaId || '',
+          selectedVehicleId: parsed.selectedVehicleId || '',
+          vehiclePlate: parsed.vehiclePlate || '',
+          franchiseNumber: parsed.franchiseNumber || '',
+          todaName: parsed.todaName || '',
+          isOnline: false,
+          isPaused: false,
+          currentLat: typeof parsed.currentLat === 'number' ? parsed.currentLat : 13.4117,
+          currentLng: typeof parsed.currentLng === 'number' ? parsed.currentLng : 121.1803,
         };
       } catch (e) {
         console.warn('Error parsing driver profile from storage:', e);
       }
     }
-    return INITIAL_DRIVER_PROFILE;
+    return {
+      id: '',
+      name: '',
+      phone: '',
+      email: '',
+      licenseNo: '',
+      licenseExpiry: '',
+      avatarUrl: '',
+      rating: 5.0,
+      totalTrips: 0,
+      accountStatus: 'Verified',
+      selectedTodaId: '',
+      selectedVehicleId: '',
+      vehiclePlate: '',
+      franchiseNumber: '',
+      todaName: '',
+      isOnline: false,
+      isPaused: false,
+      currentLat: 13.4117,
+      currentLng: 121.1803,
+    };
   });
 
   const [todaModalOpen, setTodaModalOpen] = useState(false);
@@ -82,17 +115,20 @@ export const DriverAvailabilityHome: React.FC = () => {
   const [incomingRequest, setIncomingRequest] = useState<MockDispatchBooking | null>(null);
   const [countdown, setCountdown] = useState<number>(15);
 
-  // Load live Supabase profile on mount
+  // Load live Supabase profile and accredited TODAs on mount
   useEffect(() => {
+    // 1. Fetch live TODAs
+    fetchAccreditedTodas().then((todas) => {
+      if (todas && todas.length > 0) {
+        setAvailableTodas(todas);
+      }
+    });
+
+    // 2. Fetch live Driver Profile
     async function loadLiveDriver() {
       try {
         const storedId = localStorage.getItem('sakay_driver_id');
         const storedPhone = localStorage.getItem('sakay_driver_phone');
-
-        // If active session is the verified test driver, keep on map
-        if (storedId === 'test-driver-001' || storedPhone === '09171234567' || storedPhone === '09181234567') {
-          return;
-        }
 
         const { data: { user } } = await supabase.auth.getUser();
 
@@ -102,12 +138,15 @@ export const DriverAvailabilityHome: React.FC = () => {
             driver_id,
             full_name,
             contact_number,
+            email,
             plate_number,
             license_number,
             franchise_number,
             account_status,
             availability_status,
             weighted_average_rating,
+            current_latitude,
+            current_longitude,
             toda:toda_id (
               toda_id,
               toda_name,
@@ -117,7 +156,7 @@ export const DriverAvailabilityHome: React.FC = () => {
 
         if (user?.id) {
           query = query.eq('auth_user_id', user.id);
-        } else if (storedId) {
+        } else if (storedId && storedId !== 'test-driver-001') {
           query = query.eq('driver_id', storedId);
         } else if (storedPhone) {
           const clean = storedPhone.replace(/\D/g, '');
@@ -135,22 +174,52 @@ export const DriverAvailabilityHome: React.FC = () => {
             return;
           }
 
+          // Query completed trips count for this driver
+          const { count: completedTripsCount } = await supabase
+            .from('booking')
+            .select('*', { count: 'exact', head: true })
+            .eq('driver_id', driverData.driver_id)
+            .eq('booking_status', 'Completed');
+
+          // Check verification record if plate/license/franchise are null in driver table
+          let plateNumber = driverData.plate_number;
+          let licenseNumber = driverData.license_number;
+          let franchiseNumber = driverData.franchise_number;
+
+          if (!plateNumber || !licenseNumber || !franchiseNumber) {
+            const { data: verif } = await supabase
+              .from('driver_verification')
+              .select('submitted_plate_number, submitted_license_number, submitted_franchise_number, ocr_plate_number, ocr_license_number, ocr_franchise_number')
+              .eq('driver_id', driverData.driver_id)
+              .maybeSingle();
+
+            if (verif) {
+              plateNumber = plateNumber || verif.submitted_plate_number || verif.ocr_plate_number || '';
+              licenseNumber = licenseNumber || verif.submitted_license_number || verif.ocr_license_number || '';
+              franchiseNumber = franchiseNumber || verif.submitted_franchise_number || verif.ocr_franchise_number || '';
+            }
+          }
+
           const todaObj = Array.isArray(driverData.toda) ? driverData.toda[0] : driverData.toda;
-          const todaNameStr = todaObj?.toda_name || 'Calapan Central TODA';
-          const todaAcronymStr = todaObj?.toda_acronym || 'CCTODA';
+          const todaNameStr = todaObj ? `${todaObj.toda_name} (${todaObj.toda_acronym})` : '';
 
           setProfile((prev) => ({
             ...prev,
             id: driverData.driver_id,
             name: driverData.full_name || prev.name,
             phone: driverData.contact_number || prev.phone,
-            vehiclePlate: driverData.plate_number || prev.vehiclePlate,
-            licenseNumber: driverData.license_number || prev.licenseNumber,
-            franchiseNumber: driverData.franchise_number || prev.franchiseNumber,
-            todaName: `${todaNameStr} (${todaAcronymStr})`,
+            email: driverData.email || prev.email,
+            vehiclePlate: plateNumber || prev.vehiclePlate,
+            licenseNumber: licenseNumber || prev.licenseNumber,
+            franchiseNumber: franchiseNumber || prev.franchiseNumber,
+            todaName: todaNameStr || prev.todaName,
+            selectedTodaId: todaObj?.toda_id || prev.selectedTodaId,
             rating: Number(driverData.weighted_average_rating) || 5.0,
+            totalTrips: completedTripsCount || 0,
             accountStatus: driverData.account_status,
             verificationStage: 'Stage 2 Approved',
+            currentLat: driverData.current_latitude ? Number(driverData.current_latitude) : prev.currentLat,
+            currentLng: driverData.current_longitude ? Number(driverData.current_longitude) : prev.currentLng,
           }));
         }
       } catch (err) {
@@ -310,17 +379,23 @@ export const DriverAvailabilityHome: React.FC = () => {
     return () => clearInterval(timer);
   }, [incomingRequest, countdown]);
 
-  const selectedToda = ACCREDITED_TODAS.find((t) => t.id === profile.selectedTodaId) || ACCREDITED_TODAS[0];
-  const selectedVehicle = VERIFIED_TRICYCLES.find((v) => v.id === profile.selectedVehicleId) || VERIFIED_TRICYCLES[0];
+  const selectedToda = availableTodas.find((t) => t.id === profile.selectedTodaId) || (profile.todaName ? {
+    id: profile.selectedTodaId,
+    name: profile.todaName,
+    acronym: '',
+    terminalLocation: '',
+  } : null);
 
-  // Dual-Gate Verification Check (Permits live verified driver or mock fallback)
+  const selectedVehicle = {
+    id: profile.selectedVehicleId || profile.id || 'veh-primary',
+    plateNumber: profile.vehiclePlate || 'N/A',
+    franchiseNumber: profile.franchiseNumber || 'N/A',
+    model: 'Registered Tricycle Unit',
+  };
+
+  // Dual-Gate Verification Check (Permits live verified driver)
   const isDriverVerifiedInDb = profile.accountStatus === 'Active' || profile.accountStatus === 'Verified';
-  const canGoOnline = isDriverVerifiedInDb || Boolean(
-    selectedToda &&
-    selectedToda.status === 'Verified' &&
-    selectedVehicle &&
-    selectedVehicle.status === 'Verified'
-  );
+  const canGoOnline = isDriverVerifiedInDb;
 
   const handleToggleOnline = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!canGoOnline) return;
@@ -357,11 +432,11 @@ export const DriverAvailabilityHome: React.FC = () => {
 
     const driverPayload = {
       driver_id: profile.id || 'test-driver-001',
-      driver_name: profile.name || 'Juan Dela Cruz',
-      driver_phone: profile.phone || '09171234567',
-      franchise_no: selectedVehicle?.franchiseNumber || 'CAL-2025-0773',
-      vehicle_plate: selectedVehicle?.plateNumber || '773-MV',
-      toda_name: selectedToda?.name || 'Calapan Central TODA',
+      driver_name: profile.name || 'Drayber',
+      driver_phone: profile.phone || '',
+      franchise_no: profile.franchiseNumber || selectedVehicle?.franchiseNumber || 'MTOP-PENDING',
+      vehicle_plate: profile.vehiclePlate || selectedVehicle?.plateNumber || 'N/A',
+      toda_name: profile.todaName || selectedToda?.name || 'TODA',
     };
 
     acceptBookingByDriver(incomingRequest.booking_id, driverPayload);
@@ -399,6 +474,8 @@ export const DriverAvailabilityHome: React.FC = () => {
   };
 
   const handleAllowLocation = (saveAlways: boolean) => {
+    sessionStorage.setItem('sakay_driver_just_logged_in', 'false');
+    sessionStorage.setItem('sakay_driver_location_prompt_dismissed', 'true');
     if (saveAlways) {
       localStorage.setItem('sakay_driver_location_permission', 'always');
     } else {
@@ -408,32 +485,49 @@ export const DriverAvailabilityHome: React.FC = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
+          const { latitude, longitude } = pos.coords;
           setProfile((prev) => ({
             ...prev,
-            currentLat: pos.coords.latitude,
-            currentLng: pos.coords.longitude,
+            currentLat: latitude,
+            currentLng: longitude,
           }));
           setRecenterTrigger((prev) => prev + 1);
+
+          // Update driver's coordinates in Supabase database so live map and features have real GPS
+          const activeDriverId = localStorage.getItem('sakay_driver_id');
+          if (activeDriverId) {
+            supabase
+              .from('driver')
+              .update({
+                current_latitude: latitude,
+                current_longitude: longitude,
+                last_location_update: new Date().toISOString(),
+              })
+              .eq('driver_id', activeDriverId)
+              .then(() => {});
+          }
         },
         (err) => {
           console.warn('[DriverAvailabilityHome] Geolocation note:', err.message);
         },
-        { enableHighAccuracy: true, timeout: 5000 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 1000 }
       );
     }
     setLocationPermissionOpen(false);
   };
 
   const handleDenyLocation = () => {
+    sessionStorage.setItem('sakay_driver_just_logged_in', 'false');
+    sessionStorage.setItem('sakay_driver_location_prompt_dismissed', 'true');
     localStorage.setItem('sakay_driver_location_permission', 'denied');
     setLocationPermissionOpen(false);
   };
 
-  const displayName = profile.name || 'Juan Dela Cruz';
+  const displayName = profile.name || 'Drayber';
   const firstName = displayName.split(' ')[0] || 'Drayber';
   const initialLetter = firstName.charAt(0) || 'D';
   const ratingNum = typeof profile.rating === 'number' ? profile.rating : 5.0;
-  const tripsCount = typeof profile.totalTrips === 'number' ? profile.totalTrips : 124;
+  const tripsCount = typeof profile.totalTrips === 'number' ? profile.totalTrips : 0;
 
   return (
     <Box sx={{ width: '100%', height: '100%', backgroundColor: '#E3ECEF', display: 'flex', flexDirection: 'column', position: 'relative' }}>
@@ -823,27 +917,35 @@ export const DriverAvailabilityHome: React.FC = () => {
         </DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
-            {ACCREDITED_TODAS.map((toda) => (
-              <Box
-                key={toda.id}
-                onClick={() => {
-                  setProfile((prev) => ({ ...prev, selectedTodaId: toda.id }));
-                  setTodaModalOpen(false);
-                }}
-                sx={{
-                  p: 2,
-                  borderRadius: '14px',
-                  border: profile.selectedTodaId === toda.id ? '2px solid #FF6B00' : '1px solid #E2E8F0',
-                  backgroundColor: profile.selectedTodaId === toda.id ? '#FFF8F0' : '#FFFFFF',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  '&:hover': { borderColor: '#FF6B00' },
-                }}
-              >
-                <Typography sx={{ fontWeight: 700, fontSize: '14.5px', color: '#0F172A' }}>{toda.name} ({toda.acronym})</Typography>
-                <Typography sx={{ fontSize: '12px', color: '#64748B' }}>Terminal: {toda.terminalLocation}</Typography>
+            {availableTodas.length > 0 ? (
+              availableTodas.map((toda) => (
+                <Box
+                  key={toda.id}
+                  onClick={() => {
+                    setProfile((prev) => ({ ...prev, selectedTodaId: toda.id, todaName: `${toda.name} (${toda.acronym})` }));
+                    setTodaModalOpen(false);
+                  }}
+                  sx={{
+                    p: 2,
+                    borderRadius: '14px',
+                    border: profile.selectedTodaId === toda.id ? '2px solid #FF6B00' : '1px solid #E2E8F0',
+                    backgroundColor: profile.selectedTodaId === toda.id ? '#FFF8F0' : '#FFFFFF',
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    '&:hover': { borderColor: '#FF6B00' },
+                  }}
+                >
+                  <Typography sx={{ fontWeight: 700, fontSize: '14.5px', color: '#0F172A' }}>{toda.name} ({toda.acronym})</Typography>
+                  <Typography sx={{ fontSize: '12px', color: '#64748B' }}>Terminal: {toda.terminalLocation}</Typography>
+                </Box>
+              ))
+            ) : (
+              <Box sx={{ p: 2, textAlign: 'center' }}>
+                <Typography sx={{ fontSize: '13px', color: '#64748B' }}>
+                  {language === 'tl' ? 'Walang nahanap na TODA sa database' : 'No TODAs found in database'}
+                </Typography>
               </Box>
-            ))}
+            )}
           </Box>
         </DialogContent>
       </Dialog>
@@ -855,27 +957,23 @@ export const DriverAvailabilityHome: React.FC = () => {
         </DialogTitle>
         <DialogContent>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 1 }}>
-            {VERIFIED_TRICYCLES.map((veh) => (
-              <Box
-                key={veh.id}
-                onClick={() => {
-                  setProfile((prev) => ({ ...prev, selectedVehicleId: veh.id }));
-                  setVehicleModalOpen(false);
-                }}
-                sx={{
-                  p: 2,
-                  borderRadius: '14px',
-                  border: profile.selectedVehicleId === veh.id ? '2px solid #FF6B00' : '1px solid #E2E8F0',
-                  backgroundColor: profile.selectedVehicleId === veh.id ? '#FFF8F0' : '#FFFFFF',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  '&:hover': { borderColor: '#FF6B00' },
-                }}
-              >
-                <Typography sx={{ fontWeight: 700, fontSize: '14.5px', color: '#0F172A' }}>Plate: {veh.plateNumber} • Franchise: {veh.franchiseNumber}</Typography>
-                <Typography sx={{ fontSize: '12px', color: '#64748B' }}>{veh.model}</Typography>
-              </Box>
-            ))}
+            <Box
+              onClick={() => setVehicleModalOpen(false)}
+              sx={{
+                p: 2,
+                borderRadius: '14px',
+                border: '2px solid #FF6B00',
+                backgroundColor: '#FFF8F0',
+                cursor: 'pointer',
+              }}
+            >
+              <Typography sx={{ fontWeight: 700, fontSize: '14.5px', color: '#0F172A' }}>
+                {language === 'tl' ? 'Plaka' : 'Plate'}: {profile.vehiclePlate || 'N/A'} • Franchise: {profile.franchiseNumber || 'N/A'}
+              </Typography>
+              <Typography sx={{ fontSize: '12px', color: '#64748B' }}>
+                {language === 'tl' ? 'Rehistradong Tricycle Unit ng Drayber' : "Driver's Registered Tricycle Unit"}
+              </Typography>
+            </Box>
           </Box>
         </DialogContent>
       </Dialog>

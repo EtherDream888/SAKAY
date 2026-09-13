@@ -88,6 +88,9 @@ export const DriverLogin: React.FC = () => {
 
     if (isTestDriver) {
       setLoading(false);
+      sessionStorage.setItem('sakay_driver_just_logged_in', 'true');
+      sessionStorage.removeItem('sakay_driver_location_prompt_dismissed');
+      localStorage.removeItem('sakay_driver_location_permission');
       localStorage.setItem('sakay_driver_phone', phone63);
       localStorage.setItem('sakay_driver_id', 'test-driver-001');
       localStorage.setItem(
@@ -103,7 +106,7 @@ export const DriverLogin: React.FC = () => {
           selectedTodaId: 'toda-1',
           selectedVehicleId: 'VEH-001',
           rating: 5.0,
-          totalTrips: 142,
+          totalTrips: 0,
           isOnline: true,
           isPaused: false,
           currentLat: 13.4124,
@@ -180,24 +183,39 @@ export const DriverLogin: React.FC = () => {
           .then(() => {});
       }
 
+      // Reset location permission prompt so the location modal always shows upon entering interface
+      sessionStorage.setItem('sakay_driver_just_logged_in', 'true');
+      sessionStorage.removeItem('sakay_driver_location_prompt_dismissed');
+      localStorage.removeItem('sakay_driver_location_permission');
+
       // Persist active driver session cache
       localStorage.setItem('sakay_driver_phone', phone63);
       localStorage.setItem('sakay_driver_id', driverData.driver_id);
 
       const todaInfo = Array.isArray(driverData.toda) ? driverData.toda[0] : driverData.toda;
-      const todaNameStr = todaInfo?.toda_name || 'Calapan Central TODA';
-      const todaAcronymStr = todaInfo?.toda_acronym || 'CCTODA';
+      const todaNameStr = todaInfo?.toda_name || '';
+      const todaAcronymStr = todaInfo?.toda_acronym || '';
+
+      const verif = driverData.verification;
+      const plateNumber = driverData.plate_number || verif?.submitted_plate_number || verif?.ocr_plate_number || '';
+      const licenseNumber = driverData.license_number || verif?.submitted_license_number || verif?.ocr_license_number || '';
+      const franchiseNumber = driverData.franchise_number || verif?.submitted_franchise_number || verif?.ocr_franchise_number || '';
+      const rating = Number(driverData.weighted_average_rating) || 5.0;
 
       localStorage.setItem(
         'sakay_driver_profile',
         JSON.stringify({
+          id: driverData.driver_id,
           name: driverData.full_name,
           phone: phone63,
-          vehiclePlate: driverData.plate_number || 'MV-101',
-          licenseNumber: driverData.license_number || 'L01-99-123456',
-          franchiseNumber: driverData.franchise_number || 'MTOP-PENDING',
-          todaName: `${todaNameStr} (${todaAcronymStr})`,
-          rating: 5.0,
+          email: driverData.email || '',
+          vehiclePlate: plateNumber,
+          licenseNumber: licenseNumber,
+          franchiseNumber: franchiseNumber,
+          todaName: todaInfo ? `${todaNameStr} (${todaAcronymStr})` : '',
+          selectedTodaId: driverData.toda_id || '',
+          rating: rating,
+          totalTrips: 0,
           isOnline: false,
           isPaused: false,
           accountStatus: driverData.account_status,

@@ -35,6 +35,43 @@ export const DriverNavigation: React.FC = () => {
   const [eta, setEta] = useState(4);
 
   useEffect(() => {
+    if (!bookingId) return;
+    Promise.resolve(
+      supabase
+        .from('booking')
+        .select('*, passenger:passenger_id(*)')
+        .eq('booking_id', bookingId)
+        .maybeSingle()
+    )
+      .then(({ data }: any) => {
+        if (data) {
+          const p = Array.isArray(data.passenger) ? data.passenger[0] : data.passenger;
+          setBooking({
+            booking_id: data.booking_id,
+            passenger_id: data.passenger_id,
+            passenger_name: p?.full_name || 'Calapan Commuter',
+            passenger_phone: p?.contact_number || '+63 917 000 0000',
+            booking_type: data.booking_type || 'Immediate',
+            is_shared_trip: Boolean(data.is_shared_trip),
+            passenger_count: data.passenger_count || 1,
+            pickup_address: data.pickup_address || data.pickup_location_address || 'Calapan City',
+            pickup_latitude: Number(data.pickup_latitude) || 13.4117,
+            pickup_longitude: Number(data.pickup_longitude) || 121.1803,
+            dropoff_address: data.dropoff_address || data.dropoff_location_address || 'Calapan City',
+            dropoff_latitude: Number(data.dropoff_latitude) || 13.4180,
+            dropoff_longitude: Number(data.dropoff_longitude) || 121.1850,
+            estimated_distance_km: Number(data.route_distance_km || data.estimated_distance_km) || 1.5,
+            estimated_fare: Number(data.final_fare || data.estimated_fare) || 18,
+            booking_status: data.booking_status,
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+          } as any);
+        }
+      })
+      .catch((e: any) => console.warn('[DriverNavigation] Supabase fetch error:', e));
+  }, [bookingId]);
+
+  useEffect(() => {
     // Notify broker that driver is en route
     updateTripStage(bookingId, 'Driver En Route', 3);
 

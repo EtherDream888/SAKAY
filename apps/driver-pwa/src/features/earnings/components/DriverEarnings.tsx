@@ -31,6 +31,7 @@ interface TripItem {
   date: string;
   time: string;
   pairedPassenger?: string | null;
+  createdAt?: string;
 }
 
 export const DriverEarnings: React.FC = () => {
@@ -54,7 +55,8 @@ export const DriverEarnings: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetchDriverTrips()
+    const driverId = localStorage.getItem('sakay_driver_id') || undefined;
+    fetchDriverTrips(driverId)
       .then((data) => {
         let list: TripItem[] = (data || []).map((t: any) => ({
           id: t.id,
@@ -62,12 +64,13 @@ export const DriverEarnings: React.FC = () => {
           passengerName: t.passengerName || 'Calapan Commuter',
           pickupLocation: t.pickupLocation || 'JP Rizal Central Terminal',
           dropoffLocation: t.dropoffLocation || 'Calapan Public Market',
-          fareAmount: Number(t.fareAmount) || 18,
+          fareAmount: Number(t.fareAmount) || 0,
           tripMode: t.tripMode || 'Single Commuter',
           status: t.status || 'Completed',
           date: t.date || 'Today',
           time: t.time || 'Just now',
           pairedPassenger: t.pairedPassenger || null,
+          createdAt: t.createdAt,
         }));
 
         if (justCompleted) {
@@ -83,6 +86,7 @@ export const DriverEarnings: React.FC = () => {
             date: 'Today',
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             pairedPassenger: justCompleted.pairedPassenger,
+            createdAt: new Date().toISOString(),
           };
           list = [freshItem, ...list.filter((x) => x.bookingCode !== justCompleted.bookingCode)];
         }
@@ -93,10 +97,23 @@ export const DriverEarnings: React.FC = () => {
       .finally(() => setIsLoading(false));
   }, [justCompleted]);
 
-  // Compute live aggregates
+  // Compute live aggregates from database records
   const completedList = trips.filter((t) => t.status === 'Completed');
-  const todayTotal = completedList.reduce((acc, t) => acc + (t.fareAmount || 0), 0);
-  const weekTotal = Math.max(todayTotal * 3.5, 4930.0);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const sevenDaysAgo = startOfToday - 6 * 24 * 60 * 60 * 1000;
+
+  const todayList = completedList.filter((t: any) => {
+    const time = t.createdAt ? new Date(t.createdAt).getTime() : startOfToday;
+    return time >= startOfToday;
+  });
+  const todayTotal = todayList.reduce((acc, t) => acc + (t.fareAmount || 0), 0);
+
+  const weekList = completedList.filter((t: any) => {
+    const time = t.createdAt ? new Date(t.createdAt).getTime() : startOfToday;
+    return time >= sevenDaysAgo;
+  });
+  const weekTotal = weekList.reduce((acc, t) => acc + (t.fareAmount || 0), 0);
 
   return (
     <Box sx={{ width: '100%', height: '100%', backgroundColor: '#F8FAFC', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
@@ -151,10 +168,10 @@ export const DriverEarnings: React.FC = () => {
           </Box>
 
           <Typography sx={{ fontSize: '36px', fontWeight: 900, color: '#FFFFFF', lineHeight: 1 }}>
-            ₱{todayTotal > 0 ? todayTotal.toFixed(2) : '680.00'}
+            ₱{todayTotal.toFixed(2)}
           </Typography>
           <Typography sx={{ fontSize: '12px', color: '#94A3B8', mt: 0.5 }}>
-            {completedList.length > 0 ? completedList.length : 8} {language === 'tl' ? 'nakumpletong biyahe ngayong araw' : 'completed trips today'}
+            {todayList.length} {language === 'tl' ? 'nakumpletong biyahe ngayong araw' : 'completed trips today'}
           </Typography>
 
           <Divider sx={{ my: 2, borderColor: 'rgba(255, 255, 255, 0.1)' }} />
@@ -171,7 +188,7 @@ export const DriverEarnings: React.FC = () => {
                 {language === 'tl' ? 'Kabuuang Biyahe (Linggo)' : 'Total Trips (Week)'}
               </Typography>
               <Typography sx={{ fontSize: '16px', fontWeight: 800, color: '#34D399' }}>
-                {completedList.length + 41} {language === 'tl' ? 'biyahe' : 'trips'}
+                {weekList.length} {language === 'tl' ? 'biyahe' : 'trips'}
               </Typography>
             </Box>
           </Box>
@@ -183,57 +200,79 @@ export const DriverEarnings: React.FC = () => {
             {language === 'tl' ? 'Mga Nakaraang Biyahe' : 'Recent Completed Trips'}
           </Typography>
 
-          {completedList.slice(0, 6).map((trip, idx) => (
+          {completedList.length === 0 ? (
             <Paper
-              key={trip.id || idx}
               elevation={0}
               sx={{
-                p: '14px 16px',
+                p: 3,
                 borderRadius: '16px',
                 backgroundColor: '#FFFFFF',
                 border: '1px solid #E2E8F0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
+                textAlign: 'center',
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Avatar sx={{ width: 40, height: 40, backgroundColor: trip.tripMode === 'Shared Ride' ? '#ECFDF5' : '#FFF7ED', color: trip.tripMode === 'Shared Ride' ? '#10B981' : '#FF6B00' }}>
-                  {trip.tripMode === 'Shared Ride' ? <GroupsIcon fontSize="small" /> : <TwoWheelerIcon fontSize="small" />}
-                </Avatar>
-                <Box>
-                  <Typography sx={{ fontSize: '13.5px', fontWeight: 800, color: '#0F172A' }}>
-                    {trip.passengerName}
-                  </Typography>
-                  <Typography sx={{ fontSize: '11px', color: '#64748B', maxWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {trip.pickupLocation} → {trip.dropoffLocation}
-                  </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: '2px' }}>
-                    <AccessTimeIcon sx={{ fontSize: 11, color: '#94A3B8' }} />
-                    <Typography sx={{ fontSize: '10.5px', color: '#94A3B8' }}>{trip.date} • {trip.time}</Typography>
+              <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#0F172A', mb: 0.5 }}>
+                {language === 'tl' ? 'Wala pang nakumpletong biyahe' : 'No completed trips yet'}
+              </Typography>
+              <Typography sx={{ fontSize: '12px', color: '#64748B' }}>
+                {language === 'tl'
+                  ? 'Lilitaw dito ang mga detalye ng iyong biyahe at kita kapag nakatapos ka na ng booking.'
+                  : 'Your trip details and earnings will appear here once you complete a booking.'}
+              </Typography>
+            </Paper>
+          ) : (
+            completedList.slice(0, 10).map((trip, idx) => (
+              <Paper
+                key={trip.id || idx}
+                elevation={0}
+                sx={{
+                  p: '14px 16px',
+                  borderRadius: '16px',
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #E2E8F0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  <Avatar sx={{ width: 40, height: 40, backgroundColor: trip.tripMode === 'Shared Ride' ? '#ECFDF5' : '#FFF7ED', color: trip.tripMode === 'Shared Ride' ? '#10B981' : '#FF6B00' }}>
+                    {trip.tripMode === 'Shared Ride' ? <GroupsIcon fontSize="small" /> : <TwoWheelerIcon fontSize="small" />}
+                  </Avatar>
+                  <Box>
+                    <Typography sx={{ fontSize: '13.5px', fontWeight: 800, color: '#0F172A' }}>
+                      {trip.passengerName}
+                    </Typography>
+                    <Typography sx={{ fontSize: '11px', color: '#64748B', maxWidth: '180px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {trip.pickupLocation} → {trip.dropoffLocation}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: '2px' }}>
+                      <AccessTimeIcon sx={{ fontSize: 11, color: '#94A3B8' }} />
+                      <Typography sx={{ fontSize: '10.5px', color: '#94A3B8' }}>{trip.date} • {trip.time}</Typography>
+                    </Box>
                   </Box>
                 </Box>
-              </Box>
 
-              <Box sx={{ textAlign: 'right' }}>
-                <Typography sx={{ fontSize: '16px', fontWeight: 900, color: '#10B981' }}>
-                  +₱{trip.fareAmount.toFixed(2)}
-                </Typography>
-                <Chip
-                  label={trip.tripMode === 'Shared Ride' ? 'Shared' : 'Solo'}
-                  size="small"
-                  sx={{
-                    height: '18px',
-                    fontSize: '9.5px',
-                    fontWeight: 700,
-                    backgroundColor: trip.tripMode === 'Shared Ride' ? '#D1FAE5' : '#FEF3C7',
-                    color: trip.tripMode === 'Shared Ride' ? '#047857' : '#B45309',
-                    mt: '2px',
-                  }}
-                />
-              </Box>
-            </Paper>
-          ))}
+                <Box sx={{ textAlign: 'right' }}>
+                  <Typography sx={{ fontSize: '16px', fontWeight: 900, color: '#10B981' }}>
+                    +₱{trip.fareAmount.toFixed(2)}
+                  </Typography>
+                  <Chip
+                    label={trip.tripMode === 'Shared Ride' ? 'Shared' : 'Solo'}
+                    size="small"
+                    sx={{
+                      height: '18px',
+                      fontSize: '9.5px',
+                      fontWeight: 700,
+                      backgroundColor: trip.tripMode === 'Shared Ride' ? '#D1FAE5' : '#FEF3C7',
+                      color: trip.tripMode === 'Shared Ride' ? '#047857' : '#B45309',
+                      mt: '2px',
+                    }}
+                  />
+                </Box>
+              </Paper>
+            ))
+          )}
         </Box>
 
         <Button
