@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { parseMtopImage } from '../../../services/mtopOcrService';
-import { saveMtopScanData } from '../../../services/driverOnboardingCache';
+import { saveMtopScanData, getCachedLicenseData, MtopExtractedData } from '../../../services/driverOnboardingCache';
 import defaultMtopSample from '../../../../../../packages/shared/src/assets/images/mtop_sample.jpg';
 import DriverProgressLoader from './DriverProgressLoader';
 
@@ -67,6 +67,7 @@ export const DriverMtopLoading: React.FC = () => {
       const photoToProcess = state?.mtopPhoto || state?.rawMtopPhoto || defaultMtopSample;
       const rawPhoto = state?.rawMtopPhoto || photoToProcess;
       const targetPhone = state?.phone || localStorage.getItem('sakay_driver_phone') || '';
+      const cachedLicense = getCachedLicenseData();
 
       try {
         if (photoToProcess) {
@@ -83,13 +84,21 @@ export const DriverMtopLoading: React.FC = () => {
           targetPctRef.current = 100;
           await new Promise((res) => setTimeout(res, 400));
 
-          saveMtopScanData(ocrResult.data, targetPhone);
+          const cleanData: MtopExtractedData = {
+            ...ocrResult.data,
+            operatorName: ocrResult.data.operatorName || state?.driverName || cachedLicense?.fullName || '',
+            plateNumber: ocrResult.data.plateNumber || cachedLicense?.plateNumber || '',
+            authorizedRoute: ocrResult.data.authorizedRoute || 'City of Calapan, Oriental Mindoro',
+            expirationDate: ocrResult.data.expirationDate || '12-31-2026',
+          };
+
+          saveMtopScanData(cleanData, targetPhone);
 
           navigate('/driver/confirm-mtop-info', {
             replace: true,
             state: {
               ...state,
-              mtopExtracted: ocrResult.data,
+              mtopExtracted: cleanData,
             },
           });
           return;
@@ -102,11 +111,11 @@ export const DriverMtopLoading: React.FC = () => {
       targetPctRef.current = 100;
       await new Promise((res) => setTimeout(res, 400));
 
-      const fallbackData = {
+      const fallbackData: MtopExtractedData = {
         photoUrl: photoToProcess || '',
-        operatorName: state?.driverName || 'DE GUZMAN, MARIO R.',
+        operatorName: state?.driverName || cachedLicense?.fullName || 'DE GUZMAN, MARIO R.',
         franchiseNumber: '3209',
-        plateNumber: '261VPI',
+        plateNumber: cachedLicense?.plateNumber || '261VPI',
         chassisNumber: 'MD2DDDUZZTWD39200',
         vehicleMake: 'KAWASAKI',
         motorNumber: 'DUMBTD62743',

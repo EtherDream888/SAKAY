@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Box, Typography, IconButton, Alert } from '@mui/material';
+import { Box, Typography, IconButton, Alert, Button } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CameraswitchIcon from '@mui/icons-material/Cameraswitch';
 import FlashOnIcon from '@mui/icons-material/FlashOn';
@@ -27,6 +27,7 @@ export const DriverScanFace: React.FC = () => {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -37,10 +38,60 @@ export const DriverScanFace: React.FC = () => {
   const startCamera = async (targetFacing: 'user' | 'environment') => {
     try {
       setCameraError(null);
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+
+      // Stop previous tracks cleanly
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
       }
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
+      if (videoRef.current && videoRef.current.srcObject) {
+        const oldStream = videoRef.current.srcObject as MediaStream;
+        oldStream.getTracks?.().forEach((t) => t.stop());
+        videoRef.current.srcObject = null;
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setCameraError(
+          isTagalog
+            ? 'Hindi ma-access ang camera sa aparatong ito.'
+            : 'Cannot access camera on this device.'
+        );
+        return;
+      }
+
+      let selectedDeviceId: string | undefined;
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+        if (targetFacing === 'user') {
+          const frontDev = videoInputs.find((d) =>
+            /front|user|facing\s*front|selfie|built-in|facetime/i.test(d.label)
+          );
+          if (frontDev) selectedDeviceId = frontDev.deviceId;
+          else if (videoInputs.length > 0) selectedDeviceId = videoInputs[0].deviceId;
+        } else {
+          const backDev = videoInputs.find((d) =>
+            /back|rear|environment|facing\s*back/i.test(d.label)
+          );
+          if (backDev) selectedDeviceId = backDev.deviceId;
+          else if (videoInputs.length > 1) selectedDeviceId = videoInputs[videoInputs.length - 1].deviceId;
+        }
+      } catch {}
+
+      const constraintsList: MediaStreamConstraints[] = [];
+
+      if (selectedDeviceId) {
+        constraintsList.push({
+          video: {
+            deviceId: { exact: selectedDeviceId },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: false,
+        });
+      }
+
+      constraintsList.push({
         video: {
           facingMode: { ideal: targetFacing },
           width: { ideal: 1280 },
@@ -49,6 +100,33 @@ export const DriverScanFace: React.FC = () => {
         audio: false,
       });
 
+      constraintsList.push({
+        video: { facingMode: targetFacing },
+        audio: false,
+      });
+
+      constraintsList.push({
+        video: true,
+        audio: false,
+      });
+
+      let mediaStream: MediaStream | null = null;
+      let lastErr: unknown = null;
+
+      for (const constraint of constraintsList) {
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia(constraint);
+          if (mediaStream) break;
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+
+      if (!mediaStream) {
+        throw lastErr || new Error('Camera access failed');
+      }
+
+      streamRef.current = mediaStream;
       setStream(mediaStream);
 
       if (videoRef.current) {
@@ -70,21 +148,21 @@ export const DriverScanFace: React.FC = () => {
     startCamera(facingMode);
 
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
       }
     };
-  }, []);
+  }, [facingMode]);
 
   const handleToggleFacingMode = () => {
     const nextFacing = facingMode === 'user' ? 'environment' : 'user';
     setFacingMode(nextFacing);
-    startCamera(nextFacing);
   };
 
   const handleToggleTorch = async () => {
     try {
-      const track = stream?.getVideoTracks()[0];
+      const track = (streamRef.current || stream)?.getVideoTracks()[0];
       if (track) {
         const nextTorch = !torchOn;
         const capabilities = track.getCapabilities?.() as { torch?: boolean } | undefined;
@@ -143,6 +221,10 @@ export const DriverScanFace: React.FC = () => {
       }
     }
 
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
     }
@@ -158,13 +240,17 @@ export const DriverScanFace: React.FC = () => {
   };
 
   const handleBack = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
     }
     if (isEditMode) {
       navigate('/driver/confirm-all-info', { state });
     } else {
-      navigate('/driver/confirm-mtop-info', { state });
+      navigate('/driver/review-tricycle', { state });
     }
   };
 
@@ -262,7 +348,20 @@ export const DriverScanFace: React.FC = () => {
         </Typography>
 
         {cameraError && (
-          <Alert severity="error" sx={{ width: '100%', maxWidth: 340, my: 1, borderRadius: '12px', zIndex: 10 }}>
+          <Alert
+            severity="error"
+            action={
+              <Button
+                color="inherit"
+                size="small"
+                onClick={() => startCamera(facingMode)}
+                sx={{ fontWeight: 700, textTransform: 'none' }}
+              >
+                {isTagalog ? 'Subukan Muli' : 'Retry'}
+              </Button>
+            }
+            sx={{ width: '100%', maxWidth: 340, my: 1, borderRadius: '12px', zIndex: 10 }}
+          >
             {cameraError}
           </Alert>
         )}
@@ -314,7 +413,7 @@ export const DriverScanFace: React.FC = () => {
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
-                transform: 'scaleX(-1)', // Mirrored live camera view
+                transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
               }}
             />
 

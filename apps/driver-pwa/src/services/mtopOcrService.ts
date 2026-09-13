@@ -36,10 +36,13 @@ export function parseMtopOperator(text: string): string {
   if (!text) return '';
   const normalized = normalizeMtopText(text);
 
+  // Unify "Granted to\n..." across newlines
+  const folded = normalized.replace(/(?:Granted|Awarded)\s*(?:to|fo|1o|2o)?[:\s]*\n\s*/gi, 'Granted to ');
+
   // 1. "Granted to ..." patterns in MTOP (with OCR typo tolerance)
   const grantedMatch =
-    normalized.match(/(?:Granted\s*(?:to|fo|1o|2o)?|Awarded\s+to)[:\s]+([A-Za-z\s,.-]+?)(?=\s+(?:residing|reslding|tesiding|at|to\s+operate|with)\b|\r?\n|$)/i) ||
-    normalized.match(/Granted\s+to\s+([A-Za-z\s,.-]{4,45})/i);
+    folded.match(/(?:Granted\s*(?:to|fo|1o|2o)?|Awarded\s+to)[:\s]+([A-Za-z\s,.-]+?)(?=\s+(?:residing|reslding|tesiding|at\s+Brgy|at|to\s+operate|with)\b|\r?\n\s*\r?\n|Subject|\.|$)/i) ||
+    folded.match(/Granted\s+to\s+([A-Za-z\s,.-]{4,50})/i);
 
   if (grantedMatch) {
     const clean = grantedMatch[1]
@@ -82,7 +85,8 @@ export function parseMtopFranchiseNumber(text: string): string {
   const franMatch =
     normalized.match(/(?:Fr[a-z]*nchise|OPERATORS?\s*PERMIT)[^\d\n]*(\d{3,6})\b/i) ||
     normalized.match(/\bFr[a-z]*nchise\s*(?:No\.?|Ro\.?|#)?[:\s]*([A-Z0-9-]{3,15})/i) ||
-    normalized.match(/\b(?:MTOP|Permit|Case)\s*(?:No\.?|#)?[:\s]*([A-Z0-9-]{3,15})/i);
+    normalized.match(/\b(?:MTOP|Permit|Case)\s*(?:No\.?|#)?[:\s]*([A-Z0-9-]{3,15})/i) ||
+    normalized.match(/\b(?:Franchise|Franchise\s*No\.?|Franchise\s*#)\s*[:.-]?\s*(\d{3,6})\b/i);
 
   if (franMatch) {
     const candidate = franMatch[1].trim();
@@ -91,7 +95,13 @@ export function parseMtopFranchiseNumber(text: string): string {
     }
   }
 
-  // Priority 2: Year-code franchise (e.g. 2025-0891)
+  // Priority 2: 4-digit number at the right side of the permit line
+  const header4Digit = normalized.match(/(?:OPERATORS?\s*PERMIT|TFRB)[^\n]*?\b(\d{4})\b/i);
+  if (header4Digit) {
+    return header4Digit[1];
+  }
+
+  // Priority 3: Year-code franchise (e.g. 2025-0891)
   const yearCodeMatch = normalized.match(/\b(202[0-9]-\d{3,6})\b/);
   if (yearCodeMatch) return yearCodeMatch[1];
 
@@ -346,7 +356,7 @@ export function parseMtopTableLine(text: string, currentMake?: string): {
   const lines = text.split('\n');
 
   for (const line of lines) {
-    const makeMatch = line.match(/\b(KAWASAKI|HONDA|YAMAHA|SUZUKI|BAJAJ|TVS|SYM|RUSI|EURO|MOTORSTAR|RATO|KYMCO)\b/i);
+    const makeMatch = line.match(/\b(KAWASAKI|HONDA|YAMAHA|SUZUKI|BAJAJ|TVS|PIAGGIO|SYM|RUSI|EURO|MOTORSTAR|RATO|KYMCO|BENELLI|HAOJUE|LONCIN)\b/i);
     if (makeMatch) {
       result.make = makeMatch[1].toUpperCase();
       const cleanedLine = line.replace(/\|/g, ' ');
@@ -379,11 +389,7 @@ export function parseMtopTableLine(text: string, currentMake?: string): {
           }
           // Check if plateTokens match exact plate formats
           for (const t of plateTokens) {
-            if (/^\d{3}[A-Z]{3}$/i.test(t)) {
-              result.plateNumber = t.toUpperCase();
-              break;
-            }
-            if (/^\d{4}[A-Z]{2}$/i.test(t)) {
+            if (/^\d{3}[A-Z]{3}$/i.test(t) || /^\d{4}[A-Z]{2}$/i.test(t)) {
               result.plateNumber = t.toUpperCase();
               break;
             }
@@ -399,6 +405,53 @@ export function parseMtopTableLine(text: string, currentMake?: string): {
         }
       }
     }
+  }
+
+  // Cross-line fallback: if table columns were parsed onto separate lines
+  if (!result.chassisNumber) {
+    const allTokens = text
+      .replace(/\|/g, ' ')
+      .split(/\s+/)
+      .map((t) => t.replace(/[^A-Z0-9]/gi, '').trim())
+      .filter(Boolean);
+
+    const cIdx = allTokens.findIndex(
+      (t) =>
+        t.length >= 14 &&
+        t.length <= 18 &&
+        /[A-Z]/i.test(t) &&
+        /[0-9]/.test(t) &&
+        !/^(OPERATORSPERMIT|REGULATORYBOARD|JURISDICTIONOF|DESCRIPTIONOF)$/i.test(t)
+    );
+
+    if (cIdx !== -1) {
+      result.chassisNumber = allTokens[cIdx].toUpperCase();
+      // Motor number is column before chassis
+      if (cIdx > 0 && allTokens[cIdx - 1].length >= 5 && allTokens[cIdx - 1].length <= 16) {
+        result.motorNumber = allTokens[cIdx - 1].toUpperCase();
+        // Make is column before motor
+        if (cIdx > 1) {
+          const candMake = allTokens[cIdx - 2].toUpperCase();
+          if (/^(KAWASAKI|HONDA|YAMAHA|SUZUKI|BAJAJ|TVS|PIAGGIO|SYM|RUSI|EURO|MOTORSTAR|RATO|KYMCO|BENELLI|HAOJUE|LONCIN)$/i.test(candMake)) {
+            result.make = candMake;
+          }
+        }
+      }
+
+      // Look ahead for Year Model and Plate Number
+      const restTokens = allTokens.slice(cIdx + 1, cIdx + 6);
+      for (const token of restTokens) {
+        if (!result.yearModel && /^\d{4}$/.test(token) && parseInt(token, 10) >= 1990 && parseInt(token, 10) <= 2035) {
+          result.yearModel = token;
+        } else if (!result.plateNumber && (/^\d{3}[A-Z]{3}$/i.test(token) || /^\d{4}[A-Z]{2}$/i.test(token) || /^[A-Z]{2,3}\d{3,4}$/i.test(token))) {
+          result.plateNumber = token.toUpperCase();
+        }
+      }
+    }
+  }
+
+  if (!result.make) {
+    result.make = parseMtopMake(text);
   }
 
   return result;

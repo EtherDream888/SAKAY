@@ -528,21 +528,10 @@ export async function preprocessLicenseImage(
 
   if (isVideo && cropOrElement && cropOrElement instanceof HTMLElement) {
     const cropRect = getSourceVideoCropRect(source as HTMLVideoElement, cropOrElement);
-    if (isMtop) {
-      // For MTOP full-sheet documents, expand the crop with generous margins
-      // so the header ("Granted to", "Franchise No.") and footer ("Expiration", "OR No.") are NEVER chopped off
-      const padX = Math.round(cropRect.width * 0.25);
-      const padY = Math.round(cropRect.height * 0.35);
-      cropX = Math.max(0, cropRect.x - padX);
-      cropY = Math.max(0, cropRect.y - padY);
-      cropW = Math.min(srcWidth - cropX, cropRect.width + padX * 2);
-      cropH = Math.min(srcHeight - cropY, cropRect.height + padY * 2);
-    } else {
-      cropX = cropRect.x;
-      cropY = cropRect.y;
-      cropW = cropRect.width;
-      cropH = cropRect.height;
-    }
+    cropX = cropRect.x;
+    cropY = cropRect.y;
+    cropW = cropRect.width;
+    cropH = cropRect.height;
   }
 
   // 2. Extract Guide Region to working canvas
@@ -554,12 +543,12 @@ export async function preprocessLicenseImage(
 
   guideCtx.drawImage(source, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
-  // 3. Normalize aspect orientation for landscape cards (rotate 90° if cropW < cropH for DL cards only)
+  // 3. Normalize aspect orientation for landscape cards / documents (rotate 90° if cropW < cropH)
   let workCanvas = guideCanvas;
   let workW = cropW;
   let workH = cropH;
 
-  if (workW < workH && !isMtop) {
+  if (workW < workH) {
     const rotCanvas = document.createElement('canvas');
     rotCanvas.width = workH;
     rotCanvas.height = workW;

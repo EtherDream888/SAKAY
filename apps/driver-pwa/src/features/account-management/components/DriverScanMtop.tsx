@@ -29,19 +29,25 @@ export const DriverScanMtop: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewfinderRef = useRef<HTMLDivElement | null>(null);
+  const guideRef = useRef<HTMLDivElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [torchOn, setTorchOn] = useState(false);
+  const [focusPoint, setFocusPoint] = useState<{ x: number; y: number } | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
 
   const startCamera = useCallback(async (targetFacing: 'environment' | 'user') => {
     setCameraError(null);
-    if (stream) {
-      stream.getTracks().forEach((track) => track.stop());
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
     }
-    if (videoRef.current) {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const curStream = videoRef.current.srcObject as MediaStream;
+      curStream.getTracks?.().forEach((t) => t.stop());
       videoRef.current.srcObject = null;
     }
 
@@ -55,56 +61,121 @@ export const DriverScanMtop: React.FC = () => {
     }
 
     try {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: targetFacing },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-        },
+      let selectedDeviceId: string | undefined;
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+        if (targetFacing === 'user') {
+          const frontDev = videoInputs.find((d) =>
+            /front|user|facing\s*front|selfie|built-in|facetime/i.test(d.label)
+          );
+          if (frontDev) selectedDeviceId = frontDev.deviceId;
+          else if (videoInputs.length > 1) selectedDeviceId = videoInputs[0].deviceId;
+        } else {
+          const backDev = videoInputs.find((d) =>
+            /back|rear|environment|facing\s*back/i.test(d.label)
+          );
+          if (backDev) selectedDeviceId = backDev.deviceId;
+          else if (videoInputs.length > 1) selectedDeviceId = videoInputs[videoInputs.length - 1].deviceId;
+        }
+      } catch {}
+
+      const constraintsList: MediaStreamConstraints[] = [];
+      if (selectedDeviceId) {
+        constraintsList.push({
+          video: { deviceId: { exact: selectedDeviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+          audio: false,
+        });
+      }
+      constraintsList.push({
+        video: { facingMode: { ideal: targetFacing }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+        audio: false,
+      });
+      constraintsList.push({
+        video: { facingMode: targetFacing },
+        audio: false,
+      });
+      constraintsList.push({
+        video: true,
         audio: false,
       });
 
-      setStream(newStream);
+      let activeStream: MediaStream | null = null;
+      let lastErr: unknown = null;
+      for (const constraint of constraintsList) {
+        try {
+          activeStream = await navigator.mediaDevices.getUserMedia(constraint);
+          if (activeStream) break;
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+
+      if (!activeStream) {
+        throw lastErr || new Error('Camera access failed');
+      }
+
+      streamRef.current = activeStream;
+      setStream(activeStream);
       if (videoRef.current) {
-        videoRef.current.srcObject = newStream;
+        videoRef.current.srcObject = activeStream;
       }
     } catch (err: any) {
       console.warn('[DriverScanMtop] Camera start failed:', err);
-      // Fallback without constraints
-      try {
-        const fallbackStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        setStream(fallbackStream);
-        if (videoRef.current) {
-          videoRef.current.srcObject = fallbackStream;
-        }
-      } catch (fallbackErr) {
-        setCameraError(
-          isTagalog
-            ? 'Pakipahintulutan ang access sa camera upang ma-scan ang iyong MTOP.'
-            : 'Please allow camera access to scan your MTOP.'
-        );
-      }
+      setCameraError(
+        isTagalog
+          ? 'Pakipahintulutan ang access sa camera upang ma-scan ang iyong MTOP.'
+          : 'Please allow camera access to scan your MTOP.'
+      );
     }
-  }, [stream, isTagalog]);
+  }, [isTagalog]);
 
   useEffect(() => {
     startCamera(facingMode);
     return () => {
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
       }
     };
-  }, []);
+  }, [facingMode]);
+
+  // Tap-to-Focus Handler (mimicking driver's license focus reticle and camera focus mode)
+  const handleTapToFocus = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!viewfinderRef.current) return;
+    const rect = viewfinderRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    setFocusPoint({ x, y });
+    setTimeout(() => setFocusPoint(null), 1200);
+
+    try {
+      const track = (streamRef.current || stream)?.getVideoTracks()[0];
+      if (track) {
+        const capabilities = track.getCapabilities?.() as { focusMode?: string[] } | undefined;
+        if (capabilities?.focusMode?.includes('continuous') || capabilities?.focusMode?.includes('manual')) {
+          (track.applyConstraints as (c: unknown) => Promise<void>)({
+            advanced: [
+              {
+                focusMode: 'continuous',
+                pointsOfInterest: [{ x: x / rect.width, y: y / rect.height }],
+              },
+            ],
+          }).catch(() => {});
+        }
+      }
+    } catch {}
+  };
 
   const handleToggleCamera = () => {
     const nextFacing = facingMode === 'environment' ? 'user' : 'environment';
     setFacingMode(nextFacing);
-    startCamera(nextFacing);
   };
 
   const handleToggleTorch = async () => {
     try {
-      const track = stream?.getVideoTracks()[0];
+      const track = (streamRef.current || stream)?.getVideoTracks()[0];
       if (track) {
         const nextTorch = !torchOn;
         const capabilities = track.getCapabilities?.() as { torch?: boolean } | undefined;
@@ -130,13 +201,13 @@ export const DriverScanMtop: React.FC = () => {
       let rawPhoto = '';
       let processedPhoto = '';
 
-      if (videoRef.current && viewfinderRef.current && canvasRef.current) {
+      if (videoRef.current && (guideRef.current || viewfinderRef.current)) {
         const rawCaptured = captureRawFrame(videoRef.current);
         if (rawCaptured) {
           rawPhoto = rawCaptured;
           const enhanced = await enhanceLicenseDocument(
             videoRef.current,
-            viewfinderRef.current,
+            guideRef.current || viewfinderRef.current,
             'mtop' as any
           );
           processedPhoto = enhanced || rawCaptured;
@@ -149,7 +220,11 @@ export const DriverScanMtop: React.FC = () => {
         rawPhoto = defaultMtopSample;
       }
 
-      // Stop camera stream
+      // Stop camera stream cleanly
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
@@ -253,11 +328,12 @@ export const DriverScanMtop: React.FC = () => {
         {/* Viewfinder Target Area with Dashed Frame & 4 Corner L-Brackets */}
         <Box
           ref={viewfinderRef}
+          onClick={handleTapToFocus}
           sx={{
             width: '100%',
             maxWidth: '370px',
-            aspectRatio: '4 / 3',
-            minHeight: '275px',
+            aspectRatio: '1.45 / 1',
+            minHeight: '255px',
             borderRadius: '18px',
             position: 'relative',
             overflow: 'hidden',
@@ -278,16 +354,19 @@ export const DriverScanMtop: React.FC = () => {
               width: '100%',
               height: '100%',
               objectFit: 'cover',
+              transform: facingMode === 'user' ? 'scaleX(-1)' : 'none',
+              display: cameraError ? 'none' : 'block',
             }}
           />
 
-          {/* Card Boundary Dashed Frame with 4-Corner L-Brackets */}
+          {/* Card Boundary Dashed Frame with 4-Corner L-Brackets framing the permit */}
           <Box
+            ref={guideRef}
             sx={{
               position: 'absolute',
               inset: '8px',
               border: '1.5px dashed rgba(255, 255, 255, 0.75)',
-              borderRadius: '12px',
+              borderRadius: '14px',
               pointerEvents: 'none',
             }}
           >
@@ -295,55 +374,77 @@ export const DriverScanMtop: React.FC = () => {
             <Box
               sx={{
                 position: 'absolute',
-                top: '-2px',
-                left: '-2px',
-                width: '28px',
-                height: '28px',
-                borderTop: '4px solid #FF6B00',
-                borderLeft: '4px solid #FF6B00',
-                borderTopLeftRadius: '12px',
+                top: '-3px',
+                left: '-3px',
+                width: '32px',
+                height: '32px',
+                borderTop: '4.5px solid #FF6B00',
+                borderLeft: '4.5px solid #FF6B00',
+                borderTopLeftRadius: '14px',
               }}
             />
             {/* Top-Right Corner L Bracket */}
             <Box
               sx={{
                 position: 'absolute',
-                top: '-2px',
-                right: '-2px',
-                width: '28px',
-                height: '28px',
-                borderTop: '4px solid #FF6B00',
-                borderRight: '4px solid #FF6B00',
-                borderTopRightRadius: '12px',
+                top: '-3px',
+                right: '-3px',
+                width: '32px',
+                height: '32px',
+                borderTop: '4.5px solid #FF6B00',
+                borderRight: '4.5px solid #FF6B00',
+                borderTopRightRadius: '14px',
               }}
             />
             {/* Bottom-Left Corner L Bracket */}
             <Box
               sx={{
                 position: 'absolute',
-                bottom: '-2px',
-                left: '-2px',
-                width: '28px',
-                height: '28px',
-                borderBottom: '4px solid #FF6B00',
-                borderLeft: '4px solid #FF6B00',
-                borderBottomLeftRadius: '12px',
+                bottom: '-3px',
+                left: '-3px',
+                width: '32px',
+                height: '32px',
+                borderBottom: '4.5px solid #FF6B00',
+                borderLeft: '4.5px solid #FF6B00',
+                borderBottomLeftRadius: '14px',
               }}
             />
             {/* Bottom-Right Corner L Bracket */}
             <Box
               sx={{
                 position: 'absolute',
-                bottom: '-2px',
-                right: '-2px',
-                width: '28px',
-                height: '28px',
-                borderBottom: '4px solid #FF6B00',
-                borderRight: '4px solid #FF6B00',
-                borderBottomRightRadius: '12px',
+                bottom: '-3px',
+                right: '-3px',
+                width: '32px',
+                height: '32px',
+                borderBottom: '4.5px solid #FF6B00',
+                borderRight: '4.5px solid #FF6B00',
+                borderBottomRightRadius: '14px',
               }}
             />
           </Box>
+
+          {/* Tap-to-Focus Reticle Indicator (Orange Border) */}
+          {focusPoint && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: focusPoint.y - 28,
+                left: focusPoint.x - 28,
+                width: 56,
+                height: 56,
+                border: '2.5px solid #FF6B00',
+                borderRadius: '10px',
+                pointerEvents: 'none',
+                animation: 'pulseFocus 0.8s ease-out',
+                '@keyframes pulseFocus': {
+                  '0%': { transform: 'scale(1.4)', opacity: 0.9 },
+                  '50%': { transform: 'scale(1.0)', opacity: 1 },
+                  '100%': { transform: 'scale(0.95)', opacity: 0.7 },
+                },
+              }}
+            />
+          )}
         </Box>
 
         {/* Camera Permission Alert */}
