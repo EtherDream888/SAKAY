@@ -19,6 +19,7 @@ import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { supabase } from '../../../services/supabaseClient';
+import { lookupDriverByPhoneSecure } from '../../../services/driverApiService';
 
 export const DriverStatusMonitor: React.FC = () => {
   const navigate = useNavigate();
@@ -62,8 +63,6 @@ export const DriverStatusMonitor: React.FC = () => {
             plate_number,
             license_number,
             franchise_number,
-            rejection_reason,
-            rejection_comment,
             toda:toda_id (
               toda_id,
               toda_name,
@@ -92,8 +91,6 @@ export const DriverStatusMonitor: React.FC = () => {
               plate_number,
               license_number,
               franchise_number,
-              rejection_reason,
-              rejection_comment,
               toda:toda_id (
                 toda_id,
                 toda_name,
@@ -107,30 +104,7 @@ export const DriverStatusMonitor: React.FC = () => {
         }
 
         if (!driverData && storedPhone) {
-          const cleanPhone = storedPhone.replace(/\D/g, '');
-          const e164 = `+63${cleanPhone.replace(/^0/, '')}`;
-          const { data } = await supabase
-            .from('driver')
-            .select(`
-              driver_id,
-              account_status,
-              full_name,
-              contact_number,
-              plate_number,
-              license_number,
-              franchise_number,
-              rejection_reason,
-              rejection_comment,
-              toda:toda_id (
-                toda_id,
-                toda_name,
-                toda_acronym
-              )
-            `)
-            .or(`contact_number.eq.${cleanPhone},contact_number.eq.${e164}`)
-            .maybeSingle();
-
-          if (data) driverData = data;
+          driverData = await lookupDriverByPhoneSecure(storedPhone);
         }
       }
 
@@ -139,6 +113,11 @@ export const DriverStatusMonitor: React.FC = () => {
         const todaInfo = Array.isArray(driverData.toda) ? driverData.toda[0] : driverData.toda;
         const todaNameStr = todaInfo?.toda_name || 'Calapan Central TODA';
         const todaAcronymStr = todaInfo?.toda_acronym || 'CCTODA';
+
+        localStorage.setItem('sakay_driver_id', driverData.driver_id);
+        if (driverData.contact_number) {
+          localStorage.setItem('sakay_driver_phone', driverData.contact_number);
+        }
 
         localStorage.setItem(
           'sakay_driver_profile',
@@ -153,7 +132,7 @@ export const DriverStatusMonitor: React.FC = () => {
             isOnline: false,
             isPaused: false,
             accountStatus: driverData.account_status,
-            verificationStage: driverData.account_status === 'Verified' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
+            verificationStage: driverData.account_status === 'Verified' || driverData.account_status === 'Active' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
           })
         );
 
@@ -163,13 +142,21 @@ export const DriverStatusMonitor: React.FC = () => {
           return;
         }
 
-        // Check if documents have been submitted to driver_verification
-        if (driverData.driver_id && driverData.account_status !== 'Rejected') {
+        // Check verification details from driver_verification
+        if (driverData.driver_id) {
           const { data: verif } = await supabase
             .from('driver_verification')
-            .select('verification_status, submitted_license_number')
+            .select('verification_status, submitted_license_number, remarks')
             .eq('driver_id', driverData.driver_id)
             .maybeSingle();
+
+          if (driverData.account_status === 'Rejected' || verif?.verification_status === 'Rejected') {
+            setProfileStatus('Rejected');
+            setRejectionReason(verif?.remarks || state?.rejectionReason || 'Application rejected');
+            setRejectionComment(state?.rejectionComment);
+            setLoading(false);
+            return;
+          }
 
           if (!verif || !verif.submitted_license_number) {
             setIsDocIncomplete(true);
@@ -183,7 +170,9 @@ export const DriverStatusMonitor: React.FC = () => {
               verif.verification_status === 'Approved' ||
               verif.verification_status === 'TODA Approved' ||
               verif.verification_status === 'TODA Endorsed' ||
-              verif.verification_status === 'Endorsed to LGU'
+              verif.verification_status === 'Endorsed to LGU' ||
+              driverData.account_status === 'TODA Approved' ||
+              driverData.account_status === 'Endorsed to LGU'
             ) {
               setProfileStatus('Endorsed to LGU');
               setLoading(false);
@@ -193,8 +182,6 @@ export const DriverStatusMonitor: React.FC = () => {
         }
 
         setProfileStatus(driverData.account_status || 'Pending Verification');
-        setRejectionReason(driverData.rejection_reason || undefined);
-        setRejectionComment(driverData.rejection_comment || undefined);
       }
     } catch (err) {
       console.warn('[DriverStatusMonitor] Status check warning:', err);

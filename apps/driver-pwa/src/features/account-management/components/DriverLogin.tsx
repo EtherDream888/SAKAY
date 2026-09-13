@@ -17,7 +17,7 @@ import { RegisterInput } from '../../../common/components/RegisterInput';
 import SakayPhoneInput from '../../../common/components/SakayPhoneInput';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { supabase } from '../../../services/supabaseClient';
-import { getPhoneLookupCandidates, lookupDriverByPhoneSecure, sendDriverOtp } from '../../../services/driverApiService';
+import { getPhoneLookupCandidates, lookupDriverByPhoneSecure } from '../../../services/driverApiService';
 
 export const formatMobileNumber = (value: string): string => {
   const digits = value.replace(/\D/g, '');
@@ -54,63 +54,11 @@ export const DriverLogin: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [otpLoading, setOtpLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handlePhoneChange = (val: string) => {
     const formatted = formatMobileNumber(val);
     setPhone(formatted);
-  };
-
-  const handleOtpLogin = async () => {
-    const rawDigits = phone.replace(/\D/g, '');
-    if (!rawDigits || rawDigits.length < 10) {
-      setError(
-        language === 'tl'
-          ? 'Pakilagay muna ang inyong numero ng telepono bago mag-login gamit ang OTP.'
-          : 'Please enter your mobile number first before logging in with OTP.'
-      );
-      return;
-    }
-
-    const candidates = getPhoneLookupCandidates(rawDigits);
-    const phone63 = candidates.phone63WithPlus;
-
-    setOtpLoading(true);
-    setError('');
-
-    // Check if account exists
-    const existingDriver = await lookupDriverByPhoneSecure(phone63);
-    if (!existingDriver) {
-      setOtpLoading(false);
-      setError(
-        language === 'tl'
-          ? 'Walang nahanap na account para sa numerong ito. Mangyaring mag-register muna.'
-          : 'No account found for this mobile number. Please register first.'
-      );
-      return;
-    }
-
-    try {
-      const otpResult = await sendDriverOtp(phone63);
-      setOtpLoading(false);
-      navigate('/driver/verify-otp', {
-        state: {
-          phone: phone63,
-          isOtpLogin: true,
-          driverName: existingDriver.full_name,
-          debugOtp: otpResult?.debugOtp,
-        },
-      });
-    } catch (err: any) {
-      setOtpLoading(false);
-      setError(
-        err?.message ||
-          (language === 'tl'
-            ? 'Hindi maipadala ang OTP. Pakisubukang muli.'
-            : 'Unable to send OTP. Please try again.')
-      );
-    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -169,11 +117,30 @@ export const DriverLogin: React.FC = () => {
     }
 
     try {
-      // 1. Authenticate with Supabase Auth across candidate credentials
+      // 1. Verify if driver account exists in database first using secure lookup
+      const driverData = await lookupDriverByPhoneSecure(phone63);
+
+      if (!driverData) {
+        setLoading(false);
+        setError(
+          language === 'tl'
+            ? 'Walang nahanap na account para sa numerong ito. Mangyaring mag-register muna o suriin ang inyong numero.'
+            : 'No account found for this mobile number. Please register first or check your mobile number.'
+        );
+        return;
+      }
+
+      // 2. Driver exists! Attempt authentication with Supabase Auth
       let sessionUser: any = null;
       let lastAuthError: any = null;
 
-      for (const candidate of candidates.authCandidates) {
+      // Prepare candidate credentials (including driver email if present in profile)
+      const authCandidates = [...candidates.authCandidates];
+      if (driverData.email && !authCandidates.some((c: any) => c.email === driverData.email)) {
+        authCandidates.unshift({ email: driverData.email });
+      }
+
+      for (const candidate of authCandidates) {
         const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
           ...candidate,
           password: password,
@@ -187,190 +154,99 @@ export const DriverLogin: React.FC = () => {
         lastAuthError = signInErr;
       }
 
-      // 2. Query driver record from Supabase database
-      let driverData: any = null;
+      // 3. If password was incorrect:
+      if (!sessionUser) {
+        setLoading(false);
+        setError(
+          language === 'tl'
+            ? 'Mali ang password para sa account na ito. Pakisubukang muli.'
+            : 'Incorrect password for this account. Please check your password and try again.'
+        );
+        return;
+      }
 
-      if (sessionUser?.id) {
-        const { data: driverRows, error: dbErr } = await supabase
+      // 4. Session established! Link driver record to sessionUser if unlinked
+      if (sessionUser?.id && !driverData.auth_user_id) {
+        await supabase
           .from('driver')
-          .select(`
-            driver_id,
-            auth_user_id,
-            full_name,
-            contact_number,
-            plate_number,
-            license_number,
-            franchise_number,
-            account_status,
-            rejection_reason,
-            rejection_comment,
-            toda:toda_id (
-              toda_id,
-              toda_name,
-              toda_acronym
-            )
-          `)
-          .or(`auth_user_id.eq.${sessionUser.id},contact_number.eq.${phone63},contact_number.eq.${phone09},contact_number.eq.${candidates.phoneRaw},contact_number.eq.${candidates.phone63NoPlus}`)
-          .limit(1);
-
-        if (dbErr) {
-          console.error('[DriverLogin] Driver profile lookup error:', dbErr);
-        }
-
-        driverData = driverRows?.[0] || null;
-      }
-
-      // Check database using secure lookup if driverData not resolved yet
-      if (!driverData) {
-        driverData = await lookupDriverByPhoneSecure(phone63);
-      }
-
-      // 3. Auto-provision profile if auth succeeded but driver profile row was pending
-      if (sessionUser && !driverData) {
-        console.log('[DriverLogin] Authenticated in Auth but driver row missing, auto-provisioning...');
-        const storedTodaId = typeof window !== 'undefined' ? localStorage.getItem('sakay_driver_toda_id') : null;
-        const { data: newDriver } = await supabase
+          .update({ auth_user_id: sessionUser.id, contact_number: phone63 })
+          .eq('driver_id', driverData.driver_id);
+      } else if (driverData.contact_number !== phone63) {
+        // Standardize contact_number in DB to E.164 (+639XXXXXXXXX)
+        supabase
           .from('driver')
-          .insert([
-            {
-              auth_user_id: sessionUser.id,
-              full_name: sessionUser.user_metadata?.full_name || 'Driver Applicant',
-              contact_number: phone63,
-              toda_id: sessionUser.user_metadata?.toda_id || storedTodaId || null,
-              account_status: 'Pending Verification',
-              availability_status: 'Offline',
-            },
-          ])
-          .select(`
-            driver_id,
-            auth_user_id,
-            full_name,
-            contact_number,
-            plate_number,
-            license_number,
-            franchise_number,
-            account_status,
-            rejection_reason,
-            rejection_comment,
-            toda:toda_id (
-              toda_id,
-              toda_name,
-              toda_acronym
-            )
-          `)
-          .maybeSingle();
-
-        driverData = newDriver;
+          .update({ contact_number: phone63 })
+          .eq('driver_id', driverData.driver_id)
+          .then(() => {});
       }
+
+      // Persist active driver session cache
+      localStorage.setItem('sakay_driver_phone', phone63);
+      localStorage.setItem('sakay_driver_id', driverData.driver_id);
+
+      const todaInfo = Array.isArray(driverData.toda) ? driverData.toda[0] : driverData.toda;
+      const todaNameStr = todaInfo?.toda_name || 'Calapan Central TODA';
+      const todaAcronymStr = todaInfo?.toda_acronym || 'CCTODA';
+
+      localStorage.setItem(
+        'sakay_driver_profile',
+        JSON.stringify({
+          name: driverData.full_name,
+          phone: phone63,
+          vehiclePlate: driverData.plate_number || 'MV-101',
+          licenseNumber: driverData.license_number || 'L01-99-123456',
+          franchiseNumber: driverData.franchise_number || 'MTOP-PENDING',
+          todaName: `${todaNameStr} (${todaAcronymStr})`,
+          rating: 5.0,
+          isOnline: false,
+          isPaused: false,
+          accountStatus: driverData.account_status,
+          verificationStage: driverData.account_status === 'Verified' || driverData.account_status === 'Active' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
+        })
+      );
 
       setLoading(false);
 
-      if (driverData) {
-        // If driver exists in database but Auth session failed due to incorrect password:
-        if (!sessionUser) {
-          setError(
-            language === 'tl'
-              ? 'Mali ang password para sa account na ito. Pakisubukang muli o mag-login gamit ang SMS OTP sa ibaba.'
-              : 'Incorrect password for this account. Please try again or log in with SMS OTP below.'
-          );
+      // Enforce strict approval lifecycle routing:
+      if (driverData.account_status === 'Active' || driverData.account_status === 'Verified') {
+        navigate('/driver/home', { replace: true });
+      } else if (driverData.account_status === 'Rejected') {
+        navigate('/driver/status', {
+          replace: true,
+          state: {
+            driverName: driverData.full_name,
+            accountStatus: 'Rejected',
+            rejectionReason: driverData.verification?.remarks || 'Application rejected',
+          },
+        });
+      } else {
+        // Check verification status
+        const verif = driverData.verification;
+        if (!verif || !verif.submitted_license_number) {
+          navigate('/driver/prepare-documents', {
+            replace: true,
+            state: {
+              phone: phone63,
+              driverName: driverData.full_name,
+            },
+          });
           return;
         }
 
-        // Link driver record to sessionUser if unlinked
-        if (sessionUser?.id && !driverData.auth_user_id) {
-          await supabase
-            .from('driver')
-            .update({ auth_user_id: sessionUser.id, contact_number: phone63 })
-            .eq('driver_id', driverData.driver_id);
-        } else if (driverData.contact_number !== phone63) {
-          // Standardize contact_number in DB to E.164 (+639XXXXXXXXX)
-          supabase
-            .from('driver')
-            .update({ contact_number: phone63 })
-            .eq('driver_id', driverData.driver_id)
-            .then(() => {});
-        }
+        const isEndorsed =
+          verif.verification_status === 'Approved' ||
+          verif.verification_status === 'TODA Approved' ||
+          verif.verification_status === 'Endorsed to LGU' ||
+          driverData.account_status === 'TODA Approved' ||
+          driverData.account_status === 'Endorsed to LGU';
 
-        // Persist active driver session cache
-        localStorage.setItem('sakay_driver_phone', phone63);
-        localStorage.setItem('sakay_driver_id', driverData.driver_id);
-
-        const todaInfo = Array.isArray(driverData.toda) ? driverData.toda[0] : driverData.toda;
-        const todaNameStr = todaInfo?.toda_name || 'Calapan Central TODA';
-        const todaAcronymStr = todaInfo?.toda_acronym || 'CCTODA';
-
-        localStorage.setItem(
-          'sakay_driver_profile',
-          JSON.stringify({
-            name: driverData.full_name,
-            phone: phone63,
-            vehiclePlate: driverData.plate_number || 'MV-101',
-            licenseNumber: driverData.license_number || 'L01-99-123456',
-            franchiseNumber: driverData.franchise_number || 'MTOP-PENDING',
-            todaName: `${todaNameStr} (${todaAcronymStr})`,
-            rating: 5.0,
-            isOnline: false,
-            isPaused: false,
-            accountStatus: driverData.account_status,
-            verificationStage: driverData.account_status === 'Verified' || driverData.account_status === 'Active' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
-          })
-        );
-
-        // Enforce strict approval lifecycle routing:
-        if (driverData.account_status === 'Active' || driverData.account_status === 'Verified') {
-          navigate('/driver/home', { replace: true });
-        } else if (driverData.account_status === 'Rejected') {
-          navigate('/driver/status', {
-            replace: true,
-            state: {
-              driverName: driverData.full_name,
-              accountStatus: 'Rejected',
-              rejectionReason: driverData.rejection_reason,
-              rejectionComment: driverData.rejection_comment,
-            },
-          });
-        } else {
-          // Check if documents have been submitted to verification queue
-          const { data: verif } = await supabase
-            .from('driver_verification')
-            .select('verification_status, submitted_license_number')
-            .eq('driver_id', driverData.driver_id)
-            .maybeSingle();
-
-          // If the account was created but no documents have been submitted yet:
-          if (!verif || !verif.submitted_license_number) {
-            navigate('/driver/prepare-documents', {
-              replace: true,
-              state: {
-                phone: phone63,
-                driverName: driverData.full_name,
-              },
-            });
-            return;
-          }
-
-          const isEndorsed =
-            verif.verification_status === 'Approved' ||
-            verif.verification_status === 'TODA Approved' ||
-            verif.verification_status === 'Endorsed to LGU' ||
-            driverData.account_status === 'TODA Approved' ||
-            driverData.account_status === 'Endorsed to LGU';
-
-          navigate('/driver/status', {
-            replace: true,
-            state: {
-              driverName: driverData.full_name,
-              accountStatus: isEndorsed ? 'Endorsed to LGU' : 'Pending Verification',
-            },
-          });
-        }
-      } else {
-        // Neither session nor driverData could be resolved:
-        setError(
-          language === 'tl'
-            ? 'Walang nahanap na account para sa numerong ito. Mangyaring mag-register muna o suriin ang inyong numero.'
-            : 'No account found for this mobile number. Please register first or check your mobile number.'
-        );
+        navigate('/driver/status', {
+          replace: true,
+          state: {
+            driverName: driverData.full_name,
+            accountStatus: isEndorsed ? 'Endorsed to LGU' : 'Pending Verification',
+          },
+        });
       }
     } catch (err: any) {
       setLoading(false);
@@ -530,50 +406,11 @@ export const DriverLogin: React.FC = () => {
             backgroundColor: '#FF6B00',
             boxShadow: 'none',
             '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
-            mb: 1.5,
+            mb: 2.5,
             mt: 3,
           }}
         >
           {t.loginTitle}
-        </PrimaryButton>
-
-        {/* Divider */}
-        <Box sx={{ display: 'flex', alignItems: 'center', my: 1 }}>
-          <Box sx={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }} />
-          <Typography
-            sx={{
-              px: 2,
-              fontSize: '11px',
-              color: '#94A3B8',
-              fontWeight: 700,
-              letterSpacing: '0.5px',
-            }}
-          >
-            {language === 'tl' ? 'O KAYA' : 'OR'}
-          </Typography>
-          <Box sx={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }} />
-        </Box>
-
-        {/* OTP Login Alternative Button */}
-        <PrimaryButton
-          fullWidth
-          type="button"
-          onClick={handleOtpLogin}
-          loading={otpLoading}
-          sx={{
-            height: '52px',
-            borderRadius: '16px',
-            fontSize: '15px',
-            fontWeight: 700,
-            color: '#FF6B00',
-            border: '1.5px solid #FF6B00',
-            backgroundColor: '#FFF7ED',
-            boxShadow: 'none',
-            '&:hover': { backgroundColor: '#FFEDD5', boxShadow: 'none' },
-            mb: 2.5,
-          }}
-        >
-          {language === 'tl' ? 'Mag-login gamit ang SMS OTP' : 'Log in with SMS OTP'}
         </PrimaryButton>
 
         {/* Tagalog Registration Link */}

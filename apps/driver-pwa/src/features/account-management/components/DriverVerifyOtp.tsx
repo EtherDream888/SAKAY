@@ -210,8 +210,7 @@ export const DriverVerifyOtp: React.FC = () => {
                 state: {
                   driverName: driverData.full_name,
                   accountStatus: 'Rejected',
-                  rejectionReason: driverData.rejection_reason,
-                  rejectionComment: driverData.rejection_comment,
+                  rejectionReason: driverData.verification?.remarks || 'Application rejected',
                 },
               });
             } else {

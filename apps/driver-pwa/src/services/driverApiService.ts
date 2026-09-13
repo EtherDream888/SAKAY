@@ -138,8 +138,6 @@ export async function lookupDriverByPhoneSecure(phone: string): Promise<any | nu
         license_number,
         franchise_number,
         account_status,
-        rejection_reason,
-        rejection_comment,
         toda:toda_id (
           toda_id,
           toda_name,
@@ -158,7 +156,7 @@ export async function lookupDriverByPhoneSecure(phone: string): Promise<any | nu
     // Check verification status
     const { data: verif } = await client
       .from('driver_verification')
-      .select('verification_status, submitted_license_number')
+      .select('verification_status, submitted_license_number, remarks')
       .eq('driver_id', driver.driver_id)
       .maybeSingle();
 
