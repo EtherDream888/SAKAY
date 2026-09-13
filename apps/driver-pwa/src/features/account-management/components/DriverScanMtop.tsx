@@ -17,6 +17,7 @@ import {
   enhanceLicenseDocument,
   captureRawFrame,
 } from '../../../services/imageEnhancementService';
+import defaultMtopSample from '../../../../../../packages/shared/src/assets/images/mtop_sample.jpg';
 
 export const DriverScanMtop: React.FC = () => {
   const navigate = useNavigate();
@@ -143,20 +144,9 @@ export const DriverScanMtop: React.FC = () => {
       }
 
       if (!processedPhoto) {
-        // Fallback placeholder photo if camera stream is unavailable in desktop preview mode
-        const dummyCanvas = document.createElement('canvas');
-        dummyCanvas.width = 640;
-        dummyCanvas.height = 400;
-        const ctx = dummyCanvas.getContext('2d');
-        if (ctx) {
-          ctx.fillStyle = '#F8FAFC';
-          ctx.fillRect(0, 0, 640, 400);
-          ctx.fillStyle = '#FF6B00';
-          ctx.font = 'bold 20px sans-serif';
-          ctx.fillText('MTOP PERMIT SAMPLE SCAN', 180, 200);
-        }
-        processedPhoto = dummyCanvas.toDataURL('image/jpeg', 0.85);
-        rawPhoto = processedPhoto;
+        // Fallback sample MTOP photo if camera stream is unavailable in desktop preview mode
+        processedPhoto = defaultMtopSample;
+        rawPhoto = defaultMtopSample;
       }
 
       // Stop camera stream

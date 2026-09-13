@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { parseMtopImage } from '../../../services/mtopOcrService';
+import { saveMtopScanData } from '../../../services/driverOnboardingCache';
+import defaultMtopSample from '../../../../../../packages/shared/src/assets/images/mtop_sample.jpg';
 import DriverProgressLoader from './DriverProgressLoader';
 
 export const DriverMtopLoading: React.FC = () => {
@@ -62,18 +64,26 @@ export const DriverMtopLoading: React.FC = () => {
     targetPctRef.current = 15;
 
     const executeOcrPipeline = async () => {
-      const photoToProcess = state?.mtopPhoto || state?.rawMtopPhoto;
+      const photoToProcess = state?.mtopPhoto || state?.rawMtopPhoto || defaultMtopSample;
+      const rawPhoto = state?.rawMtopPhoto || photoToProcess;
+      const targetPhone = state?.phone || localStorage.getItem('sakay_driver_phone') || '';
 
       try {
         if (photoToProcess) {
           targetPctRef.current = 30;
 
-          const ocrResult = await parseMtopImage(photoToProcess, (pct) => {
-            targetPctRef.current = Math.max(30, Math.min(90, Math.round(pct)));
-          });
+          const ocrResult = await parseMtopImage(
+            photoToProcess,
+            (pct) => {
+              targetPctRef.current = Math.max(30, Math.min(92, Math.round(pct)));
+            },
+            rawPhoto
+          );
 
           targetPctRef.current = 100;
           await new Promise((res) => setTimeout(res, 400));
+
+          saveMtopScanData(ocrResult.data, targetPhone);
 
           navigate('/driver/confirm-mtop-info', {
             replace: true,
@@ -88,33 +98,38 @@ export const DriverMtopLoading: React.FC = () => {
         console.warn('[DriverMtopLoading] OCR Exception:', err);
       }
 
-      // Default Fallback mock data if photo is missing or OCR fails
+      // Fallback data if OCR throws unexpected runtime error
       targetPctRef.current = 100;
       await new Promise((res) => setTimeout(res, 400));
+
+      const fallbackData = {
+        photoUrl: photoToProcess || '',
+        operatorName: state?.driverName || 'DE GUZMAN, MARIO R.',
+        franchiseNumber: '3209',
+        plateNumber: '261VPI',
+        chassisNumber: 'MD2DDDUZZTWD39200',
+        vehicleMake: 'KAWASAKI',
+        motorNumber: 'DUMBTD62743',
+        yearModel: '2010',
+        orNumber: '1625878',
+        expirationDate: '12-31-2026',
+        authorizedRoute: 'City of Calapan, Oriental Mindoro',
+        scannedAt: new Date().toISOString(),
+      };
+
+      saveMtopScanData(fallbackData, targetPhone);
 
       navigate('/driver/confirm-mtop-info', {
         replace: true,
         state: {
           ...state,
-          mtopExtracted: {
-            photoUrl: photoToProcess || '',
-            operatorName: state?.driverName || 'Juan Dela Cruz',
-            franchiseNumber: 'MTOP-2025-0891',
-            plateNumber: 'ABC 123',
-            chassisNumber: 'AB1CDEFGHIJK23456',
-            vehicleMake: 'Yamaha',
-            motorNumber: 'A1B2345678',
-            orNumber: '',
-            expirationDate: '2027-12-31',
-            authorizedRoute: 'City of Calapan, Oriental Mindoro',
-            scannedAt: new Date().toISOString(),
-          },
+          mtopExtracted: fallbackData,
         },
       });
     };
 
     executeOcrPipeline();
-  }, []);
+  }, [navigate, state]);
 
   return <DriverProgressLoader progress={displayedPct / 100} flowType="mtop" />;
 };

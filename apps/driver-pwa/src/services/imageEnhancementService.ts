@@ -524,12 +524,25 @@ export async function preprocessLicenseImage(
   let cropW = srcWidth;
   let cropH = srcHeight;
 
+  const isMtop = (documentSide as string) === 'mtop';
+
   if (isVideo && cropOrElement && cropOrElement instanceof HTMLElement) {
     const cropRect = getSourceVideoCropRect(source as HTMLVideoElement, cropOrElement);
-    cropX = cropRect.x;
-    cropY = cropRect.y;
-    cropW = cropRect.width;
-    cropH = cropRect.height;
+    if (isMtop) {
+      // For MTOP full-sheet documents, expand the crop with generous margins
+      // so the header ("Granted to", "Franchise No.") and footer ("Expiration", "OR No.") are NEVER chopped off
+      const padX = Math.round(cropRect.width * 0.25);
+      const padY = Math.round(cropRect.height * 0.35);
+      cropX = Math.max(0, cropRect.x - padX);
+      cropY = Math.max(0, cropRect.y - padY);
+      cropW = Math.min(srcWidth - cropX, cropRect.width + padX * 2);
+      cropH = Math.min(srcHeight - cropY, cropRect.height + padY * 2);
+    } else {
+      cropX = cropRect.x;
+      cropY = cropRect.y;
+      cropW = cropRect.width;
+      cropH = cropRect.height;
+    }
   }
 
   // 2. Extract Guide Region to working canvas
@@ -545,8 +558,6 @@ export async function preprocessLicenseImage(
   let workCanvas = guideCanvas;
   let workW = cropW;
   let workH = cropH;
-
-  const isMtop = (documentSide as string) === 'mtop';
 
   if (workW < workH && !isMtop) {
     const rotCanvas = document.createElement('canvas');
