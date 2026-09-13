@@ -1,6 +1,6 @@
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -41,7 +41,20 @@ interface TodaRegistrationFlowProps {
 
 export const TodaRegistrationFlow: React.FC<TodaRegistrationFlowProps> = ({ onBackToLogin }) => {
   const [activeStep, setActiveStep] = useState(0);
-    const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Global window drop listener to prevent browser opening dropped files
+  useEffect(() => {
+    const handleWindowDrag = (e: DragEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('dragover', handleWindowDrag);
+    window.addEventListener('drop', handleWindowDrag);
+    return () => {
+      window.removeEventListener('dragover', handleWindowDrag);
+      window.removeEventListener('drop', handleWindowDrag);
+    };
+  }, []);
 
   useEffect(() => {
     if (errorMsg) {
@@ -855,8 +868,54 @@ const ValidationItem = ({ label, valid }: { label: string, valid: boolean }) => 
 );
 
 const DocumentUploadBox = ({ label, sublabel, file, onFileSelect, onRemove, accept, acceptedText, maxSizeText }: any) => {
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounter = useRef(0);
+
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', border: '1px solid #E5E5EA', borderRadius: '16px', p: 2.5, backgroundColor: '#FFFFFF', transition: 'all 0.2s', '&:hover': { borderColor: '#C7C7CC' } }}>
+    <Box
+      onDragEnter={(e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragCounter.current += 1;
+        setIsDragging(true);
+      }}
+      onDragOver={(e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'copy';
+      }}
+      onDragLeave={(e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragCounter.current -= 1;
+        if (dragCounter.current <= 0) {
+          dragCounter.current = 0;
+          setIsDragging(false);
+        }
+      }}
+      onDrop={(e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dragCounter.current = 0;
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          onFileSelect(e.dataTransfer.files[0]);
+        }
+      }}
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        border: isDragging ? '2px dashed #FF6B00' : '1px solid #E5E5EA',
+        borderRadius: '16px',
+        p: 2.5,
+        backgroundColor: isDragging ? 'rgba(255, 107, 0, 0.06)' : '#FFFFFF',
+        boxShadow: isDragging ? '0 0 0 4px rgba(255, 107, 0, 0.12)' : 'none',
+        transition: 'all 0.2s',
+        '&:hover': { borderColor: isDragging ? '#FF6B00' : '#C7C7CC' },
+        ...(isDragging ? { '& *': { pointerEvents: 'none' } } : {}),
+      }}
+    >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
         <Box>
           <Typography sx={{ fontSize: '15px', fontWeight: 600, color: '#1D1D1F', mb: 0.5 }}>{label}</Typography>
@@ -885,22 +944,22 @@ const DocumentUploadBox = ({ label, sublabel, file, onFileSelect, onRemove, acce
               fullWidth 
               startIcon={<CloudUploadOutlinedIcon />}
               sx={{ 
-                borderStyle: 'dashed', 
-                borderColor: '#C7C7CC', 
-                color: '#1D1D1F',
-                fontWeight: 500,
+                borderStyle: isDragging ? 'solid' : 'dashed', 
+                borderColor: isDragging ? '#FF6B00' : '#C7C7CC', 
+                color: isDragging ? '#FF6B00' : '#1D1D1F',
+                fontWeight: 600,
                 textTransform: 'none',
                 py: 2,
                 borderRadius: '12px',
-                backgroundColor: '#FAFAF9',
+                backgroundColor: isDragging ? 'rgba(255, 107, 0, 0.08)' : '#FAFAF9',
                 '&:hover': { backgroundColor: '#F0F0F5', borderColor: '#86868B' }
               }}
             >
-              Select File to Upload
+              {isDragging ? 'Drop File Here' : 'Select File to Upload'}
               <input type="file" hidden accept={accept} onChange={(e) => e.target.files && onFileSelect(e.target.files[0])} />
             </Button>
-            <Typography sx={{ fontSize: '12px', color: '#86868B', fontWeight: 500 }}>
-              {acceptedText} &middot; {maxSizeText}
+            <Typography sx={{ fontSize: '12px', color: isDragging ? '#FF6B00' : '#86868B', fontWeight: isDragging ? 600 : 500 }}>
+              {isDragging ? 'Release to upload' : `${acceptedText} · ${maxSizeText}`}
             </Typography>
           </Box>
         )}

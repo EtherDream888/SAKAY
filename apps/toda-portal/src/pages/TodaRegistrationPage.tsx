@@ -170,6 +170,25 @@ export const TodaRegistrationPage: React.FC = () => {
   const rosterInputRef = useRef<HTMLInputElement | null>(null);
   const bylawsInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Drag & Drop State for the 3 Registration Document Cards
+  const [activeDragTarget, setActiveDragTarget] = useState<'clearance' | 'roster' | 'bylaws' | null>(null);
+  const clearanceDragCounter = useRef(0);
+  const rosterDragCounter = useRef(0);
+  const bylawsDragCounter = useRef(0);
+
+  // Global window drop listener to prevent browser opening dropped files
+  useEffect(() => {
+    const handleWindowDrag = (e: DragEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('dragover', handleWindowDrag);
+    window.addEventListener('drop', handleWindowDrag);
+    return () => {
+      window.removeEventListener('dragover', handleWindowDrag);
+      window.removeEventListener('drop', handleWindowDrag);
+    };
+  }, []);
+
   // Document Review Modal State
   const [reviewModalState, setReviewModalState] = useState<{
     open: boolean;
@@ -446,14 +465,38 @@ export const TodaRegistrationPage: React.FC = () => {
     }
   }, [password, confirmPassword]);
 
-  // Real File Upload Handler
+  // Real File Upload Handler (supports both file input ChangeEvent and dropped File)
   const handleFileUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>,
+    fileOrEvent: React.ChangeEvent<HTMLInputElement> | File,
     bucket: 'barangay-clearances' | 'toda-accredited-driver-lists' | 'toda-bylaws',
     setDocState: React.Dispatch<React.SetStateAction<UploadedDocState>>
   ) => {
-    const file = e.target.files?.[0];
+    let file: File | undefined;
+    if ('target' in fileOrEvent) {
+      file = fileOrEvent.target.files?.[0];
+    } else {
+      file = fileOrEvent;
+    }
     if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      showToast('File size exceeds the 10MB limit. Please upload a file smaller than 10MB.');
+      return;
+    }
+
+    // Format extension validation
+    const ext = `.${file.name.split('.').pop()?.toLowerCase()}`;
+    if (bucket === 'toda-accredited-driver-lists') {
+      if (!['.csv', '.xlsx', '.xls', '.pdf'].includes(ext)) {
+        showToast('Invalid file format for Driver Roster. Please upload a CSV, Excel, or PDF file.');
+        return;
+      }
+    } else {
+      if (!['.pdf', '.png', '.jpg', '.jpeg'].includes(ext)) {
+        showToast('Invalid file format. Please upload a PDF, PNG, or JPG file.');
+        return;
+      }
+    }
 
     setDocState((prev) => ({ ...prev, isUploading: true, uploadError: null }));
 
@@ -477,6 +520,7 @@ export const TodaRegistrationPage: React.FC = () => {
         isUploading: false,
         uploadError: null,
       });
+      showToast(`Attached ${file.name} successfully.`);
     } catch (err: any) {
       console.warn('Document storage upload fallback to local ObjectURL:', err);
       // Ensure file attachment succeeds even if remote storage bucket is provisioning
@@ -489,6 +533,7 @@ export const TodaRegistrationPage: React.FC = () => {
         isUploading: false,
         uploadError: null,
       });
+      showToast(`Attached ${file.name} successfully.`);
     }
   };
 
@@ -1121,21 +1166,65 @@ export const TodaRegistrationPage: React.FC = () => {
                 <Paper
                   id="field-clearanceDoc"
                   variant="outlined"
+                  onDragEnter={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    clearanceDragCounter.current += 1;
+                    setActiveDragTarget('clearance');
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.dataTransfer.dropEffect = 'copy';
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    clearanceDragCounter.current -= 1;
+                    if (clearanceDragCounter.current <= 0) {
+                      clearanceDragCounter.current = 0;
+                      setActiveDragTarget(null);
+                    }
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    clearanceDragCounter.current = 0;
+                    setActiveDragTarget(null);
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      handleFileUpload(e.dataTransfer.files[0], 'barangay-clearances', setClearanceDoc);
+                    }
+                  }}
                   sx={{
                     p: '14px 18px',
                     borderRadius: '12px',
-                    borderColor: hasAttemptedSubmit && !clearanceDoc.url ? '#EF4444' : (clearanceDoc.url ? '#22C55E' : 'var(--mac-border-color)'),
-                    backgroundColor: hasAttemptedSubmit && !clearanceDoc.url ? '#FEF2F2' : (clearanceDoc.url ? '#F0FDF4' : '#FAFAFC'),
+                    border: activeDragTarget === 'clearance'
+                      ? '2px dashed var(--sakay-orange)'
+                      : '1px solid',
+                    borderColor: activeDragTarget === 'clearance'
+                      ? 'var(--sakay-orange)'
+                      : hasAttemptedSubmit && !clearanceDoc.url
+                      ? '#EF4444'
+                      : (clearanceDoc.url ? '#22C55E' : 'var(--mac-border-color)'),
+                    backgroundColor: activeDragTarget === 'clearance'
+                      ? 'rgba(255, 107, 26, 0.12)'
+                      : hasAttemptedSubmit && !clearanceDoc.url
+                      ? '#FEF2F2'
+                      : (clearanceDoc.url ? '#F0FDF4' : '#FAFAFC'),
+                    boxShadow: activeDragTarget === 'clearance' ? '0 0 0 3px rgba(255, 107, 26, 0.15)' : 'none',
                     display: 'flex',
                     flexDirection: { xs: 'column', sm: 'row' },
                     alignItems: { xs: 'flex-start', sm: 'center' },
                     justifyContent: 'space-between',
                     gap: 1.5,
-                    transition: 'border-color 0.2s, background-color 0.2s',
+                    transition: 'all 0.2s ease',
+                    '& > *': {
+                      pointerEvents: activeDragTarget === 'clearance' ? 'none' : 'auto',
+                    },
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <PictureAsPdfOutlinedIcon sx={{ color: hasAttemptedSubmit && !clearanceDoc.url ? '#DC2626' : (clearanceDoc.url ? '#16A34A' : '#64748B'), fontSize: 26 }} />
+                    <PictureAsPdfOutlinedIcon sx={{ color: activeDragTarget === 'clearance' ? 'var(--sakay-orange)' : hasAttemptedSubmit && !clearanceDoc.url ? '#DC2626' : (clearanceDoc.url ? '#16A34A' : '#64748B'), fontSize: 28 }} />
                     <Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
@@ -1143,7 +1232,11 @@ export const TodaRegistrationPage: React.FC = () => {
                         </Typography>
                         <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>*</Box>
                       </Box>
-                      {clearanceDoc.fileName ? (
+                      {activeDragTarget === 'clearance' ? (
+                        <Typography sx={{ fontSize: '12px', color: 'var(--sakay-orange)', fontWeight: 700 }}>
+                          Drop file here to attach
+                        </Typography>
+                      ) : clearanceDoc.fileName ? (
                         <Typography sx={{ fontSize: '12px', color: '#16A34A', fontWeight: 500 }}>
                           {clearanceDoc.fileName} ({formatFileSize(clearanceDoc.sizeBytes)})
                         </Typography>
@@ -1153,7 +1246,7 @@ export const TodaRegistrationPage: React.FC = () => {
                         </Typography>
                       ) : (
                         <Typography sx={{ fontSize: '11.5px', color: '#94A3B8' }}>
-                          PDF, PNG, or JPG (Max 10MB)
+                          PDF, PNG, or JPG (Max 10MB) &bull; Drag & drop or click
                         </Typography>
                       )}
                       {clearanceDoc.uploadError && (
@@ -1256,21 +1349,65 @@ export const TodaRegistrationPage: React.FC = () => {
                 <Paper
                   id="field-rosterDoc"
                   variant="outlined"
+                  onDragEnter={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    rosterDragCounter.current += 1;
+                    setActiveDragTarget('roster');
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.dataTransfer.dropEffect = 'copy';
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    rosterDragCounter.current -= 1;
+                    if (rosterDragCounter.current <= 0) {
+                      rosterDragCounter.current = 0;
+                      setActiveDragTarget(null);
+                    }
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    rosterDragCounter.current = 0;
+                    setActiveDragTarget(null);
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      handleFileUpload(e.dataTransfer.files[0], 'toda-accredited-driver-lists', setRosterDoc);
+                    }
+                  }}
                   sx={{
                     p: '14px 18px',
                     borderRadius: '12px',
-                    borderColor: hasAttemptedSubmit && !rosterDoc.url ? '#EF4444' : (rosterDoc.url ? '#22C55E' : 'var(--mac-border-color)'),
-                    backgroundColor: hasAttemptedSubmit && !rosterDoc.url ? '#FEF2F2' : (rosterDoc.url ? '#F0FDF4' : '#FAFAFC'),
+                    border: activeDragTarget === 'roster'
+                      ? '2px dashed var(--sakay-orange)'
+                      : '1px solid',
+                    borderColor: activeDragTarget === 'roster'
+                      ? 'var(--sakay-orange)'
+                      : hasAttemptedSubmit && !rosterDoc.url
+                      ? '#EF4444'
+                      : (rosterDoc.url ? '#22C55E' : 'var(--mac-border-color)'),
+                    backgroundColor: activeDragTarget === 'roster'
+                      ? 'rgba(255, 107, 26, 0.12)'
+                      : hasAttemptedSubmit && !rosterDoc.url
+                      ? '#FEF2F2'
+                      : (rosterDoc.url ? '#F0FDF4' : '#FAFAFC'),
+                    boxShadow: activeDragTarget === 'roster' ? '0 0 0 3px rgba(255, 107, 26, 0.15)' : 'none',
                     display: 'flex',
                     flexDirection: { xs: 'column', sm: 'row' },
                     alignItems: { xs: 'flex-start', sm: 'center' },
                     justifyContent: 'space-between',
                     gap: 1.5,
-                    transition: 'border-color 0.2s, background-color 0.2s',
+                    transition: 'all 0.2s ease',
+                    '& > *': {
+                      pointerEvents: activeDragTarget === 'roster' ? 'none' : 'auto',
+                    },
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <TableChartOutlinedIcon sx={{ color: hasAttemptedSubmit && !rosterDoc.url ? '#DC2626' : (rosterDoc.url ? '#16A34A' : '#059669'), fontSize: 26 }} />
+                    <TableChartOutlinedIcon sx={{ color: activeDragTarget === 'roster' ? 'var(--sakay-orange)' : hasAttemptedSubmit && !rosterDoc.url ? '#DC2626' : (rosterDoc.url ? '#16A34A' : '#059669'), fontSize: 28 }} />
                     <Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
@@ -1278,7 +1415,11 @@ export const TodaRegistrationPage: React.FC = () => {
                         </Typography>
                         <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>*</Box>
                       </Box>
-                      {rosterDoc.fileName ? (
+                      {activeDragTarget === 'roster' ? (
+                        <Typography sx={{ fontSize: '12px', color: 'var(--sakay-orange)', fontWeight: 700 }}>
+                          Drop file here to attach
+                        </Typography>
+                      ) : rosterDoc.fileName ? (
                         <Typography sx={{ fontSize: '12px', color: '#16A34A', fontWeight: 500 }}>
                           {rosterDoc.fileName} ({formatFileSize(rosterDoc.sizeBytes)})
                         </Typography>
@@ -1288,7 +1429,7 @@ export const TodaRegistrationPage: React.FC = () => {
                         </Typography>
                       ) : (
                         <Typography sx={{ fontSize: '11.5px', color: '#94A3B8' }}>
-                          CSV, Excel, or PDF (Max 10MB)
+                          CSV, Excel, or PDF (Max 10MB) &bull; Drag & drop or click
                         </Typography>
                       )}
                       {rosterDoc.uploadError && (
@@ -1391,21 +1532,65 @@ export const TodaRegistrationPage: React.FC = () => {
                 <Paper
                   id="field-bylawsDoc"
                   variant="outlined"
+                  onDragEnter={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    bylawsDragCounter.current += 1;
+                    setActiveDragTarget('bylaws');
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.dataTransfer.dropEffect = 'copy';
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    bylawsDragCounter.current -= 1;
+                    if (bylawsDragCounter.current <= 0) {
+                      bylawsDragCounter.current = 0;
+                      setActiveDragTarget(null);
+                    }
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    bylawsDragCounter.current = 0;
+                    setActiveDragTarget(null);
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      handleFileUpload(e.dataTransfer.files[0], 'toda-bylaws', setBylawsDoc);
+                    }
+                  }}
                   sx={{
                     p: '14px 18px',
                     borderRadius: '12px',
-                    borderColor: hasAttemptedSubmit && !bylawsDoc.url ? '#EF4444' : (bylawsDoc.url ? '#22C55E' : 'var(--mac-border-color)'),
-                    backgroundColor: hasAttemptedSubmit && !bylawsDoc.url ? '#FEF2F2' : (bylawsDoc.url ? '#F0FDF4' : '#FAFAFC'),
+                    border: activeDragTarget === 'bylaws'
+                      ? '2px dashed var(--sakay-orange)'
+                      : '1px solid',
+                    borderColor: activeDragTarget === 'bylaws'
+                      ? 'var(--sakay-orange)'
+                      : hasAttemptedSubmit && !bylawsDoc.url
+                      ? '#EF4444'
+                      : (bylawsDoc.url ? '#22C55E' : 'var(--mac-border-color)'),
+                    backgroundColor: activeDragTarget === 'bylaws'
+                      ? 'rgba(255, 107, 26, 0.12)'
+                      : hasAttemptedSubmit && !bylawsDoc.url
+                      ? '#FEF2F2'
+                      : (bylawsDoc.url ? '#F0FDF4' : '#FAFAFC'),
+                    boxShadow: activeDragTarget === 'bylaws' ? '0 0 0 3px rgba(255, 107, 26, 0.15)' : 'none',
                     display: 'flex',
                     flexDirection: { xs: 'column', sm: 'row' },
                     alignItems: { xs: 'flex-start', sm: 'center' },
                     justifyContent: 'space-between',
                     gap: 1.5,
-                    transition: 'border-color 0.2s, background-color 0.2s',
+                    transition: 'all 0.2s ease',
+                    '& > *': {
+                      pointerEvents: activeDragTarget === 'bylaws' ? 'none' : 'auto',
+                    },
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <DescriptionOutlinedIcon sx={{ color: hasAttemptedSubmit && !bylawsDoc.url ? '#DC2626' : (bylawsDoc.url ? '#16A34A' : '#2563EB'), fontSize: 26 }} />
+                    <DescriptionOutlinedIcon sx={{ color: activeDragTarget === 'bylaws' ? 'var(--sakay-orange)' : hasAttemptedSubmit && !bylawsDoc.url ? '#DC2626' : (bylawsDoc.url ? '#16A34A' : '#2563EB'), fontSize: 28 }} />
                     <Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <Typography sx={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
@@ -1413,7 +1598,11 @@ export const TodaRegistrationPage: React.FC = () => {
                         </Typography>
                         <Box component="span" sx={{ color: '#FF6B00', fontWeight: 800 }}>*</Box>
                       </Box>
-                      {bylawsDoc.fileName ? (
+                      {activeDragTarget === 'bylaws' ? (
+                        <Typography sx={{ fontSize: '12px', color: 'var(--sakay-orange)', fontWeight: 700 }}>
+                          Drop file here to attach
+                        </Typography>
+                      ) : bylawsDoc.fileName ? (
                         <Typography sx={{ fontSize: '12px', color: '#16A34A', fontWeight: 500 }}>
                           {bylawsDoc.fileName} ({formatFileSize(bylawsDoc.sizeBytes)})
                         </Typography>
@@ -1423,7 +1612,7 @@ export const TodaRegistrationPage: React.FC = () => {
                         </Typography>
                       ) : (
                         <Typography sx={{ fontSize: '11.5px', color: '#94A3B8' }}>
-                          PDF, PNG, or JPG (Max 10MB)
+                          PDF, PNG, or JPG (Max 10MB) &bull; Drag & drop or click
                         </Typography>
                       )}
                       {bylawsDoc.uploadError && (

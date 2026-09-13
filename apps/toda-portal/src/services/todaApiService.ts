@@ -266,6 +266,65 @@ export async function uploadTodaDocument(
   }
 }
 
+/**
+ * Updates a TODA compliance document URL (Barangay Clearance, Driver Roster, or Bylaws)
+ * in the database and marks status as 'Pending Verification' so the LGU can verify and endorse it.
+ */
+export async function updateTodaComplianceDocument(
+  todaId: string,
+  category: 'Barangay Clearance' | 'Driver Roster' | 'Internal Bylaws',
+  fileUrl: string,
+  fileName: string
+) {
+  const updatePayload: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+    toda_status: 'Pending Verification',
+  };
+
+  if (category === 'Barangay Clearance') {
+    updatePayload.barangay_clearance_url = fileUrl;
+  } else if (category === 'Driver Roster') {
+    updatePayload.accredited_drivers_url = fileUrl;
+  } else if (category === 'Internal Bylaws') {
+    updatePayload.bylaws_url = fileUrl;
+  }
+
+  let { data, error } = await supabase
+    .from('toda')
+    .update(updatePayload)
+    .eq('toda_id', todaId)
+    .select()
+    .single();
+
+  if (error && error.message?.includes('toda_status')) {
+    delete updatePayload.toda_status;
+    updatePayload.account_status = 'Pending Verification';
+    const retry = await supabase
+      .from('toda')
+      .update(updatePayload)
+      .eq('toda_id', todaId)
+      .select()
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
+
+  if (error) {
+    console.error('[todaApiService] updateTodaComplianceDocument error:', error);
+    throw error;
+  }
+
+  await recordTodaAuditAction({
+    actionType: 'COMPLIANCE_DOCUMENT_UPDATED',
+    targetId: todaId,
+    targetName: fileName,
+    details: `Re-uploaded and submitted updated ${category} ("${fileName}") for City LGU verification and review.`,
+    category: 'Account',
+  });
+
+  return data;
+}
+
 export async function registerToda(payload: {
   todaName: string;
   todaAcronym: string;
