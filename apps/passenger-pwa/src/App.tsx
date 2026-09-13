@@ -10,6 +10,8 @@ import AccountSelection from "./features/account-management/components/AccountSe
 import Login from "./features/account-management/components/Login/Login";
 import Register from "./features/account-management/components/Register/Register";
 import VerifyOtp from "./features/account-management/components/VerifyOtp/VerifyOtp";
+import PassengerTermsOfService from "./features/account-management/components/TermsOfService/PassengerTermsOfService";
+import PassengerPrivacyPolicy from "./features/account-management/components/PrivacyPolicy/PassengerPrivacyPolicy";
 import ForgotPassword from "./features/account-management/components/ForgotPassword/ForgotPassword";
 import ResetPassword from "./features/account-management/components/ResetPassword/ResetPassword";
 import RegistrationSuccess from "./features/account-management/components/RegistrationSuccess/RegistrationSuccess";
@@ -37,6 +39,12 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/verify-otp" element={<VerifyOtp />} />
+              <Route path="/terms-of-service" element={<PassengerTermsOfService />} />
+              <Route path="/passenger/terms-of-service" element={<PassengerTermsOfService />} />
+              <Route path="/terms" element={<PassengerTermsOfService />} />
+              <Route path="/privacy-policy" element={<PassengerPrivacyPolicy />} />
+              <Route path="/passenger/privacy-policy" element={<PassengerPrivacyPolicy />} />
+              <Route path="/privacy" element={<PassengerPrivacyPolicy />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/registration-success" element={<RegistrationSuccess />} />
