@@ -21,7 +21,7 @@ import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
 import SakayPhoneInput from '../../../common/components/SakayPhoneInput';
 import { useLanguage } from '../../../utils/LanguageContext';
-import { sendDriverOtp, ensureDriverAuthSession, fetchAccreditedTodas } from '../../../services/driverApiService';
+import { sendDriverOtp, ensureDriverAuthSession, fetchAccreditedTodas, formatPhoneToE164 } from '../../../services/driverApiService';
 
 export const formatMobileNumber = (value: string): string => {
   const digits = value.replace(/\D/g, '');
@@ -353,12 +353,14 @@ export const DriverRegister: React.FC = () => {
     }
   }, [password, confirmPassword]);
 
+  const e164Phone = formatPhoneToE164(cleanPhoneDigits);
+  const isValidPhone = cleanPhoneDigits.length === 11 && cleanPhoneDigits.startsWith('09');
+
   const isFormValid = Boolean(
     firstName.trim() &&
     lastName.trim() &&
     selectedTodaId &&
-    cleanPhoneDigits.length === 11 &&
-    cleanPhoneDigits.startsWith('09') &&
+    isValidPhone &&
     isPasswordValid &&
     password === confirmPassword
   );
@@ -371,7 +373,7 @@ export const DriverRegister: React.FC = () => {
 
     setSubmitted(true);
 
-    const sessionResult = await ensureDriverAuthSession(cleanPhoneDigits, password, fullName, selectedTodaId);
+    const sessionResult = await ensureDriverAuthSession(e164Phone, password, fullName, selectedTodaId);
     if (!sessionResult.success) {
       setSubmitted(false);
       setAccountError(sessionResult.error || (language === 'tl' ? 'Hindi maihanda ang inyong account. Pakisubukang muli.' : 'Unable to prepare your account. Please try again.'));
@@ -380,20 +382,21 @@ export const DriverRegister: React.FC = () => {
 
     try {
       localStorage.removeItem('sakay_driver_registration_draft');
-      localStorage.setItem('sakay_driver_phone', cleanPhoneDigits);
+      localStorage.setItem('sakay_driver_phone', e164Phone);
+      localStorage.setItem('sakay_driver_password', password);
       localStorage.setItem('sakay_driver_toda_id', selectedTodaId);
     } catch {}
 
     let otpResult: { success: boolean; message?: string; error?: string; debugOtp?: string } | null = null;
     try {
-      otpResult = await sendDriverOtp(cleanPhoneDigits);
+      otpResult = await sendDriverOtp(e164Phone);
     } catch (err) {
       console.warn('[DriverRegister] Error triggering SMS OTP:', err);
     }
 
     navigate('/driver/verify-otp', {
       state: {
-        phone: cleanPhoneDigits,
+        phone: e164Phone,
         password: password,
         driverName: fullName,
         todaId: selectedTodaId,
@@ -630,10 +633,10 @@ export const DriverRegister: React.FC = () => {
             value={phone}
             onChange={(fullVal) => setPhone(fullVal)}
             required
-            error={hasAttemptedSubmit && cleanPhoneDigits.length !== 11}
+            error={hasAttemptedSubmit && !isValidPhone}
             helperText={
-              hasAttemptedSubmit && cleanPhoneDigits.length !== 11
-                ? (language === 'tl' ? 'Pakikumpleto ang 10-digit mobile number na nagsisimula sa 9.' : 'Please enter an 11-digit mobile number starting with 09.')
+              hasAttemptedSubmit && !isValidPhone
+                ? (language === 'tl' ? 'Pakikumpleto ang 10-digit mobile number na nagsisimula sa 9.' : 'Please enter a valid 10-digit mobile number starting with 9.')
                 : ''
             }
           />

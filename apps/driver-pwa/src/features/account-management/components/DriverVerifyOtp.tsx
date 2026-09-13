@@ -14,7 +14,7 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
 import { useLanguage } from '../../../utils/LanguageContext';
-import { sendDriverOtp, verifyDriverOtp } from '../../../services/driverApiService';
+import { sendDriverOtp, verifyDriverOtp, formatPhoneToE164, getPhoneLookupCandidates } from '../../../services/driverApiService';
 import { supabase } from '../../../services/supabaseClient';
 
 const formatDisplayPhone = (raw: string = ''): string => {
@@ -85,27 +85,41 @@ export const DriverVerifyOtp: React.FC = () => {
         }
 
         // Establish active Supabase Auth session for driver
-        const cleanPhone = (state?.phone || localStorage.getItem('sakay_driver_phone') || '').replace(/\D/g, '');
-        const driverPassword = state?.password || localStorage.getItem('sakay_driver_password') || `SakayDriver#2026_${cleanPhone.slice(-4)}`;
+        const rawPhone = state?.phone || localStorage.getItem('sakay_driver_phone') || '';
+        const candidates = getPhoneLookupCandidates(rawPhone);
+        const e164Phone = candidates.e164;
+        const driverPassword = state?.password || localStorage.getItem('sakay_driver_password') || `SakayDriver#2026_${candidates.phoneRaw.slice(-4)}`;
 
-        if (cleanPhone) {
+        if (rawPhone) {
           try {
-            const driverEmail = `driver_${cleanPhone}@sakay.ph`;
             let authUser = (await supabase.auth.getUser()).data.user;
 
             if (!authUser) {
-              const { data: signInRes } = await supabase.auth.signInWithPassword({
-                email: driverEmail,
-                password: driverPassword,
-              });
-              authUser = signInRes?.user || null;
+              for (const candidate of candidates.authCandidates) {
+                const { data: signInRes, error: signInErr } = await supabase.auth.signInWithPassword({
+                  ...candidate,
+                  password: driverPassword,
+                });
+                if (!signInErr && signInRes?.user) {
+                  authUser = signInRes.user;
+                  break;
+                }
+              }
             }
 
             if (!authUser) {
               const { data: signUpRes } = await supabase.auth.signUp({
-                email: driverEmail,
+                email: `driver_${candidates.phone63NoPlus}@sakay.ph`,
                 password: driverPassword,
-                options: { data: { phone: cleanPhone, full_name: state?.driverName } },
+                options: {
+                  data: {
+                    role: 'driver',
+                    phone: e164Phone,
+                    contact_number: e164Phone,
+                    full_name: state?.driverName || null,
+                    toda_id: state?.todaId || null,
+                  },
+                },
               });
               authUser = signUpRes?.user || null;
             }
@@ -113,51 +127,49 @@ export const DriverVerifyOtp: React.FC = () => {
             if (authUser) {
               console.log('[DriverVerifyOtp] Authenticated user session established:', authUser.id);
               // Link or update driver record in public.driver
-              const { data: driverByAuth } = await supabase
+              const { data: driverRows } = await supabase
                 .from('driver')
-                .select('driver_id, auth_user_id')
-                .eq('auth_user_id', authUser.id)
-                .maybeSingle();
+                .select('driver_id, auth_user_id, contact_number')
+                .or(`auth_user_id.eq.${authUser.id},contact_number.eq.${candidates.phone63WithPlus},contact_number.eq.${candidates.phone09},contact_number.eq.${candidates.phone63NoPlus},contact_number.eq.${candidates.phoneRaw}`)
+                .limit(1);
 
-              if (driverByAuth) {
-                console.log('[DriverVerifyOtp] Driver record already linked to auth_user_id:', driverByAuth.driver_id);
-              } else {
-                const { data: driverByPhone } = await supabase
+              const driverRow = driverRows?.[0] || null;
+
+              if (driverRow) {
+                console.log('[DriverVerifyOtp] Linking existing driver profile:', driverRow.driver_id);
+                await supabase
                   .from('driver')
-                  .select('driver_id, auth_user_id')
-                  .or(`contact_number.eq.${cleanPhone},contact_number.eq.+63${cleanPhone.replace(/^0/, '')}`)
-                  .maybeSingle();
-
-                if (driverByPhone) {
-                  if (!driverByPhone.auth_user_id) {
-                    await supabase
-                      .from('driver')
-                      .update({ auth_user_id: authUser.id })
-                      .eq('driver_id', driverByPhone.driver_id);
-                  }
-                } else {
-                  const storedTodaId = typeof window !== 'undefined' ? localStorage.getItem('sakay_driver_toda_id') : null;
-                  await supabase
-                    .from('driver')
-                    .upsert(
-                      [
-                        {
-                          auth_user_id: authUser.id,
-                          full_name: state?.driverName || 'Bagong Drayber',
-                          contact_number: cleanPhone,
-                          toda_id: state?.todaId || storedTodaId || null,
-                          account_status: 'Pending Verification',
-                        },
-                      ],
-                      { onConflict: 'auth_user_id' }
-                    );
-                }
+                  .update({
+                    auth_user_id: authUser.id,
+                    contact_number: e164Phone,
+                    ...(state?.todaId ? { toda_id: state.todaId } : {}),
+                    ...(state?.driverName ? { full_name: state.driverName } : {}),
+                  })
+                  .eq('driver_id', driverRow.driver_id);
+              } else {
+                const storedTodaId = typeof window !== 'undefined' ? localStorage.getItem('sakay_driver_toda_id') : null;
+                await supabase
+                  .from('driver')
+                  .upsert(
+                    [
+                      {
+                        auth_user_id: authUser.id,
+                        full_name: state?.driverName || 'Bagong Drayber',
+                        contact_number: e164Phone,
+                        toda_id: state?.todaId || storedTodaId || null,
+                        account_status: 'Pending Verification',
+                        availability_status: 'Offline',
+                      },
+                    ],
+                    { onConflict: 'auth_user_id' }
+                  );
               }
             }
           } catch (authErr) {
             console.warn('[DriverVerifyOtp] Auth session setup warning:', authErr);
           } finally {
             try {
+              localStorage.setItem('sakay_driver_phone', e164Phone);
               localStorage.removeItem('sakay_driver_password');
             } catch {}
           }
@@ -165,13 +177,13 @@ export const DriverVerifyOtp: React.FC = () => {
 
         setLoading(false);
         if (state?.isRecovery) {
-          navigate('/driver/reset-password', { replace: true, state: { phone: state?.phone } });
+          navigate('/driver/reset-password', { replace: true, state: { phone: e164Phone } });
         } else {
           navigate('/driver/terms-of-service', {
             replace: true,
             state: {
               driverName: state?.driverName || 'Bagong Drayber',
-              phone: state?.phone || cleanPhone,
+              phone: e164Phone,
             },
           });
         }

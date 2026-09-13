@@ -20,6 +20,76 @@ import {
 
 export const DEFAULT_DRIVER_ID = 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b22';
 
+/**
+ * Helper to get localized error message respecting current selected language
+ */
+export function getLocalizedError(tlMsg: string, enMsg: string): string {
+  const lang = typeof window !== 'undefined' ? localStorage.getItem('sakay_language') || 'tl' : 'tl';
+  return lang === 'tl' ? tlMsg : enMsg;
+}
+
+/**
+ * Normalizes any Philippine phone number representation to standard E.164 (+639XXXXXXXXX)
+ */
+export function formatPhoneToE164(phone: string): string {
+  if (!phone) return '';
+  const digits = phone.replace(/\D/g, '');
+  if (digits.startsWith('639') && digits.length === 12) {
+    return `+${digits}`;
+  }
+  if (digits.startsWith('09') && digits.length === 11) {
+    return `+63${digits.slice(1)}`;
+  }
+  if (digits.startsWith('9') && digits.length === 10) {
+    return `+63${digits}`;
+  }
+  if (digits.startsWith('63') && digits.length >= 12) {
+    return `+${digits}`;
+  }
+  if (digits.startsWith('0') && digits.length >= 11) {
+    return `+63${digits.slice(1)}`;
+  }
+  return digits ? `+63${digits}` : '';
+}
+
+/**
+ * Returns candidate phone representations and auth sign-in email variants for resilient matching
+ */
+export function getPhoneLookupCandidates(raw: string) {
+  const digits = (raw || '').replace(/\D/g, '');
+  let phoneRaw = digits;
+  if (digits.startsWith('639')) {
+    phoneRaw = digits.slice(2);
+  } else if (digits.startsWith('09')) {
+    phoneRaw = digits.slice(1);
+  } else if (digits.startsWith('63')) {
+    phoneRaw = digits.slice(2);
+  } else if (digits.startsWith('0')) {
+    phoneRaw = digits.slice(1);
+  }
+
+  const phone09 = `0${phoneRaw}`;
+  const phone63WithPlus = `+63${phoneRaw}`;
+  const phone63NoPlus = `63${phoneRaw}`;
+
+  return {
+    phoneRaw,
+    phone09,
+    phone63WithPlus,
+    phone63NoPlus,
+    e164: phone63WithPlus,
+    authCandidates: [
+      { email: `driver_${phone63NoPlus}@sakay.ph` },
+      { email: `driver_${phone09}@sakay.ph` },
+      { email: `driver_${phoneRaw}@sakay.ph` },
+      { email: `driver_${phone09}@driver.sakay.internal` },
+      { email: `driver_${phone63NoPlus}@driver.sakay.internal` },
+      { phone: phone63WithPlus },
+      { phone: phone09 },
+    ],
+  };
+}
+
 // ============================================================================
 // 1. REGISTRATION & PROFILE
 // ============================================================================
@@ -330,12 +400,13 @@ export async function ensureDriverAuthSession(
   fullName?: string,
   todaId?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const cleanPhone = phone.replace(/\D/g, '');
-  const driverEmail = `driver_${cleanPhone}@sakay.ph`;
+  const candidates = getPhoneLookupCandidates(phone);
+  const e164Phone = candidates.e164;
+  const driverEmail = `driver_${candidates.phone63NoPlus}@sakay.ph`;
 
   console.log('[DRIVER REGISTRATION AUTH] ========================================');
   console.log('[DRIVER REGISTRATION AUTH] Starting fresh driver registration auth');
-  console.log('[DRIVER REGISTRATION AUTH] Phone:', cleanPhone);
+  console.log('[DRIVER REGISTRATION AUTH] Phone (E.164):', e164Phone);
   console.log('[DRIVER REGISTRATION AUTH] Identifier Email:', driverEmail);
   console.log('[DRIVER REGISTRATION AUTH] Target TODA ID:', todaId);
 
@@ -348,71 +419,21 @@ export async function ensureDriverAuthSession(
       error: sessionErr ? sessionErr.message : null,
     });
 
-    if (sessionData?.session?.user) {
-      const activeUserId = sessionData.session.user.id;
-      // Verify if a driver profile exists for this session user and matches current phone
-      const { data: driverRow } = await supabase
-        .from('driver')
-        .select('driver_id, auth_user_id, contact_number, toda_id')
-        .eq('auth_user_id', activeUserId)
-        .maybeSingle();
-
-      if (driverRow) {
-        const phone09 = cleanPhone.startsWith('0') ? cleanPhone : `0${cleanPhone}`;
-        const phone63 = `+63${cleanPhone.replace(/^0/, '')}`;
-        const isSamePhone = !driverRow.contact_number || driverRow.contact_number === phone09 || driverRow.contact_number === phone63 || driverRow.contact_number === cleanPhone;
-
-        if (isSamePhone) {
-          console.log('[DRIVER REGISTRATION AUTH] Active session matches driver profile:', driverRow.driver_id);
-          if (todaId && !driverRow.toda_id) {
-            await supabase.from('driver').update({ toda_id: todaId }).eq('driver_id', driverRow.driver_id);
-          }
-          return { success: true };
-        }
-      }
-
-      // If active session belongs to a different account or has no driver profile, clear stale session
-      console.warn('[DRIVER REGISTRATION AUTH] Active session is unlinked or stale for user:', activeUserId, '. Signing out...');
-      await supabase.auth.signOut();
-    }
-
-    // 2. FRESH REGISTRATION: Call signUp FIRST with exact trigger metadata fields
-    console.log('[DRIVER REGISTRATION AUTH] Invoking signUp with driver credentials & trigger metadata...');
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email: driverEmail,
-      password: password,
-      options: {
-        data: {
-          role: 'driver',
-          full_name: fullName || null,
-          contact_number: cleanPhone,
-          phone: cleanPhone,
-          toda_id: todaId || null,
-        },
-      },
-    });
-
-    console.log('[DRIVER REGISTRATION AUTH] signUp result:', {
-      userCreated: Boolean(signUpData?.user),
-      userId: signUpData?.user?.id || null,
-      sessionCreated: Boolean(signUpData?.session),
-      errorCode: signUpError?.code || null,
-      errorMessage: signUpError?.message || null,
-    });
-
     // Helper to ensure public.driver record is provisioned and linked to auth_user_id
     const syncDriverProfileRecord = async (userId: string) => {
       try {
-        const { data: existing } = await supabase
+        const { data: existingRows } = await supabase
           .from('driver')
-          .select('driver_id, toda_id')
-          .or(`auth_user_id.eq.${userId},contact_number.eq.${cleanPhone},contact_number.eq.0${cleanPhone.replace(/^0/, '')},contact_number.eq.+63${cleanPhone.replace(/^0/, '')}`)
-          .maybeSingle();
+          .select('driver_id, toda_id, contact_number')
+          .or(`auth_user_id.eq.${userId},contact_number.eq.${candidates.phone63WithPlus},contact_number.eq.${candidates.phone09},contact_number.eq.${candidates.phone63NoPlus},contact_number.eq.${candidates.phoneRaw}`)
+          .limit(1);
+
+        const existing = existingRows?.[0] || null;
 
         if (existing) {
           const updateObj: Record<string, any> = {
             auth_user_id: userId,
-            contact_number: cleanPhone,
+            contact_number: e164Phone,
           };
           if (fullName) updateObj.full_name = fullName;
           if (todaId) updateObj.toda_id = todaId;
@@ -422,7 +443,7 @@ export async function ensureDriverAuthSession(
         } else {
           const insertObj: Record<string, any> = {
             auth_user_id: userId,
-            contact_number: cleanPhone,
+            contact_number: e164Phone,
             full_name: fullName || 'Driver Applicant',
             account_status: 'Pending Verification',
             availability_status: 'Offline',
@@ -446,7 +467,50 @@ export async function ensureDriverAuthSession(
       }
     };
 
-    // If signUp returned a live session immediately, registration auth is complete!
+    if (sessionData?.session?.user) {
+      const activeUserId = sessionData.session.user.id;
+      const { data: driverRows } = await supabase
+        .from('driver')
+        .select('driver_id, auth_user_id, contact_number, toda_id')
+        .or(`auth_user_id.eq.${activeUserId},contact_number.eq.${candidates.phone63WithPlus},contact_number.eq.${candidates.phone09},contact_number.eq.${candidates.phoneRaw}`)
+        .limit(1);
+
+      const driverRow = driverRows?.[0] || null;
+
+      if (driverRow) {
+        console.log('[DRIVER REGISTRATION AUTH] Active session matches driver profile:', driverRow.driver_id);
+        await syncDriverProfileRecord(activeUserId);
+        return { success: true };
+      }
+
+      console.warn('[DRIVER REGISTRATION AUTH] Active session is unlinked or stale for user:', activeUserId, '. Signing out...');
+      await supabase.auth.signOut();
+    }
+
+    // 2. FRESH REGISTRATION: Call signUp with trigger metadata fields
+    console.log('[DRIVER REGISTRATION AUTH] Invoking signUp with driver credentials & trigger metadata...');
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email: driverEmail,
+      password: password,
+      options: {
+        data: {
+          role: 'driver',
+          full_name: fullName || null,
+          contact_number: e164Phone,
+          phone: e164Phone,
+          toda_id: todaId || null,
+        },
+      },
+    });
+
+    console.log('[DRIVER REGISTRATION AUTH] signUp result:', {
+      userCreated: Boolean(signUpData?.user),
+      userId: signUpData?.user?.id || null,
+      sessionCreated: Boolean(signUpData?.session),
+      errorCode: signUpError?.code || null,
+      errorMessage: signUpError?.message || null,
+    });
+
     if (!signUpError && (signUpData?.session || signUpData?.user)) {
       const activeId = signUpData?.session?.user?.id || signUpData?.user?.id;
       console.log('[DRIVER REGISTRATION AUTH] Fresh registration signUp SUCCESS. User:', activeId);
@@ -454,85 +518,49 @@ export async function ensureDriverAuthSession(
       return { success: true };
     }
 
-    const message = (signUpError?.message || '').toLowerCase();
-    const isAlreadyRegistered = message.includes('already registered') || message.includes('already exists');
-
-    // 3. If user already exists, attempt signInWithPassword to activate session
-    if (!signUpError || isAlreadyRegistered) {
-      console.log('[DRIVER REGISTRATION AUTH] Attempting signInWithPassword (session activation)...');
+    // 3. Attempt signInWithPassword across candidate email / phone formats
+    console.log('[DRIVER REGISTRATION AUTH] Attempting candidate sign-in for existing user...');
+    for (const candidate of candidates.authCandidates) {
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: driverEmail,
+        ...candidate,
         password: password,
       });
 
-      console.log('[DRIVER REGISTRATION AUTH] signInWithPassword result:', {
-        hasSession: Boolean(signInData?.session),
-        userId: signInData?.user?.id || null,
-        errorCode: signInError?.code || null,
-        errorMessage: signInError?.message || null,
-      });
-
       if (!signInError && signInData?.session) {
-        console.log('[DRIVER REGISTRATION AUTH] Session established via signInWithPassword:', signInData.session.user.id);
+        console.log('[DRIVER REGISTRATION AUTH] Session established via candidate signIn:', candidate, signInData.session.user.id);
         await syncDriverProfileRecord(signInData.session.user.id);
         return { success: true };
       }
-
-      if (isAlreadyRegistered) {
-        console.warn('[DRIVER REGISTRATION AUTH] Account already exists with different credentials.');
-        return {
-          success: false,
-          error: 'Ang mobile number na ito ay nakarehistro na sa ibang password. Pakisubukang mag-login.',
-        };
-      }
     }
 
-    // 4. Fallback phone-based registration if email provider returned error
-    console.log('[DRIVER REGISTRATION AUTH] Trying phone-based registration fallback...');
-    const e164Phone = `+63${cleanPhone.replace(/^0/, '')}`;
-    const { data: phoneSignUpData, error: phoneSignUpErr } = await supabase.auth.signUp({
-      phone: e164Phone,
-      password: password,
-      options: {
-        data: {
-          role: 'driver',
-          full_name: fullName || null,
-          contact_number: cleanPhone,
-          toda_id: todaId || null,
-        },
-      },
-    });
-
-    if (!phoneSignUpErr && phoneSignUpData?.session) {
-      console.log('[DRIVER REGISTRATION AUTH] Phone signUp SUCCESS with session:', phoneSignUpData.session.user.id);
-      return { success: true };
+    const message = (signUpError?.message || '').toLowerCase();
+    const isAlreadyRegistered = message.includes('already registered') || message.includes('already exists');
+    if (isAlreadyRegistered) {
+      console.warn('[DRIVER REGISTRATION AUTH] Account already exists with different credentials.');
+      return {
+        success: false,
+        error: getLocalizedError(
+          'Ang mobile number na ito ay nakarehistro na sa ibang password. Pakisubukang mag-login.',
+          'This mobile number is already registered with a different password. Please try logging in.'
+        ),
+      };
     }
 
-    // Attempt phone sign-in if account exists
-    const { data: phoneSignInData, error: phoneSignInErr } = await supabase.auth.signInWithPassword({
-      phone: e164Phone,
-      password: password,
-    });
-
-    if (!phoneSignInErr && phoneSignInData?.session) {
-      console.log('[DRIVER REGISTRATION AUTH] Phone signIn SUCCESS with session:', phoneSignInData.session.user.id);
-      return { success: true };
-    }
-
-    console.error('[DRIVER REGISTRATION AUTH] All registration auth strategies failed.');
     return {
       success: false,
-      error: 'Hindi maihanda ang inyong account. Pakisuri ang koneksyon at subukang muli.',
-    };
-    return {
-      success: false,
-      error: 'Hindi maihanda ang inyong account. Pakisuri ang koneksyon at subukang muli.',
+      error: getLocalizedError(
+        'Hindi maihanda ang inyong account. Pakisuri ang koneksyon at subukang muli.',
+        'Unable to prepare your account. Please check your connection and try again.'
+      ),
     };
   } catch (err: any) {
     console.error('[DRIVER REGISTRATION AUTH] Exception in ensureDriverAuthSession:', err);
     return {
       success: false,
-      error: 'Hindi maihanda ang inyong account. Pakisuri ang koneksyon at subukang muli.',
+      error: getLocalizedError(
+        'Hindi maihanda ang inyong account. Pakisuri ang koneksyon at subukang muli.',
+        'Unable to prepare your account. Please check your connection and try again.'
+      ),
     };
   }
 }
@@ -611,6 +639,8 @@ export async function saveDriverLicenseVerification(
 
   try {
     const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+    const candidates = getPhoneLookupCandidates(phone || cleanPhone);
+    const e164Phone = candidates.e164;
 
     // 1. Verify Active Supabase Auth Session
     const { data: { user }, error: userErr } = await supabase.auth.getUser();
@@ -624,7 +654,10 @@ export async function saveDriverLicenseVerification(
       console.error('[DRIVER LICENSE SAVE] userErr:', userErr, 'sessionErr:', sessionErr);
       return {
         success: false,
-        error: 'Kailangan munang mag-login o kumpletuhin ang oryentasyon upang ma-save ang iyong beripikasyon.',
+        error: getLocalizedError(
+          'Kailangan munang mag-login o kumpletuhin ang registration upang ma-save ang iyong beripikasyon.',
+          'Please log in or complete registration first to save your verification.'
+        ),
       };
     }
 
@@ -638,14 +671,16 @@ export async function saveDriverLicenseVerification(
     // 2. Identify and verify public.driver profile record
     let driverId: string | null = null;
 
-    // Lookup driver profile linked directly to auth_user_id
-    const { data: driverRow, error: driverLookupErr } = await supabase
+    // Lookup driver profile linked directly to auth_user_id or candidate phones
+    const { data: driverRows, error: driverLookupErr } = await supabase
       .from('driver')
       .select('driver_id, auth_user_id, contact_number')
-      .eq('auth_user_id', authUserId)
-      .maybeSingle();
+      .or(`auth_user_id.eq.${authUserId},contact_number.eq.${candidates.phone63WithPlus},contact_number.eq.${candidates.phone09},contact_number.eq.${candidates.phone63NoPlus},contact_number.eq.${candidates.phoneRaw}`)
+      .limit(1);
 
-    console.log('[DRIVER PROFILE DEBUG] Lookup by auth_user_id:', {
+    const driverRow = driverRows?.[0] || null;
+
+    console.log('[DRIVER PROFILE DEBUG] Lookup result:', {
       found: Boolean(driverRow),
       driverId: driverRow?.driver_id || null,
       error: driverLookupErr ? { code: driverLookupErr.code, message: driverLookupErr.message } : null,
@@ -653,68 +688,73 @@ export async function saveDriverLicenseVerification(
 
     if (driverRow) {
       driverId = driverRow.driver_id;
-    } else if (cleanPhone) {
-      const rawDigits = cleanPhone.replace(/\D/g, '');
-      const phone09 = rawDigits.startsWith('0') ? rawDigits : `0${rawDigits}`;
-      const phone63 = `+63${rawDigits.replace(/^0/, '')}`;
-      const phone63NoPlus = `63${rawDigits.replace(/^0/, '')}`;
-
-      // Check by normalized phone variations and link auth_user_id
-      const { data: driverByPhone, error: phoneLookupErr } = await supabase
-        .from('driver')
-        .select('driver_id, auth_user_id, contact_number')
-        .or(`contact_number.eq.${phone09},contact_number.eq.${phone63},contact_number.eq.${phone63NoPlus}`)
-        .maybeSingle();
-
-      console.log('[DRIVER PROFILE DEBUG] Lookup by phone:', {
-        phone09,
-        phone63,
-        found: Boolean(driverByPhone),
-        driverId: driverByPhone?.driver_id || null,
-        existingAuthUser: driverByPhone?.auth_user_id || null,
-        error: phoneLookupErr ? { code: phoneLookupErr.code, message: phoneLookupErr.message } : null,
-      });
-
-      if (driverByPhone) {
-        driverId = driverByPhone.driver_id;
-
-        if (!driverByPhone.auth_user_id) {
-          console.log('[DRIVER PROFILE DEBUG] Linking existing driver record to auth_user_id:', authUserId);
-          const { error: linkErr } = await supabase
-            .from('driver')
-            .update({ auth_user_id: authUserId })
-            .eq('driver_id', driverId);
-
-          if (linkErr) {
-            console.error('[DRIVER PROFILE DEBUG] Link auth_user_id error:', {
-              code: linkErr.code,
-              message: linkErr.message,
-              details: linkErr.details,
-              hint: linkErr.hint,
-            });
-          }
-        }
+      if (!driverRow.auth_user_id) {
+        console.log('[DRIVER PROFILE DEBUG] Linking existing driver record to auth_user_id:', authUserId);
+        await supabase
+          .from('driver')
+          .update({ auth_user_id: authUserId, contact_number: e164Phone })
+          .eq('driver_id', driverId);
       }
     }
 
     const storedTodaId = typeof window !== 'undefined' ? localStorage.getItem('sakay_driver_toda_id') : null;
 
+    // AUTO-PROVISION IF NOT FOUND (Ensures driver registering for the first time is never blocked):
     if (!driverId) {
-      console.error('[DRIVER PROFILE DEBUG] Could not resolve driver profile for auth_user_id:', authUserId, 'phone:', cleanPhone);
+      console.log('[DRIVER PROFILE DEBUG] Auto-provisioning new driver record for auth_user_id:', authUserId);
+      const insertDriverPayload: Record<string, any> = {
+        auth_user_id: authUserId,
+        contact_number: e164Phone,
+        full_name: formData.fullName || user.user_metadata?.full_name || 'Driver Applicant',
+        license_number: formData.licenseNumber || null,
+        date_of_birth: parseDateForDb(formData.dob),
+        residential_address: formData.address || null,
+        toda_id: storedTodaId || user.user_metadata?.toda_id || null,
+        account_status: 'Pending Verification',
+        availability_status: 'Offline',
+      };
+
+      const { data: insertedDriver, error: insertDriverErr } = await supabase
+        .from('driver')
+        .insert([insertDriverPayload])
+        .select('driver_id')
+        .maybeSingle();
+
+      if (insertedDriver?.driver_id) {
+        driverId = insertedDriver.driver_id;
+      } else {
+        if (insertDriverErr) {
+          console.warn('[DRIVER PROFILE DEBUG] Driver auto-insert note:', insertDriverErr.message);
+        }
+        const { data: refetchRows } = await supabase
+          .from('driver')
+          .select('driver_id')
+          .eq('auth_user_id', authUserId)
+          .limit(1);
+        driverId = refetchRows?.[0]?.driver_id || null;
+      }
+    }
+
+    if (!driverId) {
+      console.error('[DRIVER PROFILE DEBUG] Could not resolve driver profile for auth_user_id:', authUserId);
       return {
         success: false,
-        error: 'Hindi nahanap ang rekord ng iyong drayber profile sa database. Pakisubukang magparehistro muli mula sa umpisa.',
+        error: getLocalizedError(
+          'Hindi mai-save ang profile ng drayber sa database. Pakisubukang muli.',
+          'Unable to save driver profile to database. Please try again.'
+        ),
       };
     }
 
-    // Update existing driver record with allowable profile details and ensure toda_id is set
-    console.log('[DRIVER PROFILE DEBUG] Updating existing driver record ID:', driverId);
+    // Update existing driver record with allowable profile details and ensure toda_id and phone are set
+    console.log('[DRIVER PROFILE DEBUG] Updating driver record ID:', driverId);
     const updatePayload: Record<string, any> = {
       updated_at: new Date().toISOString(),
+      contact_number: e164Phone,
     };
     if (formData.fullName) updatePayload.full_name = formData.fullName;
     if (formData.licenseNumber) updatePayload.license_number = formData.licenseNumber;
-    if (formData.dob) updatePayload.date_of_birth = formData.dob;
+    if (formData.dob) updatePayload.date_of_birth = parseDateForDb(formData.dob);
     if (formData.address) updatePayload.residential_address = formData.address;
     if (storedTodaId) updatePayload.toda_id = storedTodaId;
 
@@ -727,12 +767,7 @@ export async function saveDriverLicenseVerification(
       console.error('[DRIVER PROFILE DEBUG] Driver update note:', {
         code: updateErr.code,
         message: updateErr.message,
-        details: updateErr.details,
-        hint: updateErr.hint,
       });
-      if (updateErr.code === '42501') {
-        console.warn('[DRIVER PROFILE DEBUG] RLS column restriction on driver update, continuing with driver_verification insertion...');
-      }
     }
 
     console.log('[DRIVER PROFILE DEBUG] Confirmed Driver ID:', driverId);
@@ -767,7 +802,10 @@ export async function saveDriverLicenseVerification(
           console.error('[DRIVER LICENSE SAVE] Storage upload error (front photo):', frontUploadErr);
           return {
             success: false,
-            error: 'Hindi na-save ang larawan ng iyong lisensya sa storage. Pakisubukang muli.',
+            error: getLocalizedError(
+              'Hindi na-save ang larawan ng iyong lisensya sa storage. Pakisubukang muli.',
+              'Could not save your license photo to storage. Please try again.'
+            ),
           };
         }
         console.log('[DRIVER LICENSE SAVE] Storage upload SUCCESS (front photo):', storageRes);
@@ -775,14 +813,20 @@ export async function saveDriverLicenseVerification(
         console.error('[DRIVER LICENSE SAVE] Front photo conversion exception:', frontErr);
         return {
           success: false,
-          error: 'May problema sa pagproseso ng larawan ng lisensya. Pakisubukang muli.',
+          error: getLocalizedError(
+            'May problema sa pagproseso ng larawan ng lisensya. Pakisubukang muli.',
+            'There was a problem processing the license photo. Please try again.'
+          ),
         };
       }
     } else {
       console.error('[DRIVER LICENSE SAVE] Missing rawFrontPhoto or frontPhoto payload.');
       return {
         success: false,
-        error: 'Kailangan ng malinaw na larawan ng iyong driver license.',
+        error: getLocalizedError(
+          'Kailangan ng malinaw na larawan ng iyong driver license.',
+          'A clear photo of your driver license is required.'
+        ),
       };
     }
 
@@ -963,6 +1007,8 @@ export async function saveDriverMtopVerification(
 
   try {
     const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+    const candidates = getPhoneLookupCandidates(phone || cleanPhone);
+    const e164Phone = candidates.e164;
 
     // 1. Verify Active Supabase Auth Session
     const { data: { user }, error: userErr } = await supabase.auth.getUser();
@@ -972,7 +1018,10 @@ export async function saveDriverMtopVerification(
       console.error('[DRIVER MTOP SAVE] Authentication check failed. User or session is missing.');
       return {
         success: false,
-        error: 'Kailangan munang mag-login o kumpletuhin ang oryentasyon upang ma-save ang iyong MTOP.',
+        error: getLocalizedError(
+          'Kailangan munang mag-login upang ma-save ang iyong MTOP.',
+          'Please log in first to save your MTOP.'
+        ),
       };
     }
 
@@ -980,32 +1029,45 @@ export async function saveDriverMtopVerification(
 
     // 2. Identify public.driver profile record
     let driverId: string | null = null;
-    const { data: driverRow } = await supabase
+    const { data: driverRows } = await supabase
       .from('driver')
       .select('driver_id')
-      .eq('auth_user_id', authUserId)
-      .maybeSingle();
+      .or(`auth_user_id.eq.${authUserId},contact_number.eq.${candidates.phone63WithPlus},contact_number.eq.${candidates.phone09}`)
+      .limit(1);
 
-    if (driverRow) {
-      driverId = driverRow.driver_id;
-    } else if (cleanPhone) {
-      const phone09 = cleanPhone.startsWith('0') ? cleanPhone : `0${cleanPhone}`;
-      const phone63 = `+63${cleanPhone.replace(/^0/, '')}`;
-      const { data: driverByPhone } = await supabase
+    driverId = driverRows?.[0]?.driver_id || null;
+
+    if (!driverId) {
+      console.log('[DRIVER MTOP SAVE] Auto-provisioning driver record for authUserId:', authUserId);
+      const storedTodaId = typeof window !== 'undefined' ? localStorage.getItem('sakay_driver_toda_id') : null;
+      const { data: insertedDriver } = await supabase
         .from('driver')
+        .insert([
+          {
+            auth_user_id: authUserId,
+            contact_number: e164Phone,
+            full_name: formData.operatorName || user.user_metadata?.full_name || 'Driver Applicant',
+            franchise_number: formData.franchiseNumber || null,
+            plate_number: formData.plateNumber || null,
+            toda_id: storedTodaId || user.user_metadata?.toda_id || null,
+            account_status: 'Pending Verification',
+            availability_status: 'Offline',
+          },
+        ])
         .select('driver_id')
-        .or(`contact_number.eq.${phone09},contact_number.eq.${phone63}`)
         .maybeSingle();
-      if (driverByPhone) {
-        driverId = driverByPhone.driver_id;
-      }
+
+      driverId = insertedDriver?.driver_id || null;
     }
 
     if (!driverId) {
       console.error('[DRIVER MTOP SAVE] Driver record not found for authUserId:', authUserId);
       return {
         success: false,
-        error: 'Hindi nahanap ang iyong rekord ng drayber. Pakisubukang i-save muli ang lisensya.',
+        error: getLocalizedError(
+          'Hindi nahanap ang iyong rekord ng drayber. Pakisubukang muli.',
+          'Driver record not found. Please try again.'
+        ),
       };
     }
 
@@ -1046,6 +1108,7 @@ export async function saveDriverMtopVerification(
       .update({
         franchise_number: formData.franchiseNumber,
         plate_number: formData.plateNumber,
+        contact_number: e164Phone,
         updated_at: new Date().toISOString(),
       })
       .eq('driver_id', driverId);
@@ -1090,7 +1153,10 @@ export async function saveDriverMtopVerification(
     console.error('[DRIVER MTOP SAVE] Exception:', err);
     return {
       success: false,
-      error: 'Nagkaroon ng hindi inaasahang problema sa pag-save ng MTOP. Pakisubukang muli.',
+      error: getLocalizedError(
+        'Nagkaroon ng hindi inaasahang problema sa pag-save ng MTOP. Pakisubukang muli.',
+        'An unexpected error occurred while saving MTOP. Please try again.'
+      ),
     };
   }
 }
@@ -1216,11 +1282,20 @@ export async function submitFinalDriverRegistration(
   console.log('[FINAL REGISTRATION SUBMIT] Finalizing registration submission...');
 
   try {
+    const candidates = getPhoneLookupCandidates(phone || '');
+    const e164Phone = candidates.e164;
+
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
       console.warn('[FINAL REGISTRATION SUBMIT] User session not active during final submission.');
-      return { success: false, error: 'Kailangan munang mag-login bago mag-submit.' };
+      return {
+        success: false,
+        error: getLocalizedError(
+          'Kailangan munang mag-login bago mag-submit.',
+          'Please log in before submitting.'
+        ),
+      };
     }
 
     const authUserId = user.id;
@@ -1235,21 +1310,44 @@ export async function submitFinalDriverRegistration(
     const tricyclePath = tricycle?.photoUrl ? `${authUserId}/tricycle.jpg` : null;
 
     // 1. Resolve Driver Record
-    let { data: driverRow } = await supabase
+    const { data: driverRows } = await supabase
       .from('driver')
       .select('driver_id')
-      .eq('auth_user_id', authUserId)
-      .maybeSingle();
+      .or(`auth_user_id.eq.${authUserId},contact_number.eq.${candidates.phone63WithPlus},contact_number.eq.${candidates.phone09}`)
+      .limit(1);
 
-    if (!driverRow?.driver_id) {
+    let driverId = driverRows?.[0]?.driver_id || null;
+
+    if (!driverId) {
+      console.log('[FINAL REGISTRATION SUBMIT] Auto-provisioning driver record for authUserId:', authUserId);
+      const { data: newDriver } = await supabase
+        .from('driver')
+        .insert([
+          {
+            auth_user_id: authUserId,
+            contact_number: e164Phone,
+            full_name: license?.fullName || user.user_metadata?.full_name || 'Driver Applicant',
+            toda_id: storedTodaId || user.user_metadata?.toda_id || null,
+            account_status: 'Pending Verification',
+            availability_status: 'Offline',
+          },
+        ])
+        .select('driver_id')
+        .maybeSingle();
+
+      driverId = newDriver?.driver_id || null;
+    }
+
+    if (!driverId) {
       console.error('[FINAL REGISTRATION SUBMIT] Driver profile row not found for authUserId:', authUserId);
       return {
         success: false,
-        error: 'Hindi nahanap ang rekord ng drayber sa database. Pakisubukang magparehistro muli.',
+        error: getLocalizedError(
+          'Hindi nahanap ang rekord ng drayber sa database. Pakisubukang magparehistro muli.',
+          'Driver record not found in the database. Please try registering again.'
+        ),
       };
     }
-
-    const driverId = driverRow.driver_id;
 
     // 2. Update public.driver with allowable profile details (name, dob, address)
     const driverPayload: Record<string, any> = {
@@ -1371,7 +1469,10 @@ export async function submitFinalDriverRegistration(
     console.error('[FINAL REGISTRATION SUBMIT] Exception during final submission:', err);
     return {
       success: false,
-      error: 'Hindi na-proseso ang huling submission. Pakisubukang muli.',
+      error: getLocalizedError(
+        'Hindi na-proseso ang huling submission. Pakisubukang muli.',
+        'Could not process final submission. Please try again.'
+      ),
     };
   }
 }

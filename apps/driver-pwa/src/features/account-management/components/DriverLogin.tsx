@@ -17,6 +17,7 @@ import { RegisterInput } from '../../../common/components/RegisterInput';
 import SakayPhoneInput from '../../../common/components/SakayPhoneInput';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { supabase } from '../../../services/supabaseClient';
+import { getPhoneLookupCandidates } from '../../../services/driverApiService';
 
 export const formatMobileNumber = (value: string): string => {
   const digits = value.replace(/\D/g, '');
@@ -73,21 +74,12 @@ export const DriverLogin: React.FC = () => {
       return;
     }
 
-    // Normalize phone format to 09XXXXXXXXX
-    let cleanPhone = rawDigits;
-    if (cleanPhone.startsWith('63') && cleanPhone.length === 12) {
-      cleanPhone = '0' + cleanPhone.slice(2);
-    } else if (!cleanPhone.startsWith('0') && cleanPhone.length === 10) {
-      cleanPhone = '0' + cleanPhone;
-    }
+    const candidates = getPhoneLookupCandidates(rawDigits);
+    const phone09 = candidates.phone09;
+    const phone63 = candidates.phone63WithPlus;
 
     setLoading(true);
     setError('');
-
-    const phoneDigits = cleanPhone.replace(/\D/g, '');
-    const phone09 = phoneDigits.startsWith('0') ? phoneDigits : `0${phoneDigits}`;
-    const phone63 = `+63${phoneDigits.replace(/^0/, '')}`;
-    const phoneRaw = phoneDigits.replace(/^0/, '');
 
     // Instant Verified Test Driver Login (Option A for live map & ride testing)
     const isTestDriver =
@@ -96,14 +88,14 @@ export const DriverLogin: React.FC = () => {
 
     if (isTestDriver) {
       setLoading(false);
-      localStorage.setItem('sakay_driver_phone', phone09);
+      localStorage.setItem('sakay_driver_phone', phone63);
       localStorage.setItem('sakay_driver_id', 'test-driver-001');
       localStorage.setItem(
         'sakay_driver_profile',
         JSON.stringify({
           id: 'test-driver-001',
           name: 'Juan Dela Cruz',
-          phone: phone09,
+          phone: phone63,
           vehiclePlate: 'ABC 123',
           licenseNumber: 'N03-12-123456',
           franchiseNumber: '1234',
@@ -124,40 +116,26 @@ export const DriverLogin: React.FC = () => {
       return;
     }
 
-    const driverEmail = `driver_${cleanPhone}@sakay.ph`;
-    const e164Phone = `+63${cleanPhone.slice(1)}`;
-
     try {
-      // 1. Authenticate with Supabase Auth to establish live JWT session
+      // 1. Authenticate with Supabase Auth across candidate credentials
       let sessionUser: any = null;
+      let lastAuthError: any = null;
 
-      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-        email: driverEmail,
-        password: password,
-      });
-
-      if (!signInErr && signInData?.user) {
-        sessionUser = signInData.user;
-      } else {
-        // Fallback: Attempt sign-in with phone format if email identifier fails
-        const { data: phoneSignInData, error: phoneSignInErr } = await supabase.auth.signInWithPassword({
-          phone: e164Phone,
+      for (const candidate of candidates.authCandidates) {
+        const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+          ...candidate,
           password: password,
         });
 
-        if (!phoneSignInErr && phoneSignInData?.user) {
-          sessionUser = phoneSignInData.user;
-        } else {
-          console.warn('[DriverLogin] Supabase Auth sign-in note:', signInErr?.message || phoneSignInErr?.message);
+        if (!signInErr && signInData?.user) {
+          sessionUser = signInData.user;
+          console.log('[DriverLogin] Authenticated successfully with candidate:', candidate);
+          break;
         }
+        lastAuthError = signInErr;
       }
 
-      // 2. Query driver record from Supabase database across all phone representations
-      const phoneDigits = cleanPhone.replace(/\D/g, '');
-      const phone09 = phoneDigits.startsWith('0') ? phoneDigits : `0${phoneDigits}`;
-      const phone63 = `+63${phoneDigits.replace(/^0/, '')}`;
-      const phoneRaw = phoneDigits.replace(/^0/, '');
-
+      // 2. Query driver record from Supabase database
       let driverQuery = supabase
         .from('driver')
         .select(`
@@ -179,28 +157,90 @@ export const DriverLogin: React.FC = () => {
         `);
 
       if (sessionUser?.id) {
-        driverQuery = driverQuery.or(`auth_user_id.eq.${sessionUser.id},contact_number.eq.${phone09},contact_number.eq.${phone63},contact_number.eq.${phoneRaw},contact_number.eq.${cleanPhone}`);
+        driverQuery = driverQuery.or(`auth_user_id.eq.${sessionUser.id},contact_number.eq.${phone63},contact_number.eq.${phone09},contact_number.eq.${candidates.phoneRaw},contact_number.eq.${candidates.phone63NoPlus}`);
       } else {
-        driverQuery = driverQuery.or(`contact_number.eq.${phone09},contact_number.eq.${phone63},contact_number.eq.${phoneRaw},contact_number.eq.${cleanPhone}`);
+        driverQuery = driverQuery.or(`contact_number.eq.${phone63},contact_number.eq.${phone09},contact_number.eq.${candidates.phoneRaw},contact_number.eq.${candidates.phone63NoPlus}`);
       }
 
-      const { data: driverData, error: dbErr } = await driverQuery.maybeSingle();
+      const { data: driverRows, error: dbErr } = await driverQuery.limit(1);
 
       if (dbErr) {
         console.error('[DriverLogin] Driver profile lookup error:', dbErr);
       }
 
+      let driverData = driverRows?.[0] || null;
+
+      // 3. Auto-provision profile if auth succeeded but driver profile row was pending
+      if (sessionUser && !driverData) {
+        console.log('[DriverLogin] Authenticated in Auth but driver row missing, auto-provisioning...');
+        const storedTodaId = typeof window !== 'undefined' ? localStorage.getItem('sakay_driver_toda_id') : null;
+        const { data: newDriver } = await supabase
+          .from('driver')
+          .insert([
+            {
+              auth_user_id: sessionUser.id,
+              full_name: sessionUser.user_metadata?.full_name || 'Driver Applicant',
+              contact_number: phone63,
+              toda_id: sessionUser.user_metadata?.toda_id || storedTodaId || null,
+              account_status: 'Pending Verification',
+              availability_status: 'Offline',
+            },
+          ])
+          .select(`
+            driver_id,
+            auth_user_id,
+            full_name,
+            contact_number,
+            plate_number,
+            license_number,
+            franchise_number,
+            account_status,
+            rejection_reason,
+            rejection_comment,
+            toda:toda_id (
+              toda_id,
+              toda_name,
+              toda_acronym
+            )
+          `)
+          .maybeSingle();
+
+        driverData = newDriver;
+      }
+
       setLoading(false);
 
       if (driverData) {
-        // If Supabase Auth failed with invalid password AND driver exists in database:
-        if (!sessionUser && signInErr && (signInErr.message?.toLowerCase().includes('invalid login credentials') || signInErr.message?.toLowerCase().includes('invalid credentials'))) {
-          setError('Mali ang password. Pakisubukang muli.');
-          return;
+        // If driver exists but Auth session failed due to incorrect password:
+        if (!sessionUser && lastAuthError) {
+          const authMsg = (lastAuthError.message || '').toLowerCase();
+          if (authMsg.includes('invalid login credentials') || authMsg.includes('invalid credentials')) {
+            setError(
+              language === 'tl'
+                ? 'Mali ang password. Pakisubukang muli.'
+                : 'Incorrect password. Please try again.'
+            );
+            return;
+          }
+        }
+
+        // Link driver record to sessionUser if unlinked
+        if (sessionUser?.id && !driverData.auth_user_id) {
+          await supabase
+            .from('driver')
+            .update({ auth_user_id: sessionUser.id, contact_number: phone63 })
+            .eq('driver_id', driverData.driver_id);
+        } else if (driverData.contact_number !== phone63) {
+          // Standardize contact_number in DB to E.164 (+639XXXXXXXXX)
+          supabase
+            .from('driver')
+            .update({ contact_number: phone63 })
+            .eq('driver_id', driverData.driver_id)
+            .then(() => {});
         }
 
         // Persist active driver session cache
-        localStorage.setItem('sakay_driver_phone', phone09);
+        localStorage.setItem('sakay_driver_phone', phone63);
         localStorage.setItem('sakay_driver_id', driverData.driver_id);
 
         const todaInfo = Array.isArray(driverData.toda) ? driverData.toda[0] : driverData.toda;
@@ -211,7 +251,7 @@ export const DriverLogin: React.FC = () => {
           'sakay_driver_profile',
           JSON.stringify({
             name: driverData.full_name,
-            phone: driverData.contact_number || phone09,
+            phone: phone63,
             vehiclePlate: driverData.plate_number || 'MV-101',
             licenseNumber: driverData.license_number || 'L01-99-123456',
             franchiseNumber: driverData.franchise_number || 'MTOP-PENDING',
@@ -250,7 +290,7 @@ export const DriverLogin: React.FC = () => {
             navigate('/driver/prepare-documents', {
               replace: true,
               state: {
-                phone: phone09,
+                phone: phone63,
                 driverName: driverData.full_name,
               },
             });
@@ -273,7 +313,19 @@ export const DriverLogin: React.FC = () => {
           });
         }
       } else {
-        // Account does NOT exist in the system:
+        // Neither session nor driverData could be resolved:
+        if (lastAuthError) {
+          const authErrStr = (lastAuthError.message || '').toLowerCase();
+          if (authErrStr.includes('invalid login credentials') || authErrStr.includes('invalid credentials')) {
+            setError(
+              language === 'tl'
+                ? 'Maling numero o password. Pakisuri ang iyong impormasyon at subukang muli.'
+                : 'Incorrect mobile number or password. Please check your details and try again.'
+            );
+            return;
+          }
+        }
+
         setError(
           language === 'tl'
             ? 'Walang nahanap na account para sa numerong ito. Mangyaring mag-register muna o suriin ang iyong numero at password.'
