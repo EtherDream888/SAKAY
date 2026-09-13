@@ -307,8 +307,18 @@ export const TodaAccountManagementPage: React.FC = () => {
 
       await loadProfile();
       setEditProfileModalOpen(false);
-    } catch (err) {
+      setUploadSnackbar({
+        open: true,
+        message: 'Successfully updated TODA organizational profile!',
+        severity: 'success',
+      });
+    } catch (err: any) {
       console.error('[TodaAccount] Error updating profile in database:', err);
+      setUploadSnackbar({
+        open: true,
+        message: err?.message || 'Failed to update organizational profile. Please try again.',
+        severity: 'error',
+      });
     } finally {
       setIsSavingEdit(false);
     }
@@ -336,6 +346,34 @@ export const TodaAccountManagementPage: React.FC = () => {
         uploadResult.url,
         selectedFile.name
       );
+
+      // Optimistically update local profile state so UI immediately reflects the new document
+      const nowStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      setProfile((prev) => {
+        if (!prev) return prev;
+        const updated = { ...prev, accreditationStatus: 'Pending Verification' as const };
+        if (docCategory === 'Barangay Clearance') {
+          updated.barangayClearanceFile = {
+            name: selectedFile.name,
+            date: nowStr,
+            url: uploadResult.url,
+          };
+        } else if (docCategory === 'Driver Roster') {
+          updated.rosterFile = {
+            name: selectedFile.name,
+            date: nowStr,
+            count: prev.rosterFile?.count || 0,
+            url: uploadResult.url,
+          };
+        } else if (docCategory === 'Internal Bylaws') {
+          updated.bylawsFile = {
+            name: selectedFile.name,
+            date: nowStr,
+            url: uploadResult.url,
+          };
+        }
+        return updated;
+      });
 
       setUploadSnackbar({
         open: true,

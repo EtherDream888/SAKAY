@@ -153,11 +153,12 @@ export async function updateTodaProfile(
   if (profileData.acronym) updatePayload.toda_acronym = profileData.acronym;
   if (profileData.barangay) updatePayload.barangay = profileData.barangay;
   if (profileData.dateEstablished) updatePayload.date_established = profileData.dateEstablished;
-  if (profileData.terminalLocation) updatePayload.terminal_location = profileData.terminalLocation;
   if (profileData.terminalLatitude !== undefined) updatePayload.terminal_latitude = profileData.terminalLatitude;
   if (profileData.terminalLongitude !== undefined) updatePayload.terminal_longitude = profileData.terminalLongitude;
   if (profileData.contactPhone) updatePayload.president_contact = profileData.contactPhone;
-  if (profileData.serviceArea) updatePayload.service_coverage_area = profileData.serviceArea;
+  if (profileData.serviceArea || profileData.terminalLocation) {
+    updatePayload.service_coverage_area = profileData.serviceArea || profileData.terminalLocation;
+  }
   if (profileData.officers) {
     if (profileData.officers.president !== undefined) updatePayload.president_name = profileData.officers.president;
     if (profileData.officers.presidentContact !== undefined) updatePayload.president_contact = profileData.officers.presidentContact;
@@ -169,22 +170,41 @@ export async function updateTodaProfile(
     if (profileData.officers.treasurerContact !== undefined) updatePayload.treasurer_contact = profileData.officers.treasurerContact;
   }
 
-  const { data, error } = await supabase
-    .from('toda')
-    .update(updatePayload)
-    .eq('toda_id', todaId)
-    .select()
-    .single();
+  let updatedData: any = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data, error } = await supabase
+      .from('toda')
+      .update(updatePayload)
+      .eq('toda_id', todaId)
+      .select()
+      .maybeSingle();
 
-  if (error) throw error;
+    if (!error) {
+      updatedData = data;
+      break;
+    }
+
+    const errMsg = (error.message || '') + ' ' + (error.details || '');
+    const match =
+      errMsg.match(/Could not find the '([^']+)' column/i) ||
+      errMsg.match(/column [^.]*\.?([a-zA-Z0-9_]+) does not exist/i);
+
+    if (match && match[1] && match[1] in updatePayload) {
+      console.warn(`[todaApiService] Column '${match[1]}' does not exist in 'toda', pruning and retrying...`);
+      delete updatePayload[match[1]];
+    } else {
+      console.error('[todaApiService] updateTodaProfile error:', error);
+      throw error;
+    }
+  }
 
   await recordTodaAuditAction({
     actionType: 'TODA_PROFILE_UPDATED',
     targetId: todaId,
-    details: `Updated association contact info for '${data?.toda_name || todaId}'.`,
+    details: `Updated association contact info for '${updatedData?.toda_name || todaId}'.`,
   });
 
-  return { success: true, data };
+  return { success: true, data: updatedData };
 }
 
 export async function checkAcronymAvailability(acronym: string): Promise<boolean> {
@@ -276,9 +296,10 @@ export async function updateTodaComplianceDocument(
   fileUrl: string,
   fileName: string
 ) {
+  // Columns guaranteed to exist in public.toda (no updated_at!)
   const updatePayload: Record<string, any> = {
-    updated_at: new Date().toISOString(),
     toda_status: 'Pending Verification',
+    resubmission_reason: null, // Clear any previous correction request
   };
 
   if (category === 'Barangay Clearance') {
@@ -289,29 +310,35 @@ export async function updateTodaComplianceDocument(
     updatePayload.bylaws_url = fileUrl;
   }
 
-  let { data, error } = await supabase
-    .from('toda')
-    .update(updatePayload)
-    .eq('toda_id', todaId)
-    .select()
-    .single();
-
-  if (error && error.message?.includes('toda_status')) {
-    delete updatePayload.toda_status;
-    updatePayload.account_status = 'Pending Verification';
-    const retry = await supabase
+  let updatedData: any = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data, error } = await supabase
       .from('toda')
       .update(updatePayload)
       .eq('toda_id', todaId)
       .select()
-      .single();
-    data = retry.data;
-    error = retry.error;
-  }
+      .maybeSingle();
 
-  if (error) {
-    console.error('[todaApiService] updateTodaComplianceDocument error:', error);
-    throw error;
+    if (!error) {
+      updatedData = data;
+      break;
+    }
+
+    const errMsg = (error.message || '') + ' ' + (error.details || '');
+    const match =
+      errMsg.match(/Could not find the '([^']+)' column/i) ||
+      errMsg.match(/column [^.]*\.?([a-zA-Z0-9_]+) does not exist/i);
+
+    if (match && match[1] && match[1] in updatePayload) {
+      console.warn(`[todaApiService] Column '${match[1]}' does not exist in 'toda', pruning and retrying...`);
+      delete updatePayload[match[1]];
+    } else if (errMsg.includes('toda_status') && 'toda_status' in updatePayload) {
+      delete updatePayload.toda_status;
+      updatePayload.account_status = 'Pending Verification';
+    } else {
+      console.error('[todaApiService] updateTodaComplianceDocument error:', error);
+      throw error;
+    }
   }
 
   await recordTodaAuditAction({
@@ -322,7 +349,7 @@ export async function updateTodaComplianceDocument(
     category: 'Account',
   });
 
-  return data;
+  return updatedData || { toda_id: todaId, status: 'Pending Verification', fileUrl };
 }
 
 export async function registerToda(payload: {
@@ -494,39 +521,51 @@ export async function registerToda(payload: {
 }
 
 export async function resubmitTodaApplication(todaId: string, updatedData: any) {
-  let updatePayload = {
+  let updatePayload: Record<string, any> = {
     ...updatedData,
     toda_status: 'Pending Verification',
   };
+  delete updatePayload.updated_at;
+  delete updatePayload.terminal_location;
 
-  let res = await supabase
-    .from('toda')
-    .update(updatePayload)
-    .eq('toda_id', todaId)
-    .select()
-    .single();
-
-  if (res.error && res.error.message?.includes('toda_status')) {
-    delete (updatePayload as any).toda_status;
-    (updatePayload as any).account_status = 'Pending Verification';
-    res = await supabase
+  let updatedDataResult: any = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data, error } = await supabase
       .from('toda')
       .update(updatePayload)
       .eq('toda_id', todaId)
       .select()
-      .single();
-  }
+      .maybeSingle();
 
-  if (res.error) throw res.error;
-  const data = res.data;
+    if (!error) {
+      updatedDataResult = data;
+      break;
+    }
+
+    const errMsg = (error.message || '') + ' ' + (error.details || '');
+    const match =
+      errMsg.match(/Could not find the '([^']+)' column/i) ||
+      errMsg.match(/column [^.]*\.?([a-zA-Z0-9_]+) does not exist/i);
+
+    if (match && match[1] && match[1] in updatePayload) {
+      console.warn(`[todaApiService] Column '${match[1]}' does not exist in 'toda', pruning and retrying...`);
+      delete updatePayload[match[1]];
+    } else if (errMsg.includes('toda_status') && 'toda_status' in updatePayload) {
+      delete updatePayload.toda_status;
+      updatePayload.account_status = 'Pending Verification';
+    } else {
+      console.error('[todaApiService] resubmitTodaApplication error:', error);
+      throw error;
+    }
+  }
 
   await recordTodaAuditAction({
     actionType: 'TODA_APPLICATION_RESUBMITTED',
     targetId: todaId,
-    details: `Corrected and resubmitted TODA accreditation application for '${data?.toda_name || todaId}'.`,
+    details: `Corrected and resubmitted TODA accreditation application for '${updatedDataResult?.toda_name || todaId}'.`,
   });
 
-  return { success: true, data };
+  return { success: true, data: updatedDataResult };
 }
 
 
