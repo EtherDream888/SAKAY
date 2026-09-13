@@ -17,7 +17,7 @@ import { RegisterInput } from '../../../common/components/RegisterInput';
 import SakayPhoneInput from '../../../common/components/SakayPhoneInput';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { supabase } from '../../../services/supabaseClient';
-import { getPhoneLookupCandidates } from '../../../services/driverApiService';
+import { getPhoneLookupCandidates, lookupDriverByPhoneSecure, sendDriverOtp } from '../../../services/driverApiService';
 
 export const formatMobileNumber = (value: string): string => {
   const digits = value.replace(/\D/g, '');
@@ -54,11 +54,63 @@ export const DriverLogin: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handlePhoneChange = (val: string) => {
     const formatted = formatMobileNumber(val);
     setPhone(formatted);
+  };
+
+  const handleOtpLogin = async () => {
+    const rawDigits = phone.replace(/\D/g, '');
+    if (!rawDigits || rawDigits.length < 10) {
+      setError(
+        language === 'tl'
+          ? 'Pakilagay muna ang inyong numero ng telepono bago mag-login gamit ang OTP.'
+          : 'Please enter your mobile number first before logging in with OTP.'
+      );
+      return;
+    }
+
+    const candidates = getPhoneLookupCandidates(rawDigits);
+    const phone63 = candidates.phone63WithPlus;
+
+    setOtpLoading(true);
+    setError('');
+
+    // Check if account exists
+    const existingDriver = await lookupDriverByPhoneSecure(phone63);
+    if (!existingDriver) {
+      setOtpLoading(false);
+      setError(
+        language === 'tl'
+          ? 'Walang nahanap na account para sa numerong ito. Mangyaring mag-register muna.'
+          : 'No account found for this mobile number. Please register first.'
+      );
+      return;
+    }
+
+    try {
+      const otpResult = await sendDriverOtp(phone63);
+      setOtpLoading(false);
+      navigate('/driver/verify-otp', {
+        state: {
+          phone: phone63,
+          isOtpLogin: true,
+          driverName: existingDriver.full_name,
+          debugOtp: otpResult?.debugOtp,
+        },
+      });
+    } catch (err: any) {
+      setOtpLoading(false);
+      setError(
+        err?.message ||
+          (language === 'tl'
+            ? 'Hindi maipadala ang OTP. Pakisubukang muli.'
+            : 'Unable to send OTP. Please try again.')
+      );
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -136,39 +188,42 @@ export const DriverLogin: React.FC = () => {
       }
 
       // 2. Query driver record from Supabase database
-      let driverQuery = supabase
-        .from('driver')
-        .select(`
-          driver_id,
-          auth_user_id,
-          full_name,
-          contact_number,
-          plate_number,
-          license_number,
-          franchise_number,
-          account_status,
-          rejection_reason,
-          rejection_comment,
-          toda:toda_id (
-            toda_id,
-            toda_name,
-            toda_acronym
-          )
-        `);
+      let driverData: any = null;
 
       if (sessionUser?.id) {
-        driverQuery = driverQuery.or(`auth_user_id.eq.${sessionUser.id},contact_number.eq.${phone63},contact_number.eq.${phone09},contact_number.eq.${candidates.phoneRaw},contact_number.eq.${candidates.phone63NoPlus}`);
-      } else {
-        driverQuery = driverQuery.or(`contact_number.eq.${phone63},contact_number.eq.${phone09},contact_number.eq.${candidates.phoneRaw},contact_number.eq.${candidates.phone63NoPlus}`);
+        const { data: driverRows, error: dbErr } = await supabase
+          .from('driver')
+          .select(`
+            driver_id,
+            auth_user_id,
+            full_name,
+            contact_number,
+            plate_number,
+            license_number,
+            franchise_number,
+            account_status,
+            rejection_reason,
+            rejection_comment,
+            toda:toda_id (
+              toda_id,
+              toda_name,
+              toda_acronym
+            )
+          `)
+          .or(`auth_user_id.eq.${sessionUser.id},contact_number.eq.${phone63},contact_number.eq.${phone09},contact_number.eq.${candidates.phoneRaw},contact_number.eq.${candidates.phone63NoPlus}`)
+          .limit(1);
+
+        if (dbErr) {
+          console.error('[DriverLogin] Driver profile lookup error:', dbErr);
+        }
+
+        driverData = driverRows?.[0] || null;
       }
 
-      const { data: driverRows, error: dbErr } = await driverQuery.limit(1);
-
-      if (dbErr) {
-        console.error('[DriverLogin] Driver profile lookup error:', dbErr);
+      // Check database using secure lookup if driverData not resolved yet
+      if (!driverData) {
+        driverData = await lookupDriverByPhoneSecure(phone63);
       }
-
-      let driverData = driverRows?.[0] || null;
 
       // 3. Auto-provision profile if auth succeeded but driver profile row was pending
       if (sessionUser && !driverData) {
@@ -211,17 +266,14 @@ export const DriverLogin: React.FC = () => {
       setLoading(false);
 
       if (driverData) {
-        // If driver exists but Auth session failed due to incorrect password:
-        if (!sessionUser && lastAuthError) {
-          const authMsg = (lastAuthError.message || '').toLowerCase();
-          if (authMsg.includes('invalid login credentials') || authMsg.includes('invalid credentials')) {
-            setError(
-              language === 'tl'
-                ? 'Mali ang password. Pakisubukang muli.'
-                : 'Incorrect password. Please try again.'
-            );
-            return;
-          }
+        // If driver exists in database but Auth session failed due to incorrect password:
+        if (!sessionUser) {
+          setError(
+            language === 'tl'
+              ? 'Mali ang password para sa account na ito. Pakisubukang muli o mag-login gamit ang SMS OTP sa ibaba.'
+              : 'Incorrect password for this account. Please try again or log in with SMS OTP below.'
+          );
+          return;
         }
 
         // Link driver record to sessionUser if unlinked
@@ -314,22 +366,10 @@ export const DriverLogin: React.FC = () => {
         }
       } else {
         // Neither session nor driverData could be resolved:
-        if (lastAuthError) {
-          const authErrStr = (lastAuthError.message || '').toLowerCase();
-          if (authErrStr.includes('invalid login credentials') || authErrStr.includes('invalid credentials')) {
-            setError(
-              language === 'tl'
-                ? 'Maling numero o password. Pakisuri ang iyong impormasyon at subukang muli.'
-                : 'Incorrect mobile number or password. Please check your details and try again.'
-            );
-            return;
-          }
-        }
-
         setError(
           language === 'tl'
-            ? 'Walang nahanap na account para sa numerong ito. Mangyaring mag-register muna o suriin ang iyong numero at password.'
-            : 'No account found for this mobile number. Please register first or check your number and password.'
+            ? 'Walang nahanap na account para sa numerong ito. Mangyaring mag-register muna o suriin ang inyong numero.'
+            : 'No account found for this mobile number. Please register first or check your mobile number.'
         );
       }
     } catch (err: any) {
@@ -490,11 +530,50 @@ export const DriverLogin: React.FC = () => {
             backgroundColor: '#FF6B00',
             boxShadow: 'none',
             '&:hover': { backgroundColor: '#E66000', boxShadow: 'none' },
-            mb: 2,
+            mb: 1.5,
             mt: 3,
           }}
         >
           {t.loginTitle}
+        </PrimaryButton>
+
+        {/* Divider */}
+        <Box sx={{ display: 'flex', alignItems: 'center', my: 1 }}>
+          <Box sx={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }} />
+          <Typography
+            sx={{
+              px: 2,
+              fontSize: '11px',
+              color: '#94A3B8',
+              fontWeight: 700,
+              letterSpacing: '0.5px',
+            }}
+          >
+            {language === 'tl' ? 'O KAYA' : 'OR'}
+          </Typography>
+          <Box sx={{ flex: 1, height: '1px', backgroundColor: '#E2E8F0' }} />
+        </Box>
+
+        {/* OTP Login Alternative Button */}
+        <PrimaryButton
+          fullWidth
+          type="button"
+          onClick={handleOtpLogin}
+          loading={otpLoading}
+          sx={{
+            height: '52px',
+            borderRadius: '16px',
+            fontSize: '15px',
+            fontWeight: 700,
+            color: '#FF6B00',
+            border: '1.5px solid #FF6B00',
+            backgroundColor: '#FFF7ED',
+            boxShadow: 'none',
+            '&:hover': { backgroundColor: '#FFEDD5', boxShadow: 'none' },
+            mb: 2.5,
+          }}
+        >
+          {language === 'tl' ? 'Mag-login gamit ang SMS OTP' : 'Log in with SMS OTP'}
         </PrimaryButton>
 
         {/* Tagalog Registration Link */}

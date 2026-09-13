@@ -14,7 +14,7 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
 import { useLanguage } from '../../../utils/LanguageContext';
-import { sendDriverOtp, verifyDriverOtp, formatPhoneToE164, getPhoneLookupCandidates } from '../../../services/driverApiService';
+import { sendDriverOtp, verifyDriverOtp, formatPhoneToE164, getPhoneLookupCandidates, lookupDriverByPhoneSecure } from '../../../services/driverApiService';
 import { supabase } from '../../../services/supabaseClient';
 
 const formatDisplayPhone = (raw: string = ''): string => {
@@ -27,8 +27,8 @@ const formatDisplayPhone = (raw: string = ''): string => {
 export const DriverVerifyOtp: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { t } = useLanguage();
-  const state = location.state as { phone?: string; password?: string; isRecovery?: boolean; driverName?: string; todaId?: string; debugOtp?: string } | undefined;
+  const { t, language } = useLanguage();
+  const state = location.state as { phone?: string; password?: string; isRecovery?: boolean; isOtpLogin?: boolean; driverName?: string; todaId?: string; debugOtp?: string } | undefined;
 
   const [otp, setOtp] = useState<string[]>(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
@@ -172,6 +172,82 @@ export const DriverVerifyOtp: React.FC = () => {
               localStorage.setItem('sakay_driver_phone', e164Phone);
               localStorage.removeItem('sakay_driver_password');
             } catch {}
+          }
+        }
+
+        if (state?.isOtpLogin) {
+          const driverData = await lookupDriverByPhoneSecure(e164Phone);
+          setLoading(false);
+          if (driverData) {
+            localStorage.setItem('sakay_driver_phone', e164Phone);
+            localStorage.setItem('sakay_driver_id', driverData.driver_id);
+            const todaInfo = Array.isArray(driverData.toda) ? driverData.toda[0] : driverData.toda;
+            const todaNameStr = todaInfo?.toda_name || 'Calapan Central TODA';
+            const todaAcronymStr = todaInfo?.toda_acronym || 'CCTODA';
+
+            localStorage.setItem(
+              'sakay_driver_profile',
+              JSON.stringify({
+                name: driverData.full_name,
+                phone: driverData.contact_number || e164Phone,
+                vehiclePlate: driverData.plate_number || 'MV-101',
+                licenseNumber: driverData.license_number || 'L01-99-123456',
+                franchiseNumber: driverData.franchise_number || 'MTOP-PENDING',
+                todaName: `${todaNameStr} (${todaAcronymStr})`,
+                rating: 5.0,
+                isOnline: false,
+                isPaused: false,
+                accountStatus: driverData.account_status,
+                verificationStage: driverData.account_status === 'Verified' || driverData.account_status === 'Active' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
+              })
+            );
+
+            if (driverData.account_status === 'Active' || driverData.account_status === 'Verified') {
+              navigate('/driver/home', { replace: true });
+            } else if (driverData.account_status === 'Rejected') {
+              navigate('/driver/status', {
+                replace: true,
+                state: {
+                  driverName: driverData.full_name,
+                  accountStatus: 'Rejected',
+                  rejectionReason: driverData.rejection_reason,
+                  rejectionComment: driverData.rejection_comment,
+                },
+              });
+            } else {
+              if (!driverData.verification || !driverData.verification.submitted_license_number) {
+                navigate('/driver/prepare-documents', {
+                  replace: true,
+                  state: {
+                    phone: e164Phone,
+                    driverName: driverData.full_name,
+                  },
+                });
+              } else {
+                const isEndorsed =
+                  driverData.verification.verification_status === 'Approved' ||
+                  driverData.verification.verification_status === 'TODA Approved' ||
+                  driverData.verification.verification_status === 'Endorsed to LGU' ||
+                  driverData.account_status === 'TODA Approved' ||
+                  driverData.account_status === 'Endorsed to LGU';
+
+                navigate('/driver/status', {
+                  replace: true,
+                  state: {
+                    driverName: driverData.full_name,
+                    accountStatus: isEndorsed ? 'Endorsed to LGU' : 'Pending Verification',
+                  },
+                });
+              }
+            }
+            return;
+          } else {
+            setError(
+              language === 'tl'
+                ? 'Walang nahanap na account para sa numerong ito. Mangyaring mag-register muna.'
+                : 'No account found for this mobile number. Please register first.'
+            );
+            return;
           }
         }
 

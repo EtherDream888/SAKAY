@@ -14,7 +14,7 @@ import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
 import SakayPhoneInput from '../../../common/components/SakayPhoneInput';
 import { useLanguage } from '../../../utils/LanguageContext';
-import { sendDriverOtp } from '../../../services/driverApiService';
+import { sendDriverOtp, getPhoneLookupCandidates } from '../../../services/driverApiService';
 
 export const formatMobileNumber = (value: string): string => {
   const digits = value.replace(/\D/g, '');
@@ -113,19 +113,22 @@ export const DriverForgotPassword: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanDigits = phone.replace(/\D/g, '');
-    if (!cleanDigits || cleanDigits.length < 11) return;
+    if (!cleanDigits || cleanDigits.length < 10) return;
     setLoading(true);
+
+    const candidates = getPhoneLookupCandidates(cleanDigits);
+    const e164Phone = candidates.e164;
 
     let otpResult: { success: boolean; message?: string; error?: string; debugOtp?: string } | null = null;
     try {
-      otpResult = await sendDriverOtp(cleanDigits);
+      otpResult = await sendDriverOtp(e164Phone);
     } catch (err) {
       console.warn('[DriverForgotPassword] sendDriverOtp error:', err);
     } finally {
       setLoading(false);
       navigate('/driver/verify-otp', {
         state: {
-          phone: cleanDigits,
+          phone: e164Phone,
           isRecovery: true,
           debugOtp: otpResult?.debugOtp,
         },

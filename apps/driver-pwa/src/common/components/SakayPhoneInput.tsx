@@ -11,21 +11,37 @@ export interface SakayPhoneInputProps {
   readOnly?: boolean;
 }
 
-// Helper to extract 9 digits after 9
-export const extract9DigitsAfter9 = (raw: string): string => {
+// Robust extractor for Philippine mobile numbers (10 digits starting with 9)
+export const extractPhDigits10 = (raw: string): string => {
   if (!raw) return '';
   const digits = raw.replace(/\D/g, '');
-  let after9 = '';
-  if (digits.startsWith('639')) {
-    after9 = digits.slice(3);
-  } else if (digits.startsWith('09')) {
-    after9 = digits.slice(2);
-  } else if (digits.startsWith('9')) {
-    after9 = digits.slice(1);
-  } else {
-    after9 = digits;
-  }
-  return after9.slice(0, 9);
+  let d10 = digits;
+  
+  if (d10.startsWith('6309')) d10 = d10.slice(3);
+  else if (d10.startsWith('639')) d10 = d10.slice(2);
+  else if (d10.startsWith('09')) d10 = d10.slice(1);
+  else if (d10.startsWith('63')) d10 = d10.slice(2);
+  else if (d10.startsWith('0')) d10 = d10.slice(1);
+
+  // Deduplicate accidental double 9 when typing with prefill
+  if (d10.startsWith('99') && d10.length > 10) d10 = d10.slice(1);
+  if (d10.startsWith('909')) d10 = d10.slice(1);
+  if (d10.startsWith('09')) d10 = d10.slice(1);
+
+  return d10.slice(0, 10);
+};
+
+export const formatPhMobileDisplay = (d10: string): string => {
+  if (!d10) return '';
+  if (d10.length <= 3) return d10;
+  if (d10.length <= 6) return `${d10.slice(0, 3)} ${d10.slice(3)}`;
+  return `${d10.slice(0, 3)} ${d10.slice(3, 6)} ${d10.slice(6)}`;
+};
+
+// Legacy compatibility export
+export const extract9DigitsAfter9 = (raw: string): string => {
+  const d10 = extractPhDigits10(raw);
+  return d10.startsWith('9') ? d10.slice(1) : d10;
 };
 
 export const SakayPhoneInput: React.FC<SakayPhoneInputProps> = ({
@@ -38,46 +54,39 @@ export const SakayPhoneInput: React.FC<SakayPhoneInputProps> = ({
   readOnly = false,
 }) => {
   const [focused, setFocused] = useState(false);
-  const [digitsAfter9, setDigitsAfter9] = useState(() => extract9DigitsAfter9(value));
+  const [digits10, setDigits10] = useState(() => extractPhDigits10(value));
 
   useEffect(() => {
-    setDigitsAfter9(extract9DigitsAfter9(value));
+    setDigits10(extractPhDigits10(value));
   }, [value]);
 
-  const isFloating = focused || Boolean(digitsAfter9 && digitsAfter9.length > 0) || true;
+  const isFloating = focused || Boolean(digits10 && digits10.length > 0);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (readOnly) return;
     const val = e.target.value;
-    const cleanDigits = extract9DigitsAfter9(val);
-    setDigitsAfter9(cleanDigits);
-    // Emits standard 11-digit national phone string starting with 09 (e.g. 09181234567)
-    const fullNational = cleanDigits ? `09${cleanDigits}` : '';
+    const cleanD10 = extractPhDigits10(val);
+    setDigits10(cleanD10);
+    // Emits standard 11-digit national phone string starting with 09 (e.g. 09350357698)
+    const fullNational = cleanD10 ? (cleanD10.startsWith('0') ? cleanD10 : `0${cleanD10}`) : '';
     onChange(fullNational);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const input = e.currentTarget;
-    const start = input.selectionStart ?? 0;
-    const end = input.selectionEnd ?? 0;
-
-    // Prevent erasing the leading '9'
     if (e.key === 'Backspace') {
-      if (start === end && start <= 1) {
+      const input = e.currentTarget;
+      const start = input.selectionStart ?? 0;
+      const end = input.selectionEnd ?? 0;
+      if (start === end && start > 0 && displayInputValue[start - 1] === ' ') {
         e.preventDefault();
-        return;
-      }
-    }
-    if (e.key === 'Delete') {
-      if (start === end && start === 0) {
-        e.preventDefault();
-        return;
+        const next = digits10.slice(0, -1);
+        setDigits10(next);
+        onChange(next ? (next.startsWith('0') ? next : `0${next}`) : '');
       }
     }
   };
 
-  // Formatted value inside text input always starts with 9
-  const displayInputValue = `9${digitsAfter9}`;
+  const displayInputValue = formatPhMobileDisplay(digits10);
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -163,9 +172,10 @@ export const SakayPhoneInput: React.FC<SakayPhoneInputProps> = ({
             />
           </Box>
 
-          {/* Editable text input starting with 9 */}
+          {/* Editable text input */}
           <input
             type="tel"
+            placeholder={focused ? '9XX XXX XXXX' : ''}
             value={displayInputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
