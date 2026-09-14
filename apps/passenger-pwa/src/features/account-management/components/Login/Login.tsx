@@ -72,6 +72,24 @@ const Login: React.FC = () => {
         });
         if (!emailResponse.error && emailResponse.data?.user) {
           signInResponse = emailResponse;
+        } else {
+          // Check if passenger record has custom/aliased email registered
+          const { data: profileRecord } = await supabase
+            .from('passenger')
+            .select('email')
+            .or(`contact_number.eq.${formattedPhone},contact_number.eq.0${cleanPhone.slice(-10)},contact_number.eq.+63${cleanPhone.slice(-10)}`)
+            .limit(1)
+            .maybeSingle();
+
+          if (profileRecord?.email && profileRecord.email !== passengerEmail) {
+            const profileEmailResponse = await supabase.auth.signInWithPassword({
+              email: profileRecord.email,
+              password: password,
+            });
+            if (!profileEmailResponse.error && profileEmailResponse.data?.user) {
+              signInResponse = profileEmailResponse;
+            }
+          }
         }
       }
 

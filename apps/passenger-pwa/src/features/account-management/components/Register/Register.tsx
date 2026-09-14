@@ -78,7 +78,6 @@ export const Register: React.FC = () => {
   const [submitted, setSubmitted] = useState(false);
   const [accountError, setAccountError] = useState<string | null>(null);
   const [phoneRegisteredError, setPhoneRegisteredError] = useState<string | null>(null);
-  const [checkingPhone, setCheckingPhone] = useState(false);
 
   useEffect(() => {
     try {
@@ -95,7 +94,6 @@ export const Register: React.FC = () => {
   useEffect(() => {
     if (cleanPhoneDigits.length === 11 && cleanPhoneDigits.startsWith('09')) {
       let isCurrent = true;
-      setCheckingPhone(true);
       const timer = setTimeout(async () => {
         try {
           const existing = await lookupPassengerByPhone(cleanPhoneDigits);
@@ -112,8 +110,6 @@ export const Register: React.FC = () => {
           }
         } catch (err) {
           console.warn('[Register] Error checking phone uniqueness:', err);
-        } finally {
-          if (isCurrent) setCheckingPhone(false);
         }
       }, 350);
 
@@ -123,7 +119,6 @@ export const Register: React.FC = () => {
       };
     } else {
       setPhoneRegisteredError(null);
-      setCheckingPhone(false);
     }
   }, [cleanPhoneDigits, language]);
 
@@ -395,7 +390,7 @@ export const Register: React.FC = () => {
                 ? phoneRegisteredError
                 : (hasAttemptedSubmit && !isValidPhone
                     ? (language === 'tl' ? 'Pakikumpleto ang 10-digit mobile number na nagsisimula sa 9.' : 'Please enter a valid 10-digit mobile number starting with 9.')
-                    : (checkingPhone ? (language === 'tl' ? 'Sinusuri ang numero...' : 'Checking number...') : ''))
+                    : '')
             }
           />
 
