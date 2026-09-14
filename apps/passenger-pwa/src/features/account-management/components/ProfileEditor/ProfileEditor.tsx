@@ -307,7 +307,7 @@ const ProfileEditor: React.FC = () => {
               "&:hover": { backgroundColor: "#E05300" },
               width: "32px",
               height: "32px",
-              boxShadow: "0 4px 10px rgba(255,107,0,0.3)"
+              boxShadow: "none"
             }}
           >
             {uploadingPhoto ? (

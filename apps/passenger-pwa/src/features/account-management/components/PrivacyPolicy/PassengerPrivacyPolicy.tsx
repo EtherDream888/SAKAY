@@ -174,7 +174,7 @@ export const PassengerPrivacyPolicy: React.FC = () => {
             mb: 0.5,
           }}
         >
-          {isTagalog ? 'Patakaran sa Privacy ng Pasahero' : 'Passenger Privacy Policy'}
+          {isTagalog ? 'Patakaran sa Privacy' : 'Privacy Policy'}
         </Typography>
         <Typography
           sx={{

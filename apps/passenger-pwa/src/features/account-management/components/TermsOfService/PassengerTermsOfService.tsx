@@ -130,7 +130,7 @@ export const PassengerTermsOfService: React.FC = () => {
             mb: 0.5,
           }}
         >
-          {isTagalog ? 'Mga Tuntunin ng Serbisyo para sa Pasahero' : 'Passenger Terms of Service'}
+          {isTagalog ? 'Mga Tuntunin ng Serbisyo' : 'Terms of Service'}
         </Typography>
         <Typography
           sx={{

@@ -55,6 +55,9 @@ const theme = createTheme({
   },
   components: {
     MuiButton: {
+      defaultProps: {
+        disableElevation: true,
+      },
       styleOverrides: {
         root: {
           borderRadius: 14,
@@ -62,13 +65,15 @@ const theme = createTheme({
           fontSize: '1rem',
           boxShadow: 'none',
           '&:hover': {
-            boxShadow: '0 8px 20px rgba(255, 107, 0, 0.25)',
+            boxShadow: 'none',
           },
           '&.MuiButton-containedPrimary': {
-            background: 'linear-gradient(135deg, #FF6B00 0%, #FF8533 100%)',
+            backgroundColor: '#FF6B00',
             color: '#FFFFFF',
+            boxShadow: 'none',
             '&:hover': {
-              background: 'linear-gradient(135deg, #E66000 0%, #FF7315 100%)',
+              backgroundColor: '#E66000',
+              boxShadow: 'none',
             },
           },
         },

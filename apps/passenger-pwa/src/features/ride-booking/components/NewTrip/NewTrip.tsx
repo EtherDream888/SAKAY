@@ -56,14 +56,21 @@ const NewTrip: React.FC = () => {
   });
 
   // Pickup location state
-  const [pickup, setPickup] = useState<{ address: string; lat: number; lng: number }>(() => {
+  const [pickup, setPickup] = useState<{ address: string; lat: number; lng: number; isCustom?: boolean }>(() => {
     const saved = sessionStorage.getItem("trip_pickup");
-    if (saved) return JSON.parse(saved);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.lat && parsed.address && parsed.isCustom) {
+          return parsed;
+        }
+      } catch {}
+    }
 
     const gpsLat = navState?.coords?.lat || parseFloat(localStorage.getItem("user_lat") || "");
     const gpsLng = navState?.coords?.lng || parseFloat(localStorage.getItem("user_lng") || "");
 
-    if (gpsLat && gpsLng) {
+    if (gpsLat && gpsLng && !isNaN(gpsLat) && !isNaN(gpsLng) && gpsLat !== 0) {
       return {
         address: language === "tl" ? "Kasalukuyang Lokasyon" : "Current Location",
         lat: gpsLat,
@@ -72,11 +79,46 @@ const NewTrip: React.FC = () => {
     }
 
     return {
-      address: language === "tl" ? "Pumili ng pickup location" : "Choose pickup location",
+      address: language === "tl" ? "Kasalukuyang Lokasyon" : "Current Location",
       lat: DEFAULT_CALAPAN_CENTER.latitude,
       lng: DEFAULT_CALAPAN_CENTER.longitude,
     };
   });
+
+  // Always query real device location on mount so passenger actual location is pinned
+  useEffect(() => {
+    // If navState already brought coords, use them
+    if (navState?.coords && navState.coords.lat !== 0) {
+      setPickup((prev) => {
+        if (prev.isCustom) return prev;
+        return {
+          address: prev.address || (language === "tl" ? "Kasalukuyang Lokasyon" : "Current Location"),
+          lat: navState.coords!.lat,
+          lng: navState.coords!.lng,
+        };
+      });
+      setRecenterTrigger((prev) => prev + 1);
+    }
+
+    // Always fetch latest live device position
+    getCurrentDevicePosition()
+      .then((coords) => {
+        setPickup((prev) => {
+          if (prev.isCustom) return prev;
+          const updated = {
+            address: prev.address || (language === "tl" ? "Kasalukuyang Lokasyon" : "Current Location"),
+            lat: coords.latitude,
+            lng: coords.longitude,
+          };
+          sessionStorage.setItem("trip_pickup", JSON.stringify(updated));
+          return updated;
+        });
+        setRecenterTrigger((prev) => prev + 1);
+      })
+      .catch((err) => {
+        console.warn("[NewTrip] Note on device geolocation:", err);
+      });
+  }, []);
 
   // Dropoff location state
   const [dropoff] = useState<{ address: string; lat: number; lng: number }>(() => {
@@ -136,10 +178,18 @@ const NewTrip: React.FC = () => {
 
   // Fetch real reverse-geocoded address for GPS pickup if not yet labeled
   useEffect(() => {
-    if (pickup.lat && pickup.address === "Kasalukuyang Lokasyon") {
+    const isGeneric =
+      !pickup.address ||
+      pickup.address === "Kasalukuyang Lokasyon" ||
+      pickup.address === "Current Location" ||
+      pickup.address === "Pumili ng pickup location" ||
+      pickup.address === "Choose pickup location";
+
+    if (pickup.lat && pickup.lat !== 0 && isGeneric && !pickup.isCustom) {
       reverseGeocodeCoordinates(pickup.lat, pickup.lng).then((realAddress) => {
-        if (realAddress) {
+        if (realAddress && !realAddress.startsWith("Kasalukuyang Lokasyon")) {
           setPickup((prev) => {
+            if (prev.isCustom) return prev;
             const updated = { ...prev, address: realAddress };
             sessionStorage.setItem("trip_pickup", JSON.stringify(updated));
             return updated;
@@ -147,7 +197,7 @@ const NewTrip: React.FC = () => {
         }
       });
     }
-  }, [pickup.lat, pickup.lng]);
+  }, [pickup.lat, pickup.lng, pickup.address, pickup.isCustom]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -207,11 +257,19 @@ const NewTrip: React.FC = () => {
   const handleRecenterGps = async () => {
     try {
       const coords = await getCurrentDevicePosition();
-      setPickup({
-        address: language === "tl" ? "Kasalukuyang Lokasyon" : "Current Location",
+      let realAddr = "";
+      try {
+        realAddr = await reverseGeocodeCoordinates(coords.latitude, coords.longitude);
+      } catch {}
+      const updated = {
+        address: realAddr && !realAddr.startsWith("Kasalukuyang Lokasyon")
+          ? realAddr
+          : (language === "tl" ? "Kasalukuyang Lokasyon" : "Current Location"),
         lat: coords.latitude,
         lng: coords.longitude,
-      });
+      };
+      setPickup(updated);
+      sessionStorage.setItem("trip_pickup", JSON.stringify(updated));
       setRecenterTrigger((prev) => prev + 1);
     } catch {
       setRecenterTrigger((prev) => prev + 1);
@@ -232,6 +290,7 @@ const NewTrip: React.FC = () => {
     >
       {/* 1. Real Google Maps View */}
       <MapView
+        userLocation={pickup.lat ? { lat: pickup.lat, lng: pickup.lng } : undefined}
         pickupLocation={pickup.lat ? pickup : undefined}
         dropoffLocation={dropoff.lat ? dropoff : undefined}
         recenterTrigger={recenterTrigger}
@@ -637,15 +696,16 @@ const NewTrip: React.FC = () => {
             sx={{
               height: "52px",
               borderRadius: "16px",
-              backgroundColor: "#F5A664",
+              backgroundColor: "#FF6B00",
               color: "#FFFFFF",
               fontWeight: 700,
               fontSize: "15px",
               textTransform: "none",
               fontFamily: "Poppins, sans-serif",
-              boxShadow: "0 4px 14px rgba(245, 166, 100, 0.3)",
+              boxShadow: "none",
               "&:hover": {
-                backgroundColor: "#E59553",
+                backgroundColor: "#E66000",
+                boxShadow: "none",
               },
             }}
           >
@@ -661,8 +721,15 @@ const NewTrip: React.FC = () => {
         profileName={profileName}
         onOpenTulong={() => setTulongOpen(true)}
         onLogout={async () => {
-          await supabase.auth.signOut();
-          navigate("/");
+          try {
+            await supabase.auth.signOut();
+            localStorage.removeItem("sakay_passenger_phone");
+            localStorage.removeItem("sakay_passenger_password");
+            sessionStorage.clear();
+          } catch (e) {
+            console.warn("Logout error:", e);
+          }
+          navigate("/get-started", { replace: true });
         }}
       />
       <TulongDialog open={tulongOpen} onClose={() => setTulongOpen(false)} />

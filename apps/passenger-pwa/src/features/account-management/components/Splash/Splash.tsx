@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
@@ -13,17 +13,28 @@ import background from "@sakay/shared/src/assets/images/splash-bg.png";
 import tricycle from "@sakay/shared/src/assets/icons/app-icon.png";
 import { BookingIllustration, FareIllustration, SafetyIllustration } from "@sakay/shared";
 
-const Splash: React.FC = () => {
+interface SplashProps {
+  initialStep?: number;
+}
+
+const Splash: React.FC<SplashProps> = ({ initialStep }) => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // State to manage onboarding steps:
   // 1: Animated splash sequence (tricycle rides in/out, logo fades in)
   // 4: Onboarding Slide 1 (Mag-book ng Biyahe / Book a Ride)
   // 5: Onboarding Slide 2 (Tamang Pamasahe / Fair Fares)
   // 6: Onboarding Slide 3 (Ligtas at Maaasahan / Safe & Reliable)
-  // 7: Main welcome landing page
-  const [step, setStep] = useState(1);
+  // 7: Main welcome landing page ("Get Started" screen)
+  const [step, setStep] = useState<number>(() => {
+    if (initialStep) return initialStep;
+    if (location.pathname === "/get-started") return 7;
+    const navStep = (location.state as { step?: number })?.step;
+    if (navStep) return navStep;
+    return 1;
+  });
 
   useEffect(() => {
     if (step === 1) {

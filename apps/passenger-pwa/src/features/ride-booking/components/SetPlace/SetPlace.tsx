@@ -38,14 +38,24 @@ const SetPlace: React.FC = () => {
   const [pickupText, setPickupText] = useState<string>(() => {
     if (navState?.target === "pickup" && navState?.address) return navState.address;
     const saved = sessionStorage.getItem("trip_pickup");
-    if (saved) return JSON.parse(saved).address || "Lumangbayan Barangay Hall";
-    return "Lumangbayan Barangay Hall";
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.address) return parsed.address;
+      } catch {}
+    }
+    return language === "tl" ? "Kasalukuyang Lokasyon" : "Current Location";
   });
 
   const [dropoffText, setDropoffText] = useState<string>(() => {
     if (navState?.target === "dropoff" && navState?.address) return navState.address;
     const saved = sessionStorage.getItem("trip_dropoff");
-    if (saved) return JSON.parse(saved).address || "";
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.address) return parsed.address;
+      } catch {}
+    }
     return "";
   });
 
@@ -86,6 +96,7 @@ const SetPlace: React.FC = () => {
       address: place.name,
       lat: place.lat,
       lng: place.lng,
+      isCustom: true,
     };
 
     if (activeTarget === "pickup") {

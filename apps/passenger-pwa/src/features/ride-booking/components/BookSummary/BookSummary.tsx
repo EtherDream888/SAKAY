@@ -605,12 +605,13 @@ const BookSummary: React.FC = () => {
               borderRadius: "16px",
               fontWeight: 700,
               fontSize: "1rem",
-              background: "linear-gradient(135deg, #FF6B00 0%, #FF8533 100%)",
+              backgroundColor: "#FF6B00",
               color: "#FFFFFF",
               "&:hover": {
-                background: "linear-gradient(135deg, #E66000 0%, #FF7315 100%)",
+                backgroundColor: "#E66000",
+                boxShadow: "none",
               },
-              boxShadow: "0 8px 20px rgba(255, 107, 0, 0.25)",
+              boxShadow: "none",
               textTransform: "none",
               width: "100%",
             }}
@@ -652,8 +653,8 @@ const BookSummary: React.FC = () => {
             backgroundColor: "#FF6B00",
             padding: "10px 24px",
             borderRadius: "10px",
-            boxShadow: "0 4px 12px rgba(255, 107, 0, 0.3)",
-            "&:hover": { backgroundColor: "#D65A00" },
+            boxShadow: "none",
+            "&:hover": { backgroundColor: "#E66000", boxShadow: "none" },
             textTransform: "none",
           }}
         >

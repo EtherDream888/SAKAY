@@ -41,11 +41,11 @@ const AccountSelection: React.FC = () => {
         }}
       >
         <IconButton
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/get-started")}
           sx={{
             backgroundColor: "#FFFFFF",
             border: "1px solid #E2E8F0",
-            boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+            boxShadow: "none",
             color: "#1A1A1A",
             borderRadius: "14px",
             width: "44px",

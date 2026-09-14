@@ -440,40 +440,6 @@ export const Register: React.FC = () => {
               {language === 'tl' ? 'Magkatugma ang password!' : 'Passwords match!'}
             </Typography>
           )}
-
-          {/* Terms & Privacy Notice Link */}
-          <Box sx={{ mt: 1, px: 0.5 }}>
-            <Typography sx={{ fontSize: '12.5px', color: '#64748B', lineHeight: 1.5 }}>
-              {language === 'tl' ? 'Sa pagpapatuloy, sumasang-ayon ka sa ' : 'By continuing, you agree to Sakay’s '}
-              <Box
-                component="span"
-                onClick={() => navigate('/terms-of-service', { state: { fromRegister: true } })}
-                sx={{
-                  color: '#FF6B00',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  '&:hover': { textDecoration: 'underline' },
-                }}
-              >
-                {language === 'tl' ? 'Mga Tuntunin ng Serbisyo' : 'Terms of Service'}
-              </Box>
-              {' '}
-              {language === 'tl' ? 'at ' : 'and '}
-              <Box
-                component="span"
-                onClick={() => navigate('/privacy-policy', { state: { fromRegister: true } })}
-                sx={{
-                  color: '#FF6B00',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  '&:hover': { textDecoration: 'underline' },
-                }}
-              >
-                {language === 'tl' ? 'Patakaran sa Privacy' : 'Privacy Policy'}
-              </Box>
-              {language === 'tl' ? ' ng SAKAY.' : '.'}
-            </Typography>
-          </Box>
         </Box>
       </Box>
 

@@ -136,19 +136,16 @@ const Dashboard: React.FC = () => {
     setPermissionModalOpen(false);
   };
 
-  // If location permission was already granted previously, quietly sync real position on mount
+  // Always attempt to get actual passenger position on mount
   useEffect(() => {
-    const gpsPermission = localStorage.getItem("gps_permission");
-    if (gpsPermission === "true" && !permissionModalOpen) {
-      getCurrentDevicePosition()
-        .then((coords) => {
-          setUserLocation({ lat: coords.latitude, lng: coords.longitude });
-          setRecenterTrigger((prev) => prev + 1);
-        })
-        .catch(() => {
-          // Keep previous or default
-        });
-    }
+    getCurrentDevicePosition()
+      .then((coords) => {
+        setUserLocation({ lat: coords.latitude, lng: coords.longitude });
+        setRecenterTrigger((prev) => prev + 1);
+      })
+      .catch(() => {
+        // Handled silently or by permission modal
+      });
   }, [permissionModalOpen]);
 
   // Extract first name for personalized greeting
@@ -156,16 +153,28 @@ const Dashboard: React.FC = () => {
 
   const handleLogout = async () => {
     setDrawerOpen(false);
-    await supabase.auth.signOut();
-    navigate("/");
+    try {
+      await supabase.auth.signOut();
+      localStorage.removeItem("sakay_passenger_phone");
+      localStorage.removeItem("sakay_passenger_password");
+      sessionStorage.clear();
+    } catch (e) {
+      console.warn("Logout error:", e);
+    }
+    navigate("/get-started", { replace: true });
   };
 
   const handleStartNewTrip = () => {
     const gpsPermission = localStorage.getItem("gps_permission");
-    if (gpsPermission === null) {
+    if (gpsPermission === null && !userLocation) {
       navigate("/location-permission");
     } else {
-      navigate("/new-trip", { state: { hasGps: gpsPermission === "true" } });
+      navigate("/new-trip", {
+        state: {
+          hasGps: gpsPermission === "true" || !!userLocation,
+          coords: userLocation,
+        },
+      });
     }
   };
 
@@ -178,7 +187,12 @@ const Dashboard: React.FC = () => {
         lng: 121.1834,
       })
     );
-    handleStartNewTrip();
+    navigate("/new-trip", {
+      state: {
+        hasGps: true,
+        coords: userLocation,
+      },
+    });
   };
 
   const handleAddPlace = () => {
@@ -194,11 +208,12 @@ const Dashboard: React.FC = () => {
       setUserLocation({ lat: coords.latitude, lng: coords.longitude });
       setRecenterTrigger((prev) => prev + 1);
     } catch {
-      // If geolocation not allowed or unavailable, fallback to default center
-      setUserLocation({
-        lat: DEFAULT_CALAPAN_CENTER.latitude,
-        lng: DEFAULT_CALAPAN_CENTER.longitude,
-      });
+      if (!userLocation) {
+        setUserLocation({
+          lat: DEFAULT_CALAPAN_CENTER.latitude,
+          lng: DEFAULT_CALAPAN_CENTER.longitude,
+        });
+      }
       setRecenterTrigger((prev) => prev + 1);
     }
   };

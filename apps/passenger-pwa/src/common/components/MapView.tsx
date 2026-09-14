@@ -48,8 +48,14 @@ export const MapView: React.FC<MapViewProps> = ({
       mapInstanceRef.current = null;
     }
 
-    const effectiveCenter: [number, number] = userLocation
-      ? [userLocation.lat, userLocation.lng]
+    const targetCenter = (pickupLocation && pickupLocation.lat !== 0)
+      ? pickupLocation
+      : (userLocation && userLocation.lat !== 0)
+      ? userLocation
+      : null;
+
+    const effectiveCenter: [number, number] = targetCenter
+      ? [targetCenter.lat, targetCenter.lng]
       : [center.lat, center.lng];
 
     const map = L.map(mapContainerRef.current, {
@@ -226,9 +232,11 @@ export const MapView: React.FC<MapViewProps> = ({
         padding: [60, 60],
         maxZoom: 16,
       });
-    } else if (driverLocation) {
+    } else if (driverLocation && driverLocation.lat !== 0) {
       map.panTo([driverLocation.lat, driverLocation.lng], { animate: true });
-    } else if (userLocation) {
+    } else if (pickupLocation && pickupLocation.lat !== 0) {
+      map.panTo([pickupLocation.lat, pickupLocation.lng], { animate: true });
+    } else if (userLocation && userLocation.lat !== 0) {
       map.panTo([userLocation.lat, userLocation.lng], { animate: true });
     }
   }, [userLocation, pickupLocation, dropoffLocation, driverLocation, recenterTrigger]);
@@ -238,7 +246,9 @@ export const MapView: React.FC<MapViewProps> = ({
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    if (userLocation) {
+    if (pickupLocation && pickupLocation.lat !== 0) {
+      map.flyTo([pickupLocation.lat, pickupLocation.lng], zoom, { duration: 0.8 });
+    } else if (userLocation && userLocation.lat !== 0) {
       map.flyTo([userLocation.lat, userLocation.lng], zoom, { duration: 0.8 });
     } else if (center) {
       map.flyTo([center.lat, center.lng], zoom, { duration: 0.8 });

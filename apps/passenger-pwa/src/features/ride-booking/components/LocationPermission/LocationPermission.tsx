@@ -85,7 +85,17 @@ const LocationPermission: React.FC = () => {
       }}
     >
       {/* Background Google Map */}
-      <MapView interactive={false} />
+      <MapView
+        interactive={false}
+        userLocation={
+          localStorage.getItem("user_lat") && localStorage.getItem("user_lng")
+            ? {
+                lat: parseFloat(localStorage.getItem("user_lat")!),
+                lng: parseFloat(localStorage.getItem("user_lng")!),
+              }
+            : undefined
+        }
+      />
 
       {/* Header behind overlay */}
       <HomeHeader

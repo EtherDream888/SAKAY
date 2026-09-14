@@ -53,8 +53,25 @@ export const checkGeolocationPermission = async (): Promise<PermissionState | nu
   return null;
 };
 
+export const getCachedDevicePosition = (): LocationCoords | null => {
+  try {
+    const lat = localStorage.getItem("user_lat");
+    const lng = localStorage.getItem("user_lng");
+    if (lat && lng) {
+      const parsedLat = parseFloat(lat);
+      const parsedLng = parseFloat(lng);
+      if (!isNaN(parsedLat) && !isNaN(parsedLng) && parsedLat !== 0 && parsedLng !== 0) {
+        return { latitude: parsedLat, longitude: parsedLng };
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+};
+
 /**
- * Requests real device location via browser Geolocation API
+ * Requests real device location via browser Geolocation API with automatic fallback
  */
 export const getCurrentDevicePosition = (): Promise<LocationCoords> => {
   return new Promise((resolve, reject) => {
@@ -63,41 +80,107 @@ export const getCurrentDevicePosition = (): Promise<LocationCoords> => {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords: LocationCoords = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          accuracy: position.coords.accuracy,
-          timestamp: position.timestamp,
-        };
+    const saveSuccess = (position: GeolocationPosition) => {
+      const coords: LocationCoords = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        timestamp: position.timestamp,
+      };
 
-        // Cache coordinates locally for instant rehydration
+      // Cache coordinates locally for instant rehydration across pages
+      try {
         localStorage.setItem("user_lat", coords.latitude.toString());
         localStorage.setItem("user_lng", coords.longitude.toString());
         localStorage.setItem("gps_permission", "true");
+      } catch {}
 
-        resolve(coords);
-      },
-      (error) => {
-        localStorage.setItem("gps_permission", "false");
-        let message = "An error occurred retrieving location.";
-        if (error.code === error.PERMISSION_DENIED) {
-          message = "Location permission denied by user.";
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          message = "Location information is unavailable.";
-        } else if (error.code === error.TIMEOUT) {
-          message = "Location request timed out.";
+      resolve(coords);
+    };
+
+    const tryLowAccuracy = () => {
+      navigator.geolocation.getCurrentPosition(
+        saveSuccess,
+        (error) => {
+          if (error.code === error.PERMISSION_DENIED) {
+            try {
+              localStorage.setItem("gps_permission", "false");
+            } catch {}
+          }
+          let message = "An error occurred retrieving location.";
+          if (error.code === error.PERMISSION_DENIED) {
+            message = "Location permission denied by user.";
+          } else if (error.code === error.POSITION_UNAVAILABLE) {
+            message = "Location information is unavailable.";
+          } else if (error.code === error.TIMEOUT) {
+            message = "Location request timed out.";
+          }
+          reject(new Error(message));
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 8000,
+          maximumAge: 60000,
         }
-        reject(new Error(message));
+      );
+    };
+
+    // Try high accuracy first (e.g. mobile GPS), fallback quickly to low accuracy (Wi-Fi/cellular/network)
+    navigator.geolocation.getCurrentPosition(
+      saveSuccess,
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          try {
+            localStorage.setItem("gps_permission", "false");
+          } catch {}
+          reject(new Error("Location permission denied by user."));
+          return;
+        }
+        // If high accuracy failed due to timeout or unavailable hardware (common on desktop/laptops), try low accuracy
+        tryLowAccuracy();
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
+        timeout: 4000,
+        maximumAge: 10000,
       }
     );
   });
+};
+
+/**
+ * Watch real device location in real-time
+ */
+export const watchDevicePosition = (
+  onCoords: (coords: LocationCoords) => void,
+  onError?: (err: Error) => void
+): number | null => {
+  if (!navigator.geolocation) return null;
+
+  return navigator.geolocation.watchPosition(
+    (position) => {
+      const coords: LocationCoords = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        timestamp: position.timestamp,
+      };
+      try {
+        localStorage.setItem("user_lat", coords.latitude.toString());
+        localStorage.setItem("user_lng", coords.longitude.toString());
+        localStorage.setItem("gps_permission", "true");
+      } catch {}
+      onCoords(coords);
+    },
+    (error) => {
+      if (onError) onError(new Error(error.message));
+    },
+    {
+      enableHighAccuracy: false,
+      timeout: 10000,
+      maximumAge: 30000,
+    }
+  );
 };
 
 /**
