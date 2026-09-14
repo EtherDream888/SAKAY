@@ -535,6 +535,36 @@ const PassengerHistory: React.FC = () => {
                 ))}
               </Box>
             )}
+
+            {todayTrips.length === 0 && pastTrips.length === 0 && (
+              <Box sx={{ textAlign: "center", py: 8, px: 2 }}>
+                <Typography sx={{ fontSize: "16px", fontWeight: 700, color: "#0F172A", fontFamily: "Poppins, sans-serif" }}>
+                  {language === "tl" ? "Wala pang nakaraang biyahe" : "No past trips yet"}
+                </Typography>
+                <Typography sx={{ fontSize: "13px", color: "#64748B", mt: 1, fontFamily: "Poppins, sans-serif" }}>
+                  {language === "tl"
+                    ? "Mag-book ng iyong biyahe upang makita ang iyong history rito."
+                    : "Book a ride to see your trip history here."}
+                </Typography>
+                <Button
+                  variant="contained"
+                  onClick={() => navigate("/new-trip")}
+                  sx={{
+                    mt: 3,
+                    backgroundColor: "#FF6B00",
+                    color: "#FFFFFF",
+                    borderRadius: "14px",
+                    fontWeight: 700,
+                    textTransform: "none",
+                    boxShadow: "none",
+                    fontFamily: "Poppins, sans-serif",
+                    "&:hover": { backgroundColor: "#E66000", boxShadow: "none" },
+                  }}
+                >
+                  {language === "tl" ? "Mag-book ng Biyahe" : "Book a Ride"}
+                </Button>
+              </Box>
+            )}
           </>
         )}
       </Box>

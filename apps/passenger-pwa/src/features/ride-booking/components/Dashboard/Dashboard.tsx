@@ -38,7 +38,7 @@ const Dashboard: React.FC = () => {
   const [profileName, setProfileName] = useState<string>(() => {
     return (location.state as { name?: string; userName?: string })?.name ||
            (location.state as { name?: string; userName?: string })?.userName ||
-           "John";
+           "";
   });
   const [profilePhoto, setProfilePhoto] = useState<string>("");
   const [contactNumber, setContactNumber] = useState<string>("");
@@ -89,7 +89,7 @@ const Dashboard: React.FC = () => {
             .maybeSingle();
 
           if (profile) {
-            setProfileName(profile.full_name || user.user_metadata?.full_name || "John");
+            setProfileName(profile.full_name || user.user_metadata?.full_name || "");
             setProfilePhoto(profile.profile_photo_url || "");
             setContactNumber(profile.contact_number || "");
           } else if (user.user_metadata?.full_name) {
@@ -149,7 +149,7 @@ const Dashboard: React.FC = () => {
   }, [permissionModalOpen]);
 
   // Extract first name for personalized greeting
-  const firstName = profileName.trim().split(" ")[0] || "John";
+  const firstName = profileName.trim().split(" ")[0] || (language === "tl" ? "Pasahero" : "Passenger");
 
   const handleLogout = async () => {
     setDrawerOpen(false);

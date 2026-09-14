@@ -84,7 +84,7 @@ export const DEMO_HISTORY_TRIPS: HistoryTrip[] = [
 export const fetchTripHistory = async (): Promise<HistoryTrip[]> => {
   try {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return DEMO_HISTORY_TRIPS;
+    if (!user) return [];
 
     // Fetch passenger profile
     const { data: profile } = await supabase
@@ -93,9 +93,9 @@ export const fetchTripHistory = async (): Promise<HistoryTrip[]> => {
       .eq("auth_user_id", user.id)
       .maybeSingle();
 
-    if (!profile) return DEMO_HISTORY_TRIPS;
+    if (!profile) return [];
 
-    // Query real bookings
+    // Query real bookings from database
     const { data: bookings, error } = await supabase
       .from("booking")
       .select(`
@@ -114,7 +114,7 @@ export const fetchTripHistory = async (): Promise<HistoryTrip[]> => {
       .order("created_at", { ascending: false });
 
     if (error || !bookings || bookings.length === 0) {
-      return DEMO_HISTORY_TRIPS;
+      return [];
     }
 
     // Map database bookings to HistoryTrip records
@@ -140,6 +140,6 @@ export const fetchTripHistory = async (): Promise<HistoryTrip[]> => {
     });
   } catch (err) {
     console.warn("Trip history database fetch fallback:", err);
-    return DEMO_HISTORY_TRIPS;
+    return [];
   }
 };

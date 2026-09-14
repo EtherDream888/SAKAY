@@ -10,7 +10,8 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import SwapVertIcon from "@mui/icons-material/SwapVert";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
-import NorthWestIcon from "@mui/icons-material/NorthWest";
+import NorthEastIcon from "@mui/icons-material/NorthEast";
+import splashBg from "@sakay/shared/src/assets/images/splash-bg.png";
 
 import type { PlaceSuggestion } from "../../../../services/locationService";
 import {
@@ -110,6 +111,69 @@ const SetPlace: React.FC = () => {
     navigate("/new-trip");
   };
 
+  const renderHighlightedPlaceName = (name: string, query: string) => {
+    if (!query || !query.trim()) {
+      return (
+        <Typography
+          sx={{
+            fontSize: "15px",
+            color: "#0F172A",
+            fontWeight: 700,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            fontFamily: "Poppins, sans-serif",
+          }}
+        >
+          {name}
+        </Typography>
+      );
+    }
+
+    const q = query.trim().toLowerCase();
+    const lower = name.toLowerCase();
+    const matchIndex = lower.indexOf(q);
+
+    if (matchIndex === -1) {
+      return (
+        <Typography
+          sx={{
+            fontSize: "15px",
+            color: "#0F172A",
+            fontWeight: 700,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            fontFamily: "Poppins, sans-serif",
+          }}
+        >
+          {name}
+        </Typography>
+      );
+    }
+
+    const before = name.slice(0, matchIndex);
+    const matched = name.slice(matchIndex, matchIndex + q.length);
+    const after = name.slice(matchIndex + q.length);
+
+    return (
+      <Typography
+        sx={{
+          fontSize: "15px",
+          color: "#0F172A",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          fontFamily: "Poppins, sans-serif",
+        }}
+      >
+        {before && <Box component="span" sx={{ fontWeight: 500 }}>{before}</Box>}
+        <Box component="span" sx={{ fontWeight: 400 }}>{matched}</Box>
+        {after && <Box component="span" sx={{ fontWeight: 800 }}>{after}</Box>}
+      </Typography>
+    );
+  };
+
   return (
     <Box
       sx={{
@@ -121,20 +185,22 @@ const SetPlace: React.FC = () => {
         position: "relative",
       }}
     >
-      {/* Top Header Card: Background bleeds into safe area, interactive content clears safe area */}
+      {/* Top Header Card matching SET PLACE.png & SET PLACE (1).png */}
       <Box
         sx={{
-          background: "linear-gradient(135deg, #FF5B00 0%, #FF6D00 100%)",
+          backgroundImage: `linear-gradient(135deg, rgba(255, 91, 0, 0.94) 0%, rgba(255, 109, 0, 0.94) 100%), url(${splashBg})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
           padding: "calc(var(--safe-area-top) + 16px) 16px 20px 16px",
           display: "flex",
           flexDirection: "column",
-          gap: "12px",
+          gap: "14px",
           boxShadow: "0 4px 16px rgba(255, 91, 0, 0.25)",
           position: "relative",
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          {/* Back Arrow Button */}
+        {/* Row 1: Back Button */}
+        <Box sx={{ display: "flex", alignItems: "center" }}>
           <IconButton
             onClick={() => navigate("/new-trip")}
             sx={{
@@ -148,29 +214,32 @@ const SetPlace: React.FC = () => {
           >
             <ArrowBackIcon />
           </IconButton>
+        </Box>
 
-          {/* Input Stack: PICKUP & DESTINASYON */}
+        {/* Row 2: Inputs and Swap Button */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: "10px", width: "100%" }}>
+          {/* Stack of Pickup & Dropoff Cards */}
           <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
-            {/* PICKUP Input Box */}
+            {/* PICKUP Card */}
             <Box
               onClick={() => setActiveTarget("pickup")}
               sx={{
                 backgroundColor: "rgba(255, 255, 255, 0.25)",
-                backdropFilter: "blur(4px)",
-                borderRadius: "14px",
+                backdropFilter: "blur(6px)",
+                borderRadius: "16px",
                 padding: "8px 14px",
                 display: "flex",
                 alignItems: "center",
-                gap: "10px",
+                gap: "12px",
                 border: activeTarget === "pickup" ? "1.5px solid #FFFFFF" : "1px solid rgba(255, 255, 255, 0.3)",
                 cursor: "pointer",
               }}
             >
-              {/* Orange Radio Dot */}
+              {/* Radio Circle Indicator */}
               <Box
                 sx={{
-                  width: "16px",
-                  height: "16px",
+                  width: "18px",
+                  height: "18px",
                   borderRadius: "50%",
                   border: "2px solid #FFFFFF",
                   display: "flex",
@@ -189,12 +258,12 @@ const SetPlace: React.FC = () => {
                 />
               </Box>
 
-              <Box sx={{ flexGrow: 1 }}>
+              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                 <Typography
                   sx={{
                     fontSize: "10px",
                     fontWeight: 700,
-                    color: "rgba(255, 255, 255, 0.8)",
+                    color: "rgba(255, 255, 255, 0.85)",
                     letterSpacing: "0.5px",
                     fontFamily: "Poppins, sans-serif",
                   }}
@@ -208,8 +277,8 @@ const SetPlace: React.FC = () => {
                   placeholder={language === "tl" ? "Saan ka susunduin?" : "Where should we pick you up?"}
                   sx={{
                     color: "#FFFFFF",
-                    fontSize: "14px",
-                    fontWeight: 600,
+                    fontSize: "15px",
+                    fontWeight: 500,
                     width: "100%",
                     fontFamily: "Poppins, sans-serif",
                     "& input": { padding: 0 },
@@ -218,22 +287,22 @@ const SetPlace: React.FC = () => {
               </Box>
             </Box>
 
-            {/* DESTINASYON Input Box */}
+            {/* DESTINASYON Card */}
             <Box
               onClick={() => setActiveTarget("dropoff")}
               sx={{
                 backgroundColor: "rgba(255, 255, 255, 0.25)",
-                backdropFilter: "blur(4px)",
-                borderRadius: "14px",
+                backdropFilter: "blur(6px)",
+                borderRadius: "16px",
                 padding: "8px 14px",
                 display: "flex",
                 alignItems: "center",
-                gap: "10px",
+                gap: "12px",
                 border: activeTarget === "dropoff" ? "1.5px solid #FFFFFF" : "1px solid rgba(255, 255, 255, 0.3)",
                 cursor: "pointer",
               }}
             >
-              {/* Location Pin Icon */}
+              {/* Black Location Pin Icon */}
               <Box
                 sx={{
                   width: "18px",
@@ -249,12 +318,12 @@ const SetPlace: React.FC = () => {
                 <LocationOnIcon sx={{ color: "#FFFFFF", fontSize: "12px" }} />
               </Box>
 
-              <Box sx={{ flexGrow: 1 }}>
+              <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                 <Typography
                   sx={{
                     fontSize: "10px",
                     fontWeight: 700,
-                    color: "rgba(255, 255, 255, 0.8)",
+                    color: "rgba(255, 255, 255, 0.85)",
                     letterSpacing: "0.5px",
                     fontFamily: "Poppins, sans-serif",
                   }}
@@ -265,12 +334,12 @@ const SetPlace: React.FC = () => {
                   value={dropoffText}
                   onChange={(e) => setDropoffText(e.target.value)}
                   onFocus={() => setActiveTarget("dropoff")}
-                  placeholder={language === "tl" ? "I-type ang lugar" : "Type a destination"}
+                  placeholder={language === "tl" ? "I-type ang lugar" : "Type destination"}
                   autoFocus={initialTarget === "dropoff"}
                   sx={{
                     color: "#FFFFFF",
-                    fontSize: "14px",
-                    fontWeight: 600,
+                    fontSize: "15px",
+                    fontWeight: 500,
                     width: "100%",
                     fontFamily: "Poppins, sans-serif",
                     "& input": { padding: 0 },
@@ -283,16 +352,18 @@ const SetPlace: React.FC = () => {
           {/* Swap Places Button */}
           <IconButton
             onClick={handleSwap}
+            aria-label="Swap pickup and destination"
             sx={{
               color: "#FFFFFF",
-              backgroundColor: "rgba(255, 255, 255, 0.2)",
-              width: "40px",
-              height: "40px",
-              borderRadius: "12px",
-              "&:hover": { backgroundColor: "rgba(255, 255, 255, 0.3)" },
+              backgroundColor: "transparent",
+              width: "36px",
+              height: "36px",
+              borderRadius: "10px",
+              flexShrink: 0,
+              "&:hover": { backgroundColor: "rgba(255, 255, 255, 0.15)" },
             }}
           >
-            <SwapVertIcon />
+            <SwapVertIcon sx={{ fontSize: "24px" }} />
           </IconButton>
         </Box>
       </Box>
@@ -361,21 +432,9 @@ const SetPlace: React.FC = () => {
                   </Typography>
                 </Box>
 
-                {/* Center Title & Subtitle Address */}
+                {/* Center Title with query highlight & Subtitle Address */}
                 <Box sx={{ flexGrow: 1, overflow: "hidden" }}>
-                  <Typography
-                    sx={{
-                      fontSize: "15px",
-                      color: "#0F172A",
-                      fontWeight: 700,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      fontFamily: "Poppins, sans-serif",
-                    }}
-                  >
-                    {place.name}
-                  </Typography>
+                  {renderHighlightedPlaceName(place.name, currentSearchQuery)}
                   <Typography
                     sx={{
                       fontSize: "12px",
@@ -393,7 +452,7 @@ const SetPlace: React.FC = () => {
 
                 {/* Right Top-Right Arrow Icon */}
                 <IconButton size="small" sx={{ color: "#0F172A" }}>
-                  <NorthWestIcon sx={{ fontSize: "18px" }} />
+                  <NorthEastIcon sx={{ fontSize: "20px" }} />
                 </IconButton>
               </Box>
               {idx < suggestions.length - 1 && (

@@ -22,9 +22,9 @@ const Login: React.FC = () => {
   const { language, t } = useLanguage();
   const navigate = useNavigate();
 
-  // Form State with prefilled demo values
-  const [identifier, setIdentifier] = useState("09171234567");
-  const [password, setPassword] = useState("Password123!");
+  // Form State - no prefilled placeholder data
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -50,48 +50,39 @@ const Login: React.FC = () => {
 
     try {
       const cleanPhone = identifier.replace(/\D/g, '');
-      const phone09 = cleanPhone.startsWith('0') ? cleanPhone : `0${cleanPhone}`;
       const formattedPhone = formatPhoneToE164(identifier);
+      const phone63NoPlus = cleanPhone.startsWith('0')
+        ? `63${cleanPhone.slice(1)}`
+        : cleanPhone.startsWith('63')
+        ? cleanPhone
+        : `63${cleanPhone}`;
+      const passengerEmail = `passenger_${phone63NoPlus}@sakay.ph`;
 
-      // Instant Test/Demo Passenger Login support
-      const isTestPassenger =
-        password === 'Password123!' ||
-        password === '@Dmin_123' ||
-        password === 'password' ||
-        password === '123456';
-
-      if (isTestPassenger && phone09.length >= 10) {
-        setLoading(false);
-        setSuccess(true);
-        setTimeout(() => {
-          localStorage.removeItem('gps_permission');
-          sessionStorage.removeItem('gps_permission_session');
-          navigate('/dashboard', {
-            replace: true,
-            state: {
-              name: 'Passenger',
-              freshLogin: true,
-            },
-          });
-        }, 1000);
-        return;
-      }
-      
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      // 1. Attempt phone sign-in
+      let signInResponse = await supabase.auth.signInWithPassword({
         phone: formattedPhone,
         password: password,
       });
 
-      if (signInError) {
-        console.warn("Supabase signIn warning:", signInError.message);
-        if (signInError.message?.toLowerCase().includes('invalid login credentials') || signInError.message?.toLowerCase().includes('invalid credentials')) {
-          setError(language === "tl" ? "Mali ang password o numero. Pakisubukang muli." : "Invalid mobile number or password.");
-          setLoading(false);
-          return;
+      // 2. If phone sign-in failed or returned invalid credentials, try email sign-in fallback
+      if (signInResponse.error) {
+        const emailResponse = await supabase.auth.signInWithPassword({
+          email: passengerEmail,
+          password: password,
+        });
+        if (!emailResponse.error && emailResponse.data?.user) {
+          signInResponse = emailResponse;
         }
       }
 
-      const user = data?.user;
+      if (signInResponse.error) {
+        console.warn("Supabase signIn warning:", signInResponse.error.message);
+        setError(language === "tl" ? "Mali ang password o numero. Pakisubukang muli." : "Invalid mobile number or password.");
+        setLoading(false);
+        return;
+      }
+
+      const user = signInResponse.data?.user;
       const role = user?.user_metadata?.role || 'passenger';
 
       if (user?.id) {

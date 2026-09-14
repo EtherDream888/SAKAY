@@ -22,6 +22,7 @@ import {
   sendPassengerOtp,
   ensurePassengerAuthSession,
   formatPhoneToE164,
+  lookupPassengerByPhone,
 } from '../../../../services/passengerApiService';
 
 export const formatMobileNumber = (value: string): string => {
@@ -76,6 +77,8 @@ export const Register: React.FC = () => {
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [accountError, setAccountError] = useState<string | null>(null);
+  const [phoneRegisteredError, setPhoneRegisteredError] = useState<string | null>(null);
+  const [checkingPhone, setCheckingPhone] = useState(false);
 
   useEffect(() => {
     try {
@@ -87,6 +90,42 @@ export const Register: React.FC = () => {
 
   const cleanPhoneDigits = phone.replace(/\D/g, '');
   const fullName = [firstName.trim(), middleName.trim(), lastName.trim(), suffix.trim()].filter(Boolean).join(' ');
+
+  // Debounced check for existing registered passenger by phone
+  useEffect(() => {
+    if (cleanPhoneDigits.length === 11 && cleanPhoneDigits.startsWith('09')) {
+      let isCurrent = true;
+      setCheckingPhone(true);
+      const timer = setTimeout(async () => {
+        try {
+          const existing = await lookupPassengerByPhone(cleanPhoneDigits);
+          if (isCurrent) {
+            if (existing) {
+              setPhoneRegisteredError(
+                language === 'tl'
+                  ? 'Ang numerong ito ay nakarehistro na. Mangyaring mag-log in na lamang.'
+                  : 'This mobile number is already registered. Please log in instead.'
+              );
+            } else {
+              setPhoneRegisteredError(null);
+            }
+          }
+        } catch (err) {
+          console.warn('[Register] Error checking phone uniqueness:', err);
+        } finally {
+          if (isCurrent) setCheckingPhone(false);
+        }
+      }, 350);
+
+      return () => {
+        isCurrent = false;
+        clearTimeout(timer);
+      };
+    } else {
+      setPhoneRegisteredError(null);
+      setCheckingPhone(false);
+    }
+  }, [cleanPhoneDigits, language]);
 
   const criteriaList = [
     {
@@ -159,6 +198,7 @@ export const Register: React.FC = () => {
     firstName.trim() &&
     lastName.trim() &&
     isValidPhone &&
+    !phoneRegisteredError &&
     isPasswordValid &&
     password === confirmPassword
   );
@@ -168,6 +208,17 @@ export const Register: React.FC = () => {
     setHasAttemptedSubmit(true);
     setAccountError(null);
     if (!isFormValid) return;
+
+    // Check if phone number is already registered
+    const existing = await lookupPassengerByPhone(cleanPhoneDigits);
+    if (existing) {
+      const msg = language === 'tl'
+        ? 'Ang numerong ito ay nakarehistro na. Mangyaring mag-log in na lamang.'
+        : 'This mobile number is already registered. Please log in instead.';
+      setPhoneRegisteredError(msg);
+      setAccountError(msg);
+      return;
+    }
 
     setSubmitted(true);
 
@@ -333,13 +384,18 @@ export const Register: React.FC = () => {
           <SakayPhoneInput
             label={language === 'tl' ? "NUMERO NG TELEPONO" : "MOBILE NUMBER"}
             value={phone}
-            onChange={(fullVal) => setPhone(fullVal)}
+            onChange={(fullVal) => {
+              setPhone(fullVal);
+              if (phoneRegisteredError) setPhoneRegisteredError(null);
+            }}
             required
-            error={hasAttemptedSubmit && !isValidPhone}
+            error={(hasAttemptedSubmit && !isValidPhone) || Boolean(phoneRegisteredError)}
             helperText={
-              hasAttemptedSubmit && !isValidPhone
-                ? (language === 'tl' ? 'Pakikumpleto ang 10-digit mobile number na nagsisimula sa 9.' : 'Please enter a valid 10-digit mobile number starting with 9.')
-                : ''
+              phoneRegisteredError
+                ? phoneRegisteredError
+                : (hasAttemptedSubmit && !isValidPhone
+                    ? (language === 'tl' ? 'Pakikumpleto ang 10-digit mobile number na nagsisimula sa 9.' : 'Please enter a valid 10-digit mobile number starting with 9.')
+                    : (checkingPhone ? (language === 'tl' ? 'Sinusuri ang numero...' : 'Checking number...') : ''))
             }
           />
 

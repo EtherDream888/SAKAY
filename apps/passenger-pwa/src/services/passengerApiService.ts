@@ -203,13 +203,24 @@ export async function ensurePassengerAuthSession(
   console.log('[PASSENGER REGISTRATION AUTH] Identifier Email:', passengerEmail);
 
   try {
-    // 1. Check existing active session
-    const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
-    console.log('[PASSENGER REGISTRATION AUTH] Existing session check:', {
-      exists: Boolean(sessionData?.session),
-      userId: sessionData?.session?.user?.id || null,
-      error: sessionErr ? sessionErr.message : null,
-    });
+    // 1. Strict Duplicate Check: Look up existing passenger record by phone in Supabase
+    const existingPassenger = await lookupPassengerByPhone(phone);
+    if (existingPassenger) {
+      console.warn('[PASSENGER REGISTRATION AUTH] Phone number already registered in passenger table:', e164Phone);
+      return {
+        success: false,
+        error: getLocalizedError(
+          'Ang numerong ito ay nakarehistro na. Mangyaring mag-log in na lamang.',
+          'This mobile number is already registered. Please log in instead.'
+        ),
+      };
+    }
+
+    // 2. Sign out any existing session to ensure a clean registration flow
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData?.session) {
+      await supabase.auth.signOut();
+    }
 
     // Helper to ensure public.passenger record is provisioned and linked to auth_user_id
     const syncPassengerProfileRecord = async (userId: string) => {
@@ -256,27 +267,7 @@ export async function ensurePassengerAuthSession(
       }
     };
 
-    if (sessionData?.session?.user) {
-      const activeUserId = sessionData.session.user.id;
-      const { data: passengerRows } = await supabase
-        .from('passenger')
-        .select('passenger_id, auth_user_id, contact_number')
-        .or(`auth_user_id.eq.${activeUserId},contact_number.eq.${candidates.phone63WithPlus},contact_number.eq.${candidates.phone09},contact_number.eq.${candidates.phone63NoPlus},contact_number.eq.${candidates.phoneRaw}`)
-        .limit(1);
-
-      const passengerRow = passengerRows?.[0] || null;
-
-      if (passengerRow) {
-        console.log('[PASSENGER REGISTRATION AUTH] Active session matches passenger profile:', passengerRow.passenger_id);
-        await syncPassengerProfileRecord(activeUserId);
-        return { success: true };
-      }
-
-      console.warn('[PASSENGER REGISTRATION AUTH] Active session is unlinked or stale for user:', activeUserId, '. Signing out...');
-      await supabase.auth.signOut();
-    }
-
-    // 2. FRESH REGISTRATION: Call signUp with trigger metadata fields
+    // 3. FRESH REGISTRATION: Call signUp with trigger metadata fields
     console.log('[PASSENGER REGISTRATION AUTH] Invoking signUp with passenger credentials & trigger metadata...');
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: passengerEmail,
@@ -306,26 +297,14 @@ export async function ensurePassengerAuthSession(
       return { success: true };
     }
 
-    // If user already registered, sign in to link session
+    // If user already registered in Supabase Auth, reject duplicate registration immediately
     if (signUpError && (signUpError.message?.toLowerCase().includes('already registered') || signUpError.message?.toLowerCase().includes('user already exists') || (signUpError as any)?.code === 'user_already_exists')) {
-      console.log('[PASSENGER REGISTRATION AUTH] Account already registered. Attempting sign-in...');
-      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-        email: passengerEmail,
-        password: password,
-      });
-
-      if (!signInErr && signInData?.session?.user?.id) {
-        console.log('[PASSENGER REGISTRATION AUTH] Signed into existing passenger account. Syncing profile...');
-        await syncPassengerProfileRecord(signInData.session.user.id);
-        return { success: true };
-      }
-
-      console.warn('[PASSENGER REGISTRATION AUTH] Sign in to existing account failed:', signInErr?.message);
+      console.warn('[PASSENGER REGISTRATION AUTH] Account already exists in Supabase Auth. Rejecting duplicate registration.');
       return {
         success: false,
         error: getLocalizedError(
-          'Ang mobile number na ito ay rehistrado na. Pakisubukang mag-login o i-reset ang password.',
-          'This mobile number is already registered. Please log in or reset your password.'
+          'Ang numerong ito ay nakarehistro na. Mangyaring mag-log in na lamang.',
+          'This mobile number is already registered. Please log in instead.'
         ),
       };
     }
