@@ -27,6 +27,7 @@ import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 
 import MapView from '../../../common/components/MapView';
+import PassengerCancelModal from '../../../common/components/PassengerCancelModal';
 import { getBooking, cancelBooking, updateBookingState } from '../../../services/bookingService';
 import type { BookingRecord } from '../../../services/bookingService';
 import { subscribeToDispatchEvents } from '@sakay/shared';
@@ -283,8 +284,8 @@ export const TripMonitoring: React.FC = () => {
     }
   };
 
-  const handleCancelTrip = async () => {
-    await cancelBooking(activeBookingId, 'Passenger cancelled before pickup');
+  const handleCancelTrip = async (reasonText?: string) => {
+    await cancelBooking(activeBookingId, reasonText || 'Passenger cancelled before pickup');
     setCancelModalOpen(false);
     sessionStorage.removeItem('current_active_booking_id');
     navigate('/dashboard');
@@ -553,33 +554,13 @@ export const TripMonitoring: React.FC = () => {
         </Box>
       </Paper>
 
-      {/* 4. Cancellation Confirmation Dialog */}
-      <Dialog
+      {/* 4. Cancellation Confirmation Modal matching PASSENGER CANCEL.png */}
+      <PassengerCancelModal
         open={cancelModalOpen}
         onClose={() => setCancelModalOpen(false)}
-        fullWidth
-        maxWidth="xs"
-        slotProps={{ paper: { sx: { borderRadius: '24px', p: 1 } } }}
-      >
-        <DialogTitle sx={{ fontWeight: 800, color: '#0F172A' }}>
-          {language === 'tl' ? 'Kanselahin ang Biyahe?' : 'Cancel Trip?'}
-        </DialogTitle>
-        <DialogContent>
-          <Typography sx={{ fontSize: '13.5px', color: '#64748B' }}>
-            {language === 'tl'
-              ? 'Sigurado ka bang nais mong kanselahin ang booking na ito?'
-              : 'Are you sure you want to cancel this booking?'}
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ p: '12px 18px 18px', gap: 1 }}>
-          <Button variant="outlined" fullWidth onClick={() => setCancelModalOpen(false)} sx={{ borderRadius: '12px' }}>
-            {language === 'tl' ? 'Huwag Kanselahin' : 'Keep Trip'}
-          </Button>
-          <Button variant="contained" fullWidth color="error" onClick={handleCancelTrip} sx={{ borderRadius: '12px', fontWeight: 700 }}>
-            {language === 'tl' ? 'Oo, Kanselahin' : 'Yes, Cancel'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onConfirmCancel={handleCancelTrip}
+        language={language}
+      />
 
       {/* 5. Passenger SMS Communication Modal */}
       <Dialog

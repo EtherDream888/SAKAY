@@ -24,6 +24,7 @@ import DialogActions from "@mui/material/DialogActions";
 import TextField from "@mui/material/TextField";
 
 import MapView from "../../../../common/components/MapView";
+import PassengerCancelModal from "../../../../common/components/PassengerCancelModal";
 import HomeHeader from "../Dashboard/HomeHeader";
 import PassengerNavigationDrawer from "../Dashboard/PassengerNavigationDrawer";
 import TulongDialog from "../Dashboard/TulongDialog";
@@ -83,6 +84,8 @@ const NewTrip: React.FC = () => {
   const [notificationsOpen, setNotificationsOpen] = useState<boolean>(false);
   const [recenterTrigger, setRecenterTrigger] = useState<number>(0);
   const [validationError, setValidationError] = useState<string>("");
+  const [cancelModalOpen, setCancelModalOpen] = useState<boolean>(false);
+  const [cancelling, setCancelling] = useState<boolean>(false);
 
   // Dialog States for Controls
   const [notesDialogOpen, setNotesDialogOpen] = useState<boolean>(false);
@@ -438,12 +441,27 @@ const NewTrip: React.FC = () => {
     }
   };
 
-  const handleCancelBooking = async () => {
-    if (activeBooking?.booking_id) {
-      await cancelBooking(activeBooking.booking_id, "Cancelled by Passenger");
+  const handleConfirmCancelBooking = async (reasonText: string) => {
+    try {
+      setCancelling(true);
+      if (activeBooking?.booking_id) {
+        await cancelBooking(activeBooking.booking_id, reasonText);
+      }
+      setIsSearching(false);
+      setActiveBooking(null);
+      setCancelModalOpen(false);
+    } catch (err) {
+      console.warn("Error cancelling booking:", err);
+      setIsSearching(false);
+      setActiveBooking(null);
+      setCancelModalOpen(false);
+    } finally {
+      setCancelling(false);
     }
-    setIsSearching(false);
-    setActiveBooking(null);
+  };
+
+  const handleCancelBooking = () => {
+    setCancelModalOpen(true);
   };
 
   const handleSaveNotes = () => {
@@ -652,7 +670,7 @@ const NewTrip: React.FC = () => {
             {/* Cancel Booking Button matching TIER 1 - SOLO.png */}
             <Button
               fullWidth
-              onClick={handleCancelBooking}
+              onClick={() => setCancelModalOpen(true)}
               sx={{
                 mt: 2,
                 height: "50px",
@@ -1577,6 +1595,15 @@ const NewTrip: React.FC = () => {
       <NotificationsDialog
         open={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
+      />
+
+      {/* 11. Passenger Cancellation Modal matching PASSENGER CANCEL.png */}
+      <PassengerCancelModal
+        open={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        onConfirmCancel={handleConfirmCancelBooking}
+        language={language}
+        loading={cancelling}
       />
     </Box>
   );

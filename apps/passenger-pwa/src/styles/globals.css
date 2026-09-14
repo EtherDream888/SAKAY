@@ -47,6 +47,12 @@ body {
   display: none !important;
 }
 
+/* Reset Leaflet div icon default frame */
+.leaflet-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
 /* User Location GPS Pulse Dot */
 .leaflet-user-marker {
   display: flex;
@@ -91,5 +97,78 @@ body {
   100% {
     transform: scale(2.4);
     opacity: 0;
+  }
+}
+
+/* Google Maps-Style Pickup Location Glowing & Moving Circle */
+.leaflet-gmaps-pickup-container {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.gmaps-pickup-radar-wave {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 107, 0, 0.5) 0%, rgba(255, 107, 0, 0.18) 55%, rgba(255, 107, 0, 0) 75%);
+  animation: gmapsRadarWave 2.4s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+  pointer-events: none;
+}
+
+.gmaps-pickup-radar-wave.wave-delayed {
+  animation-delay: 1.2s;
+}
+
+.gmaps-pickup-aura {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: rgba(255, 107, 0, 0.28);
+  animation: gmapsAuraPulse 2.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.gmaps-pickup-core-dot {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: #FF6B00;
+  border: 3px solid #FFFFFF;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35), 0 0 12px rgba(255, 107, 0, 0.75);
+  z-index: 3;
+}
+
+@keyframes gmapsRadarWave {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.95;
+  }
+  50% {
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+@keyframes gmapsAuraPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.45;
+  }
+  50% {
+    transform: scale(1.45);
+    opacity: 0.9;
   }
 }

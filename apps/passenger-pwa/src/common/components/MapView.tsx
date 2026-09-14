@@ -166,60 +166,66 @@ export const MapView: React.FC<MapViewProps> = ({
       const userDotIcon = L.divIcon({
         className: "leaflet-user-marker",
         html: `
-          <div class="leaflet-user-pulse">
-            <div class="pulse-ring"></div>
-            <div class="pulse-core"></div>
+          <div class="leaflet-gmaps-pickup-container">
+            <div class="gmaps-pickup-radar-wave"></div>
+            <div class="gmaps-pickup-radar-wave wave-delayed"></div>
+            <div class="gmaps-pickup-aura"></div>
+            <div class="gmaps-pickup-core-dot"></div>
           </div>
         `,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
       });
 
       L.marker([userLocation.lat, userLocation.lng], { icon: userDotIcon }).addTo(markersLayer);
     }
 
-    // 2. Pickup Pin Marker matching BOOK - SOLO.png (White circle with orange center)
+    // 2. Pickup Marker: Google Maps Style Glowing & Moving Circle
     if (pickupLocation && pickupLocation.lat !== 0) {
       const pickupIcon = L.divIcon({
         className: "leaflet-pickup-marker",
         html: `
-          <div style="
-            width: 20px;
-            height: 20px;
-            background-color: #FFFFFF;
-            border: 4.5px solid #FF6B00;
-            border-radius: 50%;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-          "></div>
+          <div class="leaflet-gmaps-pickup-container">
+            <div class="gmaps-pickup-radar-wave"></div>
+            <div class="gmaps-pickup-radar-wave wave-delayed"></div>
+            <div class="gmaps-pickup-aura"></div>
+            <div class="gmaps-pickup-core-dot"></div>
+          </div>
         `,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
       });
 
       L.marker([pickupLocation.lat, pickupLocation.lng], { icon: pickupIcon }).addTo(markersLayer);
     }
 
-    // 3. Dropoff Pin Marker matching BOOK - SOLO.png (Dark destination pin with white core)
+    // 3. Dropoff Marker: Google Maps Style Red Location Pin
     if (dropoffLocation && dropoffLocation.lat !== 0) {
       const dropoffIcon = L.divIcon({
-        className: "leaflet-dropoff-marker",
+        className: "leaflet-destination-marker",
         html: `
           <div style="
-            width: 22px;
-            height: 22px;
-            background-color: #0F172A;
-            border: 3px solid #FFFFFF;
-            border-radius: 50%;
-            box-shadow: 0 3px 10px rgba(15, 23, 42, 0.35);
+            position: relative;
+            width: 32px;
+            height: 42px;
             display: flex;
             align-items: center;
             justify-content: center;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.38));
+            cursor: pointer;
           ">
-            <div style="width: 7px; height: 7px; background-color: #FFFFFF; border-radius: 50%;"></div>
+            <svg width="32" height="42" viewBox="0 0 32 42" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M16 0C7.16344 0 0 7.16344 0 16C0 27.2 14.5 40.5 15.36 41.28C15.73 41.62 16.27 41.62 16.64 41.28C17.5 40.5 32 27.2 32 16C32 7.16344 24.8366 0 16 0Z"
+                fill="#EA4335"
+              />
+              <circle cx="16" cy="16" r="6.2" fill="#FFFFFF" />
+              <circle cx="16" cy="16" r="3" fill="#C5221F" />
+            </svg>
           </div>
         `,
-        iconSize: [22, 22],
-        iconAnchor: [11, 11],
+        iconSize: [32, 42],
+        iconAnchor: [16, 42],
       });
 
       L.marker([dropoffLocation.lat, dropoffLocation.lng], { icon: dropoffIcon }).addTo(markersLayer);
