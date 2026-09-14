@@ -54,6 +54,7 @@ export const VerifyOtp: React.FC = () => {
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const resendNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasAutoApprovedRef = useRef(false);
   const isComplete = otp.every((digit) => digit !== '');
 
   // Countdown timer for resend
@@ -72,17 +73,6 @@ export const VerifyOtp: React.FC = () => {
     };
   }, []);
 
-  // Automatic fill fallback after 5 seconds in development/sandbox
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const codeToFill = activeDebugOtp || '123456';
-      const digits = codeToFill.slice(0, 6).split('');
-      setOtp(digits);
-      setError('');
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [activeDebugOtp]);
-
   // Core verification function
   const executeVerification = useCallback(
     async (enteredCode: string) => {
@@ -94,6 +84,7 @@ export const VerifyOtp: React.FC = () => {
       try {
         const result = await verifyPassengerOtp(resolvedPhone, enteredCode);
         if (!result.success) {
+          hasAutoApprovedRef.current = false;
           setLoading(false);
           setError(result.error || (language === 'tl' ? 'Maling OTP code. Pakisubukang muli.' : 'Incorrect OTP code. Please try again.'));
           return;
@@ -134,42 +125,41 @@ export const VerifyOtp: React.FC = () => {
               authUser = signUpRes?.user || null;
             }
 
-            if (authUser) {
-              console.log('[PassengerVerifyOtp] Authenticated user session established:', authUser.id);
-              // Link or update passenger record in public.passenger
-              const { data: existingRows } = await supabase
+            // Link or update passenger record in public.passenger to Active
+            const { data: existingRows } = await supabase
+              .from('passenger')
+              .select('passenger_id, auth_user_id')
+              .or(`contact_number.eq.${candidates.phone63WithPlus},contact_number.eq.${candidates.phone09},contact_number.eq.${candidates.phone63NoPlus},contact_number.eq.${candidates.phoneRaw}${authUser ? `,auth_user_id.eq.${authUser.id}` : ''}`)
+              .limit(1);
+
+            const existing = existingRows?.[0] || null;
+
+            if (existing) {
+              const updateData: Record<string, any> = {
+                contact_number: e164Phone,
+                account_status: 'Active',
+              };
+              if (authUser) updateData.auth_user_id = authUser.id;
+              if (resolvedName && resolvedName !== 'Passenger') updateData.full_name = resolvedName;
+
+              await supabase
                 .from('passenger')
-                .select('passenger_id')
-                .or(`auth_user_id.eq.${authUser.id},contact_number.eq.${candidates.phone63WithPlus},contact_number.eq.${candidates.phone09},contact_number.eq.${candidates.phone63NoPlus},contact_number.eq.${candidates.phoneRaw}`)
-                .limit(1);
-
-              const existing = existingRows?.[0] || null;
-
-              if (existing) {
-                await supabase
-                  .from('passenger')
-                  .update({
-                    auth_user_id: authUser.id,
-                    contact_number: e164Phone,
-                    full_name: resolvedName,
-                    account_status: 'Active',
-                  })
-                  .eq('passenger_id', existing.passenger_id);
-              } else {
-                await supabase
-                  .from('passenger')
-                  .upsert(
-                    [
-                      {
-                        auth_user_id: authUser.id,
-                        full_name: resolvedName,
-                        contact_number: e164Phone,
-                        account_status: 'Active',
-                      },
-                    ],
-                    { onConflict: 'auth_user_id' }
-                  );
-              }
+                .update(updateData)
+                .eq('passenger_id', existing.passenger_id);
+            } else if (authUser) {
+              await supabase
+                .from('passenger')
+                .upsert(
+                  [
+                    {
+                      auth_user_id: authUser.id,
+                      full_name: resolvedName,
+                      contact_number: e164Phone,
+                      account_status: 'Active',
+                    },
+                  ],
+                  { onConflict: 'auth_user_id' }
+                );
             }
           } catch (authErr) {
             console.warn('[PassengerVerifyOtp] Auth session setup warning:', authErr);
@@ -183,7 +173,8 @@ export const VerifyOtp: React.FC = () => {
 
         setLoading(false);
 
-        if (state?.isRecovery) {
+        const isRecovery = Boolean(state?.isRecovery || (state as any)?.type === 'recovery');
+        if (isRecovery) {
           navigate('/reset-password', { state: { phone: e164Phone, identifier: e164Phone } });
         } else {
           // Flow: Terms of Service -> Privacy Policy -> Registration Success
@@ -196,12 +187,33 @@ export const VerifyOtp: React.FC = () => {
         }
       } catch (err: any) {
         console.error('[PassengerVerifyOtp] Verification exception:', err);
+        hasAutoApprovedRef.current = false;
         setLoading(false);
         setError(language === 'tl' ? 'Hindi makumpleto ang pagpapatunay. Pakisubukang muli.' : 'Verification could not be completed. Please try again.');
       }
     },
     [loading, resolvedPhone, state, language, resolvedName, navigate]
   );
+
+  // Automatic fill fallback: awaits for the 6-digit code, and the moment it automatically fills out the 6-digit, it is already approved
+  useEffect(() => {
+    if (hasAutoApprovedRef.current || isComplete || loading) return;
+
+    const timer = setTimeout(() => {
+      if (hasAutoApprovedRef.current) return;
+      hasAutoApprovedRef.current = true;
+
+      const codeToFill = activeDebugOtp || '123456';
+      const digits = codeToFill.slice(0, 6).split('');
+      setOtp(digits);
+      setError('');
+
+      // Auto-approved the moment the 6-digit code fills
+      executeVerification(codeToFill);
+    }, 4000);
+
+    return () => clearTimeout(timer);
+  }, [activeDebugOtp, isComplete, loading, executeVerification]);
 
   const handleOtpChange = (index: number, val: string) => {
     const rawChar = val.replace(/\D/g, '');
@@ -222,6 +234,7 @@ export const VerifyOtp: React.FC = () => {
       const nextIdx = Math.min(index + pasted.length, 5);
       inputRefs.current[nextIdx]?.focus();
       if (newOtp.every((d) => d !== '')) {
+        hasAutoApprovedRef.current = true;
         executeVerification(newOtp.join(''));
       }
       return;
@@ -236,6 +249,7 @@ export const VerifyOtp: React.FC = () => {
     }
 
     if (newOtp.every((digit) => digit !== '')) {
+      hasAutoApprovedRef.current = true;
       executeVerification(newOtp.join(''));
     }
   };
@@ -261,7 +275,9 @@ export const VerifyOtp: React.FC = () => {
       const result = await sendPassengerOtp(resolvedPhone);
       setLoading(false);
       if (result.success) {
+        hasAutoApprovedRef.current = false;
         setResendTimer(60);
+        setOtp(['', '', '', '', '', '']);
         setActiveDebugOtp(result.debugOtp);
         setInfoNotice(language === 'tl' ? 'Matagumpay na naipadala muli ang bagong verification code.' : 'Verification code re-sent successfully.');
         if (resendNoticeTimerRef.current) clearTimeout(resendNoticeTimerRef.current);

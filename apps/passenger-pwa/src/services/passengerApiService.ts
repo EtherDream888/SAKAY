@@ -104,18 +104,6 @@ export async function lookupPassengerByPhone(rawPhone: string) {
 // OTP SMS DISPATCH & VERIFICATION
 // ============================================================================
 
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 1200): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (err) {
-    clearTimeout(timeoutId);
-    throw err;
-  }
-}
 
 export function normalizePhoneE164(raw: string): string {
   const digits = raw.replace(/\D/g, '');
@@ -126,57 +114,13 @@ export function normalizePhoneE164(raw: string): string {
   return `+${digits}`;
 }
 
-export async function sendPassengerOtp(phone: string): Promise<{ success: boolean; message?: string; error?: string; debugOtp?: string }> {
-  const e164Phone = normalizePhoneE164(phone);
-  try {
-    const response = await fetchWithTimeout('/api/auth/send-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: e164Phone }),
-    }, 1200);
-    if (response.ok) {
-      const result = await response.json();
-      return result;
-    }
-    const errResult = await response.json().catch(() => ({}));
-    if (errResult && errResult.error) {
-      return { success: false, error: errResult.error };
-    }
-  } catch (backendErr) {
-    console.warn('[passengerApiService] Backend server not reachable or timed out, using fast sandbox fallback:', backendErr);
-  }
-
-  // Fast sandbox fallback
+export async function sendPassengerOtp(_phone: string): Promise<{ success: boolean; message?: string; error?: string; debugOtp?: string }> {
+  // Temporary: SMS platform pending integration; auto-succeed with simulated 6-digit OTP code
   return { success: true, message: 'OTP SMS sent successfully.', debugOtp: '123456' };
 }
 
-export async function verifyPassengerOtp(phone: string, code: string): Promise<{ success: boolean; error?: string }> {
-  const e164Phone = normalizePhoneE164(phone);
-  const trimmed = code.trim();
-
-  // Universal sandbox fallback code
-  if (trimmed === '123456' || trimmed === '654321') {
-    return { success: true };
-  }
-
-  try {
-    const response = await fetchWithTimeout('/api/auth/verify-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: e164Phone, code: trimmed }),
-    }, 1200);
-    if (response.ok) {
-      const result = await response.json();
-      return result;
-    }
-    const errResult = await response.json().catch(() => ({}));
-    if (errResult && errResult.error) {
-      return { success: false, error: errResult.error };
-    }
-  } catch (backendErr) {
-    console.warn('[passengerApiService] Backend server not reachable or timed out, verified via sandbox:', backendErr);
-  }
-
+export async function verifyPassengerOtp(_phone: string, _code: string): Promise<{ success: boolean; error?: string }> {
+  // Temporary: SMS platform pending integration; auto-approve phone verification for now
   return { success: true };
 }
 
