@@ -34,6 +34,7 @@ import {
   DEFAULT_CALAPAN_CENTER,
   getCurrentDevicePosition,
   reverseGeocodeCoordinates,
+  getOSRMRoute,
 } from "../../../../services/locationService";
 import {
   createBooking,
@@ -165,6 +166,7 @@ const NewTrip: React.FC = () => {
 
   const [tripDistanceKm, setTripDistanceKm] = useState<number>(3.5);
   const [estimatedFare, setEstimatedFare] = useState<number>(60.0);
+  const [routeCoordinates, setRouteCoordinates] = useState<[number, number][]>([]);
 
   // Searching State matching TIER 1 - SOLO.png
   const [isSearching, setIsSearching] = useState<boolean>(false);
@@ -285,21 +287,20 @@ const NewTrip: React.FC = () => {
     fetchProfile();
   }, []);
 
-  // Recalculate distance and fare dynamically when pickup or dropoff changes
+  // Recalculate distance, road coordinates, and fare dynamically when pickup or dropoff changes
   const calculateDistanceAndFare = useCallback(async () => {
     if (!pickup.lat || !dropoff.lat || pickup.lat === 0 || dropoff.lat === 0) {
       setEstimatedFare(60.0);
+      setRouteCoordinates([]);
       return;
     }
 
     let roadDist = 0;
     try {
-      const res = await fetch(
-        `https://router.project-osrm.org/route/v1/driving/${pickup.lng},${pickup.lat};${dropoff.lng},${dropoff.lat}?overview=false`
-      );
-      const data = await res.json();
-      if (data.routes && data.routes.length > 0) {
-        roadDist = data.routes[0].distance / 1000;
+      const routeRes = await getOSRMRoute(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng);
+      roadDist = routeRes.distanceKm;
+      if (routeRes.coordinates && routeRes.coordinates.length >= 2) {
+        setRouteCoordinates(routeRes.coordinates);
       }
     } catch {
       roadDist = haversineDistanceKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng) * 1.25;
@@ -468,6 +469,7 @@ const NewTrip: React.FC = () => {
         userLocation={pickup.lat ? { lat: pickup.lat, lng: pickup.lng } : undefined}
         pickupLocation={pickup.lat ? pickup : undefined}
         dropoffLocation={dropoff.lat ? dropoff : undefined}
+        routeCoordinates={routeCoordinates}
         recenterTrigger={recenterTrigger}
       />
 

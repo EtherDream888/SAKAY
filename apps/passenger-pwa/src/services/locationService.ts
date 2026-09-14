@@ -395,42 +395,49 @@ export const getOSRMRoute = async (
   dropoffLat: number,
   dropoffLng: number
 ): Promise<RouteResult> => {
-  try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${pickupLng},${pickupLat};${dropoffLng},${dropoffLat}?overview=full&geometries=geojson`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("OSRM route request failed");
+  const endpoints = [
+    `https://router.project-osrm.org/route/v1/driving/${pickupLng},${pickupLat};${dropoffLng},${dropoffLat}?overview=full&geometries=geojson`,
+    `https://routing.openstreetmap.de/routed-car/route/v1/driving/${pickupLng},${pickupLat};${dropoffLng},${dropoffLat}?overview=full&geometries=geojson`,
+  ];
 
-    const data = await res.json();
-    if (data.routes && data.routes.length > 0) {
-      const route = data.routes[0];
-      const distanceKm = Math.round((route.distance / 1000) * 100) / 100;
-      const durationMin = Math.max(1, Math.round(route.duration / 60));
-      const coordinates: [number, number][] = route.geometry.coordinates.map(
-        (c: [number, number]) => [c[1], c[0]]
-      );
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
 
-      return {
-        distanceKm,
-        durationMin,
-        coordinates,
-        source: "osrm",
-      };
+      const data = await res.json();
+      if (data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+        const distanceKm = Math.round((route.distance / 1000) * 100) / 100;
+        const durationMin = Math.max(1, Math.round(route.duration / 60));
+        const coordinates: [number, number][] = route.geometry.coordinates.map(
+          (c: [number, number]) => [c[1], c[0]]
+        );
+
+        return {
+          distanceKm,
+          durationMin,
+          coordinates,
+          source: "osrm",
+        };
+      }
+    } catch (err) {
+      console.warn(`[getOSRMRoute] Endpoint request issue: ${url}`, err);
     }
-    throw new Error("No routes returned by OSRM");
-  } catch (err) {
-    console.warn("OSRM routing fallback:", err);
-    const straightKm = calculateHaversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
-    const estimatedKm = Math.round(straightKm * 1.3 * 100) / 100;
-    const estimatedMin = Math.max(1, Math.round((estimatedKm / 20) * 60));
-
-    return {
-      distanceKm: estimatedKm,
-      durationMin: estimatedMin,
-      coordinates: [
-        [pickupLat, pickupLng],
-        [dropoffLat, dropoffLng],
-      ],
-      source: "haversine",
-    };
   }
+
+  // Fallback if public road routing servers are unreachable
+  const straightKm = calculateHaversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
+  const estimatedKm = Math.round(straightKm * 1.3 * 100) / 100;
+  const estimatedMin = Math.max(1, Math.round((estimatedKm / 20) * 60));
+
+  return {
+    distanceKm: estimatedKm,
+    durationMin: estimatedMin,
+    coordinates: [
+      [pickupLat, pickupLng],
+      [dropoffLat, dropoffLng],
+    ],
+    source: "haversine",
+  };
 };
