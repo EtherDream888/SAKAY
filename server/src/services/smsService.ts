@@ -166,8 +166,8 @@ export const sendOtpSms = async (
   const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
   const now = Date.now();
 
-  // Message formatted with standard Web OTP format (@domain #code) for seamless mobile detection
-  const otpMessage = `Ang iyong SAKAY verification code ay: ${otpCode}. Valid ito ng 5 minuto. Huwag ibahagi ang code na ito kaninuman.\n\n@sakay.ph #${otpCode}`;
+  // Clean plain text message without links or domains to bypass PH telco anti-smishing filters
+  const otpMessage = `Ang iyong SAKAY verification code ay: ${otpCode}. Valid ito ng 5 minuto. Huwag ibahagi ang code na ito kaninuman.`;
 
   // Actually dispatch through the cellular network first
   const dispatchResult = await sendRawSms(formattedPhone, otpMessage);
