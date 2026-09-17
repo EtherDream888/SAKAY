@@ -55,7 +55,47 @@ export const VerifyOtp: React.FC = () => {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const resendNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasAutoApprovedRef = useRef(false);
+  const hasDispatchedInitialOtpRef = useRef(false);
   const isComplete = otp.every((digit) => digit !== '');
+
+  // Automatically initiate sending OTP SMS as soon as the user lands on this screen
+  useEffect(() => {
+    if (hasDispatchedInitialOtpRef.current || !resolvedPhone) return;
+    hasDispatchedInitialOtpRef.current = true;
+
+    const dispatchInitialOtp = async () => {
+      setError('');
+      try {
+        const result = await sendPassengerOtp(resolvedPhone);
+        if (result.success) {
+          setResendTimer(60);
+          setInfoNotice(
+            language === 'tl'
+              ? 'Ipinadala ang 6-digit verification code sa iyong mobile number.'
+              : 'A 6-digit verification code was sent to your mobile number.'
+          );
+          if (resendNoticeTimerRef.current) clearTimeout(resendNoticeTimerRef.current);
+          resendNoticeTimerRef.current = setTimeout(() => setInfoNotice(null), 5000);
+        } else {
+          setError(
+            result.error ||
+              (language === 'tl'
+                ? 'Hindi maipadala ang OTP code. Pakisubukang muli.'
+                : 'Failed to send OTP code. Please try again.')
+          );
+        }
+      } catch (err: any) {
+        console.warn('[VerifyOtp] Initial OTP dispatch error:', err);
+        setError(
+          language === 'tl'
+            ? 'Nagkaroon ng aberya sa koneksyon sa SMS server.'
+            : 'Connection error reaching the SMS server.'
+        );
+      }
+    };
+
+    dispatchInitialOtp();
+  }, [resolvedPhone, language]);
 
   // Countdown timer for resend
   useEffect(() => {

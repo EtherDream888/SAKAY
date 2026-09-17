@@ -40,7 +40,36 @@ export const DriverVerifyOtp: React.FC = () => {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const resendNoticeTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasAutoApprovedRef = useRef(false);
+  const hasDispatchedInitialOtpRef = useRef(false);
   const isComplete = otp.every((digit) => digit !== '');
+
+  const targetPhone = state?.phone || (typeof window !== 'undefined' ? localStorage.getItem('sakay_driver_phone') : '') || '';
+
+  // Automatically initiate sending OTP SMS as soon as the user lands on this screen
+  useEffect(() => {
+    if (hasDispatchedInitialOtpRef.current || !targetPhone) return;
+    hasDispatchedInitialOtpRef.current = true;
+
+    const dispatchInitialOtp = async () => {
+      setError('');
+      try {
+        const res = await sendDriverOtp(targetPhone);
+        if (res.success) {
+          setResendTimer(60);
+          setInfoNotice(t.otpResentSuccess || 'Verification code sent to your mobile number.');
+          if (resendNoticeTimerRef.current) clearTimeout(resendNoticeTimerRef.current);
+          resendNoticeTimerRef.current = setTimeout(() => setInfoNotice(null), 5000);
+        } else {
+          setError(res.error || 'Failed to send OTP SMS.');
+        }
+      } catch (err: any) {
+        console.warn('[DriverVerifyOtp] Initial OTP dispatch error:', err);
+        setError('Network error while requesting OTP.');
+      }
+    };
+
+    dispatchInitialOtp();
+  }, [targetPhone, t]);
 
   // Countdown timer for resend (stops immediately if OTP is completely filled)
   useEffect(() => {

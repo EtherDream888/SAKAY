@@ -19,7 +19,6 @@ import RegisterInput from '../../../../common/components/RegisterInput';
 import SakayPhoneInput from '../../../../common/components/SakayPhoneInput';
 import { useLanguage } from '../../../../utils/LanguageContext';
 import {
-  sendPassengerOtp,
   ensurePassengerAuthSession,
   formatPhoneToE164,
   lookupPassengerByPhone,
@@ -229,12 +228,6 @@ export const Register: React.FC = () => {
       localStorage.setItem('sakay_passenger_phone', e164Phone);
       localStorage.setItem('sakay_passenger_password', password);
     } catch {}
-
-    try {
-      await sendPassengerOtp(e164Phone);
-    } catch (err) {
-      console.warn('[Register] Error triggering SMS OTP:', err);
-    }
 
     navigate('/verify-otp', {
       state: {

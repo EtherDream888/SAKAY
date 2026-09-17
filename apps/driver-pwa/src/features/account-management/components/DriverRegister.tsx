@@ -21,7 +21,7 @@ import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
 import SakayPhoneInput from '../../../common/components/SakayPhoneInput';
 import { useLanguage } from '../../../utils/LanguageContext';
-import { sendDriverOtp, ensureDriverAuthSession, fetchAccreditedTodas, formatPhoneToE164 } from '../../../services/driverApiService';
+import { ensureDriverAuthSession, fetchAccreditedTodas, formatPhoneToE164 } from '../../../services/driverApiService';
 
 export const formatMobileNumber = (value: string): string => {
   const digits = value.replace(/\D/g, '');
@@ -386,12 +386,6 @@ export const DriverRegister: React.FC = () => {
       localStorage.setItem('sakay_driver_password', password);
       localStorage.setItem('sakay_driver_toda_id', selectedTodaId);
     } catch {}
-
-    try {
-      await sendDriverOtp(e164Phone);
-    } catch (err) {
-      console.warn('[DriverRegister] Error triggering SMS OTP:', err);
-    }
 
     navigate('/driver/verify-otp', {
       state: {
