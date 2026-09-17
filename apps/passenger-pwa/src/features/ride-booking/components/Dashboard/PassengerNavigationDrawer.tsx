@@ -18,6 +18,7 @@ import ExitToAppIcon from "@mui/icons-material/ExitToApp";
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import ReportProblemOutlinedIcon from "@mui/icons-material/ReportProblemOutlined";
 import { useLanguage } from "../../../../utils/LanguageContext";
+import LogoutConfirmDialog from "../../../../common/components/LogoutConfirmDialog";
 
 export interface PassengerNavigationDrawerProps {
   isOpen: boolean;
@@ -42,6 +43,7 @@ const PassengerNavigationDrawer: React.FC<PassengerNavigationDrawerProps> = ({
 }) => {
   const navigate = useNavigate();
   const { language } = useLanguage();
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = React.useState(false);
 
   const handleProfileClick = () => {
     onClose();
@@ -315,21 +317,21 @@ const PassengerNavigationDrawer: React.FC<PassengerNavigationDrawerProps> = ({
         <Box sx={{ paddingBottom: "calc(var(--safe-area-bottom) + 20px)" }}>
           <ListItem disablePadding>
             <ListItemButton
-              onClick={onLogout}
+              onClick={() => setLogoutConfirmOpen(true)}
               sx={{
                 padding: "16px 24px",
                 "&:hover": { backgroundColor: "#FEF2F2" },
               }}
             >
-              <ListItemIcon sx={{ color: "#0F172A", minWidth: "44px" }}>
-                <ExitToAppIcon sx={{ fontSize: "22px" }} />
+              <ListItemIcon sx={{ color: "#EF4444", minWidth: "44px" }}>
+                <ExitToAppIcon sx={{ fontSize: "22px", color: "#EF4444" }} />
               </ListItemIcon>
               <ListItemText
                 primary={
                   <Typography
-                    sx={{ fontSize: "16px", fontWeight: 600, color: "#0F172A" }}
+                    sx={{ fontSize: "16px", fontWeight: 700, color: "#EF4444" }}
                   >
-                    Logout
+                    {language === "tl" ? "Mag-logout" : "Log out"}
                   </Typography>
                 }
               />
@@ -337,6 +339,17 @@ const PassengerNavigationDrawer: React.FC<PassengerNavigationDrawerProps> = ({
           </ListItem>
         </Box>
       </Box>
+
+      {/* Logout Confirmation Dialog */}
+      <LogoutConfirmDialog
+        open={logoutConfirmOpen}
+        onClose={() => setLogoutConfirmOpen(false)}
+        onConfirm={() => {
+          setLogoutConfirmOpen(false);
+          onClose();
+          onLogout();
+        }}
+      />
     </>
   );
 };
