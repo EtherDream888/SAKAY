@@ -129,16 +129,29 @@ const Login: React.FC = () => {
             .maybeSingle();
 
           if (profile) {
+            const isVerifiedInAuth = Boolean(
+              user?.user_metadata?.otp_verified ||
+              user?.user_metadata?.account_status === 'Active' ||
+              user?.phone_confirmed_at
+            );
+
             if (profile.account_status === "Pending OTP Verification") {
-              // Show error clearly without automatic hijacking/redirect
-              setError(
-                language === "tl"
-                  ? "Kailangan munang ma-verify ang inyong numero gamit ang OTP bago makapag-login."
-                  : "Your mobile number needs to be verified with OTP before logging in."
-              );
-              setLoading(false);
-              await supabase.auth.signOut();
-              return;
+              if (isVerifiedInAuth) {
+                // Auto-heal status in database if possible
+                supabase.rpc('activate_passenger_otp', {
+                  p_contact_number: user.phone || user.user_metadata?.contact_number || '',
+                }).then(() => {}, () => {});
+              } else {
+                // Show error clearly without automatic hijacking/redirect
+                setError(
+                  language === "tl"
+                    ? "Kailangan munang ma-verify ang inyong numero gamit ang OTP bago makapag-login."
+                    : "Your mobile number needs to be verified with OTP before logging in."
+                );
+                setLoading(false);
+                await supabase.auth.signOut();
+                return;
+              }
             }
 
             if (profile.account_status === "Suspended" || profile.account_status === "Deactivated") {

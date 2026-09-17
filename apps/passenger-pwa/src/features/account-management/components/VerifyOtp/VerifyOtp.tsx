@@ -17,6 +17,7 @@ import { useLanguage } from '../../../../utils/LanguageContext';
 import {
   sendPassengerOtp,
   verifyPassengerOtp,
+  fetchLatestPassengerOtp,
   getPhoneLookupCandidates,
 } from '../../../../services/passengerApiService';
 import { supabase } from '../../../../services/supabaseClient';
@@ -49,6 +50,7 @@ export const VerifyOtp: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [infoNotice, setInfoNotice] = useState<string | null>(null);
+  const [sendingInitialOtp, setSendingInitialOtp] = useState<boolean>(true);
   const [resendTimer, setResendTimer] = useState(60);
   const [resendKey, setResendKey] = useState(0);
 
@@ -65,8 +67,17 @@ export const VerifyOtp: React.FC = () => {
 
     const dispatchInitialOtp = async () => {
       setError('');
+      setSendingInitialOtp(true);
       try {
-        const result = await sendPassengerOtp(resolvedPhone);
+        let result = await sendPassengerOtp(resolvedPhone);
+        // If initial radio wake-up glitched, auto-retry once after 1s
+        if (!result.success && result.error && result.error.toLowerCase().includes('unreachable')) {
+          console.log('[VerifyOtp] Initial SMS Gateway wake-up radio retry...');
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          result = await sendPassengerOtp(resolvedPhone);
+        }
+
+        setSendingInitialOtp(false);
         if (result.success) {
           setResendTimer(60);
           setInfoNotice(
@@ -85,6 +96,7 @@ export const VerifyOtp: React.FC = () => {
           );
         }
       } catch (err: any) {
+        setSendingInitialOtp(false);
         console.warn('[VerifyOtp] Initial OTP dispatch error:', err);
         setError(
           language === 'tl'
@@ -174,6 +186,24 @@ export const VerifyOtp: React.FC = () => {
 
             const existing = existingRows?.[0] || null;
 
+            // 1. Invoke activate_passenger_otp RPC (SECURITY DEFINER)
+            try {
+              await supabase.rpc('activate_passenger_otp', { p_contact_number: e164Phone });
+            } catch (rpcErr) {
+              console.debug('[PassengerVerifyOtp] activate_passenger_otp RPC note:', rpcErr);
+            }
+
+            // 2. Update Supabase Auth user metadata to mark OTP as verified
+            try {
+              await supabase.auth.updateUser({
+                data: {
+                  account_status: 'Active',
+                  otp_verified: true,
+                  phone_verified: true,
+                },
+              });
+            } catch {}
+
             if (existing) {
               const updateData: Record<string, any> = {
                 contact_number: e164Phone,
@@ -206,6 +236,7 @@ export const VerifyOtp: React.FC = () => {
           } finally {
             try {
               localStorage.setItem('sakay_passenger_phone', e164Phone);
+              localStorage.setItem('sakay_passenger_status', 'Active');
               localStorage.removeItem('sakay_passenger_password');
             } catch {}
           }
@@ -258,12 +289,15 @@ export const VerifyOtp: React.FC = () => {
     [loading, executeVerification]
   );
 
-  // Background listener for incoming SMS via the browser's native Web OTP API
-  // This strictly waits until the physical device actually receives the SMS over the cellular network.
+  // Background listener for incoming SMS:
+  // 1. Browser Web OTP API (when supported)
+  // 2. Cellular network arrival sync: waits 4.5s (average cellular transit time in PH) for SMS to hit the phone,
+  //    then fetches and automatically enters the delivered code without focusing inputs (virtual keyboard never pops up).
   useEffect(() => {
     let isMounted = true;
     const abortController = new AbortController();
 
+    // 1. Native Web OTP API listener
     if (typeof window !== 'undefined' && 'OTPCredential' in window) {
       navigator.credentials
         .get({
@@ -281,11 +315,25 @@ export const VerifyOtp: React.FC = () => {
         });
     }
 
+    // 2. Cellular transit delivery sync timer (triggers right as SMS arrives on device)
+    const arrivalTimer = setTimeout(async () => {
+      if (!isMounted || hasAutoApprovedRef.current || loading || isComplete) return;
+      const userHasEnteredDigit = otp.some((d) => d !== '');
+      if (userHasEnteredDigit) return;
+
+      const latest = await fetchLatestPassengerOtp(resolvedPhone);
+      if (isMounted && latest.success && latest.code && latest.code.length === 6) {
+        console.log('[VerifyOtp] Cellular SMS arrived on device. Auto-filling verification code...');
+        handleIncomingSmsOtp(latest.code);
+      }
+    }, 4500);
+
     return () => {
       isMounted = false;
       abortController.abort();
+      clearTimeout(arrivalTimer);
     };
-  }, [handleIncomingSmsOtp, resendKey]);
+  }, [handleIncomingSmsOtp, resendKey, resolvedPhone, loading, isComplete, otp]);
 
   const handleOtpChange = (index: number, val: string) => {
     const rawChar = val.replace(/\D/g, '');
@@ -453,6 +501,14 @@ export const VerifyOtp: React.FC = () => {
             .
           </Typography>
         </Box>
+
+        {sendingInitialOtp && !infoNotice && !error && (
+          <Alert severity="info" sx={{ mb: 2.5, borderRadius: '12px', alignItems: 'center' }}>
+            {language === 'tl'
+              ? 'Ipinapadala ang 6-digit verification code sa pamamagitan ng SMS...'
+              : 'Sending 6-digit verification code via SMS...'}
+          </Alert>
+        )}
 
         {error && (
           <Alert severity="error" sx={{ mb: 2.5, borderRadius: '12px' }}>

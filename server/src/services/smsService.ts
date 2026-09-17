@@ -83,35 +83,50 @@ async function sendViaAndroidGateway(
     payload.simNumber = configuredSim;
   }
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+  // Attempt up to 2 times with a 15-second timeout to allow dozing phones to wake Wi-Fi radio
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
 
-    clearTimeout(timeout);
+      clearTimeout(timeout);
 
-    if (response.ok) {
-      console.log(`[SMS Service] Dispatched via Android SMS Gateway (${gatewayUrl}, SIM ${configuredSim}) to ${formattedPhone}`);
-      return { success: true, message: 'SMS dispatched successfully via Android Gateway.' };
+      if (response.ok) {
+        console.log(`[SMS Service] Dispatched via Android SMS Gateway (${gatewayUrl}, SIM ${configuredSim}) to ${formattedPhone}`);
+        return { success: true, message: 'SMS dispatched successfully via Android Gateway.' };
+      }
+
+      const errBody = await response.text();
+      console.warn(`[SMS Service] Android Gateway attempt ${attempt} HTTP ${response.status}: ${errBody}`);
+      if (attempt === 1) {
+        console.log('[SMS Service] Pausing 1s before retrying Android Gateway dispatch...');
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        continue;
+      }
+      return {
+        success: false,
+        error: `Gateway returned HTTP ${response.status}: ${errBody || 'Unknown error'}`,
+      };
+    } catch (err: any) {
+      const errorMsg = err.name === 'AbortError' ? 'Connection to Android Gateway timed out.' : err.message;
+      console.warn(`[SMS Service] Attempt ${attempt} failed to connect to Android SMS Gateway at ${gatewayUrl}:`, errorMsg);
+      if (attempt === 1) {
+        console.log('[SMS Service] Pausing 1s before retrying Android Gateway dispatch...');
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        continue;
+      }
+      return { success: false, error: errorMsg };
     }
-
-    const errBody = await response.text();
-    console.warn(`[SMS Service] Android Gateway HTTP ${response.status}: ${errBody}`);
-    return {
-      success: false,
-      error: `Gateway returned HTTP ${response.status}: ${errBody || 'Unknown error'}`,
-    };
-  } catch (err: any) {
-    const errorMsg = err.name === 'AbortError' ? 'Connection to Android Gateway timed out.' : err.message;
-    console.warn(`[SMS Service] Failed to connect to Android SMS Gateway at ${gatewayUrl}:`, errorMsg);
-    return { success: false, error: errorMsg };
   }
+
+  return { success: false, error: 'Failed to connect to Android SMS Gateway.' };
 }
 
 /**

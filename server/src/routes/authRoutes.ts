@@ -88,6 +88,18 @@ router.post('/verify-otp', async (req: Request, res: Response): Promise<void> =>
         const phone63NoPlus = `63${phoneRaw}`;
         const phone63WithPlus = `+63${phoneRaw}`;
 
+        // 1. Try activating via the dedicated SECURITY DEFINER RPC function (bypasses RLS)
+        const { data: rpcRes, error: rpcErr } = await supabase.rpc('activate_passenger_otp', {
+          p_contact_number: phone63WithPlus,
+        });
+
+        if (rpcErr) {
+          console.log('[Auth Route] Note on activate_passenger_otp RPC:', rpcErr.message);
+        } else {
+          console.log('[Auth Route] Passenger activated via RPC activate_passenger_otp:', rpcRes);
+        }
+
+        // 2. Also try direct table update (works with service_role or authenticated admin)
         const { data: updatedPassengers, error: pErr } = await supabase
           .from('passenger')
           .update({ account_status: 'Active' })

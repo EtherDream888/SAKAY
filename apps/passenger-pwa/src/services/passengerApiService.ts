@@ -118,7 +118,7 @@ export async function sendPassengerOtp(phone: string): Promise<{ success: boolea
   const e164Phone = normalizePhoneE164(phone);
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     const response = await fetch('/api/auth/send-otp', {
       method: 'POST',
