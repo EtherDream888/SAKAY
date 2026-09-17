@@ -230,9 +230,8 @@ export const Register: React.FC = () => {
       localStorage.setItem('sakay_passenger_password', password);
     } catch {}
 
-    let otpResult: { success: boolean; message?: string; error?: string; debugOtp?: string } | null = null;
     try {
-      otpResult = await sendPassengerOtp(e164Phone);
+      await sendPassengerOtp(e164Phone);
     } catch (err) {
       console.warn('[Register] Error triggering SMS OTP:', err);
     }
@@ -246,7 +245,6 @@ export const Register: React.FC = () => {
         fullName: fullName,
         role: 'passenger',
         isRecovery: false,
-        debugOtp: otpResult?.debugOtp,
       },
     });
   };

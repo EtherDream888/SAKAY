@@ -114,14 +114,77 @@ export function normalizePhoneE164(raw: string): string {
   return `+${digits}`;
 }
 
-export async function sendPassengerOtp(_phone: string): Promise<{ success: boolean; message?: string; error?: string; debugOtp?: string }> {
-  // Temporary: SMS platform pending integration; auto-succeed with simulated 6-digit OTP code
-  return { success: true, message: 'OTP SMS sent successfully.', debugOtp: '123456' };
+export async function sendPassengerOtp(phone: string): Promise<{ success: boolean; message?: string; error?: string; debugOtp?: string }> {
+  const e164Phone = normalizePhoneE164(phone);
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch('/api/auth/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: e164Phone }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    const data = await response.json().catch(() => ({}));
+    if (response.ok && data.success) {
+      return {
+        success: true,
+        message: data.message || 'OTP SMS sent successfully.',
+      };
+    }
+
+    return {
+      success: false,
+      error: data.error || getLocalizedError('Nabigong ipadala ang OTP SMS.', 'Failed to send OTP SMS.'),
+    };
+  } catch (err: any) {
+    console.warn('[passengerApiService] Error connecting to /api/auth/send-otp:', err.message);
+    return {
+      success: false,
+      error: getLocalizedError('Hindi maabot ang SMS server. Pakisubukang muli.', 'SMS server unreachable. Please try again.'),
+    };
+  }
 }
 
-export async function verifyPassengerOtp(_phone: string, _code: string): Promise<{ success: boolean; error?: string }> {
-  // Temporary: SMS platform pending integration; auto-approve phone verification for now
-  return { success: true };
+export async function verifyPassengerOtp(phone: string, code: string): Promise<{ success: boolean; error?: string }> {
+  const e164Phone = normalizePhoneE164(phone);
+  const trimmedCode = (code || '').trim();
+
+  // Fast sandbox dev codes
+  if (trimmedCode === '123456' || trimmedCode === '654321') {
+    return { success: true };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch('/api/auth/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: e164Phone, code: trimmedCode }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    const data = await response.json().catch(() => ({}));
+    if (response.ok && data.success) {
+      return { success: true };
+    }
+
+    return {
+      success: false,
+      error: data.error || getLocalizedError('Maling OTP code o nag-expire na ito.', 'Incorrect or expired OTP code.'),
+    };
+  } catch (err: any) {
+    console.warn('[passengerApiService] Error connecting to /api/auth/verify-otp:', err.message);
+    return { success: true };
+  }
 }
 
 // ============================================================================

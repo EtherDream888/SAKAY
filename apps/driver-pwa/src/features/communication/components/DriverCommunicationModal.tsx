@@ -12,6 +12,8 @@ import {
 import CloseIcon from '@mui/icons-material/Close';
 import PhoneIcon from '@mui/icons-material/Phone';
 import SendIcon from '@mui/icons-material/Send';
+import CircularProgress from '@mui/material/CircularProgress';
+import { sendDriverPassengerSms } from '../../../services/driverApiService';
 
 interface DriverCommunicationModalProps {
   open: boolean;
@@ -28,6 +30,8 @@ export const DriverCommunicationModal: React.FC<DriverCommunicationModalProps> =
 }) => {
   const [customMsg, setCustomMsg] = useState('');
   const [sentAlert, setSentAlert] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   const templates = [
     "I'm on my way to your pickup point.",
@@ -36,14 +40,24 @@ export const DriverCommunicationModal: React.FC<DriverCommunicationModalProps> =
     'Please have your fare ready. Thank you!',
   ];
 
-  const handleSend = (text: string) => {
-    if (!text.trim()) return;
-    setSentAlert(`SMS sent to ${passengerName}: "${text}"`);
-    setCustomMsg('');
-    setTimeout(() => {
-      setSentAlert(null);
-      onClose();
-    }, 2000);
+  const handleSend = async (text: string) => {
+    if (!text.trim() || sending) return;
+    setSending(true);
+    setErrorMessage(null);
+
+    const result = await sendDriverPassengerSms(passengerPhone, text);
+    setSending(false);
+
+    if (result.success) {
+      setSentAlert(`SMS sent to ${passengerName}: "${text}"`);
+      setCustomMsg('');
+      setTimeout(() => {
+        setSentAlert(null);
+        onClose();
+      }, 2500);
+    } else {
+      setErrorMessage(result.error || 'Failed to dispatch SMS.');
+    }
   };
 
   const handleCall = () => {
@@ -89,6 +103,14 @@ export const DriverCommunicationModal: React.FC<DriverCommunicationModalProps> =
           </Box>
         )}
 
+        {errorMessage && (
+          <Box sx={{ p: 1.5, borderRadius: '10px', backgroundColor: '#FEE2E2', border: '1px solid #FCA5A5' }}>
+            <Typography sx={{ fontSize: '12.5px', color: '#B91C1C', fontWeight: 600 }}>
+              {errorMessage}
+            </Typography>
+          </Box>
+        )}
+
         {/* Call Action Button */}
         <Button
           variant="contained"
@@ -117,6 +139,7 @@ export const DriverCommunicationModal: React.FC<DriverCommunicationModalProps> =
             <Button
               key={i}
               variant="outlined"
+              disabled={sending}
               onClick={() => handleSend(tpl)}
               sx={{
                 justifyContent: 'flex-start',
@@ -143,13 +166,14 @@ export const DriverCommunicationModal: React.FC<DriverCommunicationModalProps> =
             size="small"
             placeholder="Type a message..."
             value={customMsg}
+            disabled={sending}
             onChange={(e) => setCustomMsg(e.target.value)}
             sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
           />
           <Button
             variant="contained"
             onClick={() => handleSend(customMsg)}
-            disabled={!customMsg.trim()}
+            disabled={!customMsg.trim() || sending}
             sx={{
               borderRadius: '12px',
               backgroundColor: '#FF6B00',
@@ -158,7 +182,7 @@ export const DriverCommunicationModal: React.FC<DriverCommunicationModalProps> =
               '&:hover': { backgroundColor: '#E66000' },
             }}
           >
-            <SendIcon fontSize="small" />
+            {sending ? <CircularProgress size={18} sx={{ color: '#FFFFFF' }} /> : <SendIcon fontSize="small" />}
           </Button>
         </Box>
       </DialogContent>

@@ -26,7 +26,6 @@ router.post('/send-otp', async (req: Request, res: Response): Promise<void> => {
       success: true,
       message: result.message,
       formattedPhone: result.formattedPhone,
-      debugOtp: result.debugOtp,
     });
   } catch (err: any) {
     console.error('[Auth Route] Send OTP error:', err);

@@ -50,7 +50,6 @@ export const VerifyOtp: React.FC = () => {
   const [error, setError] = useState('');
   const [infoNotice, setInfoNotice] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(60);
-  const [activeDebugOtp, setActiveDebugOtp] = useState<string | undefined>(state?.debugOtp);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const resendNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -195,25 +194,7 @@ export const VerifyOtp: React.FC = () => {
     [loading, resolvedPhone, state, language, resolvedName, navigate]
   );
 
-  // Automatic fill fallback: awaits for the 6-digit code, and the moment it automatically fills out the 6-digit, it is already approved
-  useEffect(() => {
-    if (hasAutoApprovedRef.current || isComplete || loading) return;
 
-    const timer = setTimeout(() => {
-      if (hasAutoApprovedRef.current) return;
-      hasAutoApprovedRef.current = true;
-
-      const codeToFill = activeDebugOtp || '123456';
-      const digits = codeToFill.slice(0, 6).split('');
-      setOtp(digits);
-      setError('');
-
-      // Auto-approved the moment the 6-digit code fills
-      executeVerification(codeToFill);
-    }, 4000);
-
-    return () => clearTimeout(timer);
-  }, [activeDebugOtp, isComplete, loading, executeVerification]);
 
   const handleOtpChange = (index: number, val: string) => {
     const rawChar = val.replace(/\D/g, '');
@@ -278,7 +259,6 @@ export const VerifyOtp: React.FC = () => {
         hasAutoApprovedRef.current = false;
         setResendTimer(60);
         setOtp(['', '', '', '', '', '']);
-        setActiveDebugOtp(result.debugOtp);
         setInfoNotice(language === 'tl' ? 'Matagumpay na naipadala muli ang bagong verification code.' : 'Verification code re-sent successfully.');
         if (resendNoticeTimerRef.current) clearTimeout(resendNoticeTimerRef.current);
         resendNoticeTimerRef.current = setTimeout(() => setInfoNotice(null), 5000);

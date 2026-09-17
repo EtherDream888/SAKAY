@@ -387,9 +387,8 @@ export const DriverRegister: React.FC = () => {
       localStorage.setItem('sakay_driver_toda_id', selectedTodaId);
     } catch {}
 
-    let otpResult: { success: boolean; message?: string; error?: string; debugOtp?: string } | null = null;
     try {
-      otpResult = await sendDriverOtp(e164Phone);
+      await sendDriverOtp(e164Phone);
     } catch (err) {
       console.warn('[DriverRegister] Error triggering SMS OTP:', err);
     }
@@ -401,7 +400,6 @@ export const DriverRegister: React.FC = () => {
         driverName: fullName,
         todaId: selectedTodaId,
         isRecovery: false,
-        debugOtp: otpResult?.debugOtp,
       },
     });
   };

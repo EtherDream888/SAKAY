@@ -35,7 +35,6 @@ export const DriverVerifyOtp: React.FC = () => {
   const [error, setError] = useState('');
   const [infoNotice, setInfoNotice] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(60);
-  const [activeDebugOtp, setActiveDebugOtp] = useState<string | undefined>(state?.debugOtp);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const resendNoticeTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -57,16 +56,12 @@ export const DriverVerifyOtp: React.FC = () => {
     };
   }, []);
 
-  // Automatically enter the OTP code in the fields after 5 seconds without forcing keyboard popup
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const codeToFill = activeDebugOtp || '123456';
-      const digits = codeToFill.slice(0, 6).split('');
-      setOtp(digits);
-      setError('');
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [activeDebugOtp]);
+  // Developer helper to quickly test without waiting for SMS in sandbox
+  const handleFillDevCode = (code: string) => {
+    const digits = code.slice(0, 6).split('');
+    setOtp(digits);
+    executeVerification(code);
+  };
 
   // Core verification function
   const executeVerification = useCallback(
@@ -94,6 +89,11 @@ export const DriverVerifyOtp: React.FC = () => {
           try {
             let authUser = (await supabase.auth.getUser()).data.user;
 
+            const savedAuthEmail = localStorage.getItem('sakay_driver_auth_email');
+            if (savedAuthEmail && !candidates.authCandidates.some((c: any) => c.email === savedAuthEmail)) {
+              candidates.authCandidates.unshift({ email: savedAuthEmail });
+            }
+
             if (!authUser) {
               for (const candidate of candidates.authCandidates) {
                 const { data: signInRes, error: signInErr } = await supabase.auth.signInWithPassword({
@@ -108,8 +108,9 @@ export const DriverVerifyOtp: React.FC = () => {
             }
 
             if (!authUser) {
+              const emailToUse = savedAuthEmail || `driver_${candidates.phone63NoPlus}@sakay.ph`;
               const { data: signUpRes } = await supabase.auth.signUp({
-                email: `driver_${candidates.phone63NoPlus}@sakay.ph`,
+                email: emailToUse,
                 password: driverPassword,
                 options: {
                   data: {
@@ -122,6 +123,24 @@ export const DriverVerifyOtp: React.FC = () => {
                 },
               });
               authUser = signUpRes?.user || null;
+
+              if (!authUser) {
+                const altEmail = `driver_${candidates.phone63NoPlus}+${Date.now().toString().slice(-6)}@sakay.ph`;
+                const { data: altSignUp } = await supabase.auth.signUp({
+                  email: altEmail,
+                  password: driverPassword,
+                  options: {
+                    data: {
+                      role: 'driver',
+                      phone: e164Phone,
+                      contact_number: e164Phone,
+                      full_name: state?.driverName || null,
+                      toda_id: state?.todaId || null,
+                    },
+                  },
+                });
+                authUser = altSignUp?.user || null;
+              }
             }
 
             if (authUser) {
@@ -312,9 +331,6 @@ export const DriverVerifyOtp: React.FC = () => {
     try {
       const res = await sendDriverOtp(state?.phone || '');
       if (res.success) {
-        if (res.debugOtp) {
-          setActiveDebugOtp(res.debugOtp);
-        }
         setInfoNotice(t.otpResentSuccess);
         // Automatically disappear after 5 seconds
         resendNoticeTimerRef.current = setTimeout(() => {

@@ -13,6 +13,7 @@ import auditLogRoutes from './routes/auditLogRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 import todaPortalRoutes from './routes/todaPortalRoutes';
 import authRoutes from './routes/authRoutes';
+import communicationRoutes from './routes/communicationRoutes';
 
 dotenv.config();
 
@@ -72,6 +73,7 @@ app.use('/api/admin/audit-logs', auditLogRoutes);
 app.use('/api/admin/dashboard', dashboardRoutes);
 app.use('/api/toda', todaPortalRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/communication', communicationRoutes);
 
 // 404 Catch-All Handler
 app.use((_req: Request, res: Response) => {

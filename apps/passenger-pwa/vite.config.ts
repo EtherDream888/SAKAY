@@ -10,6 +10,15 @@ export default defineConfig({
       '@sakay/shared': path.resolve(__dirname, '../../packages/shared/src'),
     },
   },
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
