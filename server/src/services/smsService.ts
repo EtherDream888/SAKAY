@@ -141,13 +141,9 @@ export const sendRawSms = async (
       };
     }
     console.warn('[SMS Service] Android Gateway dispatch failed:', gatewayResult.error);
-  }
-
-  // Fallback mode if gateway is temporarily offline or in development
-  if (process.env.NODE_ENV === 'development') {
     return {
-      success: true,
-      message: 'SMS processed (Android SMS Gateway offline, check phone app status).',
+      success: false,
+      error: `Hindi maipadala ang SMS. Pakisuri kung bukas at aktibo ang Android SMS Gateway sa ${gatewayUrl}: ${gatewayResult.error || 'Connection failed'}`,
       formattedPhone,
       isGatewayDispatched: false,
     };
@@ -155,7 +151,7 @@ export const sendRawSms = async (
 
   return {
     success: false,
-    error: 'No active SMS provider configured or available.',
+    error: 'Walang aktibong SMS Gateway URL na naka-configure sa server.',
     formattedPhone,
   };
 };
@@ -170,7 +166,22 @@ export const sendOtpSms = async (
   const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
   const now = Date.now();
 
-  // Store OTP in memory with 5-minute TTL and creation timestamp
+  // Message formatted with standard Web OTP format (@domain #code) for seamless mobile detection
+  const otpMessage = `Ang iyong SAKAY verification code ay: ${otpCode}. Valid ito ng 5 minuto. Huwag ibahagi ang code na ito kaninuman.\n\n@sakay.ph #${otpCode}`;
+
+  // Actually dispatch through the cellular network first
+  const dispatchResult = await sendRawSms(formattedPhone, otpMessage);
+
+  if (!dispatchResult.success) {
+    console.error(`[SMS Service] Failed to dispatch OTP to ${formattedPhone}:`, dispatchResult.error);
+    return {
+      success: false,
+      error: dispatchResult.error || 'Nabigong ipadala ang SMS gamit ang Android SMS Gateway.',
+      formattedPhone,
+    };
+  }
+
+  // Only store OTP if physical dispatch succeeded
   otpStore.set(formattedPhone, {
     code: otpCode,
     createdAt: now,
@@ -179,16 +190,11 @@ export const sendOtpSms = async (
   });
 
   console.log(`\n======================================================`);
-  console.log(`[SMS Service] OTP VERIFICATION CODE GENERATED:`);
+  console.log(`[SMS Service] OTP VERIFICATION CODE GENERATED & DISPATCHED:`);
   console.log(`   ➜ Recipient: ${formattedPhone}`);
   console.log(`   ➜ OTP Code : >>> ${otpCode} <<<`);
   console.log(`   ➜ Valid for: 5 minutes`);
   console.log(`======================================================\n`);
-
-  // Message formatted with standard Web OTP format (@domain #code) for seamless mobile detection
-  const otpMessage = `Ang iyong SAKAY verification code ay: ${otpCode}. Valid ito ng 5 minuto. Huwag ibahagi ang code na ito kaninuman.\n\n@sakay.ph #${otpCode}`;
-
-  const dispatchResult = await sendRawSms(formattedPhone, otpMessage);
 
   return {
     success: true,

@@ -17,7 +17,6 @@ import { useLanguage } from '../../../../utils/LanguageContext';
 import {
   sendPassengerOtp,
   verifyPassengerOtp,
-  fetchLatestPassengerOtp,
   getPhoneLookupCandidates,
 } from '../../../../services/passengerApiService';
 import { supabase } from '../../../../services/supabaseClient';
@@ -219,12 +218,12 @@ export const VerifyOtp: React.FC = () => {
     [loading, executeVerification]
   );
 
-  // Background listener for incoming SMS (Web OTP API + Gateway delivery synchronization)
+  // Background listener for incoming SMS via the browser's native Web OTP API
+  // This strictly waits until the physical device actually receives the SMS over the cellular network.
   useEffect(() => {
     let isMounted = true;
     const abortController = new AbortController();
 
-    // 1. Native Web OTP API for mobile Chrome & supported browsers
     if (typeof window !== 'undefined' && 'OTPCredential' in window) {
       navigator.credentials
         .get({
@@ -237,47 +236,16 @@ export const VerifyOtp: React.FC = () => {
             handleIncomingSmsOtp(content.code);
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          // Normal when aborted or dismissed
+        });
     }
-
-    // 2. Real-time SMS Gateway delivery synchronization (matches 2-3s cellular SMS transit time)
-    if (!resolvedPhone) return;
-
-    let pollCount = 0;
-    const maxPolls = 20; // 30 seconds total window
-    let pollInterval: ReturnType<typeof setInterval> | null = null;
-
-    // Start checking after 2 seconds to match actual cellular network dispatch time
-    const initialTimer = setTimeout(() => {
-      const checkOtpDelivery = async () => {
-        if (!isMounted || hasAutoApprovedRef.current) {
-          if (pollInterval) clearInterval(pollInterval);
-          return;
-        }
-        pollCount += 1;
-        if (pollCount > maxPolls) {
-          if (pollInterval) clearInterval(pollInterval);
-          return;
-        }
-
-        const res = await fetchLatestPassengerOtp(resolvedPhone);
-        if (res.success && res.code && res.code.length === 6) {
-          if (pollInterval) clearInterval(pollInterval);
-          handleIncomingSmsOtp(res.code);
-        }
-      };
-
-      checkOtpDelivery();
-      pollInterval = setInterval(checkOtpDelivery, 1500);
-    }, 2000);
 
     return () => {
       isMounted = false;
       abortController.abort();
-      clearTimeout(initialTimer);
-      if (pollInterval) clearInterval(pollInterval);
     };
-  }, [resolvedPhone, handleIncomingSmsOtp, resendKey]);
+  }, [handleIncomingSmsOtp, resendKey]);
 
   const handleOtpChange = (index: number, val: string) => {
     const rawChar = val.replace(/\D/g, '');
