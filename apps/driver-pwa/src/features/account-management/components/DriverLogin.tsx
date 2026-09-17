@@ -278,6 +278,14 @@ export const DriverLogin: React.FC = () => {
     }
   };
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/welcome');
+    }
+  };
+
   return (
     <Box
       sx={{
@@ -286,14 +294,13 @@ export const DriverLogin: React.FC = () => {
         backgroundColor: '#FFFFFF',
         display: 'flex',
         flexDirection: 'column',
-        position: 'relative',
-        overflow: 'hidden',
       }}
     >
-      {/* Header with Back Button & SAKAY Logo */}
+      {/* Fixed Sticky Header */}
       <Box
         sx={{
-          padding: 'calc(var(--safe-area-top) + 16px) 24px 12px 24px',
+          padding: '16px 24px 12px 24px',
+          paddingTop: 'calc(var(--safe-area-top) + 16px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -303,7 +310,7 @@ export const DriverLogin: React.FC = () => {
         }}
       >
         <IconButton
-          onClick={() => navigate('/')}
+          onClick={handleBack}
           sx={{
             color: '#0F172A',
             backgroundColor: '#FFFFFF',

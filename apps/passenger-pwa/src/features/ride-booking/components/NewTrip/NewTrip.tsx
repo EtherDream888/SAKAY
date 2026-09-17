@@ -7,6 +7,7 @@ import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import NavigationIcon from "@mui/icons-material/Navigation";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
+import MyLocationIcon from "@mui/icons-material/MyLocation";
 import EventIcon from "@mui/icons-material/Event";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
@@ -137,7 +138,7 @@ const NewTrip: React.FC = () => {
   });
 
   // Dropoff Location State
-  const [dropoff] = useState<{ address: string; lat: number; lng: number }>(() => {
+  const [dropoff, setDropoff] = useState<{ address: string; lat: number; lng: number }>(() => {
     const saved = sessionStorage.getItem("trip_dropoff");
     if (saved) {
       try {
@@ -389,6 +390,42 @@ const NewTrip: React.FC = () => {
       setRecenterTrigger((prev) => prev + 1);
     } catch {
       setRecenterTrigger((prev) => prev + 1);
+    }
+  };
+
+  const handleSetCurrentLocationFor = async (target: "pickup" | "dropoff", e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      const coords = await getCurrentDevicePosition();
+      let realAddr = "";
+      try {
+        realAddr = await reverseGeocodeCoordinates(coords.latitude, coords.longitude);
+      } catch {}
+
+      const finalAddr =
+        realAddr && !realAddr.startsWith("Kasalukuyang Lokasyon")
+          ? realAddr
+          : language === "tl"
+          ? "Kasalukuyang Lokasyon"
+          : "Current Location";
+
+      const locObj = {
+        address: finalAddr,
+        lat: coords.latitude,
+        lng: coords.longitude,
+        isCustom: target === "dropoff",
+      };
+
+      if (target === "pickup") {
+        setPickup(locObj);
+        sessionStorage.setItem("trip_pickup", JSON.stringify(locObj));
+      } else {
+        setDropoff(locObj);
+        sessionStorage.setItem("trip_dropoff", JSON.stringify(locObj));
+      }
+      setRecenterTrigger((prev) => prev + 1);
+    } catch (err) {
+      console.error("Failed to set current location:", err);
     }
   };
 
@@ -781,6 +818,24 @@ const NewTrip: React.FC = () => {
                     (language === "tl" ? "Pumili ng pickup location" : "Choose pickup location")}
                 </Typography>
               </Box>
+
+              {/* Quick 1-Tap Current Location Button */}
+              <IconButton
+                size="small"
+                onClick={(e) => handleSetCurrentLocationFor("pickup", e)}
+                title={language === "tl" ? "Gamitin ang Kasalukuyang Lokasyon" : "Use current location"}
+                sx={{
+                  backgroundColor: "rgba(255, 107, 0, 0.12)",
+                  color: "#FF6B00",
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "10px",
+                  flexShrink: 0,
+                  "&:hover": { backgroundColor: "rgba(255, 107, 0, 0.22)" },
+                }}
+              >
+                <MyLocationIcon sx={{ fontSize: "16px" }} />
+              </IconButton>
             </Box>
 
             {/* 2. DESTINASYON Card (Soft Mint #F2F8F4) */}
@@ -842,6 +897,24 @@ const NewTrip: React.FC = () => {
                     (language === "tl" ? "I-type ang lugar" : "Type destination")}
                 </Typography>
               </Box>
+
+              {/* Quick 1-Tap Current Location Button for Dropoff */}
+              <IconButton
+                size="small"
+                onClick={(e) => handleSetCurrentLocationFor("dropoff", e)}
+                title={language === "tl" ? "Gamitin ang Kasalukuyang Lokasyon para sa Destinasyon" : "Use current location for destination"}
+                sx={{
+                  backgroundColor: "rgba(15, 23, 42, 0.08)",
+                  color: "#0F172A",
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "10px",
+                  flexShrink: 0,
+                  "&:hover": { backgroundColor: "rgba(15, 23, 42, 0.16)" },
+                }}
+              >
+                <MyLocationIcon sx={{ fontSize: "16px" }} />
+              </IconButton>
             </Box>
 
             {/* 3. Three Controls Row matching BOOK - SOLO.png */}

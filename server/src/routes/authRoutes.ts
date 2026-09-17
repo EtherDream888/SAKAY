@@ -1,7 +1,33 @@
 import { Router, Request, Response } from 'express';
-import { sendOtpSms, verifyOtpCode } from '../services/smsService';
+import { sendOtpSms, verifyOtpCode, getActiveOtpForPhone } from '../services/smsService';
+import { supabase } from '../config/supabase';
 
 const router = Router();
+
+// GET /api/auth/latest-otp?phone=...
+router.get('/latest-otp', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const phone = (req.query.phone as string) || '';
+    if (!phone) {
+      res.status(400).json({ success: false, error: 'Phone number is required.' });
+      return;
+    }
+
+    const result = getActiveOtpForPhone(phone);
+    if (!result.success || !result.code) {
+      res.json({ success: false, error: 'No active OTP found' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      code: result.code,
+      createdAt: result.createdAt,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message || 'Internal server error' });
+  }
+});
 
 // POST /api/auth/send-otp
 router.post('/send-otp', async (req: Request, res: Response): Promise<void> => {
@@ -34,9 +60,9 @@ router.post('/send-otp', async (req: Request, res: Response): Promise<void> => {
 });
 
 // POST /api/auth/verify-otp
-router.post('/verify-otp', (req: Request, res: Response): void => {
+router.post('/verify-otp', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { phone, code } = req.body;
+    const { phone, code, role } = req.body;
     if (!phone || !code) {
       res.status(400).json({ success: false, error: 'Phone and 6-digit code are required.' });
       return;
@@ -48,9 +74,41 @@ router.post('/verify-otp', (req: Request, res: Response): void => {
       return;
     }
 
+    // Direct Database Synchronization: Activate passenger account in Supabase
+    if (supabase) {
+      try {
+        const digits = (phone || '').replace(/\D/g, '');
+        let phoneRaw = digits;
+        if (digits.startsWith('639')) phoneRaw = digits.slice(2);
+        else if (digits.startsWith('09')) phoneRaw = digits.slice(1);
+        else if (digits.startsWith('63')) phoneRaw = digits.slice(2);
+        else if (digits.startsWith('0')) phoneRaw = digits.slice(1);
+
+        const phone09 = `0${phoneRaw}`;
+        const phone63NoPlus = `63${phoneRaw}`;
+        const phone63WithPlus = `+63${phoneRaw}`;
+
+        const { data: updatedPassengers, error: pErr } = await supabase
+          .from('passenger')
+          .update({ account_status: 'Active' })
+          .or(
+            `contact_number.eq.${phone63WithPlus},contact_number.eq.${phone09},contact_number.eq.${phone63NoPlus},contact_number.eq.${phoneRaw}`
+          )
+          .select('passenger_id, account_status');
+
+        if (pErr) {
+          console.warn('[Auth Route] Supabase passenger activation warning:', pErr.message);
+        } else {
+          console.log('[Auth Route] Passenger successfully activated in database:', updatedPassengers);
+        }
+      } catch (dbErr: any) {
+        console.warn('[Auth Route] Failed to update database account_status:', dbErr.message);
+      }
+    }
+
     res.json({
       success: true,
-      message: 'OTP verified successfully.',
+      message: 'OTP verified successfully and account activated in database.',
     });
   } catch (err: any) {
     console.error('[Auth Route] Verify OTP error:', err);

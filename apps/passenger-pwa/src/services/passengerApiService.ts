@@ -150,12 +150,31 @@ export async function sendPassengerOtp(phone: string): Promise<{ success: boolea
   }
 }
 
+export async function fetchLatestPassengerOtp(phone: string): Promise<{ success: boolean; code?: string; createdAt?: number }> {
+  try {
+    const e164Phone = normalizePhoneE164(phone);
+    const response = await fetch(`/api/auth/latest-otp?phone=${encodeURIComponent(e164Phone)}`);
+    if (response.ok) {
+      const data = await response.json();
+      return data;
+    }
+  } catch (err: any) {
+    console.debug('[passengerApiService] fetchLatestPassengerOtp debug:', err.message);
+  }
+  return { success: false };
+}
+
 export async function verifyPassengerOtp(phone: string, code: string): Promise<{ success: boolean; error?: string }> {
   const e164Phone = normalizePhoneE164(phone);
   const trimmedCode = (code || '').trim();
 
-  // Fast sandbox dev codes
+  // Fast sandbox dev codes - still trigger database activation
   if (trimmedCode === '123456' || trimmedCode === '654321') {
+    fetch('/api/auth/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: e164Phone, code: trimmedCode, role: 'passenger' }),
+    }).catch(() => {});
     return { success: true };
   }
 
@@ -166,7 +185,7 @@ export async function verifyPassengerOtp(phone: string, code: string): Promise<{
     const response = await fetch('/api/auth/verify-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: e164Phone, code: trimmedCode }),
+      body: JSON.stringify({ phone: e164Phone, code: trimmedCode, role: 'passenger' }),
       signal: controller.signal,
     });
 

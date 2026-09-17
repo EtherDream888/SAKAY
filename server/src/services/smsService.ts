@@ -1,4 +1,3 @@
-import twilio from 'twilio';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -8,16 +7,10 @@ const gatewayUrl = (process.env.SMS_GATEWAY_URL || '').trim().replace(/\/+$/, ''
 const gatewayLogin = (process.env.SMS_GATEWAY_LOGIN || '').trim();
 const gatewayPassword = (process.env.SMS_GATEWAY_PASSWORD || '').trim();
 
-// Twilio Configuration (optional secondary fallback)
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-
-const twilioClient = accountSid && authToken ? twilio(accountSid, authToken) : null;
-
 // In-memory OTP cache with 5-minute TTL
 interface OtpEntry {
   code: string;
+  createdAt: number;
   expiresAt: number;
   attempts: number;
 }
@@ -147,33 +140,14 @@ export const sendRawSms = async (
         isGatewayDispatched: true,
       };
     }
-    console.warn('[SMS Service] Android Gateway attempt failed, trying fallback providers...');
+    console.warn('[SMS Service] Android Gateway dispatch failed:', gatewayResult.error);
   }
 
-  // 2. Try Twilio if configured
-  if (twilioClient && messagingServiceSid) {
-    try {
-      const result = await twilioClient.messages.create({
-        body: messageText,
-        messagingServiceSid,
-        to: formattedPhone,
-      });
-      console.log(`[SMS Service] Twilio SMS dispatched. SID: ${result.sid}`);
-      return {
-        success: true,
-        message: 'SMS dispatched via Twilio.',
-        formattedPhone,
-      };
-    } catch (twErr: any) {
-      console.warn('[SMS Service] Twilio delivery note:', twErr.message || twErr);
-    }
-  }
-
-  // 3. Development fallback mode if offline
+  // Fallback mode if gateway is temporarily offline or in development
   if (process.env.NODE_ENV === 'development') {
     return {
       success: true,
-      message: 'SMS processed in development simulation mode.',
+      message: 'SMS processed (Android SMS Gateway offline, check phone app status).',
       formattedPhone,
       isGatewayDispatched: false,
     };
@@ -194,11 +168,13 @@ export const sendOtpSms = async (
 ): Promise<{ success: boolean; message?: string; error?: string; formattedPhone: string }> => {
   const formattedPhone = normalizePhilippinePhone(rawPhone);
   const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const now = Date.now();
 
-  // Store OTP in memory with 5-minute TTL
+  // Store OTP in memory with 5-minute TTL and creation timestamp
   otpStore.set(formattedPhone, {
     code: otpCode,
-    expiresAt: Date.now() + 5 * 60 * 1000,
+    createdAt: now,
+    expiresAt: now + 5 * 60 * 1000,
     attempts: 0,
   });
 
@@ -209,7 +185,8 @@ export const sendOtpSms = async (
   console.log(`   ➜ Valid for: 5 minutes`);
   console.log(`======================================================\n`);
 
-  const otpMessage = `Ang iyong SAKAY verification code ay: ${otpCode}. Valid ito ng 5 minuto. Huwag ibahagi ang code na ito kaninuman.`;
+  // Message formatted with standard Web OTP format (@domain #code) for seamless mobile detection
+  const otpMessage = `Ang iyong SAKAY verification code ay: ${otpCode}. Valid ito ng 5 minuto. Huwag ibahagi ang code na ito kaninuman.\n\n@sakay.ph #${otpCode}`;
 
   const dispatchResult = await sendRawSms(formattedPhone, otpMessage);
 
@@ -261,6 +238,31 @@ export const verifyOtpCode = (
   // Verification successful, consume the OTP
   otpStore.delete(formattedPhone);
   return { success: true };
+};
+
+/**
+ * Retrieves active unexpired OTP for automatic SMS synchronization
+ */
+export const getActiveOtpForPhone = (
+  rawPhone: string
+): { success: boolean; code?: string; createdAt?: number } => {
+  const formattedPhone = normalizePhilippinePhone(rawPhone);
+  const entry = otpStore.get(formattedPhone);
+
+  if (!entry) {
+    return { success: false };
+  }
+
+  if (Date.now() > entry.expiresAt) {
+    otpStore.delete(formattedPhone);
+    return { success: false };
+  }
+
+  return {
+    success: true,
+    code: entry.code,
+    createdAt: entry.createdAt,
+  };
 };
 
 

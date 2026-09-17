@@ -524,7 +524,53 @@ export async function parseMtopImage(
   let authorizedRoute = '';
 
   try {
-    onProgress?.(10, 'Initializing OCR Engine');
+    // Priority 1: High-accuracy server-side Gemini Vision OCR
+    try {
+      onProgress?.(15, 'Scanning with Gemini Vision AI...');
+      const payloadImage = rawImageDataUrl || imageDataUrl;
+      const response = await fetch('/api/ocr/mtop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: payloadImage }),
+      });
+
+      if (response.ok) {
+        const json = await response.json();
+        if (json.success && json.data) {
+          onProgress?.(100, 'Permit analysis complete');
+          const g = json.data;
+          const missingFields: string[] = [];
+          if (!g.operatorName) missingFields.push('Operator Name');
+          if (!g.franchiseNumber) missingFields.push('Franchise Number');
+          if (!g.plateNumber) missingFields.push('Plate Number');
+
+          return {
+            data: {
+              photoUrl: rawImageDataUrl || imageDataUrl,
+              operatorName: g.operatorName || '',
+              franchiseNumber: g.franchiseNumber || '',
+              plateNumber: g.plateNumber || '',
+              chassisNumber: g.chassisNumber || '',
+              vehicleMake: g.make || '',
+              motorNumber: g.engineNumber || '',
+              yearModel: '',
+              orNumber: '',
+              expirationDate: g.expirationDate || '',
+              authorizedRoute: 'Calapan City Route',
+              rawOcrText: JSON.stringify(g),
+              scannedAt: new Date().toISOString(),
+            },
+            isSuccessful: Boolean(g.operatorName || g.franchiseNumber || g.plateNumber),
+            confidenceScore: 0.95,
+            missingFields,
+          };
+        }
+      }
+    } catch (geminiErr) {
+      console.warn('[parseMtopImage] Gemini OCR fallback to local worker:', geminiErr);
+    }
+
+    onProgress?.(25, 'Initializing local OCR fallback...');
     worker = await createWorker('eng');
 
     // Helper to render image onto high-DPI canvas

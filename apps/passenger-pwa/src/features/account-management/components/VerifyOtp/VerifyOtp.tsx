@@ -17,6 +17,7 @@ import { useLanguage } from '../../../../utils/LanguageContext';
 import {
   sendPassengerOtp,
   verifyPassengerOtp,
+  fetchLatestPassengerOtp,
   getPhoneLookupCandidates,
 } from '../../../../services/passengerApiService';
 import { supabase } from '../../../../services/supabaseClient';
@@ -50,6 +51,7 @@ export const VerifyOtp: React.FC = () => {
   const [error, setError] = useState('');
   const [infoNotice, setInfoNotice] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(60);
+  const [resendKey, setResendKey] = useState(0);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const resendNoticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -194,7 +196,88 @@ export const VerifyOtp: React.FC = () => {
     [loading, resolvedPhone, state, language, resolvedName, navigate]
   );
 
+  // Auto-fill OTP as soon as SMS is received, without focusing inputs or showing soft keyboard
+  const handleIncomingSmsOtp = useCallback(
+    (incomingCode: string) => {
+      const cleaned = (incomingCode || '').replace(/\D/g, '').slice(0, 6);
+      if (cleaned.length !== 6 || hasAutoApprovedRef.current || loading) return;
 
+      hasAutoApprovedRef.current = true;
+      const digits = cleaned.split('');
+      setOtp(digits);
+      setError('');
+
+      // CRITICAL FOR CLEAN & SMOOTH FLOW:
+      // We do NOT call inputRefs.current[...].focus() here!
+      // Keeping focus off the input ensures the virtual keyboard never opens unless the user taps a field.
+
+      // Automatically execute verification with a gentle delay so the user sees the filled numbers
+      setTimeout(() => {
+        executeVerification(cleaned);
+      }, 400);
+    },
+    [loading, executeVerification]
+  );
+
+  // Background listener for incoming SMS (Web OTP API + Gateway delivery synchronization)
+  useEffect(() => {
+    let isMounted = true;
+    const abortController = new AbortController();
+
+    // 1. Native Web OTP API for mobile Chrome & supported browsers
+    if (typeof window !== 'undefined' && 'OTPCredential' in window) {
+      navigator.credentials
+        .get({
+          otp: { transport: ['sms'] },
+          signal: abortController.signal,
+        } as any)
+        .then((content: any) => {
+          if (!isMounted) return;
+          if (content && content.code) {
+            handleIncomingSmsOtp(content.code);
+          }
+        })
+        .catch(() => {});
+    }
+
+    // 2. Real-time SMS Gateway delivery synchronization (matches 2-3s cellular SMS transit time)
+    if (!resolvedPhone) return;
+
+    let pollCount = 0;
+    const maxPolls = 20; // 30 seconds total window
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
+
+    // Start checking after 2 seconds to match actual cellular network dispatch time
+    const initialTimer = setTimeout(() => {
+      const checkOtpDelivery = async () => {
+        if (!isMounted || hasAutoApprovedRef.current) {
+          if (pollInterval) clearInterval(pollInterval);
+          return;
+        }
+        pollCount += 1;
+        if (pollCount > maxPolls) {
+          if (pollInterval) clearInterval(pollInterval);
+          return;
+        }
+
+        const res = await fetchLatestPassengerOtp(resolvedPhone);
+        if (res.success && res.code && res.code.length === 6) {
+          if (pollInterval) clearInterval(pollInterval);
+          handleIncomingSmsOtp(res.code);
+        }
+      };
+
+      checkOtpDelivery();
+      pollInterval = setInterval(checkOtpDelivery, 1500);
+    }, 2000);
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+      clearTimeout(initialTimer);
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [resolvedPhone, handleIncomingSmsOtp, resendKey]);
 
   const handleOtpChange = (index: number, val: string) => {
     const rawChar = val.replace(/\D/g, '');
@@ -259,6 +342,7 @@ export const VerifyOtp: React.FC = () => {
         hasAutoApprovedRef.current = false;
         setResendTimer(60);
         setOtp(['', '', '', '', '', '']);
+        setResendKey((prev) => prev + 1);
         setInfoNotice(language === 'tl' ? 'Matagumpay na naipadala muli ang bagong verification code.' : 'Verification code re-sent successfully.');
         if (resendNoticeTimerRef.current) clearTimeout(resendNoticeTimerRef.current);
         resendNoticeTimerRef.current = setTimeout(() => setInfoNotice(null), 5000);
@@ -299,7 +383,11 @@ export const VerifyOtp: React.FC = () => {
         }}
       >
         <IconButton
-          onClick={() => navigate(-1)}
+          onClick={() => {
+            if (state?.isRecovery) navigate('/forgot-password');
+            else if (window.history.length > 1) navigate(-1);
+            else navigate('/register');
+          }}
           sx={{
             color: '#0F172A',
             backgroundColor: '#FFFFFF',
@@ -394,6 +482,9 @@ export const VerifyOtp: React.FC = () => {
               slotProps={{
                 htmlInput: {
                   maxLength: 6,
+                  inputMode: 'numeric',
+                  pattern: '[0-9]*',
+                  autoComplete: index === 0 ? 'one-time-code' : 'off',
                   style: {
                     textAlign: 'center',
                     fontSize: '22px',

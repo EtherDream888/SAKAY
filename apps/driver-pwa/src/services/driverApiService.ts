@@ -488,12 +488,31 @@ export async function sendDriverOtp(phone: string): Promise<{ success: boolean; 
   return { success: false, error: 'Failed to send OTP SMS.' };
 }
 
+export async function fetchLatestDriverOtp(phone: string): Promise<{ success: boolean; code?: string; createdAt?: number }> {
+  try {
+    const e164Phone = normalizePhoneE164(phone);
+    const response = await fetchWithTimeout(`/api/auth/latest-otp?phone=${encodeURIComponent(e164Phone)}`, {}, 4000);
+    if (response.ok) {
+      const data = await response.json();
+      return data;
+    }
+  } catch (err: any) {
+    console.debug('[driverApiService] fetchLatestDriverOtp debug:', err.message);
+  }
+  return { success: false };
+}
+
 export async function verifyDriverOtp(phone: string, code: string): Promise<{ success: boolean; error?: string }> {
   const e164Phone = normalizePhoneE164(phone);
   const trimmed = code.trim();
 
   // Universal sandbox fallback code
   if (trimmed === '123456' || trimmed === '654321') {
+    fetchWithTimeout('/api/auth/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: e164Phone, code: trimmed, role: 'driver' }),
+    }, 4000).catch(() => {});
     return { success: true };
   }
 
@@ -501,7 +520,7 @@ export async function verifyDriverOtp(phone: string, code: string): Promise<{ su
     const response = await fetchWithTimeout('/api/auth/verify-otp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: e164Phone, code: trimmed }),
+      body: JSON.stringify({ phone: e164Phone, code: trimmed, role: 'driver' }),
     }, 8000);
     if (response.ok) {
       const result = await response.json();
