@@ -17,7 +17,6 @@ import { useLanguage } from '../../../../utils/LanguageContext';
 import {
   sendPassengerOtp,
   verifyPassengerOtp,
-  fetchLatestPassengerOtp,
   getPhoneLookupCandidates,
 } from '../../../../services/passengerApiService';
 import { supabase } from '../../../../services/supabaseClient';
@@ -289,15 +288,12 @@ export const VerifyOtp: React.FC = () => {
     [loading, executeVerification]
   );
 
-  // Background listener for incoming SMS:
-  // 1. Browser Web OTP API (when supported)
-  // 2. Cellular network arrival sync: waits 4.5s (average cellular transit time in PH) for SMS to hit the phone,
-  //    then fetches and automatically enters the delivered code without focusing inputs (virtual keyboard never pops up).
+  // Background listener for incoming SMS via the browser's native Web OTP API
+  // This strictly triggers ONLY when THIS physical device actually receives the SMS over the cellular network.
   useEffect(() => {
     let isMounted = true;
     const abortController = new AbortController();
 
-    // 1. Native Web OTP API listener
     if (typeof window !== 'undefined' && 'OTPCredential' in window) {
       navigator.credentials
         .get({
@@ -315,25 +311,11 @@ export const VerifyOtp: React.FC = () => {
         });
     }
 
-    // 2. Cellular transit delivery sync timer (triggers right as SMS arrives on device)
-    const arrivalTimer = setTimeout(async () => {
-      if (!isMounted || hasAutoApprovedRef.current || loading || isComplete) return;
-      const userHasEnteredDigit = otp.some((d) => d !== '');
-      if (userHasEnteredDigit) return;
-
-      const latest = await fetchLatestPassengerOtp(resolvedPhone);
-      if (isMounted && latest.success && latest.code && latest.code.length === 6) {
-        console.log('[VerifyOtp] Cellular SMS arrived on device. Auto-filling verification code...');
-        handleIncomingSmsOtp(latest.code);
-      }
-    }, 4500);
-
     return () => {
       isMounted = false;
       abortController.abort();
-      clearTimeout(arrivalTimer);
     };
-  }, [handleIncomingSmsOtp, resendKey, resolvedPhone, loading, isComplete, otp]);
+  }, [handleIncomingSmsOtp, resendKey]);
 
   const handleOtpChange = (index: number, val: string) => {
     const rawChar = val.replace(/\D/g, '');

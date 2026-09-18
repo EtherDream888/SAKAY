@@ -1,33 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { sendOtpSms, verifyOtpCode, getActiveOtpForPhone } from '../services/smsService';
+import { sendOtpSms, verifyOtpCode } from '../services/smsService';
 import { supabase } from '../config/supabase';
 
 const router = Router();
-
-// GET /api/auth/latest-otp?phone=...
-router.get('/latest-otp', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const phone = (req.query.phone as string) || '';
-    if (!phone) {
-      res.status(400).json({ success: false, error: 'Phone number is required.' });
-      return;
-    }
-
-    const result = getActiveOtpForPhone(phone);
-    if (!result.success || !result.code) {
-      res.json({ success: false, error: 'No active OTP found' });
-      return;
-    }
-
-    res.json({
-      success: true,
-      code: result.code,
-      createdAt: result.createdAt,
-    });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message || 'Internal server error' });
-  }
-});
 
 // POST /api/auth/send-otp
 router.post('/send-otp', async (req: Request, res: Response): Promise<void> => {

@@ -261,29 +261,4 @@ export const verifyOtpCode = (
   return { success: true };
 };
 
-/**
- * Retrieves active unexpired OTP for automatic SMS synchronization
- */
-export const getActiveOtpForPhone = (
-  rawPhone: string
-): { success: boolean; code?: string; createdAt?: number } => {
-  const formattedPhone = normalizePhilippinePhone(rawPhone);
-  const entry = otpStore.get(formattedPhone);
-
-  if (!entry) {
-    return { success: false };
-  }
-
-  if (Date.now() > entry.expiresAt) {
-    otpStore.delete(formattedPhone);
-    return { success: false };
-  }
-
-  return {
-    success: true,
-    code: entry.code,
-    createdAt: entry.createdAt,
-  };
-};
-
 
