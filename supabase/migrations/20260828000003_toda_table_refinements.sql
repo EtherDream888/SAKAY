@@ -19,6 +19,11 @@ BEGIN
     WHERE table_schema = 'public' 
       AND table_name = 'toda' 
       AND column_name = 'account_status'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public' 
+      AND table_name = 'toda' 
+      AND column_name = 'toda_status'
   ) THEN
     ALTER TABLE public.toda RENAME COLUMN account_status TO toda_status;
   END IF;
