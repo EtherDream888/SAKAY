@@ -314,8 +314,16 @@ export const DriverAvailabilityHome: React.FC = () => {
   useEffect(() => {
     if (!profile.isOnline || profile.isPaused || incomingRequest) return;
 
+    const fifteenMinsAgoMs = Date.now() - 15 * 60000;
+
     // 1. Check local broker cache
-    const activeWaiting = getAllActiveBookings().find((b) => b.booking_status === 'Searching Driver');
+    const activeWaiting = getAllActiveBookings().find((b) => {
+      if (b.booking_status !== 'Searching Driver') return false;
+      // Ignore stale local bookings
+      const createdTime = new Date(b.created_at || Date.now()).getTime();
+      return createdTime >= fifteenMinsAgoMs;
+    });
+
     if (activeWaiting) {
       setIncomingRequest(activeWaiting);
       setCountdown(15);
@@ -324,14 +332,14 @@ export const DriverAvailabilityHome: React.FC = () => {
     }
 
     // 2. Query Supabase for waiting pending bookings across devices
-    const fifteenMinsAgo = new Date(Date.now() - 15 * 60000).toISOString();
+    const fifteenMinsAgoStr = new Date(fifteenMinsAgoMs).toISOString();
 
     Promise.resolve(
       supabase
         .from('booking')
         .select('*')
         .eq('booking_status', 'Pending')
-        .gte('created_at', fifteenMinsAgo)
+        .gte('created_at', fifteenMinsAgoStr)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
