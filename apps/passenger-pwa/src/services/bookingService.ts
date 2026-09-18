@@ -316,3 +316,11 @@ export const updateBooking = (
 };
 
 export const updateBookingState = updateBooking;
+
+// Bridge global dispatch events to local listeners
+subscribeToDispatchEvents((updatedBooking: any) => {
+  if (updatedBooking && updatedBooking.booking_id) {
+    updateBookingState(updatedBooking.booking_id, updatedBooking);
+  }
+});
+

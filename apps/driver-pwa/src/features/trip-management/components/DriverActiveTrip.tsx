@@ -108,29 +108,17 @@ export const DriverActiveTrip: React.FC = () => {
     };
   }, [bookingId]);
 
-  // Simulated Trip Progress Timer
+  // Remove simulated trip progress. Progress should be manually driven or physically calculated.
   useEffect(() => {
-    if (!tripStarted) return;
-
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        const next = prev + 5;
-        if (next >= 100) {
-          clearInterval(interval);
-          return 100;
-        }
-
-        // Section 3.4 Business Rule: Prompt mid-trip shared request ONLY while under 50% completion
-        if (booking?.is_shared_trip && next >= 25 && next <= 45 && !hasPromptedShared) {
-          setHasPromptedShared(true);
-          setSharedPromptOpen(true);
-        }
-
-        return next;
-      });
-    }, 1500);
-
-    return () => clearInterval(interval);
+    // Keep the shared trip prompt but trigger it immediately if shared, or remove if not needed.
+    if (tripStarted && booking?.is_shared_trip && !hasPromptedShared) {
+       // Just prompt after a few seconds of starting the trip for realism
+       const t = setTimeout(() => {
+         setHasPromptedShared(true);
+         setSharedPromptOpen(true);
+       }, 5000);
+       return () => clearTimeout(t);
+    }
   }, [tripStarted, hasPromptedShared, booking?.is_shared_trip]);
 
   const handleStartTrip = async () => {
