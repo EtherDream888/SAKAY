@@ -340,15 +340,21 @@ export const declineBookingByDriver = (
   const existing = store[bookingId];
   if (!existing) return;
 
-  // Auto re-routing simulation: After 2.5 seconds, re-publish as 'Searching Driver'
-  setTimeout(() => {
-    const reRouted: MockDispatchBooking = {
-      ...existing,
-      booking_status: 'Searching Driver',
-      updated_at: new Date().toISOString(),
-    };
-    broadcastBooking(reRouted);
-  }, 2500);
+  // In a real system, the backend would assign it to the next driver.
+  // For the actual logic flow, we will update the state to "Driver Declined" or leave it "Pending"
+  // but we MUST NOT force-feed it back to this same driver automatically.
+  
+  const updated: MockDispatchBooking = {
+    ...existing,
+    booking_status: 'Pending',
+    updated_at: new Date().toISOString(),
+  };
+  
+  store[bookingId] = updated;
+  saveStore(store);
+  
+  // Inform the network it was declined, but don't force a re-route.
+  emitToSubscribers(updated);
 };
 
 /**
