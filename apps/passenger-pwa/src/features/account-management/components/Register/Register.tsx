@@ -89,37 +89,10 @@ export const Register: React.FC = () => {
   const cleanPhoneDigits = phone.replace(/\D/g, '');
   const fullName = [firstName.trim(), middleName.trim(), lastName.trim(), suffix.trim()].filter(Boolean).join(' ');
 
-  // Debounced check for existing registered passenger by phone
+  // Clear phone registered error when user edits phone
   useEffect(() => {
-    if (cleanPhoneDigits.length === 11 && cleanPhoneDigits.startsWith('09')) {
-      let isCurrent = true;
-      const timer = setTimeout(async () => {
-        try {
-          const existing = await lookupPassengerByPhone(cleanPhoneDigits);
-          if (isCurrent) {
-            if (existing) {
-              setPhoneRegisteredError(
-                language === 'tl'
-                  ? 'Ang numerong ito ay nakarehistro na. Mangyaring mag-log in na lamang.'
-                  : 'This mobile number is already registered. Please log in instead.'
-              );
-            } else {
-              setPhoneRegisteredError(null);
-            }
-          }
-        } catch (err) {
-          console.warn('[Register] Error checking phone uniqueness:', err);
-        }
-      }, 350);
-
-      return () => {
-        isCurrent = false;
-        clearTimeout(timer);
-      };
-    } else {
-      setPhoneRegisteredError(null);
-    }
-  }, [cleanPhoneDigits, language]);
+    setPhoneRegisteredError(null);
+  }, [cleanPhoneDigits]);
 
   const criteriaList = [
     {
@@ -203,9 +176,9 @@ export const Register: React.FC = () => {
     setAccountError(null);
     if (!isFormValid) return;
 
-    // Check if phone number is already registered
+    // Check if phone number is already registered and Active
     const existing = await lookupPassengerByPhone(cleanPhoneDigits);
-    if (existing) {
+    if (existing && (existing.account_status === 'Active' || existing.account_status === 'Verified')) {
       const msg = language === 'tl'
         ? 'Ang numerong ito ay nakarehistro na. Mangyaring mag-log in na lamang.'
         : 'This mobile number is already registered. Please log in instead.';
@@ -216,11 +189,10 @@ export const Register: React.FC = () => {
 
     setSubmitted(true);
 
-    const sessionResult = await ensurePassengerAuthSession(e164Phone, password, fullName);
-    if (!sessionResult.success) {
-      setSubmitted(false);
-      setAccountError(sessionResult.error || (language === 'tl' ? 'Hindi maihanda ang inyong account. Pakisubukang muli.' : 'Unable to prepare your account. Please try again.'));
-      return;
+    try {
+      await ensurePassengerAuthSession(e164Phone, password, fullName);
+    } catch (authErr) {
+      console.warn('[Register] Non-blocking auth preparation note:', authErr);
     }
 
     try {

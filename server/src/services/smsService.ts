@@ -83,6 +83,10 @@ async function sendViaAndroidGateway(
     payload.simNumber = configuredSim;
   }
 
+  if (process.env.SMS_GATEWAY_DEVICE_ID) {
+    payload.deviceId = process.env.SMS_GATEWAY_DEVICE_ID.trim();
+  }
+
   // Attempt up to 2 times with a 15-second timeout to allow dozing phones to wake Wi-Fi radio
   for (let attempt = 1; attempt <= 2; attempt++) {
     try {
