@@ -324,11 +324,14 @@ export const DriverAvailabilityHome: React.FC = () => {
     }
 
     // 2. Query Supabase for waiting pending bookings across devices
+    const fifteenMinsAgo = new Date(Date.now() - 15 * 60000).toISOString();
+
     Promise.resolve(
       supabase
         .from('booking')
         .select('*')
         .eq('booking_status', 'Pending')
+        .gte('created_at', fifteenMinsAgo)
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
