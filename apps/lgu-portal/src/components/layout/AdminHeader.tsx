@@ -35,19 +35,22 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
         const { data: logs } = await supabase
           .from('audit_log')
           .select('*')
-          .order('created_at', { ascending: false })
+          .order('performed_at', { ascending: false })
           .limit(8);
 
         if (isMounted && logs && logs.length > 0) {
-          const items: NotificationItem[] = logs.map((log: any) => ({
-            id: log.log_id,
-            title: log.action_type ? log.action_type.replace(/_/g, ' ') : 'Administrative Activity',
-            description: log.details || '',
-            time: log.created_at ? new Date(log.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Recent',
-            read: false,
-            unread: true,
-            type: (log.category || 'System').toLowerCase(),
-          }));
+          const items: NotificationItem[] = logs.map((log: any) => {
+            const timeVal = log.performed_at || log.created_at;
+            return {
+              id: log.log_id,
+              title: log.action_type ? log.action_type.replace(/_/g, ' ') : 'Administrative Activity',
+              description: log.details || '',
+              time: timeVal ? new Date(timeVal).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+              read: false,
+              unread: true,
+              type: (log.category || 'System').toLowerCase(),
+            };
+          });
           setNotifications(items);
         }
       } catch (err) {

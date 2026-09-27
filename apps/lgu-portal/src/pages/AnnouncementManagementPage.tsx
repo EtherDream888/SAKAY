@@ -194,6 +194,7 @@ export const AnnouncementManagementPage: React.FC = () => {
         title: formTitle.trim(),
         message: formMessage.trim(),
         targetRole: formRole,
+        targetTodaId: formTodaId === 'all-todas' ? null : formTodaId,
       });
     } catch (err) {
       console.warn('[AnnouncementManagement] Backend error during announcement create:', err);

@@ -41,6 +41,7 @@ import {
   fetchTodaDrivers,
   forwardApplicantToLgu,
   rejectDriverApplicant,
+  requestDriverResubmission,
   recordTodaAuditAction,
 } from '../services/todaApiService';
 
@@ -264,23 +265,31 @@ export const TodaDriverVerificationPage: React.FC = () => {
     setCustomRejectComment('');
   };
 
-  const handleResubmitConfirm = () => {
+  const handleResubmitConfirm = async () => {
     if (!selectedApplicant) return;
 
-    setApplicants((prev) =>
-      prev.map((a) => (a.id === selectedApplicant.id ? { ...a, todaStageStatus: 'Resubmission Required' } : a))
-    );
+    const finalReason = selectedRejectReason === 'Iba pa' ? (customRejectComment || 'Kailangan ng pagwawasto sa mga dokumento.') : selectedRejectReason;
+    try {
+      await requestDriverResubmission(selectedApplicant.id, finalReason, customRejectComment);
 
-    recordTodaAuditAction({
-      actionType: 'DRIVER_RESUBMISSION_REQUESTED',
-      targetId: selectedApplicant.id,
-      targetName: selectedApplicant.name,
-      details: `Requested document resubmission for ${selectedApplicant.name}.`,
-      category: 'Driver Verification',
-    });
+      setApplicants((prev) =>
+        prev.map((a) => (a.id === selectedApplicant.id ? { ...a, todaStageStatus: 'Resubmission Required' } : a))
+      );
 
-    setResubmitDialogOpen(false);
-    setSelectedApplicant(null);
+      setToastMessage(`Matagumpay na naibalik ang aplikasyon ni ${selectedApplicant.name} para sa resubmission.`);
+      setToastSeverity('success');
+      setToastOpen(true);
+    } catch (err) {
+      console.error('[TodaVerification] Resubmission error:', err);
+      setToastMessage('Hindi naipadala ang resubmission request. Pakisubukang muli.');
+      setToastSeverity('error');
+      setToastOpen(true);
+    } finally {
+      setRejectDialogOpen(false);
+      setResubmitDialogOpen(false);
+      setSelectedApplicant(null);
+      setCustomRejectComment('');
+    }
   };
 
   const canEndorse = rosterChecked && photoChecked;
@@ -820,19 +829,33 @@ export const TodaDriverVerificationPage: React.FC = () => {
             onChange={(e) => setCustomRejectComment(e.target.value)}
           />
         </DialogContent>
-        <DialogActions sx={{ p: 0, pt: 3, display: 'flex', gap: 1.5 }}>
+        <DialogActions sx={{ p: 0, pt: 3, display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
           <Button
             onClick={() => setRejectDialogOpen(false)}
             sx={{
-              flex: 1,
               borderRadius: '12px',
               backgroundColor: '#F1F3F5',
               color: '#0F172A',
               fontWeight: 700,
               textTransform: 'none',
+              px: 2,
             }}
           >
             Kanselahin
+          </Button>
+          <Button
+            onClick={handleResubmitConfirm}
+            variant="outlined"
+            color="warning"
+            disabled={selectedRejectReason === 'Iba pa' && !customRejectComment.trim()}
+            sx={{
+              borderRadius: '12px',
+              fontWeight: 700,
+              textTransform: 'none',
+              px: 2,
+            }}
+          >
+            Ibalik para sa Resubmission
           </Button>
           <Button
             onClick={handleRejectConfirm}

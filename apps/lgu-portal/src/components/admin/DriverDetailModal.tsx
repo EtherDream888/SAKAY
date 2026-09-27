@@ -16,6 +16,8 @@ import { ActionButton } from './ActionButton';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
 import {
   verifyDriver,
+  rejectDriver,
+  returnDriverForCorrection,
   suspendDriver,
   reactivateDriver,
   issueDriverStrike,
@@ -43,6 +45,7 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
 
   // Dialog states
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
   const [reactivateDialogOpen, setReactivateDialogOpen] = useState(false);
   const [strikeDialogOpen, setStrikeDialogOpen] = useState(false);
@@ -72,6 +75,29 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
       setSnackbarMsg(`Error: ${(err as Error).message}`);
     }
     setVerifyDialogOpen(false);
+  };
+
+  /**
+   * Action Handler: Reject Driver Application
+   */
+  const handleRejectConfirm = async (reason?: string) => {
+    const finalReason = reason || 'Non-compliance with LGU franchise documentary guidelines.';
+    try {
+      await rejectDriver(driver.id, finalReason);
+      setSnackbarMsg(`Driver application for ${driver.name} has been rejected.`);
+      const updated: DriverRecord = {
+        ...driver,
+        accountStatus: 'Inactive',
+        verificationStatus: 'Rejected',
+        lguVerificationStatus: 'Rejected',
+      };
+      if (onDriverUpdated) onDriverUpdated(updated);
+      if (onStatusChange) onStatusChange(driver.id, 'Inactive');
+    } catch (err) {
+      console.error('[DriverDetailModal] Rejection error:', err);
+      setSnackbarMsg(`Error: ${(err as Error).message}`);
+    }
+    setRejectDialogOpen(false);
   };
 
   /**
@@ -187,6 +213,9 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
           else if (isAccountActive) setSuspendDialogOpen(true);
           else setReactivateDialogOpen(true);
         }}
+        secondaryActionLabel={!isVerified ? 'Reject Application' : 'Close'}
+        secondaryActionColor={!isVerified ? 'error' : 'inherit'}
+        onSecondaryAction={!isVerified ? () => setRejectDialogOpen(true) : onClose}
       >
         {/* Header Profile Summary Bar */}
         <Box
@@ -436,6 +465,18 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
         confirmLabel="Approve Driver"
         confirmVariant="orange"
         onConfirm={handleVerifyConfirm}
+      />
+
+      <MacConfirmDialog
+        open={rejectDialogOpen}
+        onClose={() => setRejectDialogOpen(false)}
+        title="Reject Driver Application?"
+        message={`Disapprove Stage 2 LGU verification for "${driver.name}" (${driver.todaName}). Specify the reason for rejection or return for correction.`}
+        confirmLabel="Reject Application"
+        confirmVariant="danger"
+        requireReason
+        reasonPlaceholder="Specify rejection reasons (e.g. Expired Professional License, Invalid MTOP)..."
+        onConfirm={handleRejectConfirm}
       />
 
       <MacConfirmDialog

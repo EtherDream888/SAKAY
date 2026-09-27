@@ -65,7 +65,7 @@ export const TodaFleetPage: React.FC = () => {
   const loadFleet = async () => {
     setIsLoading(true);
     try {
-      const data = await fetchTodaFleet(DEFAULT_TODA_ID);
+      const data = await fetchTodaFleet();
       setFleet(data);
     } catch (err) {
       console.error('[TodaFleetPage] Error loading fleet:', err);

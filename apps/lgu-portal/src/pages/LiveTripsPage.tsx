@@ -79,7 +79,17 @@ export const LiveTripsPage: React.FC = () => {
 
   // Categorize bookings
   const activeTrips = bookings.filter((b) =>
-    ['Driver Assigned', 'Driver En Route', 'Driver Arrived', 'Trip Ongoing', 'Heading to Passenger'].includes(b.status)
+    [
+      'Accepted',
+      'Driver Assigned',
+      'Driver En Route',
+      'In Transit',
+      'Arrived at Pickup',
+      'Driver Arrived',
+      'Trip Ongoing',
+      'Heading to Passenger',
+      'Arrived at Destination',
+    ].includes(b.status)
   );
   const completedTrips = bookings.filter((b) => b.status === 'Completed');
   const cancelledTrips = bookings.filter((b) => (b.status || '').toLowerCase().includes('cancel') || b.status === 'No Driver Found');

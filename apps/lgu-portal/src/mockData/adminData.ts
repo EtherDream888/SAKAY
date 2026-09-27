@@ -105,8 +105,8 @@ export interface DriverRecord {
   franchiseNo: string;
   franchiseExpiry: string;
   todaVerificationStatus: 'Verified' | 'Pending';
-  lguVerificationStatus: 'Verified' | 'Pending' | 'Suspended' | 'Endorsed to LGU';
-  verificationStatus: 'Verified' | 'Pending' | 'Suspended' | 'Endorsed to LGU';
+  lguVerificationStatus: 'Verified' | 'Pending' | 'Suspended' | 'Endorsed to LGU' | 'Rejected' | 'Resubmission Required';
+  verificationStatus: 'Verified' | 'Pending' | 'Suspended' | 'Endorsed to LGU' | 'Rejected' | 'Resubmission Required';
   accountStatus: 'Active' | 'Inactive';
   onlineStatus: 'Online' | 'Offline';
   rating: number;

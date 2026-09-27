@@ -165,6 +165,7 @@ export interface TodaBooking {
 
 export interface TodaIncident {
   id: string;
+  incidentCode?: string;
   bookingId: string;
   tripId: string;
   driverName: string;

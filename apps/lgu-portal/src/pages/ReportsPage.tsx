@@ -66,44 +66,46 @@ export const ReportsPage: React.FC = () => {
 
   const handleExportCSV = (reportName: string) => {
     if (!reportsData) return;
-    let csvContent = 'data:text/csv;charset=utf-8,';
+    let csvContent = '';
 
     if (reportName === 'Bookings') {
-      csvContent += 'Metric,Value\n';
-      csvContent += `Total Bookings,${reportsData.summary.totalBookings}\n`;
-      csvContent += `Completed Trips,${reportsData.summary.completedTrips}\n`;
-      csvContent += `Cancelled Bookings,${reportsData.summary.cancelledTrips}\n`;
-      csvContent += `Total Fares Collected (PHP),${reportsData.summary.totalRevenue}\n`;
-      csvContent += `Average Fare (PHP),${reportsData.summary.averageFare}\n`;
+      csvContent += 'Metric,Value\r\n';
+      csvContent += `Total Bookings,${reportsData.summary.totalBookings}\r\n`;
+      csvContent += `Completed Trips,${reportsData.summary.completedTrips}\r\n`;
+      csvContent += `Cancelled Bookings,${reportsData.summary.cancelledTrips}\r\n`;
+      csvContent += `Total Fares Collected (PHP),${reportsData.summary.totalRevenue}\r\n`;
+      csvContent += `Average Fare (PHP),${reportsData.summary.averageFare}\r\n`;
     } else if (reportName === 'PeakHours') {
-      csvContent += 'Hour Window,Trip Volume\n';
+      csvContent += 'Hour Window,Trip Volume\r\n';
       reportsData.peakHourDistribution.forEach((h) => {
-        csvContent += `"${h.hour}",${h.count}\n`;
+        csvContent += `"${h.hour.replace(/"/g, '""')}",${h.count}\r\n`;
       });
     } else if (reportName === 'Barangay') {
-      csvContent += 'Barangay Zone,Booking Requests,Percentage Share\n';
+      csvContent += 'Barangay Zone,Booking Requests,Percentage Share\r\n';
       reportsData.barangayDemand.forEach((b) => {
-        csvContent += `"${b.barangay}",${b.count},${b.percentage}%\n`;
+        csvContent += `"${b.barangay.replace(/"/g, '""')}",${b.count},${b.percentage}%\r\n`;
       });
     } else if (reportName === 'TODA') {
-      csvContent += 'TODA Name,Completed Trips,Registered Units,Compliance Rate\n';
+      csvContent += 'TODA Name,Completed Trips,Registered Units,Compliance Rate\r\n';
       reportsData.todaPerformance.forEach((t) => {
-        csvContent += `"${t.todaName}",${t.totalTrips},${t.activeUnits},${t.complianceRate}%\n`;
+        csvContent += `"${t.todaName.replace(/"/g, '""')}",${t.totalTrips},${t.activeUnits},${t.complianceRate}%\r\n`;
       });
     } else {
-      csvContent += 'Driver Name,Affiliated TODA,Completed Trips,Rating,Status\n';
+      csvContent += 'Driver Name,Affiliated TODA,Completed Trips,Rating,Status\r\n';
       reportsData.driverUtilization.forEach((d) => {
-        csvContent += `"${d.driverName}","${d.toda}",${d.completedTrips},${d.rating},"${d.status}"\n`;
+        csvContent += `"${d.driverName.replace(/"/g, '""')}","${d.toda.replace(/"/g, '""')}",${d.completedTrips},${d.rating},"${d.status}"\r\n`;
       });
     }
 
-    const encodedUri = encodeURI(csvContent);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
+    link.setAttribute('href', url);
     link.setAttribute('download', `SAKAY_LGU_Report_${reportName}_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const summary = reportsData?.summary || {

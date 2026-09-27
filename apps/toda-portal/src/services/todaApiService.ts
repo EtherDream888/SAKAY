@@ -21,6 +21,41 @@ import { parseDriverRoster } from '../utils/rosterParser';
 
 export const DEFAULT_TODA_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
 
+export async function getEffectiveTodaId(providedId?: string): Promise<string> {
+  if (providedId && providedId !== DEFAULT_TODA_ID && providedId.trim()) {
+    return providedId;
+  }
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: adminRecord } = await supabase
+        .from('toda_admin')
+        .select('toda_id')
+        .eq('auth_user_id', user.id)
+        .maybeSingle();
+
+      if (adminRecord?.toda_id) {
+        return adminRecord.toda_id;
+      }
+    }
+  } catch (err) {
+    console.warn('[todaApiService] Error resolving authenticated toda_id:', err);
+  }
+
+  // Fallback to most recently registered TODA in database
+  try {
+    const { data: latestToda } = await supabase
+      .from('toda')
+      .select('toda_id')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latestToda?.toda_id) return latestToda.toda_id;
+  } catch {}
+
+  return DEFAULT_TODA_ID;
+}
+
 // ============================================================================
 // 1. TODA PROFILE & REGISTRATION
 // ============================================================================
@@ -175,7 +210,7 @@ export async function fetchTodaProfile(todaId?: string): Promise<TodaProfile | n
 }
 
 export async function updateTodaProfile(
-  todaId: string = DEFAULT_TODA_ID,
+  todaId?: string,
   profileData: Partial<{
     name: string;
     acronym: string;
@@ -188,8 +223,9 @@ export async function updateTodaProfile(
     contactEmail: string;
     serviceArea: string;
     officers: any;
-  }>
+  }> = {}
 ) {
+  const targetTodaId = await getEffectiveTodaId(todaId);
   const updatePayload: any = {};
   if (profileData.name) updatePayload.toda_name = profileData.name;
   if (profileData.acronym) updatePayload.toda_acronym = profileData.acronym;
@@ -217,7 +253,7 @@ export async function updateTodaProfile(
     const { data, error } = await supabase
       .from('toda')
       .update(updatePayload)
-      .eq('toda_id', todaId)
+      .eq('toda_id', targetTodaId)
       .select()
       .maybeSingle();
 
@@ -776,7 +812,9 @@ export async function fetchTodaDrivers(todaId?: string): Promise<TodaDriverMembe
                 todaVerificationStatus: 'Verified',
                 lguVerificationStatus: matchedDriver?.account_status === 'Verified' ? 'Verified' : 'Pending',
                 accountStatus: accountStatus as TodaDriverMember['accountStatus'],
-                strikesCount: 0,
+                suspensionReason: matchedDriver?.suspension_reason || undefined,
+                suspendedAt: matchedDriver?.suspended_at ? new Date(matchedDriver.suspended_at).toLocaleDateString('en-US') : undefined,
+                strikesCount: matchedDriver?.strikes_count || 0,
                 rating: Number(matchedDriver?.weighted_average_rating) || 5.0,
                 totalTrips: 0,
                 joinedDate: todaRecord?.created_at ? new Date(todaRecord.created_at).toLocaleDateString('en-US') : 'Recent',
@@ -803,7 +841,9 @@ export async function fetchTodaDrivers(todaId?: string): Promise<TodaDriverMembe
         todaVerificationStatus: 'Verified',
         lguVerificationStatus: d.account_status === 'Verified' ? 'Verified' : 'Pending',
         accountStatus: d.account_status === 'Suspended' ? 'TODA Suspended' : (d.account_status as any) || 'Active',
-        strikesCount: 0,
+        suspensionReason: d.suspension_reason || undefined,
+        suspendedAt: d.suspended_at ? new Date(d.suspended_at).toLocaleDateString('en-US') : undefined,
+        strikesCount: d.strikes_count || 0,
         rating: Number(d.weighted_average_rating) || 5.0,
         totalTrips: 0,
         joinedDate: d.created_at ? new Date(d.created_at).toLocaleDateString('en-US') : 'Recent',
@@ -819,20 +859,9 @@ export async function fetchTodaDrivers(todaId?: string): Promise<TodaDriverMembe
 
 export const fetchTodaDriverMembers = fetchTodaDrivers;
 
-export async function fetchDriverApplicants(todaId: string = DEFAULT_TODA_ID): Promise<DriverApplicant[]> {
+export async function fetchDriverApplicants(todaId?: string): Promise<DriverApplicant[]> {
   try {
-    let targetTodaId = todaId;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: adminRow } = await supabase
-        .from('toda_admin')
-        .select('toda_id')
-        .eq('auth_user_id', user.id)
-        .maybeSingle();
-      if (adminRow?.toda_id) {
-        targetTodaId = adminRow.toda_id;
-      }
-    }
+    const targetTodaId = await getEffectiveTodaId(todaId);
 
     const { data, error } = await supabase
       .from('driver')
@@ -982,19 +1011,82 @@ export async function rejectDriverApplicant(applicantId: string, reason: string,
   return { success: true, data };
 }
 
+export async function requestDriverResubmission(
+  applicantId: string,
+  reason: string,
+  notes?: string,
+  actorName: string = 'TODA President'
+) {
+  const timestamp = new Date().toISOString();
+  const payload = {
+    account_status: 'Resubmission Required',
+    rejection_reason: reason,
+    rejection_comment: notes || null,
+    updated_at: timestamp,
+  };
+
+  const { data, error } = await supabase
+    .from('driver')
+    .update(payload)
+    .eq('driver_id', applicantId)
+    .select()
+    .single();
+
+  if (error) {
+    await supabase
+      .from('driver')
+      .update({ account_status: 'Resubmission Required', updated_at: timestamp })
+      .eq('driver_id', applicantId);
+  }
+
+  await supabase
+    .from('driver_verification')
+    .update({
+      verification_status: 'Resubmission Required',
+      rejection_reason: reason,
+      rejection_comment: notes || null,
+      reviewed_at: timestamp,
+    })
+    .eq('driver_id', applicantId);
+
+  await recordTodaAuditAction({
+    actionType: 'DRIVER_RESUBMISSION_REQUESTED',
+    targetId: applicantId,
+    targetName: data?.full_name || applicantId,
+    details: `[TODA Screening] ${actorName}: Requested document correction/resubmission for '${data?.full_name || applicantId}'. Reason: ${reason}. Notes: ${notes || 'None'}`,
+    category: 'Driver Verification',
+  });
+
+  return { success: true, data };
+}
+
 export async function updateDriverMembershipStatus(
   driverId: string,
   newStatus: 'Active' | 'Suspended' | 'Inactive',
   reason?: string
 ) {
-  const { data, error } = await supabase
+  const updatePayload: any = {
+    account_status: newStatus === 'Active' ? 'Verified' : 'Suspended',
+    suspension_reason: newStatus === 'Suspended' ? (reason || 'TODA Association Policy Suspension') : null,
+    suspended_at: newStatus === 'Suspended' ? new Date().toISOString() : null,
+  };
+
+  let { data, error } = await supabase
     .from('driver')
-    .update({ account_status: newStatus === 'Active' ? 'Verified' : 'Suspended' })
+    .update(updatePayload)
     .eq('driver_id', driverId)
     .select()
-    .single();
+    .maybeSingle();
 
-  if (error) throw error;
+  if (error) {
+    const fallback = await supabase
+      .from('driver')
+      .update({ account_status: newStatus === 'Active' ? 'Verified' : 'Suspended' })
+      .eq('driver_id', driverId)
+      .select()
+      .maybeSingle();
+    data = fallback.data;
+  }
 
   await recordTodaAuditAction({
     actionType: newStatus === 'Suspended' ? 'DRIVER_MEMBERSHIP_SUSPENDED' : 'DRIVER_MEMBERSHIP_REACTIVATED',
@@ -1031,9 +1123,10 @@ export interface TodaVehicleUnit {
   registeredDate: string;
 }
 
-export async function fetchTodaFleet(todaId: string = DEFAULT_TODA_ID): Promise<TodaVehicleUnit[]> {
+export async function fetchTodaFleet(todaId?: string): Promise<TodaVehicleUnit[]> {
   try {
-    const { data, error } = await supabase.from('driver').select('*').eq('toda_id', todaId);
+    const effectiveTodaId = await getEffectiveTodaId(todaId);
+    const { data, error } = await supabase.from('driver').select('*').eq('toda_id', effectiveTodaId);
     if (error || !data || data.length === 0) return [];
 
     return data.map((d: any, idx: number) => ({
@@ -1068,30 +1161,47 @@ export async function addTodaVehicle(payload: { plateNumber: string; mtopNumber:
 // 4. TODA OPERATIONS, INCIDENTS, ANNOUNCEMENTS & AUDIT LOGS
 // ============================================================================
 
-export async function fetchTodaOperationsTrips(todaId: string = DEFAULT_TODA_ID) {
+export async function fetchTodaOperationsTrips(todaId?: string) {
   try {
-    const { data, error } = await supabase.from('booking').select('*, driver:driver_id(*)').order('created_at', { ascending: false });
+    const effectiveTodaId = await getEffectiveTodaId(todaId);
+    const { data, error } = await supabase
+      .from('booking')
+      .select('*, driver:driver_id(*), passenger:passenger_id(full_name, contact_number)')
+      .order('created_at', { ascending: false });
     if (error || !data) return [];
-    return data;
+    return data.filter((b: any) => b.toda_id === effectiveTodaId || b.driver?.toda_id === effectiveTodaId);
   } catch {
     return [];
   }
 }
 
-export async function fetchTodaIncidents(todaId: string = DEFAULT_TODA_ID) {
+export async function fetchTodaIncidents(todaId?: string) {
   try {
-    const { data, error } = await supabase.from('incident_report').select('*').order('created_at', { ascending: false });
+    const effectiveTodaId = await getEffectiveTodaId(todaId);
+    const { data, error } = await supabase
+      .from('incident_report')
+      .select('*, booking:booking_id(*), driver:driver_id(*), passenger:passenger_id(full_name, contact_number)')
+      .order('created_at', { ascending: false });
     if (error || !data) return [];
-    return data;
+    return data.filter((inc: any) => 
+      inc.reported_toda_id === effectiveTodaId || 
+      inc.driver?.toda_id === effectiveTodaId || 
+      inc.booking?.toda_id === effectiveTodaId
+    );
   } catch {
     return [];
   }
 }
 
 export async function submitIncidentRemarks(incidentId: string, remarks: string) {
+  const updatePayload: Record<string, any> = {
+    resolution: remarks,
+    resolution_notes: remarks,
+    reviewed_by_toda: true,
+  };
   const { data, error } = await supabase
     .from('incident_report')
-    .update({ resolution_notes: remarks })
+    .update(updatePayload)
     .eq('incident_id', incidentId)
     .select()
     .single();
@@ -1109,12 +1219,16 @@ export async function submitIncidentRemarks(incidentId: string, remarks: string)
 }
 
 export async function escalateIncidentToLgu(incidentId: string, remarks?: string) {
+  const escalationNote = `[Escalated to LGU Transport Board] ${remarks || 'Requires City LGU investigation.'}`;
+  const updatePayload: Record<string, any> = {
+    status: 'Under Investigation',
+    resolution: escalationNote,
+    resolution_notes: escalationNote,
+    reviewed_by_toda: true,
+  };
   const { data, error } = await supabase
     .from('incident_report')
-    .update({
-      status: 'Under Investigation',
-      resolution_notes: `[Escalated to LGU Transport Board] ${remarks || 'Requires City LGU investigation.'}`,
-    })
+    .update(updatePayload)
     .eq('incident_id', incidentId)
     .select()
     .single();
@@ -1144,14 +1258,14 @@ export async function fetchTodaAuditLogs(): Promise<TodaAuditLog[]> {
     return data.map((l: any) => ({
       id: l.log_id,
       log_id: l.log_id,
-      toda_admin_id: l.toda_admin_id || DEFAULT_TODA_ID,
+      toda_admin_id: l.toda_admin_id || l.target_id || 'TODA_ADMIN',
       actor_name: 'TODA Administrator',
       action_type: l.action_type,
       target_id: l.target_id || '',
       target_name: l.target_name || l.target_id || 'Entity',
       details: l.details || '',
-      performed_at: l.performed_at
-        ? new Date(l.performed_at).toLocaleDateString('en-US', {
+      performed_at: (l.performed_at || l.created_at)
+        ? new Date(l.performed_at || l.created_at).toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',
             year: 'numeric',
@@ -1194,8 +1308,9 @@ export async function recordTodaAuditAction(action: {
   }
 }
 
-export async function fetchTodaAnnouncements(): Promise<TodaAnnouncement[]> {
+export async function fetchTodaAnnouncements(todaId?: string): Promise<TodaAnnouncement[]> {
   try {
+    const effectiveTodaId = await getEffectiveTodaId(todaId);
     const { data, error } = await supabase
       .from('announcement')
       .select('*')
@@ -1203,7 +1318,9 @@ export async function fetchTodaAnnouncements(): Promise<TodaAnnouncement[]> {
 
     if (error || !data) return [];
 
-    return data.map((a: any) => ({
+    const filtered = data.filter((a: any) => !a.toda_id || a.toda_id === effectiveTodaId);
+
+    return filtered.map((a: any) => ({
       id: a.announcement_id,
       title: a.title,
       message: a.message,
@@ -1211,7 +1328,7 @@ export async function fetchTodaAnnouncements(): Promise<TodaAnnouncement[]> {
       urgency: (a.urgency === 'Urgent' ? 'High Priority' : 'Standard') as any,
       isPublished: a.is_published ?? true,
       sendPushNotification: true,
-      createdBy: 'LGU & TODA Admin',
+      createdBy: a.toda_id ? 'TODA Admin' : 'LGU & TODA Admin',
       createdAt: a.created_at ? new Date(a.created_at).toLocaleDateString('en-US') : 'Recent',
     }));
   } catch (err) {
@@ -1220,13 +1337,23 @@ export async function fetchTodaAnnouncements(): Promise<TodaAnnouncement[]> {
   }
 }
 
-export async function postTodaAnnouncement(title: string, message: string, urgency: 'Standard' | 'High Priority' = 'Standard') {
+export async function postTodaAnnouncement(
+  title: string,
+  message: string,
+  urgency: 'Standard' | 'High Priority' = 'Standard',
+  todaId?: string
+) {
+  const effectiveTodaId = await getEffectiveTodaId(todaId);
+  const { data: { user } } = await supabase.auth.getUser();
+
   const { data, error } = await supabase.from('announcement').insert([
     {
       title,
       message,
       urgency: urgency === 'High Priority' ? 'Urgent' : 'Normal',
       is_published: true,
+      toda_id: effectiveTodaId,
+      created_by: user?.id || null,
       created_at: new Date().toISOString(),
     },
   ]).select().single();

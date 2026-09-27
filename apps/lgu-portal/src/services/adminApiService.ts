@@ -102,11 +102,11 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
       supabase.from('toda').select('*').order('created_at', { ascending: false }),
       supabase.from('booking').select('*', { count: 'exact', head: true }),
       supabase.from('booking').select('*', { count: 'exact', head: true }).eq('booking_status', 'Completed'),
-      supabase.from('booking').select('*', { count: 'exact', head: true }).in('booking_status', ['Driver Assigned', 'Driver En Route', 'Driver Arrived', 'Trip Ongoing']),
+      supabase.from('booking').select('*', { count: 'exact', head: true }).in('booking_status', ['Accepted', 'In Transit', 'Arrived at Pickup', 'Trip Ongoing', 'Arrived at Destination', 'Driver Assigned', 'Driver En Route', 'Driver Arrived', 'Heading to Passenger']),
       supabase.from('incident_report').select('*', { count: 'exact', head: true }),
       supabase.from('incident_report').select('*', { count: 'exact', head: true }).neq('status', 'Resolved'),
       supabase.from('incident_report').select('*').order('created_at', { ascending: false }).limit(5),
-      supabase.from('incident_report').select('reported_toda_id, status'),
+      supabase.from('incident_report').select('*, driver:driver_id(toda_id), booking:booking_id(toda_id)'),
     ]);
 
     const totalP = passengersTotal.count || 0;
@@ -158,8 +158,9 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
     // Check for flagged TODAs with 3+ confirmed incidents
     const todaIncidentsMap: Record<string, number> = {};
     (incidentReportsRes.data || []).forEach((inc: any) => {
-      if (inc.reported_toda_id) {
-        todaIncidentsMap[inc.reported_toda_id] = (todaIncidentsMap[inc.reported_toda_id] || 0) + 1;
+      const associatedTodaId = inc.reported_toda_id || inc.driver?.toda_id || inc.booking?.toda_id;
+      if (associatedTodaId) {
+        todaIncidentsMap[associatedTodaId] = (todaIncidentsMap[associatedTodaId] || 0) + 1;
       }
     });
 
@@ -770,7 +771,7 @@ export async function fetchFareMatrices(): Promise<FareMatrixRecord[]> {
       effective_timestamp: row.effective_timestamp,
       effective_date: new Date(row.effective_timestamp).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
       is_active: row.is_active,
-      ordinance_reference: 'Calapan City Ordinance No. 118',
+      ordinance_reference: row.ordinance_reference || 'Calapan City Ordinance No. 118',
       configured_by_lgu_admin: 'LGU Transport Board',
       created_at: row.created_at,
     }));
@@ -787,12 +788,13 @@ export async function createFareMatrix(newMatrix: {
   ordinanceNumber?: string;
   configuredBy?: string;
 }): Promise<FareMatrixRecord> {
-  const payload = {
+  const payload: any = {
     base_fare: newMatrix.baseFare,
     base_distance_km: newMatrix.baseDistanceKm,
     succeeding_rate: newMatrix.succeedingRate,
     effective_timestamp: new Date().toISOString(),
     is_active: true,
+    ordinance_reference: newMatrix.ordinanceNumber || 'Calapan City Ordinance No. 118',
   };
 
   await supabase.from('fare_matrix').update({ is_active: false }).eq('is_active', true);
@@ -816,7 +818,7 @@ export async function createFareMatrix(newMatrix: {
     effective_timestamp: data.effective_timestamp,
     effective_date: new Date(data.effective_timestamp).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }),
     is_active: data.is_active,
-    ordinance_reference: newMatrix.ordinanceNumber || 'Calapan City Ordinance',
+    ordinance_reference: data.ordinance_reference || newMatrix.ordinanceNumber || 'Calapan City Ordinance',
     configured_by_lgu_admin: newMatrix.configuredBy || 'LGU Transport Board',
     created_at: data.created_at,
   };
@@ -1004,6 +1006,91 @@ export async function verifyDriver(driverId: string, franchiseNumber?: string) {
   return { success: true, data: data ? data[0] : null };
 }
 
+export async function rejectDriver(driverId: string, reason: string, notes?: string) {
+  const timestamp = new Date().toISOString();
+  const updatePayload: any = {
+    account_status: 'Rejected',
+    rejection_reason: reason,
+    rejection_comment: notes || null,
+    rejected_at: timestamp,
+    updated_at: timestamp,
+  };
+
+  const { data, error } = await supabase
+    .from('driver')
+    .update(updatePayload)
+    .eq('driver_id', driverId)
+    .select();
+
+  if (error) {
+    await supabase
+      .from('driver')
+      .update({ account_status: 'Rejected', updated_at: timestamp })
+      .eq('driver_id', driverId);
+  }
+
+  await supabase
+    .from('driver_verification')
+    .update({
+      verification_status: 'Rejected',
+      rejection_reason: reason,
+      rejection_comment: notes || null,
+      reviewed_at: timestamp,
+    })
+    .eq('driver_id', driverId);
+
+  await recordAdminAuditAction({
+    actionType: 'DRIVER_STAGE2_REJECTED',
+    targetId: driverId,
+    details: `LGU Admin rejected driver application for '${data && data[0]?.full_name ? data[0].full_name : driverId}'. Reason: ${reason}. Notes: ${notes || 'None'}`,
+    category: 'Verification',
+  });
+
+  return { success: true, data: data ? data[0] : null };
+}
+
+export async function returnDriverForCorrection(driverId: string, reason: string, notes?: string) {
+  const timestamp = new Date().toISOString();
+  const updatePayload: any = {
+    account_status: 'Resubmission Required',
+    rejection_reason: reason,
+    rejection_comment: notes || null,
+    updated_at: timestamp,
+  };
+
+  const { data, error } = await supabase
+    .from('driver')
+    .update(updatePayload)
+    .eq('driver_id', driverId)
+    .select();
+
+  if (error) {
+    await supabase
+      .from('driver')
+      .update({ account_status: 'Resubmission Required', updated_at: timestamp })
+      .eq('driver_id', driverId);
+  }
+
+  await supabase
+    .from('driver_verification')
+    .update({
+      verification_status: 'Resubmission Required',
+      rejection_reason: reason,
+      rejection_comment: notes || null,
+      reviewed_at: timestamp,
+    })
+    .eq('driver_id', driverId);
+
+  await recordAdminAuditAction({
+    actionType: 'DRIVER_RESUBMISSION_REQUESTED',
+    targetId: driverId,
+    details: `LGU Admin requested document resubmission/correction for '${data && data[0]?.full_name ? data[0].full_name : driverId}'. Reason: ${reason}. Notes: ${notes || 'None'}`,
+    category: 'Verification',
+  });
+
+  return { success: true, data: data ? data[0] : null };
+}
+
 
 
 export async function fetchTodaDrivers(todaId: string): Promise<DriverRecord[]> {
@@ -1055,12 +1142,27 @@ export async function fetchTodaDrivers(todaId: string): Promise<DriverRecord[]> 
 }
 
 export async function suspendDriver(driverId: string, reason: string, durationDays?: number) {
-  const { data, error } = await supabase
+  const updatePayload: any = {
+    account_status: 'Suspended',
+    suspension_reason: reason,
+    suspended_at: new Date().toISOString(),
+  };
+
+  let { data, error } = await supabase
     .from('driver')
-    .update({ account_status: 'Suspended' })
+    .update(updatePayload)
     .eq('driver_id', driverId)
     .select();
-  if (error) throw error;
+
+  if (error) {
+    const fallback = await supabase
+      .from('driver')
+      .update({ account_status: 'Suspended' })
+      .eq('driver_id', driverId)
+      .select();
+    data = fallback.data;
+  }
+
   await recordAdminAuditAction({
     actionType: 'DRIVER_ACCOUNT_SUSPENDED',
     targetId: driverId,
@@ -1072,12 +1174,27 @@ export async function suspendDriver(driverId: string, reason: string, durationDa
 
 
 export async function reactivateDriver(driverId: string) {
-  const { data, error } = await supabase
+  const updatePayload: any = {
+    account_status: 'Verified',
+    suspension_reason: null,
+    suspended_at: null,
+  };
+
+  let { data, error } = await supabase
     .from('driver')
-    .update({ account_status: 'Verified' })
+    .update(updatePayload)
     .eq('driver_id', driverId)
     .select();
-  if (error) throw error;
+
+  if (error) {
+    const fallback = await supabase
+      .from('driver')
+      .update({ account_status: 'Verified' })
+      .eq('driver_id', driverId)
+      .select();
+    data = fallback.data;
+  }
+
   await recordAdminAuditAction({
     actionType: 'DRIVER_ACCOUNT_REACTIVATED',
     targetId: driverId,
@@ -1088,6 +1205,31 @@ export async function reactivateDriver(driverId: string) {
 }
 
 export async function issueDriverStrike(driverId: string, reason: string, strikesOrCategory?: string | number) {
+  try {
+    const { data: driverRow } = await supabase
+      .from('driver')
+      .select('strikes_count')
+      .eq('driver_id', driverId)
+      .maybeSingle();
+
+    const currentStrikes = (driverRow?.strikes_count || 0) + 1;
+    const updatePayload: any = {
+      strikes_count: currentStrikes,
+    };
+    if (currentStrikes >= 3) {
+      updatePayload.account_status = 'Suspended';
+      updatePayload.suspension_reason = `Automated platform suspension: ${currentStrikes} policy strikes accumulated. Last violation: ${reason}`;
+      updatePayload.suspended_at = new Date().toISOString();
+    }
+
+    await supabase
+      .from('driver')
+      .update(updatePayload)
+      .eq('driver_id', driverId);
+  } catch (err) {
+    console.warn('[adminApiService] Error updating driver strikes:', err);
+  }
+
   await recordAdminAuditAction({
     actionType: 'DRIVER_POLICY_STRIKE_ISSUED',
     targetId: driverId,
@@ -1114,12 +1256,13 @@ export async function fetchPassengers(filters?: { status?: string }): Promise<Pa
       email: p.email || '',
       verificationStatus: 'Verified',
       accountStatus: p.account_status === 'Suspended' ? 'Suspended' : 'Active',
+      suspensionReason: p.suspension_reason || undefined,
       activeSession: false,
       totalBookings: 0,
       registeredDate: p.created_at ? new Date(p.created_at).toLocaleDateString('en-US') : '2026',
       rating: 5.0,
       ratingCount: 0,
-      strikesCount: 0,
+      strikesCount: p.strikes_count || 0,
       strikeHistory: [],
     }));
   } catch (err) {
@@ -1129,12 +1272,19 @@ export async function fetchPassengers(filters?: { status?: string }): Promise<Pa
 }
 
 export async function suspendPassenger(passengerId: string, reason: string, durationDays?: number) {
+  const updatePayload: any = {
+    account_status: 'Suspended',
+    suspension_reason: reason,
+    suspended_at: new Date().toISOString(),
+  };
+
   const { data, error } = await supabase
     .from('passenger')
-    .update({ account_status: 'Suspended' })
+    .update(updatePayload)
     .eq('passenger_id', passengerId)
     .select();
   if (error) throw error;
+
   await recordAdminAuditAction({
     actionType: 'PASSENGER_ACCOUNT_SUSPENDED',
     targetId: passengerId,
@@ -1145,12 +1295,19 @@ export async function suspendPassenger(passengerId: string, reason: string, dura
 }
 
 export async function reactivatePassenger(passengerId: string) {
+  const updatePayload: any = {
+    account_status: 'Active',
+    suspension_reason: null,
+    suspended_at: null,
+  };
+
   const { data, error } = await supabase
     .from('passenger')
-    .update({ account_status: 'Active' })
+    .update(updatePayload)
     .eq('passenger_id', passengerId)
     .select();
   if (error) throw error;
+
   await recordAdminAuditAction({
     actionType: 'PASSENGER_ACCOUNT_REACTIVATED',
     targetId: passengerId,
@@ -1161,6 +1318,31 @@ export async function reactivatePassenger(passengerId: string) {
 }
 
 export async function issuePassengerStrike(passengerId: string, reason: string) {
+  try {
+    const { data: passRow } = await supabase
+      .from('passenger')
+      .select('strikes_count')
+      .eq('passenger_id', passengerId)
+      .maybeSingle();
+
+    const currentStrikes = (passRow?.strikes_count || 0) + 1;
+    const updatePayload: any = {
+      strikes_count: currentStrikes,
+    };
+    if (currentStrikes >= 3) {
+      updatePayload.account_status = 'Suspended';
+      updatePayload.suspension_reason = `Automated platform suspension: ${currentStrikes} policy strikes accumulated. Last violation: ${reason}`;
+      updatePayload.suspended_at = new Date().toISOString();
+    }
+
+    await supabase
+      .from('passenger')
+      .update(updatePayload)
+      .eq('passenger_id', passengerId);
+  } catch (err) {
+    console.warn('[adminApiService] Error updating passenger strikes:', err);
+  }
+
   await recordAdminAuditAction({
     actionType: 'PASSENGER_POLICY_STRIKE_ISSUED',
     targetId: passengerId,
@@ -1176,28 +1358,37 @@ export async function issuePassengerStrike(passengerId: string, reason: string) 
 
 export async function fetchIncidents(): Promise<IncidentReportRecord[]> {
   try {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('incident_report')
-      .select('*')
+      .select('*, driver:driver_id(full_name, plate_number, toda:toda_id(toda_name)), passenger:passenger_id(full_name)')
       .order('created_at', { ascending: false });
 
+    if (error || !data) {
+      const fallback = await supabase
+        .from('incident_report')
+        .select('*')
+        .order('created_at', { ascending: false });
+      data = fallback.data;
+    }
+
     let liveRecords: IncidentReportRecord[] = [];
-    if (!error && data && data.length > 0) {
+    if (data && data.length > 0) {
       liveRecords = data.map((i: any) => ({
         id: i.incident_id,
         bookingId: i.booking_id || 'TRIP-N/A',
         tripId: i.booking_id || 'TRIP-N/A',
-        reportedBy: (i.reporter_role as any) || 'Passenger',
-        reporterName: i.reporter_name || 'Passenger Complainant',
-        driverName: i.driver_name || 'Tricycle Unit',
-        todaName: 'Calapan Central TODA',
-        vehiclePlate: '773-MV',
-        passengerName: i.reporter_name || 'Passenger',
+        reportedBy: (i.reported_by as any) || (i.reporter_role as any) || 'Passenger',
+        reporterName: i.passenger?.full_name || i.reporter_name || 'Passenger Complainant',
+        driverName: i.driver?.full_name || i.driver_name || 'Assigned Driver',
+        todaName: i.driver?.toda?.toda_name || 'Calapan Central TODA',
+        vehiclePlate: i.driver?.plate_number || i.vehicle_plate || 'MV-101',
+        passengerName: i.passenger?.full_name || i.reporter_name || 'Passenger',
         submittedDate: i.created_at ? new Date(i.created_at).toLocaleDateString('en-US') : 'Recent',
         submittedTime: i.created_at ? new Date(i.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '12:00 PM',
         category: (i.category as any) || 'Overcharging Attempt',
         status: (i.status === 'Resolved' ? 'Resolved' : i.status === 'Dismissed' ? 'Dismissed' : i.status === 'Under Investigation' ? 'Under Investigation' : 'Pending Review') as any,
         description: i.description || 'Disputed trip fare.',
+        findings: i.resolution_notes || i.resolution || '',
         evidenceFiles: [],
         relatedIncidentsCount: 0,
         statusHistory: [],
@@ -1252,9 +1443,18 @@ export async function fetchIncidents(): Promise<IncidentReportRecord[]> {
 }
 
 export async function updateIncidentStatus(incidentId: string, status: string, notes?: string) {
+  const updatePayload: Record<string, any> = {
+    status,
+    resolution: notes || null,
+    resolution_notes: notes || null,
+  };
+  if (status === 'Resolved') {
+    updatePayload.resolved_at = new Date().toISOString();
+  }
+
   const { data, error } = await supabase
     .from('incident_report')
-    .update({ status, resolution_notes: notes })
+    .update(updatePayload)
     .eq('incident_id', incidentId)
     .select();
   if (error) throw error;
@@ -1280,7 +1480,7 @@ export async function fetchAnnouncements(): Promise<AnnouncementRecord[]> {
       title: a.title,
       message: a.message,
       target_role: a.target_audience || 'All',
-      target_toda_id: a.target_toda_id || null,
+      target_toda_id: a.target_toda_id || a.toda_id || null,
       target_toda_name: null,
       is_published: a.is_published,
       publish_timing: 'Immediate',
@@ -1300,9 +1500,12 @@ export async function createAnnouncement(payload: {
   targetRole?: string;
   target_role?: string;
   urgency?: string;
+  targetTodaId?: string | null;
+  target_toda_id?: string | null;
 }) {
   const messageText = payload.message || payload.content || '';
   const targetAudience = payload.targetRole || payload.target_role || 'All';
+  const targetTodaId = payload.targetTodaId || payload.target_toda_id || null;
 
   const { data, error } = await supabase
     .from('announcement')
@@ -1313,6 +1516,7 @@ export async function createAnnouncement(payload: {
         target_audience: targetAudience,
         urgency: payload.urgency || 'Normal',
         is_published: true,
+        toda_id: targetTodaId,
       },
     ])
     .select()
@@ -1469,11 +1673,21 @@ export async function fetchAllBookings(filterStatus?: string): Promise<BookingRe
 
     if (filterStatus && filterStatus !== 'All') {
       if (filterStatus === 'Active') {
-        query = query.in('booking_status', ['Driver Assigned', 'Driver En Route', 'Driver Arrived', 'Trip Ongoing']);
+        query = query.in('booking_status', [
+          'Accepted',
+          'Driver Assigned',
+          'Driver En Route',
+          'In Transit',
+          'Arrived at Pickup',
+          'Driver Arrived',
+          'Trip Ongoing',
+          'Heading to Passenger',
+          'Arrived at Destination',
+        ]);
       } else if (filterStatus === 'Completed') {
         query = query.eq('booking_status', 'Completed');
       } else if (filterStatus === 'Cancelled') {
-        query = query.in('booking_status', ['Cancelled by Passenger', 'Cancelled by Driver', 'No Driver Found']);
+        query = query.in('booking_status', ['Cancelled', 'Cancelled by Passenger', 'Cancelled by Driver', 'No Driver Found']);
       } else {
         query = query.eq('booking_status', filterStatus);
       }
@@ -1485,7 +1699,7 @@ export async function fetchAllBookings(filterStatus?: string): Promise<BookingRe
     return data.map((b: any) => ({
       id: b.booking_id,
       bookingId: b.booking_id,
-      tripType: b.trip_type === 'Shared' ? 'Shared Trip' : 'Solo Ride',
+      tripType: b.is_shared_trip || b.trip_type === 'Shared' ? 'Shared Trip' : 'Solo Ride',
       status: b.booking_status,
       driverId: b.driver_id,
       driverName: b.driver?.full_name || 'Assigned Driver',
@@ -1496,17 +1710,17 @@ export async function fetchAllBookings(filterStatus?: string): Promise<BookingRe
       passengerName: b.passenger?.full_name || 'Commuter',
       passengerPhone: b.passenger?.contact_number || '+63 900 000 0000',
       passengerCount: b.passenger_count || 1,
-      pickupArea: b.pickup_location_address || 'Pickup Point',
-      destinationArea: b.dropoff_location_address || 'Destination Point',
+      pickupArea: b.pickup_address || b.pickup_location_address || 'Pickup Point',
+      destinationArea: b.dropoff_address || b.dropoff_location_address || 'Destination Point',
       startLat: Number(b.pickup_latitude) || 13.4115,
       startLng: Number(b.pickup_longitude) || 121.1803,
       destLat: Number(b.dropoff_latitude) || 13.4150,
       destLng: Number(b.dropoff_longitude) || 121.1850,
       driverLat: Number(b.pickup_latitude) || 13.4115,
       driverLng: Number(b.pickup_longitude) || 121.1803,
-      currentArea: b.pickup_location_address || 'Calapan City',
-      estimatedFare: Number(b.estimated_fare) || 15.0,
-      distanceKm: Number(b.route_distance_km) || 2.0,
+      currentArea: b.pickup_address || b.pickup_location_address || 'Calapan City',
+      estimatedFare: Number(b.final_fare) || Number(b.estimated_fare) || 15.0,
+      distanceKm: Number(b.estimated_distance_km) || Number(b.route_distance_km) || 2.0,
       createdAt: b.created_at,
       bookingTime: b.created_at ? new Date(b.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '12:00 PM',
       eta: '3 mins',
@@ -1538,34 +1752,66 @@ export async function fetchPassengerFeedback(): Promise<PassengerFeedbackItem[]>
   try {
     const { data, error } = await supabase
       .from('driver_rating')
-      .select(`
-        *,
-        passenger:passenger_id (
-          full_name
-        ),
-        driver:driver_id (
-          full_name,
-          toda:toda_id (
-            toda_name
-          )
-        )
-      `)
+      .select('*')
       .order('created_at', { ascending: false });
 
-    if (error || !data) return [];
+    if (!error && data && data.length > 0) {
+      return data.map((r: any) => {
+        const ratingVal = Number(r.stars) || Number(r.rating_value) || 5;
+        return {
+          id: r.rating_id,
+          ratingId: r.rating_id,
+          passengerName: r.passenger_name || 'Passenger',
+          driverName: r.driver_name || 'Driver',
+          todaName: r.toda_name || 'Calapan TODA',
+          ratingValue: ratingVal,
+          comment: r.comment || r.feedback_comment || 'No written feedback submitted.',
+          category: ratingVal >= 4 ? 'Safe Driving' : 'General',
+          createdAt: r.created_at ? new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent',
+          isComplaint: ratingVal <= 2,
+        };
+      });
+    }
 
-    return data.map((r: any) => ({
-      id: r.rating_id,
-      ratingId: r.rating_id,
-      passengerName: r.passenger?.full_name || 'Passenger',
-      driverName: r.driver?.full_name || 'Driver',
-      todaName: r.driver?.toda?.toda_name || 'Calapan TODA',
-      ratingValue: Number(r.rating_value) || 5,
-      comment: r.feedback_comment || 'No written feedback submitted.',
-      category: Number(r.rating_value) >= 4 ? 'Safe Driving' : 'General',
-      createdAt: r.created_at ? new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent',
-      isComplaint: Number(r.rating_value) <= 2,
-    }));
+    // Fallback: Query base 'rating' table if driver_rating view is not yet created
+    const { data: rawRatings, error: rawError } = await supabase
+      .from('rating')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (rawError || !rawRatings) return [];
+
+    const passengerIds = [...new Set(rawRatings.map((r: any) => r.rater_id).filter(Boolean))];
+    const driverIds = [...new Set(rawRatings.map((r: any) => r.ratee_id).filter(Boolean))];
+
+    const [passengersRes, driversRes] = await Promise.all([
+      passengerIds.length > 0
+        ? supabase.from('passenger').select('passenger_id, full_name').in('passenger_id', passengerIds)
+        : { data: [] },
+      driverIds.length > 0
+        ? supabase.from('driver').select('driver_id, full_name, toda:toda_id(toda_name)').in('driver_id', driverIds)
+        : { data: [] },
+    ]);
+
+    const passengerMap = new Map((passengersRes.data || []).map((p: any) => [p.passenger_id, p.full_name]));
+    const driverMap = new Map((driversRes.data || []).map((d: any) => [d.driver_id, d]));
+
+    return rawRatings.map((r: any) => {
+      const d: any = driverMap.get(r.ratee_id);
+      const stars = Number(r.stars) || 5;
+      return {
+        id: r.rating_id,
+        ratingId: r.rating_id,
+        passengerName: passengerMap.get(r.rater_id) || 'Passenger',
+        driverName: d?.full_name || 'Driver',
+        todaName: d?.toda?.toda_name || 'Calapan TODA',
+        ratingValue: stars,
+        comment: r.comment || 'No written feedback submitted.',
+        category: stars >= 4 ? 'Safe Driving' : 'General',
+        createdAt: r.created_at ? new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent',
+        isComplaint: stars <= 2,
+      };
+    });
   } catch (err) {
     console.error('[adminApiService] fetchPassengerFeedback error:', err);
     return [];
@@ -1626,7 +1872,8 @@ export async function fetchOperationalReports(): Promise<OperationalReportsData>
     // Barangay aggregation
     const brgyMap: Record<string, number> = {};
     bookings.forEach((b) => {
-      const brgy = b.pickup_location_address ? b.pickup_location_address.split(',')[0].trim() : 'Calapan Center';
+      const addr = b.pickup_address || b.pickup_location_address;
+      const brgy = addr ? addr.split(',')[0].trim() : 'Calapan Center';
       brgyMap[brgy] = (brgyMap[brgy] || 0) + 1;
     });
 

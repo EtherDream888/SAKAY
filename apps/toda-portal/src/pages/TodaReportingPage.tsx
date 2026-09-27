@@ -77,39 +77,52 @@ export const TodaReportingPage: React.FC = () => {
 
       if (profileData) setTodaName(profileData.name);
 
-      const mappedBookings: TodaBooking[] = (tripsData || []).map((b: any) => ({
-        id: b.booking_id,
-        bookingCode: b.booking_id.slice(0, 8).toUpperCase(),
-        passengerName: b.passenger_name || 'Passenger',
-        passengerPhone: b.passenger_phone || '+63 900 000 0000',
-        driverName: b.driver?.full_name || 'Assigned Driver',
-        vehiclePlate: b.driver?.plate_number || 'MV-101',
-        pickupLocation: b.pickup_address || 'Pickup Point',
-        dropoffLocation: b.dropoff_address || 'Dropoff Point',
-        distanceKm: Number(b.estimated_distance_km) || 2.0,
-        fareAmount: Number(b.estimated_fare) || 15,
-        tripMode: b.is_shared_trip ? 'Shared Ride' : 'Solo Trip',
-        status: b.status === 'Completed' ? 'Completed' : b.status === 'Cancelled' ? 'Cancelled' : 'In Progress',
-        paymentMethod: 'Cash',
-        timestamp: b.created_at ? new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
-      }));
+      const mappedBookings: TodaBooking[] = (tripsData || []).map((b: any) => {
+        const rawStatus = b.booking_status || b.status || '';
+        const tripStatus =
+          rawStatus === 'Completed'
+            ? 'Completed'
+            : rawStatus.toLowerCase().includes('cancel')
+            ? 'Cancelled'
+            : 'In Progress';
+
+        return {
+          id: b.booking_id,
+          bookingCode: b.booking_id.slice(0, 8).toUpperCase(),
+          passengerName: b.passenger?.full_name || b.passenger_name || 'Passenger',
+          passengerPhone: b.passenger?.contact_number || b.passenger_phone || '+63 900 000 0000',
+          driverName: b.driver?.full_name || 'Assigned Driver',
+          vehiclePlate: b.driver?.plate_number || 'MV-101',
+          pickupLocation: b.pickup_address || b.pickup_location_address || 'Pickup Point',
+          dropoffLocation: b.dropoff_address || b.dropoff_location_address || 'Dropoff Point',
+          distanceKm: Number(b.estimated_distance_km) || Number(b.route_distance_km) || 2.0,
+          fareAmount: Number(b.final_fare) || Number(b.estimated_fare) || 15,
+          tripMode: b.is_shared_trip || b.trip_type === 'Shared' ? 'Shared Ride' : 'Solo Trip',
+          status: tripStatus,
+          paymentMethod: 'Cash',
+          timestamp: b.created_at ? new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+        };
+      });
 
       const mappedIncidents: TodaIncident[] = (incData || []).map((inc: any) => ({
-        id: inc.incident_id.slice(0, 8).toUpperCase(),
-        bookingId: inc.trip_id || 'BKG-001',
-        driverName: inc.driver_name || 'Driver',
-        vehiclePlate: inc.vehicle_plate || 'N/A',
+        id: inc.incident_id,
+        incidentCode: (inc.incident_id || '').slice(0, 8).toUpperCase(),
+        bookingId: inc.booking_id || inc.trip_id || 'BKG-001',
+        driverName: inc.driver?.full_name || inc.driver_name || 'Driver',
+        vehiclePlate: inc.driver?.plate_number || inc.vehicle_plate || 'N/A',
         category: inc.category || 'Service Quality',
         description: inc.description || '',
-        reporterName: inc.passenger_name || 'Passenger',
-        reporterRole: 'Passenger',
+        reporterName: inc.passenger?.full_name || inc.passenger_name || (inc.reported_by === 'Driver' ? 'Driver' : 'Passenger'),
+        reporterRole: (inc.reported_by || 'Passenger') as any,
         submittedAt: inc.created_at ? new Date(inc.created_at).toLocaleDateString('en-US') : 'Recent',
         status: (inc.status === 'Resolved'
           ? 'Resolved (TODA Level)'
           : inc.status === 'Under Investigation'
           ? 'Under Investigation'
+          : inc.status === 'Dismissed'
+          ? 'Dismissed'
           : 'Pending Review') as any,
-        tripId: inc.trip_id || 'TRIP-001',
+        tripId: inc.booking_id || inc.trip_id || 'TRIP-001',
         evidenceFiles: [],
       }));
 
@@ -199,6 +212,55 @@ export const TodaReportingPage: React.FC = () => {
   const handleExportReport = (reportName: string, format: 'PDF' | 'Excel') => {
     setExportNotice(`${reportName} exported as ${format}.`);
     setToastProgress(100);
+
+    try {
+      let csvContent = '';
+      const safeDate = new Date().toISOString().slice(0, 10);
+      const filename = `${reportName.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${safeDate}.csv`;
+
+      if (reportName.toLowerCase().includes('incident') || reportName.toLowerCase().includes('complaint')) {
+        const headers = ['Incident Code', 'Driver Name', 'Vehicle Plate', 'Reporter', 'Category', 'Date', 'Status', 'Description'];
+        const rows = incidents.map((i) => [
+          `"${i.incidentCode || i.id.slice(0, 8)}"`,
+          `"${i.driverName}"`,
+          `"${i.vehiclePlate}"`,
+          `"${i.reporterName} (${i.reporterRole})"`,
+          `"${i.category}"`,
+          `"${i.submittedAt}"`,
+          `"${i.status}"`,
+          `"${(i.description || '').replace(/"/g, '""')}"`,
+        ]);
+        csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+      } else {
+        const headers = ['Booking Code', 'Passenger', 'Driver', 'Vehicle Plate', 'Pickup', 'Dropoff', 'Distance (km)', 'Fare (PHP)', 'Mode', 'Status', 'Time'];
+        const rows = bookings.map((b) => [
+          `"${b.bookingCode}"`,
+          `"${b.passengerName}"`,
+          `"${b.driverName}"`,
+          `"${b.vehiclePlate}"`,
+          `"${(b.pickupLocation || '').replace(/"/g, '""')}"`,
+          `"${(b.dropoffLocation || '').replace(/"/g, '""')}"`,
+          b.distanceKm,
+          b.fareAmount,
+          `"${b.tripMode}"`,
+          `"${b.status}"`,
+          `"${b.timestamp}"`,
+        ]);
+        csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+      }
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[TodaReporting] Error generating report CSV export:', err);
+    }
 
     recordTodaAuditAction({
       actionType: 'REPORT_EXPORTED',
@@ -507,7 +569,7 @@ export const TodaReportingPage: React.FC = () => {
                   filteredIncidents.map((inc) => (
                     <TableRow key={inc.id} sx={{ '&:hover': { backgroundColor: 'var(--mac-canvas-bg)' } }}>
                       <TableCell sx={{ py: 2, px: 3, fontWeight: 600, fontSize: '14.5px', color: 'var(--sakay-orange)' }}>
-                        #{inc.id}
+                        #{inc.incidentCode || inc.id.slice(0, 8).toUpperCase()}
                       </TableCell>
 
                       <TableCell sx={{ py: 2, px: 3 }}>
@@ -576,7 +638,7 @@ export const TodaReportingPage: React.FC = () => {
         <MacCenterModal
           open={Boolean(selectedIncident)}
           onClose={() => setSelectedIncident(null)}
-          title={`Incident Report #${selectedIncident.id}`}
+          title={`Incident Report #${selectedIncident.incidentCode || selectedIncident.id.slice(0, 8).toUpperCase()}`}
           subtitle={`Category: ${selectedIncident.category} • Submitted by ${selectedIncident.reporterName}`}
           maxWidth={640}
         >

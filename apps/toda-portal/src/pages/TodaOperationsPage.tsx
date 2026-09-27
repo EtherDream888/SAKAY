@@ -57,22 +57,32 @@ export const TodaOperationsPage: React.FC = () => {
       if (prof) setProfile(prof);
       setDrivers(drvs || []);
 
-      const mappedBookings: TodaBooking[] = (trips || []).map((b: any) => ({
-        id: b.booking_id,
-        bookingCode: b.booking_id.slice(0, 8).toUpperCase(),
-        passengerName: b.passenger_name || 'Passenger',
-        passengerPhone: b.passenger_phone || '+63 900 000 0000',
-        driverName: b.driver?.full_name || 'Assigned Driver',
-        vehiclePlate: b.driver?.plate_number || 'MV-101',
-        pickupLocation: b.pickup_address || 'Pickup Point',
-        dropoffLocation: b.dropoff_address || 'Dropoff Point',
-        distanceKm: Number(b.estimated_distance_km) || 2.0,
-        fareAmount: Number(b.estimated_fare) || 15,
-        tripMode: b.is_shared_trip ? 'Shared Ride' : 'Solo Trip',
-        status: b.status === 'Completed' ? 'Completed' : b.status === 'Cancelled' ? 'Cancelled' : 'In Progress',
-        paymentMethod: 'Cash',
-        timestamp: b.created_at ? new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
-      }));
+      const mappedBookings: TodaBooking[] = (trips || []).map((b: any) => {
+        const rawStatus = b.booking_status || b.status || '';
+        const tripStatus =
+          rawStatus === 'Completed'
+            ? 'Completed'
+            : rawStatus.toLowerCase().includes('cancel')
+            ? 'Cancelled'
+            : 'In Progress';
+
+        return {
+          id: b.booking_id,
+          bookingCode: b.booking_id.slice(0, 8).toUpperCase(),
+          passengerName: b.passenger?.full_name || b.passenger_name || 'Passenger',
+          passengerPhone: b.passenger?.contact_number || b.passenger_phone || '+63 900 000 0000',
+          driverName: b.driver?.full_name || 'Assigned Driver',
+          vehiclePlate: b.driver?.plate_number || 'MV-101',
+          pickupLocation: b.pickup_address || b.pickup_location_address || 'Pickup Point',
+          dropoffLocation: b.dropoff_address || b.dropoff_location_address || 'Dropoff Point',
+          distanceKm: Number(b.estimated_distance_km) || Number(b.route_distance_km) || 2.0,
+          fareAmount: Number(b.final_fare) || Number(b.estimated_fare) || 15,
+          tripMode: b.is_shared_trip || b.trip_type === 'Shared' ? 'Shared Ride' : 'Solo Trip',
+          status: tripStatus,
+          paymentMethod: 'Cash',
+          timestamp: b.created_at ? new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+        };
+      });
 
       setBookings(mappedBookings);
       setLastRefreshed(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
