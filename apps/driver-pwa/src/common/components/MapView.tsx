@@ -114,8 +114,18 @@ export const MapView: React.FC<MapViewProps> = ({
       return;
     }
 
-    const startPoint = pickupLocation && pickupLocation.lat !== 0 ? pickupLocation : userLocation;
-    const endPoint = dropoffLocation && dropoffLocation.lat !== 0 ? dropoffLocation : null;
+    let startPoint: { lat: number; lng: number } | null = null;
+    let endPoint: { lat: number; lng: number } | null = null;
+
+    if (dropoffLocation && dropoffLocation.lat !== 0) {
+      // In trip to destination: route from driver or pickup to dropoff
+      startPoint = pickupLocation && pickupLocation.lat !== 0 ? pickupLocation : userLocation;
+      endPoint = dropoffLocation;
+    } else if (pickupLocation && pickupLocation.lat !== 0 && userLocation && userLocation.lat !== 0) {
+      // Pre-trip: en route from driver location to passenger pickup
+      startPoint = userLocation;
+      endPoint = pickupLocation;
+    }
 
     if (startPoint && startPoint.lat !== 0 && endPoint && endPoint.lat !== 0) {
       let isMounted = true;
@@ -155,8 +165,8 @@ export const MapView: React.FC<MapViewProps> = ({
     markersLayer.clearLayers();
     routeLayers.clearLayers();
 
-    // 1. Driver Pulse Dot Marker
-    if (userLocation && (!pickupLocation || !dropoffLocation)) {
+    // 1. Driver Pulse Dot Marker (ALWAYS visible when userLocation is provided)
+    if (userLocation && typeof userLocation.lat === "number" && !isNaN(userLocation.lat)) {
       const userDotIcon = L.divIcon({
         className: "leaflet-user-marker",
         html: `
@@ -223,17 +233,12 @@ export const MapView: React.FC<MapViewProps> = ({
       L.marker([dropoffLocation.lat, dropoffLocation.lng], { icon: dropoffIcon }).addTo(markersLayer);
     }
 
-    // 4. Draw Road-Based Route Polyline (OSRM geometry) & Fit Bounds
+    // 4. Draw Road-Based Route Polyline (OSRM geometry) & Fit Bounds (No ugly straight line fallback)
     const activeRoutePoints: [number, number][] =
       roadCoords && roadCoords.length >= 2
         ? roadCoords
         : routeCoordinates && routeCoordinates.length >= 2
         ? routeCoordinates
-        : pickupLocation && dropoffLocation && pickupLocation.lat !== 0 && dropoffLocation.lat !== 0
-        ? [
-            [pickupLocation.lat, pickupLocation.lng],
-            [dropoffLocation.lat, dropoffLocation.lng],
-          ]
         : [];
 
     if (activeRoutePoints.length >= 2) {

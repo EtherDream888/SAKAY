@@ -583,6 +583,8 @@ const NewTrip: React.FC = () => {
       {/* 3. Floating Left Back Button over Map */}
       <IconButton
         onClick={() => {
+          sessionStorage.removeItem("trip_dropoff");
+          sessionStorage.removeItem("trip_notes");
           if (isSearching) {
             handleCancelBooking();
           } else {
@@ -937,23 +939,47 @@ const NewTrip: React.FC = () => {
                 </Typography>
               </Box>
 
-              {/* Quick 1-Tap Current Location Button for Dropoff */}
-              <IconButton
-                size="small"
-                onClick={(e) => handleSetCurrentLocationFor("dropoff", e)}
-                title={language === "tl" ? "Gamitin ang Kasalukuyang Lokasyon para sa Destinasyon" : "Use current location for destination"}
-                sx={{
-                  backgroundColor: "rgba(15, 23, 42, 0.08)",
-                  color: "#0F172A",
-                  width: "32px",
-                  height: "32px",
-                  borderRadius: "10px",
-                  flexShrink: 0,
-                  "&:hover": { backgroundColor: "rgba(15, 23, 42, 0.16)" },
-                }}
-              >
-                <MyLocationIcon sx={{ fontSize: "16px" }} />
-              </IconButton>
+              {dropoff.address ? (
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDropoff({ address: "", lat: 0, lng: 0 });
+                    sessionStorage.removeItem("trip_dropoff");
+                    setRouteCoordinates([]);
+                  }}
+                  title={language === "tl" ? "Burahin ang destinasyon" : "Clear destination"}
+                  sx={{
+                    backgroundColor: "rgba(239, 68, 68, 0.1)",
+                    color: "#EF4444",
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "10px",
+                    flexShrink: 0,
+                    "&:hover": { backgroundColor: "rgba(239, 68, 68, 0.2)" },
+                  }}
+                >
+                  <CloseIcon sx={{ fontSize: "16px" }} />
+                </IconButton>
+              ) : (
+                /* Quick 1-Tap Current Location Button for Dropoff */
+                <IconButton
+                  size="small"
+                  onClick={(e) => handleSetCurrentLocationFor("dropoff", e)}
+                  title={language === "tl" ? "Gamitin ang Kasalukuyang Lokasyon para sa Destinasyon" : "Use current location for destination"}
+                  sx={{
+                    backgroundColor: "rgba(15, 23, 42, 0.08)",
+                    color: "#0F172A",
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "10px",
+                    flexShrink: 0,
+                    "&:hover": { backgroundColor: "rgba(15, 23, 42, 0.16)" },
+                  }}
+                >
+                  <MyLocationIcon sx={{ fontSize: "16px" }} />
+                </IconButton>
+              )}
             </Box>
 
             {/* 3. Consolidated Controls Row: TRIP TYPE | PASSENGERS | NOTES */}

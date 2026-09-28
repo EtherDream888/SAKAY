@@ -22,18 +22,23 @@ import MapView from '../../../common/components/MapView';
 import { DriverCommunicationModal } from '../../communication/components/DriverCommunicationModal';
 import { supabase } from '../../../services/supabaseClient';
 import { useLanguage } from '../../../utils/LanguageContext';
+import { useDriverSession } from '../../../contexts/DriverSessionContext';
+import { calculateHaversineKm, formatDistance } from '@sakay/shared';
 
 export const DriverNavigation: React.FC = () => {
   const { language } = useLanguage();
+  const { profile } = useDriverSession();
   const navigate = useNavigate();
   const location = useLocation();
   const bookingId = (location.state as { bookingId?: string })?.bookingId || 'BKG-9011';
 
   const [booking, setBooking] = useState<any>(null);
-  const [driverLocation, setDriverLocation] = useState({ lat: 13.4117, lng: 121.1803 });
+  const [driverLocation, setDriverLocation] = useState({
+    lat: profile.currentLat || 13.4117,
+    lng: profile.currentLng || 121.1803,
+  });
   const [commModalOpen, setCommModalOpen] = useState(false);
   const [exitGuardOpen, setExitGuardOpen] = useState(false);
-  const [eta, setEta] = useState(4);
 
   useEffect(() => {
     if (!bookingId) return;
@@ -88,36 +93,88 @@ export const DriverNavigation: React.FC = () => {
 
     // Watch real-time GPS position and broadcast to passenger
     let watchId: number | null = null;
-    let channel: any = null;
+    const channel = bookingId ? supabase.channel(`passenger_trip_${bookingId}`) : null;
 
-    if (bookingId) {
-      channel = supabase.channel(`passenger_trip_${bookingId}`);
+    if (channel) {
+      channel.subscribe((status: string) => {
+        if (status === 'SUBSCRIBED') {
+          // Immediately broadcast current location once connected
+          if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                setDriverLocation({ lat, lng });
+                channel.send({
+                  type: 'broadcast',
+                  event: 'driver_location',
+                  payload: { lat, lng },
+                });
+              },
+              () => {},
+              { enableHighAccuracy: true, timeout: 5000 }
+            );
+          }
+        }
+      });
     }
 
     if (navigator.geolocation) {
+      // Immediate position check
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setDriverLocation({ lat, lng });
+          if (channel) {
+            channel.send({
+              type: 'broadcast',
+              event: 'driver_location',
+              payload: { lat, lng },
+            });
+          }
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+
+      // Continuous watch with location broadcast and periodic DB update
+      let lastDbUpdate = Date.now();
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
           setDriverLocation({ lat, lng });
-          
+
           if (channel) {
             channel.send({
               type: 'broadcast',
               event: 'driver_location',
-              payload: { lat, lng }
+              payload: { lat, lng },
             });
           }
+
+          // Throttle DB updates to once every 5 seconds (syncs to driver table)
+          if (Date.now() - lastDbUpdate > 5000) {
+            lastDbUpdate = Date.now();
+            const activeDriverId = profile.id || booking?.driver_id || localStorage.getItem('sakay_driver_id');
+            if (activeDriverId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeDriverId)) {
+              supabase
+                .from('driver')
+                .update({
+                  current_latitude: lat,
+                  current_longitude: lng,
+                  last_location_update: new Date().toISOString(),
+                })
+                .eq('driver_id', activeDriverId)
+                .then(() => {});
+            }
+          }
         },
-        (err) => console.warn('[DriverNavigation] Geolocation watch error:', err.message),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 2000 }
+        (err) => console.warn('[DriverNavigation] Geolocation watch note:', err.message),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
       );
     }
-
-    // Simulate ETA countdown
-    const interval = setInterval(() => {
-      setEta((prev) => (prev > 1 ? prev - 1 : 1));
-    }, 4000);
 
     return () => {
       if (watchId !== null && navigator.geolocation) {
@@ -126,7 +183,6 @@ export const DriverNavigation: React.FC = () => {
       if (channel) {
         supabase.removeChannel(channel);
       }
-      clearInterval(interval);
     };
   }, [bookingId]);
 
@@ -156,6 +212,10 @@ export const DriverNavigation: React.FC = () => {
   const passengerPhone = booking?.passenger_phone || '+63 917 555 1001';
   const pickupAddress = booking?.pickup_address || 'JP Rizal St. Central Terminal, Calapan City';
   const fare = booking?.estimated_fare || 18.0;
+  const pickupLat = Number(booking?.pickup_latitude) || 13.4150;
+  const pickupLng = Number(booking?.pickup_longitude) || 121.1825;
+  const pickupDistanceKm = calculateHaversineKm(driverLocation.lat, driverLocation.lng, pickupLat, pickupLng);
+  const etaMinutes = Math.max(1, Math.round((pickupDistanceKm / 20) * 60));
 
   return (
     <Box sx={{ width: '100%', height: '100%', backgroundColor: '#E3ECEF', display: 'flex', flexDirection: 'column', position: 'relative' }}>
@@ -163,8 +223,8 @@ export const DriverNavigation: React.FC = () => {
       <MapView
         userLocation={driverLocation}
         pickupLocation={{
-          lat: booking?.pickup_latitude || 13.4150,
-          lng: booking?.pickup_longitude || 121.1825,
+          lat: pickupLat,
+          lng: pickupLng,
         }}
       />
 
@@ -209,10 +269,10 @@ export const DriverNavigation: React.FC = () => {
         </Box>
         <Box sx={{ flex: 1 }}>
           <Typography sx={{ fontSize: '11px', color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase' }}>
-            NEXT DIRECTION (IN 200M)
+            {language === 'tl' ? 'PAPUNTA SA PICKUP' : 'EN ROUTE TO PICKUP'}
           </Typography>
           <Typography sx={{ fontSize: '14px', fontWeight: 800, color: '#FFFFFF', lineHeight: 1.2 }}>
-            Turn right onto JP Rizal St. towards pickup point
+            {language === 'tl' ? 'Pumunta sa pickup location ng pasahero' : 'Drive towards passenger pickup location'}
           </Typography>
         </Box>
       </Paper>
@@ -268,8 +328,8 @@ export const DriverNavigation: React.FC = () => {
             <Typography sx={{ fontSize: '11px', color: '#64748B', fontWeight: 700 }}>
               {language === 'tl' ? 'TINATAYANG DATING (ETA)' : 'ESTIMATED ARRIVAL (ETA)'}
             </Typography>
-            <Typography sx={{ fontSize: '17px', fontWeight: 900, color: '#0F172A' }}>
-              {eta} {language === 'tl' ? 'min' : 'mins'}
+            <Typography sx={{ fontSize: '16px', fontWeight: 900, color: '#0F172A' }}>
+              {etaMinutes} {language === 'tl' ? 'min' : 'mins'} • {formatDistance(pickupDistanceKm)}
             </Typography>
           </Box>
           <Box sx={{ textAlign: 'right' }}>

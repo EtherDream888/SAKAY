@@ -32,7 +32,19 @@ const Dashboard: React.FC = () => {
   // Active Trip State check
   const activeBookingId = sessionStorage.getItem("current_active_booking_id");
   const activeBooking = activeBookingId ? getBooking(activeBookingId) : null;
-  const isTripInProgress = activeBooking && activeBooking.booking_status !== "Completed" && activeBooking.booking_status !== "Cancelled";
+  const isTripInProgress = Boolean(
+    activeBookingId &&
+    activeBooking &&
+    activeBooking.booking_status !== "Completed" &&
+    activeBooking.booking_status !== "Cancelled"
+  );
+
+  useEffect(() => {
+    if (!activeBookingId) return;
+    if (!activeBooking || activeBooking.booking_status === "Completed" || activeBooking.booking_status === "Cancelled") {
+      sessionStorage.removeItem("current_active_booking_id");
+    }
+  }, [activeBookingId, activeBooking]);
 
   // Passenger Identity State
   const [profileName, setProfileName] = useState<string>(() => {
@@ -165,6 +177,9 @@ const Dashboard: React.FC = () => {
   };
 
   const handleStartNewTrip = () => {
+    // Clear any previous unconfirmed destination and notes so new booking starts fresh
+    sessionStorage.removeItem("trip_dropoff");
+    sessionStorage.removeItem("trip_notes");
     const gpsPermission = localStorage.getItem("gps_permission");
     if (gpsPermission === null && !userLocation) {
       navigate("/location-permission");

@@ -28,124 +28,15 @@ import PersonIcon from '@mui/icons-material/Person';
 import MapView from '../../../common/components/MapView';
 import { supabase } from '../../../services/supabaseClient';
 import { useLanguage } from '../../../utils/LanguageContext';
+import { useDriverSession } from '../../../contexts/DriverSessionContext';
 import { calculateHaversineKm, formatDistance } from '@sakay/shared';
 import { DriverFeedbackModal } from '../../feedback/components/DriverFeedbackModal';
 import { DriverCommunicationModal } from '../../communication/components/DriverCommunicationModal';
 import { DriverCancelModal } from '../../../common/components/DriverCancelModal';
 
-const SlideToCompleteDriver: React.FC<{
-  enabled: boolean;
-  waitingForPayment?: boolean;
-  onComplete: () => void;
-  language?: string;
-}> = ({ enabled, waitingForPayment = false, onComplete, language = 'en' }) => {
-  const [slidePos, setSlidePos] = useState(0);
-  const isDragging = useRef(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const handleStart = () => {
-    if (!enabled || waitingForPayment) return;
-    isDragging.current = true;
-  };
-
-  const handleMove = (clientX: number) => {
-    if (!enabled || waitingForPayment || !isDragging.current || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const maxOffset = rect.width - 52;
-    const offset = Math.max(0, Math.min(clientX - rect.left - 24, maxOffset));
-    setSlidePos(offset);
-
-    if (offset >= maxOffset * 0.85) {
-      isDragging.current = false;
-      setSlidePos(maxOffset);
-      onComplete();
-    }
-  };
-
-  const handleEnd = () => {
-    if (!isDragging.current) return;
-    isDragging.current = false;
-    setSlidePos(0);
-  };
-
-  const getLabelText = () => {
-    if (waitingForPayment) {
-      return language === 'tl'
-        ? 'Naghihintay sa kumpirmasyon ng bayad...'
-        : 'Waiting for passenger to confirm payment...';
-    }
-    return language === 'tl'
-      ? 'I-slide para Kumpletuhin ang Biyahe >>>'
-      : 'Slide to Complete Trip >>>';
-  };
-
-  return (
-    <Box
-      ref={containerRef}
-      onMouseDown={handleStart}
-      onMouseMove={(e) => handleMove(e.clientX)}
-      onMouseUp={handleEnd}
-      onMouseLeave={handleEnd}
-      onTouchStart={handleStart}
-      onTouchMove={(e) => handleMove(e.touches[0].clientX)}
-      onTouchEnd={handleEnd}
-      sx={{
-        position: 'relative',
-        width: '100%',
-        height: '52px',
-        backgroundColor: waitingForPayment ? '#FEF3C7' : enabled ? '#FFF7ED' : '#F1F5F9',
-        border: waitingForPayment ? '1.5px solid #FCD34D' : enabled ? '1.5px solid #FFD6B3' : '1.5px solid #CBD5E1',
-        borderRadius: '999px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        overflow: 'hidden',
-        cursor: enabled && !waitingForPayment ? 'grab' : 'not-allowed',
-        userSelect: 'none',
-        touchAction: 'none',
-      }}
-    >
-      <Typography
-        sx={{
-          fontSize: '12.5px',
-          fontWeight: 800,
-          color: waitingForPayment ? '#D97706' : enabled ? '#FF6B00' : '#64748B',
-          fontFamily: 'Poppins, sans-serif',
-          pointerEvents: 'none',
-          opacity: enabled && !waitingForPayment ? Math.max(0.2, 1 - slidePos / 140) : 1,
-          px: 2,
-          textAlign: 'center',
-        }}
-      >
-        {getLabelText()}
-      </Typography>
-
-      {!waitingForPayment && (
-        <Box
-          sx={{
-            position: 'absolute',
-            left: 4 + slidePos,
-            width: '44px',
-            height: '44px',
-            borderRadius: '50%',
-            backgroundColor: enabled ? '#FF6B00' : '#94A3B8',
-            color: '#FFFFFF',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: enabled ? '0 4px 12px rgba(255, 107, 0, 0.4)' : 'none',
-            transition: isDragging.current ? 'none' : 'left 0.25s ease',
-          }}
-        >
-          <CheckCircleIcon sx={{ fontSize: 24 }} />
-        </Box>
-      )}
-    </Box>
-  );
-};
-
 export const DriverActiveTrip: React.FC = () => {
   const { language } = useLanguage();
+  const { profile } = useDriverSession();
   const navigate = useNavigate();
   const location = useLocation();
   const bookingId = (location.state as { bookingId?: string })?.bookingId || 'BKG-9011';
@@ -165,6 +56,7 @@ export const DriverActiveTrip: React.FC = () => {
   // Waiting for passenger payment & feedback states
   const [waitingForPayment, setWaitingForPayment] = useState(false);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [passengerFinished, setPassengerFinished] = useState(false);
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
 
   // Scroll to cancel drag tracking for driver
@@ -181,8 +73,8 @@ export const DriverActiveTrip: React.FC = () => {
   const [currentFare, setCurrentFare] = useState(booking?.estimated_fare || 35.0);
   const [proportionateFareP1, setProportionateFareP1] = useState(booking?.estimated_fare || 35.0);
   const [driverLocation, setDriverLocation] = useState({
-    lat: booking?.pickup_latitude || 13.4117,
-    lng: booking?.pickup_longitude || 121.1803,
+    lat: profile.currentLat || booking?.pickup_latitude || 13.4117,
+    lng: profile.currentLng || booking?.pickup_longitude || 121.1803,
   });
 
   // Fetch live booking & passenger details
@@ -267,6 +159,7 @@ export const DriverActiveTrip: React.FC = () => {
         setFeedbackModalOpen(true);
       })
       .on('broadcast', { event: 'passenger_finished' }, () => {
+        setPassengerFinished(true);
         setPaymentConfirmed(true);
         setWaitingForPayment(false);
         setFeedbackModalOpen(true);
@@ -288,13 +181,48 @@ export const DriverActiveTrip: React.FC = () => {
   // Real-time GPS broadcasting during active trip
   useEffect(() => {
     let watchId: number | null = null;
-    let channel: any = null;
+    const channel = bookingId ? supabase.channel(`passenger_trip_${bookingId}`) : null;
 
-    if (bookingId) {
-      channel = supabase.channel(`passenger_trip_${bookingId}`);
+    if (channel) {
+      channel.subscribe((status: string) => {
+        if (status === 'SUBSCRIBED' && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const lat = pos.coords.latitude;
+              const lng = pos.coords.longitude;
+              setDriverLocation({ lat, lng });
+              channel.send({
+                type: 'broadcast',
+                event: 'driver_location',
+                payload: { lat, lng },
+              });
+            },
+            () => {},
+            { enableHighAccuracy: true, timeout: 5000 }
+          );
+        }
+      });
     }
 
     if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setDriverLocation({ lat, lng });
+          if (channel) {
+            channel.send({
+              type: 'broadcast',
+              event: 'driver_location',
+              payload: { lat, lng },
+            });
+          }
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+
+      let lastDbUpdate = Date.now();
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
           const lat = pos.coords.latitude;
@@ -308,9 +236,26 @@ export const DriverActiveTrip: React.FC = () => {
               payload: { lat, lng },
             });
           }
+
+          // Throttle DB updates to once every 5 seconds (syncs to driver table)
+          if (Date.now() - lastDbUpdate > 5000) {
+            lastDbUpdate = Date.now();
+            const activeDriverId = profile.id || booking?.driver_id || localStorage.getItem('sakay_driver_id');
+            if (activeDriverId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeDriverId)) {
+              supabase
+                .from('driver')
+                .update({
+                  current_latitude: lat,
+                  current_longitude: lng,
+                  last_location_update: new Date().toISOString(),
+                })
+                .eq('driver_id', activeDriverId)
+                .then(() => {});
+            }
+          }
         },
-        (err) => console.warn('[DriverActiveTrip] Geolocation watch error:', err.message),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 2000 }
+        (err) => console.warn('[DriverActiveTrip] Geolocation watch note:', err.message),
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
       );
     }
 
@@ -509,7 +454,7 @@ export const DriverActiveTrip: React.FC = () => {
       {/* 1. Leaflet OpenStreetMap Surface */}
       <MapView
         pickupLocation={{ lat: pickupLat, lng: pickupLng }}
-        dropoffLocation={{ lat: dropoffLat, lng: dropoffLng }}
+        dropoffLocation={!isPreTrip ? { lat: dropoffLat, lng: dropoffLng } : undefined}
         userLocation={driverLocation}
       />
 
@@ -833,13 +778,52 @@ export const DriverActiveTrip: React.FC = () => {
             Start Trip
           </Button>
         ) : (
-          /* Slide to Complete Trip Slider for Driver */
-          <SlideToCompleteDriver
-            enabled={!waitingForPayment}
-            waitingForPayment={waitingForPayment}
-            onComplete={handleDriverSlideComplete}
-            language={language}
-          />
+          (() => {
+            const isPassengerFinished = paymentConfirmed || passengerFinished || booking?.passenger_finished;
+            const isNearDestination = dropoffDistKm <= 0.05; // 50 meters
+            const canComplete = isPassengerFinished || isNearDestination;
+
+            return (
+              <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                <Button
+                  variant="contained"
+                  fullWidth
+                  disabled={!canComplete || waitingForPayment}
+                  onClick={handleDriverSlideComplete}
+                  startIcon={<CheckCircleIcon />}
+                  sx={{
+                    height: 50,
+                    borderRadius: '14px',
+                    backgroundColor: canComplete && !waitingForPayment ? '#FF6B00' : '#E2E8F0',
+                    color: canComplete && !waitingForPayment ? '#FFFFFF' : '#94A3B8',
+                    fontWeight: 800,
+                    fontSize: '15px',
+                    textTransform: 'none',
+                    fontFamily: 'Poppins, sans-serif',
+                    boxShadow: canComplete && !waitingForPayment ? '0 4px 14px rgba(255, 107, 0, 0.35)' : 'none',
+                    '&:hover': {
+                      backgroundColor: canComplete && !waitingForPayment ? '#E66000' : '#E2E8F0',
+                    },
+                    '&.Mui-disabled': {
+                      backgroundColor: '#F1F5F9',
+                      color: '#94A3B8',
+                    },
+                  }}
+                >
+                  {waitingForPayment
+                    ? (language === 'tl' ? 'Naghihintay ng Kumpirmasyon...' : 'Waiting for Passenger Confirmation...')
+                    : (language === 'tl' ? 'Tapusin ang Biyahe' : 'Complete Trip')}
+                </Button>
+                {!canComplete && !waitingForPayment && (
+                  <Typography sx={{ fontSize: '11px', color: '#64748B', textAlign: 'center', fontWeight: 600, fontFamily: 'Poppins, sans-serif' }}>
+                    {language === 'tl'
+                      ? `Maaaring tapusin kapag nag-slide ang pasahero o nasa loob ng 50m (${formatDistance(dropoffDistKm)} pa)`
+                      : `Active when passenger slides to finish or within 50m of destination (${formatDistance(dropoffDistKm)} left)`}
+                  </Typography>
+                )}
+              </Box>
+            );
+          })()
         )}
       </Paper>
 

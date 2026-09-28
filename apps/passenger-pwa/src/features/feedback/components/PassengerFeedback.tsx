@@ -54,6 +54,22 @@ export const PassengerFeedback: React.FC = () => {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [thankYouModalOpen, setThankYouModalOpen] = useState(false);
 
+  // Clear active ongoing booking session since trip is completed
+  React.useEffect(() => {
+    sessionStorage.removeItem('current_active_booking_id');
+    sessionStorage.removeItem('trip_dropoff');
+    sessionStorage.removeItem('trip_pickup');
+    sessionStorage.removeItem('trip_notes');
+  }, []);
+
+  const handleReturnToDashboard = () => {
+    sessionStorage.removeItem('current_active_booking_id');
+    sessionStorage.removeItem('trip_dropoff');
+    sessionStorage.removeItem('trip_pickup');
+    sessionStorage.removeItem('trip_notes');
+    navigate('/dashboard', { replace: true });
+  };
+
   // RATING STATE MUST BE SAVED AND LOADED CORRECTLY
   React.useEffect(() => {
     let isMounted = true;
@@ -152,13 +168,17 @@ export const PassengerFeedback: React.FC = () => {
     };
 
     try {
-      if (booking?.booking_id) {
+      const isUuid = (str: any) =>
+        typeof str === 'string' &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
+      if (isUuid(booking?.booking_id) && isUuid(booking?.passenger_id) && isUuid(booking?.driver_id)) {
         const { error } = await supabase.from('rating').upsert(
           [
             {
               booking_id: booking.booking_id,
-              rater_id: booking.passenger_id || 'PSG-DEMO',
-              ratee_id: booking.driver_id || 'DRV-DEMO',
+              rater_id: booking.passenger_id,
+              ratee_id: booking.driver_id,
               rater_role: 'Passenger',
               stars: rating,
               tags: selectedTags,
@@ -210,7 +230,7 @@ export const PassengerFeedback: React.FC = () => {
         }}
       >
         <IconButton
-          onClick={() => navigate('/dashboard', { replace: true })}
+          onClick={handleReturnToDashboard}
           sx={{
             color: '#0F172A',
             border: '1px solid #E2E8F0',
@@ -374,7 +394,7 @@ export const PassengerFeedback: React.FC = () => {
       {/* Thank You Popup Modal */}
       <Dialog
         open={thankYouModalOpen}
-        onClose={() => navigate('/dashboard', { replace: true })}
+        onClose={handleReturnToDashboard}
         fullWidth
         maxWidth="xs"
         slotProps={{
@@ -408,7 +428,7 @@ export const PassengerFeedback: React.FC = () => {
         <Button
           variant="contained"
           fullWidth
-          onClick={() => navigate('/dashboard', { replace: true })}
+          onClick={handleReturnToDashboard}
           sx={{
             height: '52px',
             borderRadius: '16px',

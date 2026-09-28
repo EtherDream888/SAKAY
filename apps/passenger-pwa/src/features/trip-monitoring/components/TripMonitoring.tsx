@@ -32,14 +32,27 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import CancelIcon from '@mui/icons-material/Cancel';
+import LinearProgress from '@mui/material/LinearProgress';
 import MapView from '../../../common/components/MapView';
 import PassengerCancelModal from '../../../common/components/PassengerCancelModal';
 import SakayToast from '../../../common/components/SakayToast';
 import { getBooking, cancelBooking, updateBookingState } from '../../../services/bookingService';
 import type { BookingRecord } from '@sakay/shared';
-import { formatShortBookingId } from '@sakay/shared';
+import { formatShortBookingId, calculateHaversineKm, formatDistance } from '@sakay/shared';
 import { supabase } from '../../../services/supabaseClient';
 import { useLanguage } from '../../../utils/LanguageContext';
+
+const mapBookingStatus = (rawStatus: string): any => {
+  if (rawStatus === 'Pending') return 'Searching Driver';
+  if (rawStatus === 'Accepted' || rawStatus === 'Driver Assigned') return 'Driver Assigned';
+  if (rawStatus === 'In Transit') return 'Driver En Route';
+  if (rawStatus === 'Arrived at Pickup' || rawStatus === 'Driver Arrived') return 'Driver Arrived';
+  if (rawStatus === 'Trip Ongoing') return 'Trip Ongoing';
+  if (rawStatus === 'Arrived at Destination') return 'Arrived at Destination';
+  if (rawStatus === 'Completed') return 'Completed';
+  if (rawStatus === 'Cancelled') return 'Cancelled';
+  return rawStatus || 'Searching Driver';
+};
 
 const SlideToCancel: React.FC<{ onCancel: () => void; language: string }> = ({ onCancel, language }) => {
   const [slidePos, setSlidePos] = useState(0);
@@ -132,17 +145,22 @@ const SlideToCancel: React.FC<{ onCancel: () => void; language: string }> = ({ o
   );
 };
 
-const SlideToFinish: React.FC<{ onFinish: () => void; language: string }> = ({ onFinish, language }) => {
+const SlideToFinish: React.FC<{ onFinish: () => void; language: string; disabled?: boolean }> = ({
+  onFinish,
+  language,
+  disabled = false,
+}) => {
   const [slidePos, setSlidePos] = useState(0);
   const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleStart = () => {
+    if (disabled) return;
     isDragging.current = true;
   };
 
   const handleMove = (clientX: number) => {
-    if (!isDragging.current || !containerRef.current) return;
+    if (disabled || !isDragging.current || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const maxOffset = rect.width - 52;
     const offset = Math.max(0, Math.min(clientX - rect.left - 24, maxOffset));
@@ -175,14 +193,14 @@ const SlideToFinish: React.FC<{ onFinish: () => void; language: string }> = ({ o
         position: 'relative',
         width: '100%',
         height: '52px',
-        backgroundColor: '#FFF7ED',
-        border: '1.5px solid #FFD6B3',
+        backgroundColor: disabled ? '#F1F5F9' : '#FFF7ED',
+        border: disabled ? '1.5px solid #CBD5E1' : '1.5px solid #FFD6B3',
         borderRadius: '999px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        cursor: 'grab',
+        cursor: disabled ? 'not-allowed' : 'grab',
         userSelect: 'none',
         touchAction: 'none',
         mt: 1.5,
@@ -192,28 +210,30 @@ const SlideToFinish: React.FC<{ onFinish: () => void; language: string }> = ({ o
         sx={{
           fontSize: '13.5px',
           fontWeight: 800,
-          color: '#FF6B00',
+          color: disabled ? '#94A3B8' : '#FF6B00',
           fontFamily: 'Poppins, sans-serif',
           pointerEvents: 'none',
-          opacity: Math.max(0.2, 1 - slidePos / 140),
+          opacity: disabled ? 1 : Math.max(0.2, 1 - slidePos / 140),
         }}
       >
-        {language === 'tl' ? 'Slide to Finish Trip >>>' : 'Slide to Finish Trip >>>'}
+        {disabled
+          ? (language === 'tl' ? 'Naghihintay na simulan ang biyahe...' : 'Waiting for trip to start...')
+          : (language === 'tl' ? 'Slide to Finish Trip >>>' : 'Slide to Finish Trip >>>')}
       </Typography>
 
       <Box
         sx={{
           position: 'absolute',
-          left: 4 + slidePos,
+          left: 4 + (disabled ? 0 : slidePos),
           width: '44px',
           height: '44px',
           borderRadius: '50%',
-          backgroundColor: '#FF6B00',
+          backgroundColor: disabled ? '#94A3B8' : '#FF6B00',
           color: '#FFFFFF',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 4px 12px rgba(255, 107, 0, 0.4)',
+          boxShadow: disabled ? 'none' : '0 4px 12px rgba(255, 107, 0, 0.4)',
           transition: isDragging.current ? 'none' : 'left 0.25s ease',
         }}
       >
@@ -324,10 +344,15 @@ export const TripMonitoring: React.FC = () => {
   const handlePassengerFinishTrip = async () => {
     try {
       localStorage.setItem(`passenger_finished_${activeBookingId}`, 'true');
-      await supabase
-        .from('booking')
-        .update({ passenger_finished: true, booking_status: 'Arrived at Destination' })
-        .eq('booking_id', activeBookingId);
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeBookingId)) {
+        await supabase
+          .from('booking')
+          .update({
+            booking_status: 'Arrived at Destination',
+            arrived_at: new Date().toISOString(),
+          })
+          .eq('booking_id', activeBookingId);
+      }
 
       const channel = supabase.channel(`booking_sync_${activeBookingId}`);
       await channel.send({
@@ -345,16 +370,27 @@ export const TripMonitoring: React.FC = () => {
     try {
       localStorage.setItem(`payment_confirmed_${activeBookingId}`, 'true');
       localStorage.setItem(`passenger_finished_${activeBookingId}`, 'true');
-      await supabase
-        .from('booking')
-        .update({ passenger_finished: true, booking_status: 'Completed' })
-        .eq('booking_id', activeBookingId);
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeBookingId)) {
+        await supabase
+          .from('booking')
+          .update({
+            booking_status: 'Completed',
+            actual_fare: passengerPayableFare,
+            trip_completed_at: new Date().toISOString(),
+          })
+          .eq('booking_id', activeBookingId);
+      }
 
       const channel = supabase.channel(`booking_sync_${activeBookingId}`);
       await channel.send({
         type: 'broadcast',
         event: 'payment_confirmed',
         payload: { bookingId: activeBookingId, payment_confirmed: true },
+      });
+
+      updateBookingState(activeBookingId, {
+        booking_status: 'Completed',
+        actual_fare: passengerPayableFare,
       });
     } catch (err) {
       console.warn('[TripMonitoring] handlePassengerPaid error:', err);
@@ -400,6 +436,8 @@ export const TripMonitoring: React.FC = () => {
               contact_number,
               franchise_number,
               plate_number,
+              current_latitude,
+              current_longitude,
               toda:toda_id (toda_name)
             )
           `)
@@ -411,13 +449,16 @@ export const TripMonitoring: React.FC = () => {
           const driverInfo = Array.isArray(d.driver) ? d.driver[0] : d.driver;
           const todaInfo = driverInfo?.toda ? (Array.isArray(driverInfo.toda) ? driverInfo.toda[0] : driverInfo.toda) : null;
 
-          const mappedStatus = d.booking_status === 'Pending' ? 'Searching Driver'
-            : d.booking_status === 'Accepted' || d.booking_status === 'Driver Assigned' ? 'Driver Assigned'
-            : d.booking_status === 'In Transit' || d.booking_status === 'Trip Ongoing' ? 'Trip Ongoing'
-            : d.booking_status === 'Arrived at Pickup' || d.booking_status === 'Driver Arrived' ? 'Driver Arrived'
-            : d.booking_status === 'Completed' ? 'Completed'
-            : d.booking_status === 'Cancelled' ? 'Cancelled'
-            : (d.booking_status || 'Searching Driver');
+          const mappedStatus = mapBookingStatus(d.booking_status);
+
+          const drvLat = driverInfo?.current_latitude ?? d.driver_latitude;
+          const drvLng = driverInfo?.current_longitude ?? d.driver_longitude;
+          if (drvLat && drvLng && !hasLiveDriverGpsRef.current) {
+            setDriverPos({
+              lat: Number(drvLat),
+              lng: Number(drvLng),
+            });
+          }
 
           setBooking((prev) => {
             const updated: BookingRecord = {
@@ -470,32 +511,46 @@ export const TripMonitoring: React.FC = () => {
       try {
         const { data, error } = await supabase
           .from('booking')
-          .select('booking_status, actual_fare, updated_at, driver_id, cancelled_by, cancellation_reason')
+          .select(`
+            booking_status,
+            actual_fare,
+            created_at,
+            driver_id,
+            cancelled_by,
+            cancellation_reason,
+            driver:driver_id (
+              current_latitude,
+              current_longitude
+            )
+          `)
           .eq('booking_id', activeBookingId)
           .maybeSingle();
 
         if (!error && data) {
-          if (data.booking_status === 'Cancelled' && (data.cancelled_by === 'driver' || !data.cancelled_by)) {
-            setDriverCancelReason(data.cancellation_reason || (language === 'tl' ? 'Kinansela ng drayber ang booking' : 'The driver cancelled the booking'));
+          const d = data as any;
+          if (d.booking_status === 'Cancelled' && (d.cancelled_by === 'driver' || !d.cancelled_by)) {
+            setDriverCancelReason(d.cancellation_reason || (language === 'tl' ? 'Kinansela ng drayber ang booking' : 'The driver cancelled the booking'));
             setDriverCancelledAlertOpen(true);
           }
 
+          const drv = Array.isArray(d.driver) ? d.driver[0] : d.driver;
+          if (drv?.current_latitude && drv?.current_longitude && !hasLiveDriverGpsRef.current) {
+            setDriverPos({
+              lat: Number(drv.current_latitude),
+              lng: Number(drv.current_longitude),
+            });
+          }
+
           setBooking((prev) => {
-            if (prev?.booking_status === data.booking_status) return prev; // No change
+            if (prev?.booking_status === d.booking_status) return prev; // No change
             
-            const mappedStatus = data.booking_status === 'Pending' ? 'Searching Driver'
-              : data.booking_status === 'Accepted' || data.booking_status === 'Driver Assigned' ? 'Driver Assigned'
-              : data.booking_status === 'In Transit' || data.booking_status === 'Trip Ongoing' ? 'Trip Ongoing'
-              : data.booking_status === 'Arrived at Pickup' || data.booking_status === 'Driver Arrived' ? 'Driver Arrived'
-              : data.booking_status === 'Completed' ? 'Completed'
-              : data.booking_status === 'Cancelled' ? 'Cancelled'
-              : (data.booking_status || prev?.booking_status);
+            const mappedStatus = mapBookingStatus(d.booking_status);
 
             const merged: BookingRecord = {
               ...(prev || ({} as any)),
               booking_status: mappedStatus as any,
-              actual_fare: data.actual_fare !== null && data.actual_fare !== undefined ? Number(data.actual_fare) : prev?.actual_fare,
-              updated_at: data.updated_at || new Date().toISOString(),
+              actual_fare: d.actual_fare !== null && d.actual_fare !== undefined ? Number(d.actual_fare) : prev?.actual_fare,
+              updated_at: new Date().toISOString(),
             };
             updateBookingState(activeBookingId, merged);
 
@@ -538,14 +593,15 @@ export const TripMonitoring: React.FC = () => {
               setDriverCancelledAlertOpen(true);
             }
 
+            if (row.driver_latitude && row.driver_longitude && !hasLiveDriverGpsRef.current) {
+              setDriverPos({
+                lat: Number(row.driver_latitude),
+                lng: Number(row.driver_longitude),
+              });
+            }
+
             setBooking((prev) => {
-              const mappedStatus = row.booking_status === 'Pending' ? 'Searching Driver'
-                : row.booking_status === 'Accepted' || row.booking_status === 'Driver Assigned' ? 'Driver Assigned'
-                : row.booking_status === 'In Transit' || row.booking_status === 'Trip Ongoing' ? 'Trip Ongoing'
-                : row.booking_status === 'Arrived at Pickup' || row.booking_status === 'Driver Arrived' ? 'Driver Arrived'
-                : row.booking_status === 'Completed' ? 'Completed'
-                : row.booking_status === 'Cancelled' ? 'Cancelled'
-                : (row.booking_status || prev?.booking_status);
+              const mappedStatus = mapBookingStatus(row.booking_status);
 
               const merged: BookingRecord = {
                 ...(prev || ({} as any)),
@@ -658,6 +714,33 @@ export const TripMonitoring: React.FC = () => {
   const todaName = booking?.toda_name || 'Calapan Central TODA';
   const passengerPayableFare = booking?.proportionate_fare || booking?.actual_fare || booking?.estimated_fare || 18.0;
 
+  const isPreTrip =
+    status === 'Searching Driver' ||
+    status === 'Driver Assigned' ||
+    status === 'Driver En Route' ||
+    status === 'Driver Arrived';
+
+  const pickupLat = booking?.pickup_latitude || 13.4124;
+  const pickupLng = booking?.pickup_longitude || 121.1834;
+  const dropoffLat = booking?.dropoff_latitude || 13.4150;
+  const dropoffLng = booking?.dropoff_longitude || 121.1810;
+
+  const totalTripKm = calculateHaversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
+  const driverToPickupKm = calculateHaversineKm(driverPos.lat, driverPos.lng, pickupLat, pickupLng);
+  const driverToDropoffKm = calculateHaversineKm(driverPos.lat, driverPos.lng, dropoffLat, dropoffLng);
+
+  let tripProgress = 0;
+  if (status === 'Trip Ongoing') {
+    if (totalTripKm > 0) {
+      const remainingKm = Math.min(totalTripKm, driverToDropoffKm);
+      tripProgress = Math.max(5, Math.min(95, Math.round(((totalTripKm - remainingKm) / totalTripKm) * 100)));
+    } else {
+      tripProgress = 50;
+    }
+  } else if (status === 'Arrived at Destination' || status === 'Completed') {
+    tripProgress = 100;
+  }
+
   return (
     <Box sx={{ width: '100%', height: '100%', backgroundColor: '#F8FAFC', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
       {/* 1. Header Bar matching Settings PageHeader */}
@@ -738,13 +821,17 @@ export const TripMonitoring: React.FC = () => {
       >
         <MapView
           pickupLocation={{
-            lat: booking?.pickup_latitude || 13.4124,
-            lng: booking?.pickup_longitude || 121.1834,
+            lat: pickupLat,
+            lng: pickupLng,
           }}
-          dropoffLocation={{
-            lat: booking?.dropoff_latitude || 13.4150,
-            lng: booking?.dropoff_longitude || 121.1810,
-          }}
+          dropoffLocation={
+            isPreTrip
+              ? undefined
+              : {
+                  lat: dropoffLat,
+                  lng: dropoffLng,
+                }
+          }
           driverLocation={status !== 'Searching Driver' ? driverPos : null}
         />
 
@@ -754,11 +841,15 @@ export const TripMonitoring: React.FC = () => {
             status === 'Searching Driver'
               ? (language === 'tl' ? 'Naghahanap ng pinakamalapit na Tricycle...' : 'Finding nearest tricycle...')
               : status === 'Driver Assigned' || status === 'Driver En Route'
-              ? (language === 'tl' ? `Papunta na ang Driver • ETA: ${booking?.eta_minutes || 4} mins` : `Driver is en route • ETA: ${booking?.eta_minutes || 4} mins`)
+              ? (language === 'tl'
+                  ? `Papunta na ang Driver • ${formatDistance(driverToPickupKm)} (~${Math.max(1, Math.round(driverToPickupKm * 3))} min)`
+                  : `Driver en route • ${formatDistance(driverToPickupKm)} (~${Math.max(1, Math.round(driverToPickupKm * 3))} min)`)
               : status === 'Driver Arrived'
               ? (language === 'tl' ? 'Nandito na ang Tricycle sa Pickup Point!' : 'Tricycle has arrived at the pickup point!')
               : status === 'Trip Ongoing'
-              ? (language === 'tl' ? 'Kasalukuyang bumibiyahe patungo sa destinasyon' : 'Currently traveling to destination')
+              ? (language === 'tl'
+                  ? `Bumibiyahe sa Destinasyon • ${tripProgress}% (${formatDistance(driverToDropoffKm)} naiwan)`
+                  : `Traveling to destination • ${tripProgress}% (${formatDistance(driverToDropoffKm)} left)`)
               : (language === 'tl' ? 'Nakumpleto na ang Biyahe!' : 'Trip Completed!')
           }
           sx={{
@@ -920,6 +1011,75 @@ export const TripMonitoring: React.FC = () => {
           </Box>
         </Box>
 
+        {/* Driver En Route Proximity Box */}
+        {(status === 'Driver Assigned' || status === 'Driver En Route') && (
+          <Box
+            sx={{
+              p: '10px 14px',
+              borderRadius: '12px',
+              backgroundColor: '#FFF7ED',
+              border: '1.5px solid #FFD6B3',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Box>
+              <Typography sx={{ fontSize: '10.5px', fontWeight: 700, color: '#C2410C', letterSpacing: '0.4px' }}>
+                {language === 'tl' ? 'DRAYBER PAPUNTA SA PICKUP' : 'DRIVER HEADING TO PICKUP'}
+              </Typography>
+              <Typography sx={{ fontSize: '13px', fontWeight: 800, color: '#9A3412' }}>
+                {formatDistance(driverToPickupKm)} away
+              </Typography>
+            </Box>
+            <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#EA580C' }}>
+              ETA ~{Math.max(1, Math.round(driverToPickupKm * 3))} min
+            </Typography>
+          </Box>
+        )}
+
+        {/* Live Trip Progress Bar (Ongoing Trip) */}
+        {status === 'Trip Ongoing' && (
+          <Box
+            sx={{
+              p: '12px 16px',
+              borderRadius: '14px',
+              backgroundColor: '#F8FAFC',
+              border: '1.5px solid #E2E8F0',
+            }}
+          >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.75 }}>
+              <Typography sx={{ fontSize: '11px', fontWeight: 700, color: '#64748B', letterSpacing: '0.4px' }}>
+                {language === 'tl' ? 'PROGRESO NG BIYAHE' : 'TRIP PROGRESS'}
+              </Typography>
+              <Typography sx={{ fontSize: '12.5px', fontWeight: 800, color: '#FF6B00' }}>
+                {tripProgress}%
+              </Typography>
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={tripProgress}
+              sx={{
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: '#E2E8F0',
+                '& .MuiLinearProgress-bar': {
+                  backgroundColor: '#FF6B00',
+                  borderRadius: 4,
+                },
+              }}
+            />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.75 }}>
+              <Typography sx={{ fontSize: '11px', color: '#64748B' }}>
+                {language === 'tl' ? 'Natitira:' : 'Remaining:'} <strong>{formatDistance(driverToDropoffKm)}</strong>
+              </Typography>
+              <Typography sx={{ fontSize: '11px', color: '#64748B' }}>
+                ETA: <strong>~{Math.max(1, Math.round(driverToDropoffKm * 3))} min</strong>
+              </Typography>
+            </Box>
+          </Box>
+        )}
+
         {/* Tricycle Franchise Plate Box */}
         <Box sx={{ p: '12px 16px', borderRadius: '12px', backgroundColor: '#F8FAFC', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box>
@@ -1003,24 +1163,26 @@ export const TripMonitoring: React.FC = () => {
           </Box>
         ) : status !== 'Completed' && (
           <Box sx={{ pt: 1, borderTop: '1px solid #F1F5F9', mt: 0.5 }}>
-            {/* Initial Collapsed View: Slide to Finish Trip (Visible ONLY when status === 'Trip Ongoing' after driver clicked both Arrived at Pickup and Start Trip) */}
-            {status === 'Trip Ongoing' && (
-              <Box
-                sx={{
-                  opacity: isExpanded ? 0 : 1,
-                  maxHeight: isExpanded ? '0px' : '140px',
-                  overflow: 'hidden',
-                  transition: 'opacity 0.3s ease, max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-                  pointerEvents: isExpanded ? 'none' : 'auto',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  width: '100%',
-                }}
-              >
-                <SlideToFinish onFinish={handlePassengerFinishTrip} language={language} />
-              </Box>
-            )}
+            {/* Initial Collapsed View: Slide to Finish Trip (Disabled until driver clicks Start Trip) */}
+            <Box
+              sx={{
+                opacity: isExpanded ? 0 : 1,
+                maxHeight: isExpanded ? '0px' : '140px',
+                overflow: 'hidden',
+                transition: 'opacity 0.3s ease, max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                pointerEvents: isExpanded ? 'none' : 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                width: '100%',
+              }}
+            >
+              <SlideToFinish
+                onFinish={handlePassengerFinishTrip}
+                language={language}
+                disabled={status !== 'Trip Ongoing'}
+              />
+            </Box>
 
             {/* Revealed Expanded View: Visually Separated Slide to Cancel */}
             <Box
@@ -1224,7 +1386,24 @@ export const TripMonitoring: React.FC = () => {
             fullWidth
             onClick={() => {
               setCompletionFareModalOpen(false);
-              navigate('/feedback', { replace: true, state: { booking: { ...booking, actual_fare: passengerPayableFare } } });
+              sessionStorage.removeItem('current_active_booking_id');
+              sessionStorage.removeItem('trip_dropoff');
+              sessionStorage.removeItem('trip_pickup');
+              sessionStorage.removeItem('trip_notes');
+              updateBookingState(activeBookingId, {
+                booking_status: 'Completed',
+                actual_fare: passengerPayableFare,
+              });
+              navigate('/feedback', {
+                replace: true,
+                state: {
+                  booking: {
+                    ...booking,
+                    booking_status: 'Completed',
+                    actual_fare: passengerPayableFare,
+                  },
+                },
+              });
             }}
             sx={{
               height: '52px',
