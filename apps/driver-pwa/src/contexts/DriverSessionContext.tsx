@@ -8,6 +8,8 @@ interface DriverSessionContextType {
   setProfile: React.Dispatch<React.SetStateAction<DriverProfile>>;
   incomingRequest: BookingRecord | null;
   setIncomingRequest: React.Dispatch<React.SetStateAction<BookingRecord | null>>;
+  currentAttemptId: string | null;
+  setCurrentAttemptId: React.Dispatch<React.SetStateAction<string | null>>;
   countdown: number;
   setCountdown: React.Dispatch<React.SetStateAction<number>>;
   declinedBookings: Set<string>;
@@ -59,6 +61,7 @@ export const DriverSessionProvider: React.FC<{ children: ReactNode }> = ({ child
   });
 
   const [incomingRequest, setIncomingRequest] = useState<BookingRecord | null>(null);
+  const [currentAttemptId, setCurrentAttemptId] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number>(15);
   const [declinedBookings, setDeclinedBookings] = useState<Set<string>>(new Set());
 
@@ -119,14 +122,24 @@ export const DriverSessionProvider: React.FC<{ children: ReactNode }> = ({ child
     } catch {}
   };
 
-  const handleDeclineRequest = () => {
+  const handleDeclineRequest = async () => {
     if (!incomingRequest) return;
     setDeclinedBookings((prev) => {
       const updated = new Set(prev);
       updated.add(incomingRequest.booking_id);
       return updated;
     });
+
+    if (currentAttemptId) {
+      try {
+        await supabase.from('dispatch_attempt').update({ response_status: 'Declined' }).eq('attempt_id', currentAttemptId);
+      } catch (err) {
+        console.warn('Failed to decline attempt:', err);
+      }
+    }
+
     setIncomingRequest(null);
+    setCurrentAttemptId(null);
   };
 
   // Countdown Timer
@@ -140,72 +153,75 @@ export const DriverSessionProvider: React.FC<{ children: ReactNode }> = ({ child
     return () => clearInterval(timer);
   }, [incomingRequest, countdown]);
 
-  // Realtime Booking Listener + Polling Fallback
+  // Realtime Dispatch Listener
   useEffect(() => {
     if (!profile.isOnline || profile.isPaused) {
-      if (incomingRequest) setIncomingRequest(null);
+      if (incomingRequest) {
+        setIncomingRequest(null);
+        setCurrentAttemptId(null);
+      }
       return;
     }
 
-    const fetchPendingBooking = async () => {
-      const fifteenMinsAgoMs = Date.now() - 15 * 60000;
-      const fifteenMinsAgoStr = new Date(fifteenMinsAgoMs).toISOString();
+    const fetchPendingAttempt = async () => {
+      const { data: attempt, error: attemptError } = await supabase
+        .from('dispatch_attempt')
+        .select('*')
+        .eq('driver_id', profile.id)
+        .eq('response_status', 'Pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      let query = supabase
-        .from('booking')
-        .select('*, passenger:passenger_id(*)')
-        .eq('booking_status', 'Pending')
-        .gte('created_at', fifteenMinsAgoStr);
+      if (!attemptError && attempt && !incomingRequest && !declinedBookings.has(attempt.booking_id)) {
+        // Fetch booking details
+        const { data: data } = await supabase
+          .from('booking')
+          .select('*, passenger:passenger_id(*)')
+          .eq('booking_id', attempt.booking_id)
+          .single();
 
-      if (declinedBookings.size > 0) {
-        query = query.not('booking_id', 'in', `(${Array.from(declinedBookings).join(',')})`);
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false }).limit(1).maybeSingle();
-      
-      if (!error && data && !incomingRequest && !declinedBookings.has(data.booking_id)) {
-        const p = Array.isArray(data.passenger) ? data.passenger[0] : data.passenger;
-        const mapped: BookingRecord = {
-          booking_id: data.booking_id,
-          passenger_id: data.passenger_id || 'passenger-demo',
-          passenger_name: data.passenger_name || p?.full_name || 'Passenger',
-          passenger_phone: p?.contact_number || data.passenger_phone || '+63 917 123 4567',
-          booking_type: data.booking_type || 'Immediate',
-          is_shared_trip: Boolean(data.is_shared_trip),
-          passenger_count: data.passenger_count || 1,
-          pickup_address: data.pickup_address,
-          pickup_latitude: data.pickup_latitude,
-          pickup_longitude: data.pickup_longitude,
-          dropoff_address: data.dropoff_address,
-          dropoff_latitude: data.dropoff_latitude,
-          dropoff_longitude: data.dropoff_longitude,
-          estimated_distance_km: data.estimated_distance_km || 1,
-          estimated_fare: data.estimated_fare || 20,
-          booking_status: 'Pending',
-          created_at: data.created_at,
-          updated_at: data.created_at,
-        };
-        setIncomingRequest(mapped);
-        setCountdown(15);
-        playIncomingAlert();
+        if (data) {
+          const p = Array.isArray(data.passenger) ? data.passenger[0] : data.passenger;
+          const mapped: BookingRecord = {
+            booking_id: data.booking_id,
+            passenger_id: data.passenger_id || 'passenger-demo',
+            passenger_name: data.passenger_name || p?.full_name || 'Passenger',
+            passenger_phone: p?.contact_number || data.passenger_phone || '+63 917 123 4567',
+            booking_type: data.booking_type || 'Immediate',
+            is_shared_trip: Boolean(data.is_shared_trip),
+            passenger_count: data.passenger_count || 1,
+            pickup_address: data.pickup_address,
+            pickup_latitude: data.pickup_latitude,
+            pickup_longitude: data.pickup_longitude,
+            dropoff_address: data.dropoff_address,
+            dropoff_latitude: data.dropoff_latitude,
+            dropoff_longitude: data.dropoff_longitude,
+            estimated_distance_km: data.estimated_distance_km || 1,
+            estimated_fare: data.estimated_fare || 20,
+            booking_status: 'Pending',
+            created_at: data.created_at,
+            updated_at: data.created_at,
+          };
+          
+          setCurrentAttemptId(attempt.attempt_id);
+          setIncomingRequest(mapped);
+          setCountdown(15);
+          playIncomingAlert();
+        }
       }
     };
 
-    // Initial fetch
-    fetchPendingBooking();
+    fetchPendingAttempt();
+    const interval = setInterval(fetchPendingAttempt, 5000);
 
-    // 5-second polling fallback (in case Realtime is off or drops)
-    const interval = setInterval(fetchPendingBooking, 5000);
-
-    // Supabase Realtime Subscription
     const channel = supabase
-      .channel('public:booking')
+      .channel('public:dispatch_attempt')
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'booking', filter: 'booking_status=eq.Pending' },
+        { event: 'INSERT', schema: 'public', table: 'dispatch_attempt', filter: `driver_id=eq.${profile.id}` },
         (payload) => {
-          // Double check to trigger a fetch to ensure fresh data
-          fetchPendingBooking();
+          fetchPendingAttempt();
         }
       )
       .subscribe();
@@ -214,7 +230,7 @@ export const DriverSessionProvider: React.FC<{ children: ReactNode }> = ({ child
       clearInterval(interval);
       supabase.removeChannel(channel);
     };
-  }, [profile.isOnline, profile.isPaused, incomingRequest, declinedBookings]);
+  }, [profile.isOnline, profile.isPaused, incomingRequest, declinedBookings, profile.id]);
 
   return (
     <DriverSessionContext.Provider
@@ -223,6 +239,8 @@ export const DriverSessionProvider: React.FC<{ children: ReactNode }> = ({ child
         setProfile,
         incomingRequest,
         setIncomingRequest,
+        currentAttemptId,
+        setCurrentAttemptId,
         countdown,
         setCountdown,
         declinedBookings,

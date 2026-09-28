@@ -1,81 +1,151 @@
 /**
  * Official SAKAY Fare Calculator
- * Calapan City Ordinance Fare Matrix Rules:
- * - Base seat fare: ₱15.00 covering the first 2.0 km.
- * - Succeeding distance: ₱1.00 per km for distance beyond 2.0 km.
- * - Solo trip: Entire passenger seat fare multiplied by 4 (reserving all 4 seats).
- * - Shared booking: Seat fare per passenger (Base ₱15.00 + ₱1.00/km succeeding).
+ * Adheres to Calapan City Ordinance Fare Matrix Rules and Ride Sharing Rules.
  */
 
 export interface TariffConfig {
-  baseFare: number;       // Base seat fare for first 2.0 km (default: 15.00)
+  baseFare: number;       // Base seat fare for first X km (default: 15.00)
   baseDistanceKm: number; // Included base distance in km (default: 2.0)
   succeedingRate: number; // Rate per succeeding km (default: 1.00)
-}
-
-export interface FareBreakdown {
-  distanceKm: number;
-  succeedingDistanceKm: number;
-  tripType: 'Solo' | 'Shared';
-  passengers: number;
-  multiplier: number;
-  baseFareSeat: number;
-  baseFareTotal: number;
-  succeedingRate: number;
-  succeedingChargeSeat: number;
-  succeedingChargeTotal: number;
-  seatFare: number;
-  totalFare: number;
+  capacity: number;       // Total tricycle capacity (default: 4)
 }
 
 export const DEFAULT_TARIFF: TariffConfig = {
   baseFare: 15.0,
   baseDistanceKm: 2.0,
   succeedingRate: 1.0,
+  capacity: 4,
 };
 
-/**
- * Computes exact SAKAY estimated fare and detailed itemized breakdown.
- * Uses un-rounded distance float for internal calculation and rounds monetary values to 2 decimal places.
- */
-export function calculateFare(
-  distanceKm: number,
-  tripType: 'Solo' | 'Shared' = 'Solo',
-  passengers: number = 1,
-  tariff: TariffConfig = DEFAULT_TARIFF
-): FareBreakdown {
-  const baseFareSeat = Number(tariff?.baseFare) || DEFAULT_TARIFF.baseFare;
-  const baseKm = Number(tariff?.baseDistanceKm) || DEFAULT_TARIFF.baseDistanceKm;
-  const succRate = Number(tariff?.succeedingRate) ?? DEFAULT_TARIFF.succeedingRate;
+export interface RouteSegment {
+  distanceKm: number;
+  type: 'common' | 'exclusive';
+  totalPassengersOnBoard: number; // Total passengers in the trike during this segment
+}
 
-  // Un-rounded succeeding distance beyond baseKm (0 if distance <= baseKm)
-  const dist = Math.max(0, distanceKm);
-  const succeedingDistanceKm = Math.max(0, dist - baseKm);
+export interface FareCalculationParams {
+  distanceKm: number;          // Total distance for this booking
+  tripType: 'Solo' | 'Shared'; // Booking type
+  passengerCount: number;      // Declared passenger count
+  segments?: RouteSegment[];   // Present if finalizing a matched shared trip
+  tariff?: TariffConfig;
+}
 
-  // Seat fare (for 1 seat)
-  const succeedingChargeSeat = succeedingDistanceKm * succRate;
-  const seatFare = baseFareSeat + succeedingChargeSeat;
+export interface FareSegmentBreakdown {
+  type: 'common' | 'exclusive';
+  distanceKm: number;
+  totalPassengersOnBoard: number;
+  cost: number;
+}
 
-  // Multiplier: Solo = 4 seats reserved; Shared = passenger count (or 1)
-  const multiplier = tripType === 'Solo' ? 4 : Math.max(1, passengers);
+export interface FareCalculationResult {
+  seatFare: number;
+  soloFare: number;
+  sharedEstimate: number | null;
+  maxUnmatchedFare: number | null;
+  finalFare: number; // The exact fare to bill
+  breakdown: {
+    baseFareApplied: number;
+    excessKm: number;
+    shareRatio?: string;
+    segments?: FareSegmentBreakdown[];
+    minimumFareApplied: boolean;
+  };
+}
 
-  const baseFareTotal = baseFareSeat * multiplier;
-  const succeedingChargeTotal = succeedingChargeSeat * multiplier;
-  const rawTotal = seatFare * multiplier;
-  const totalFare = Number(rawTotal.toFixed(2));
+export function calculateFare(params: FareCalculationParams): FareCalculationResult {
+  const tariff = params.tariff || DEFAULT_TARIFF;
+  
+  // 1. Calculate the core Seat Fare for the given total distance
+  const excessKm = Math.max(0, params.distanceKm - tariff.baseDistanceKm);
+  const seatFare = tariff.baseFare + (excessKm * tariff.succeedingRate);
+  
+  // 2. Solo Fare (Max Unmatched Fare) is always Seat Fare * Capacity
+  const soloFare = seatFare * tariff.capacity;
+
+  let sharedEstimate: number | null = null;
+  let maxUnmatchedFare: number | null = null;
+  let finalFareRaw = 0;
+  let minimumFareApplied = false;
+  let segmentsBreakdown: FareSegmentBreakdown[] | undefined = undefined;
+
+  if (params.tripType === 'Solo') {
+    // Solo trip implies they reserve the whole trike
+    finalFareRaw = soloFare;
+  } else {
+    // Shared Trip
+    sharedEstimate = seatFare * params.passengerCount;
+    maxUnmatchedFare = soloFare;
+
+    if (!params.segments || params.segments.length === 0) {
+      // If no segments provided (e.g. at booking time), finalFare defaults to unmatched max
+      finalFareRaw = soloFare;
+    } else {
+      // Trip completed, segments provided. Calculate proportional split.
+      segmentsBreakdown = [];
+      let totalSegmentDistance = 0;
+      
+      // We calculate proportion based on the sum of segment distances.
+      // (This should closely match params.distanceKm unless there was a reroute).
+      params.segments.forEach(s => totalSegmentDistance += s.distanceKm);
+
+      // If for some reason segments sum to 0, fallback to solo fare.
+      if (totalSegmentDistance === 0) {
+        finalFareRaw = soloFare;
+      } else {
+        // Re-calculate the theoretical solo pool for the actual total segment distance
+        // (This accounts for reroutes where segment sum != original distanceKm)
+        const actualExcessKm = Math.max(0, totalSegmentDistance - tariff.baseDistanceKm);
+        const actualSeatFare = tariff.baseFare + (actualExcessKm * tariff.succeedingRate);
+        const actualSoloPool = actualSeatFare * tariff.capacity;
+
+        params.segments.forEach(seg => {
+          const distanceProportion = seg.distanceKm / totalSegmentDistance;
+          let segmentCost = 0;
+
+          if (seg.type === 'exclusive') {
+            // Passenger pays 100% of their share of the solo pool for this segment
+            segmentCost = distanceProportion * actualSoloPool;
+          } else {
+            // Passenger pays a proportional share based on passengers onboard
+            // Share ratio = their passenger count / total passengers on board
+            const shareRatio = params.passengerCount / seg.totalPassengersOnBoard;
+            segmentCost = distanceProportion * actualSoloPool * shareRatio;
+          }
+
+          segmentsBreakdown!.push({
+            type: seg.type,
+            distanceKm: seg.distanceKm,
+            totalPassengersOnBoard: seg.totalPassengersOnBoard,
+            cost: segmentCost
+          });
+
+          finalFareRaw += segmentCost;
+        });
+      }
+    }
+  }
+
+  // Rounding: nearest whole peso; >= .50 rounds up. Round once per booking at the end.
+  let finalFareRounded = Math.round(finalFareRaw);
+
+  // Minimum fare rule: no booking pays less than the base fare (15)
+  if (finalFareRounded < tariff.baseFare) {
+    finalFareRounded = tariff.baseFare;
+    minimumFareApplied = true;
+  }
 
   return {
-    distanceKm: dist,
-    succeedingDistanceKm,
-    tripType,
-    passengers,
-    multiplier,
-    baseFareSeat: Number(baseFareSeat.toFixed(2)),
-    baseFareTotal: Number(baseFareTotal.toFixed(2)),
-    succeedingRate: Number(succRate.toFixed(2)),
-    succeedingChargeSeat: Number(succeedingChargeSeat.toFixed(2)),
-    succeedingChargeTotal: Number(succeedingChargeTotal.toFixed(2)),
-    seatFare: Number(seatFare.toFixed(2)),
-    totalFare,
+    seatFare,
+    soloFare,
+    sharedEstimate,
+    maxUnmatchedFare,
+    finalFare: finalFareRounded,
+    breakdown: {
+      baseFareApplied: tariff.baseFare,
+      excessKm,
+      segments: segmentsBreakdown,
+      minimumFareApplied
+    }
   };
 }

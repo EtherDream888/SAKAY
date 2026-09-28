@@ -43,6 +43,7 @@ export const MapView: React.FC<MapViewProps> = ({
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
   const routeLayersRef = useRef<L.LayerGroup | null>(null);
   const [roadCoords, setRoadCoords] = useState<[number, number][]>(routeCoordinates || []);
+  const lastFetchRef = useRef<{ startLat: number; startLng: number; endLat: number; endLng: number } | null>(null);
 
   // Initialize Leaflet Map
   useEffect(() => {
@@ -128,11 +129,26 @@ export const MapView: React.FC<MapViewProps> = ({
     }
 
     if (startPoint && startPoint.lat !== 0 && endPoint && endPoint.lat !== 0) {
+      // Prevent excessive OSRM recalculation. If endPoint is the same, keep existing route.
+      if (lastFetchRef.current) {
+        const dLat = Math.abs(lastFetchRef.current.endLat - endPoint.lat);
+        const dLng = Math.abs(lastFetchRef.current.endLng - endPoint.lng);
+        if (dLat < 0.0005 && dLng < 0.0005 && roadCoords.length > 0) {
+          return;
+        }
+      }
+
       let isMounted = true;
       getOSRMRoute(startPoint.lat, startPoint.lng, endPoint.lat, endPoint.lng)
         .then((result) => {
           if (isMounted && result.coordinates && result.coordinates.length >= 2) {
             setRoadCoords(result.coordinates);
+            lastFetchRef.current = {
+              startLat: startPoint!.lat,
+              startLng: startPoint!.lng,
+              endLat: endPoint!.lat,
+              endLng: endPoint!.lng,
+            };
           }
         })
         .catch((err) => {
@@ -144,6 +160,7 @@ export const MapView: React.FC<MapViewProps> = ({
       };
     } else {
       setRoadCoords([]);
+      lastFetchRef.current = null;
     }
   }, [
     pickupLocation?.lat,
@@ -153,6 +170,7 @@ export const MapView: React.FC<MapViewProps> = ({
     userLocation?.lat,
     userLocation?.lng,
     routeCoordinates,
+    roadCoords.length
   ]);
 
   // Handle Updates: Markers, Road Route Polyline, Panning

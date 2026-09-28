@@ -157,14 +157,20 @@ const BookSummary: React.FC = () => {
     setDistance(roadDistance);
     setDistanceSource(source);
 
-    const result = calculateFare(roadDistance, type, passengerCount, {
-      baseFare,
-      baseDistanceKm: baseDistance,
-      succeedingRate,
+    const result = calculateFare({
+      distanceKm: roadDistance,
+      tripType: type,
+      passengerCount,
+      tariff: {
+        baseFare,
+        baseDistanceKm: baseDistance,
+        succeedingRate,
+        capacity: 4
+      }
     });
 
     setSeatFare(result.seatFare);
-    setFare(result.totalFare);
+    setFare(result.tripType === "Shared" ? (result.sharedEstimate || result.finalFare) : result.finalFare);
 
     setLoading(false);
   };
@@ -178,9 +184,9 @@ const BookSummary: React.FC = () => {
     }
     sessionStorage.setItem("trip_type", newType);
     sessionStorage.setItem("trip_passengers", newPassengers.toString());
-    const result = calculateFare(distance, newType, newPassengers);
+    const result = calculateFare({ distanceKm: distance, tripType: newType, passengerCount: newPassengers });
     setSeatFare(result.seatFare);
-    setFare(result.totalFare);
+    setFare(newType === "Shared" ? (result.sharedEstimate || result.finalFare) : result.finalFare);
   };
 
   const handleChangePassengers = (delta: number) => {
@@ -188,9 +194,9 @@ const BookSummary: React.FC = () => {
     const next = Math.max(1, Math.min(max, passengers + delta));
     setPassengers(next);
     sessionStorage.setItem("trip_passengers", next.toString());
-    const result = calculateFare(distance, tripType, next);
+    const result = calculateFare({ distanceKm: distance, tripType, passengerCount: next });
     setSeatFare(result.seatFare);
-    setFare(result.totalFare);
+    setFare(tripType === "Shared" ? (result.sharedEstimate || result.finalFare) : result.finalFare);
   };
 
   const [createdBookingId, setCreatedBookingId] = useState<string>("");
@@ -213,6 +219,11 @@ const BookSummary: React.FC = () => {
         dropoff_longitude: dropoff.lng,
         estimated_distance_km: distance,
         estimated_fare: fare,
+      });
+
+      // Start tiered dispatch process in the background
+      import("../../../../services/dispatchService").then(({ startDispatch }) => {
+        startDispatch(newBooking.booking_id).catch((err) => console.error("Dispatch failed:", err));
       });
 
       setCreatedBookingId(newBooking.booking_id);

@@ -40,10 +40,42 @@ const Dashboard: React.FC = () => {
   );
 
   useEffect(() => {
-    if (!activeBookingId) return;
+    if (!activeBookingId) {
+      // Clear temporary draft states when arriving at Dashboard without an active trip
+      sessionStorage.removeItem("trip_dropoff");
+      sessionStorage.removeItem("trip_notes");
+      return;
+    }
+
     if (!activeBooking || activeBooking.booking_status === "Completed" || activeBooking.booking_status === "Cancelled") {
       sessionStorage.removeItem("current_active_booking_id");
+      sessionStorage.removeItem("trip_dropoff");
+      sessionStorage.removeItem("trip_notes");
+      return;
     }
+
+    // Poll Supabase to check if the active trip was completed/cancelled by the driver
+    const pollInterval = setInterval(async () => {
+      try {
+        const { data, error } = await supabase
+          .from("booking")
+          .select("booking_status")
+          .eq("booking_id", activeBookingId)
+          .maybeSingle();
+
+        if (!error && data) {
+          if (data.booking_status === "Completed" || data.booking_status === "Cancelled") {
+            sessionStorage.removeItem("current_active_booking_id");
+            sessionStorage.removeItem("trip_dropoff");
+            sessionStorage.removeItem("trip_notes");
+            // Force re-render to hide the banner
+            window.location.reload();
+          }
+        }
+      } catch (err) {}
+    }, 5000);
+
+    return () => clearInterval(pollInterval);
   }, [activeBookingId, activeBooking]);
 
   // Passenger Identity State

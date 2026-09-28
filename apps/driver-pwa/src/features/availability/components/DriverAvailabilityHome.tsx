@@ -166,6 +166,7 @@ export const DriverAvailabilityHome: React.FC = () => {
             totalTrips: completedTripsCount || 0,
             accountStatus: driverData.account_status,
             verificationStage: 'Stage 2 Approved',
+            isOnline: driverData.availability_status === 'Available',
             currentLat: driverData.current_latitude ? Number(driverData.current_latitude) : prev.currentLat,
             currentLng: driverData.current_longitude ? Number(driverData.current_longitude) : prev.currentLng,
           }));
@@ -197,9 +198,22 @@ export const DriverAvailabilityHome: React.FC = () => {
   const isDriverVerifiedInDb = profile.accountStatus === 'Active' || profile.accountStatus === 'Verified';
   const canGoOnline = isDriverVerifiedInDb;
 
-  const handleToggleOnline = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleToggleOnline = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!canGoOnline) return;
-    setProfile((prev) => ({ ...prev, isOnline: e.target.checked }));
+    const nextState = e.target.checked;
+    setProfile((prev) => ({ ...prev, isOnline: nextState }));
+    
+    // Update Supabase
+    if (profile.id && profile.id !== 'test-driver-001') {
+      try {
+        await supabase
+          .from('driver')
+          .update({ availability_status: nextState ? 'Available' : 'Offline' })
+          .eq('driver_id', profile.id);
+      } catch (err) {
+        console.warn('[DriverAvailabilityHome] Failed to sync availability_status:', err);
+      }
+    }
   };
 
   const handleRecenter = () => {

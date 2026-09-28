@@ -23,6 +23,7 @@ export const DriverIncomingRequestModal: React.FC = () => {
     profile,
     incomingRequest,
     setIncomingRequest,
+    currentAttemptId,
     countdown,
     handleDeclineRequest,
   } = useDriverSession();
@@ -57,6 +58,11 @@ export const DriverIncomingRequestModal: React.FC = () => {
         console.warn('[DriverIncomingRequestModal] acceptBooking DB sync warning:', error.message);
         alert('Database Update Error: ' + error.message);
         return;
+      }
+
+      // Also mark attempt as Accepted
+      if (currentAttemptId) {
+        await supabase.from('dispatch_attempt').update({ response_status: 'Accepted' }).eq('attempt_id', currentAttemptId);
       }
     } catch (err: any) {
       console.warn('[DriverIncomingRequestModal] acceptBooking DB sync exception:', err);

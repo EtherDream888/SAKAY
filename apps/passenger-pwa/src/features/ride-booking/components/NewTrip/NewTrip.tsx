@@ -336,13 +336,19 @@ const NewTrip: React.FC = () => {
     setTripDistanceKm(roadDist);
 
     // Calculate official SAKAY estimated fare using central fare calculator
-    const result = calculateFare(roadDist, tripType, passengers, {
-      baseFare: activeTariff.baseFare,
-      baseDistanceKm: activeTariff.baseKm,
-      succeedingRate: activeTariff.succRate,
+    const result = calculateFare({
+      distanceKm: roadDist,
+      tripType,
+      passengerCount: passengers,
+      tariff: {
+        baseFare: activeTariff.baseFare,
+        baseDistanceKm: activeTariff.baseKm,
+        succeedingRate: activeTariff.succRate,
+        capacity: 4
+      }
     });
 
-    setEstimatedFare(result.totalFare);
+    setEstimatedFare(tripType === 'Shared' ? (result.sharedEstimate || result.finalFare) : result.finalFare);
   }, [pickup.lat, pickup.lng, dropoff.lat, dropoff.lng, tripType, passengers, activeTariff]);
 
   useEffect(() => {
@@ -1059,7 +1065,7 @@ const NewTrip: React.FC = () => {
                   <Box
                     onClick={() => {
                       setTripType("Shared");
-                      if (passengers > 3) setPassengers(3);
+                      if (passengers > 2) setPassengers(2);
                     }}
                     sx={{
                       flex: 1,
@@ -1147,9 +1153,9 @@ const NewTrip: React.FC = () => {
 
                   <IconButton
                     size="small"
-                    disabled={tripType === "Shared" ? passengers >= 3 : passengers >= 4}
+                    disabled={tripType === "Shared" ? passengers >= 2 : passengers >= 4}
                     onClick={() => {
-                      const max = tripType === "Shared" ? 3 : 4;
+                      const max = tripType === "Shared" ? 2 : 4;
                       if (passengers < max) {
                         setPassengers((prev) => prev + 1);
                       }
@@ -1499,11 +1505,24 @@ const NewTrip: React.FC = () => {
 
         {/* Receipt Container Body */}
         {(() => {
-          const breakdown = calculateFare(tripDistanceKm, tripType, passengers, {
-            baseFare: activeTariff.baseFare,
-            baseDistanceKm: activeTariff.baseKm,
-            succeedingRate: activeTariff.succRate,
+          const breakdown = calculateFare({
+            distanceKm: tripDistanceKm,
+            tripType,
+            passengerCount: passengers,
+            tariff: {
+              baseFare: activeTariff.baseFare,
+              baseDistanceKm: activeTariff.baseKm,
+              succeedingRate: activeTariff.succRate,
+              capacity: 4
+            }
           });
+
+          // Compute equivalent values for UI presentation based on the new logic
+          const displayedTotal = tripType === 'Shared' ? (breakdown.sharedEstimate || breakdown.finalFare) : breakdown.finalFare;
+          const multiplier = tripType === 'Solo' ? 4 : passengers;
+          const baseFareTotal = activeTariff.baseFare * multiplier;
+          const succeedingChargeTotal = breakdown.breakdown.excessKm * activeTariff.succRate * multiplier;
+
           return (
             <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2 }}>
               <Box
@@ -1540,7 +1559,7 @@ const NewTrip: React.FC = () => {
                     )}
                   </Box>
                   <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#0F172A", fontFamily: "Poppins, sans-serif" }}>
-                    ₱{breakdown.baseFareTotal.toFixed(2)}
+                    ₱{baseFareTotal.toFixed(2)}
                   </Typography>
                 </Box>
 
@@ -1549,17 +1568,17 @@ const NewTrip: React.FC = () => {
                   <Box>
                     <Typography sx={{ fontSize: "12.5px", color: "#64748B", fontFamily: "Poppins, sans-serif" }}>
                       {language === "tl"
-                        ? `Dagdag na Distansya (${breakdown.succeedingDistanceKm.toFixed(1)} km)`
-                        : `Distance Charge (${breakdown.succeedingDistanceKm.toFixed(1)} km)`}
+                        ? `Dagdag na Distansya (${breakdown.breakdown.excessKm.toFixed(1)} km)`
+                        : `Distance Charge (${breakdown.breakdown.excessKm.toFixed(1)} km)`}
                     </Typography>
-                    {tripType === "Solo" && breakdown.succeedingDistanceKm > 0 && (
+                    {tripType === "Solo" && breakdown.breakdown.excessKm > 0 && (
                       <Typography sx={{ fontSize: "11px", color: "#94A3B8", fontFamily: "Poppins, sans-serif" }}>
-                        {breakdown.succeedingDistanceKm.toFixed(1)} km × ₱1.00 × 4
+                        {breakdown.breakdown.excessKm.toFixed(1)} km × ₱1.00 × 4
                       </Typography>
                     )}
                   </Box>
                   <Typography sx={{ fontSize: "13px", fontWeight: 700, color: "#0F172A", fontFamily: "Poppins, sans-serif" }}>
-                    ₱{breakdown.succeedingChargeTotal.toFixed(2)}
+                    ₱{succeedingChargeTotal.toFixed(2)}
                   </Typography>
                 </Box>
 
@@ -1571,7 +1590,7 @@ const NewTrip: React.FC = () => {
                     {language === "tl" ? "Kabuuan" : "Total Fare"}
                   </Typography>
                   <Typography sx={{ fontSize: "17px", fontWeight: 900, color: "#FF6B00", fontFamily: "Poppins, sans-serif" }}>
-                    ₱{breakdown.totalFare.toFixed(2)}
+                    ₱{displayedTotal.toFixed(2)}
                   </Typography>
                 </Box>
               </Box>

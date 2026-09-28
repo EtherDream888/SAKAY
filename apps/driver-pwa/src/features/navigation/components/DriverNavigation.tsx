@@ -33,10 +33,10 @@ export const DriverNavigation: React.FC = () => {
   const bookingId = (location.state as { bookingId?: string })?.bookingId || 'BKG-9011';
 
   const [booking, setBooking] = useState<any>(null);
-  const [driverLocation, setDriverLocation] = useState({
+  const driverLocation = {
     lat: profile.currentLat || 13.4117,
     lng: profile.currentLng || 121.1803,
-  });
+  };
   const [commModalOpen, setCommModalOpen] = useState(false);
   const [exitGuardOpen, setExitGuardOpen] = useState(false);
 
@@ -119,72 +119,41 @@ export const DriverNavigation: React.FC = () => {
       });
     }
 
-    if (navigator.geolocation) {
-      // Immediate position check
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          setDriverLocation({ lat, lng });
-          if (channel) {
-            channel.send({
-              type: 'broadcast',
-              event: 'driver_location',
-              payload: { lat, lng },
-            });
-          }
-        },
-        () => {},
-        { enableHighAccuracy: true, timeout: 5000 }
-      );
+    // Broadcast Driver Location whenever it changes from the central context
+    const broadcastInterval = setInterval(() => {
+       if (channel && profile.currentLat && profile.currentLng) {
+         channel.send({
+           type: 'broadcast',
+           event: 'driver_location',
+           payload: { lat: profile.currentLat, lng: profile.currentLng },
+         });
+       }
+    }, 2000);
 
-      // Continuous watch with location broadcast and periodic DB update
-      let lastDbUpdate = Date.now();
-      watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          setDriverLocation({ lat, lng });
-
-          if (channel) {
-            channel.send({
-              type: 'broadcast',
-              event: 'driver_location',
-              payload: { lat, lng },
-            });
-          }
-
-          // Throttle DB updates to once every 5 seconds (syncs to driver table)
-          if (Date.now() - lastDbUpdate > 5000) {
-            lastDbUpdate = Date.now();
-            const activeDriverId = profile.id || booking?.driver_id || localStorage.getItem('sakay_driver_id');
-            if (activeDriverId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeDriverId)) {
-              supabase
-                .from('driver')
-                .update({
-                  current_latitude: lat,
-                  current_longitude: lng,
-                  last_location_update: new Date().toISOString(),
-                })
-                .eq('driver_id', activeDriverId)
-                .then(() => {});
-            }
-          }
-        },
-        (err) => console.warn('[DriverNavigation] Geolocation watch note:', err.message),
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 2000 }
-      );
-    }
+    // Sync to Supabase periodically
+    const dbInterval = setInterval(() => {
+      const activeDriverId = profile.id || booking?.driver_id || localStorage.getItem('sakay_driver_id');
+      if (activeDriverId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeDriverId) && profile.currentLat && profile.currentLng) {
+        supabase
+          .from('driver')
+          .update({
+            current_latitude: profile.currentLat,
+            current_longitude: profile.currentLng,
+            last_location_update: new Date().toISOString(),
+          })
+          .eq('driver_id', activeDriverId)
+          .then(() => {});
+      }
+    }, 5000);
 
     return () => {
-      if (watchId !== null && navigator.geolocation) {
-        navigator.geolocation.clearWatch(watchId);
-      }
+      clearInterval(broadcastInterval);
+      clearInterval(dbInterval);
       if (channel) {
         supabase.removeChannel(channel);
       }
     };
-  }, [bookingId]);
+  }, [bookingId, profile.currentLat, profile.currentLng, profile.id, booking?.driver_id]);
 
   const handleArrivedAtPickup = async () => {
     // Sync arrival with Supabase
