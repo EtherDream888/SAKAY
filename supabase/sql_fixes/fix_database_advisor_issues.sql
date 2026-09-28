@@ -473,9 +473,11 @@ DROP POLICY IF EXISTS "TODA admins can access/edit own toda" ON public.toda;
 DROP POLICY IF EXISTS "Public authenticated can view active toda names" ON public.toda;
 DROP POLICY IF EXISTS "toda_select_active_public" ON public.toda;
 DROP POLICY IF EXISTS "toda_select_admins" ON public.toda;
+DROP POLICY IF EXISTS "toda_select_policy" ON public.toda;
 DROP POLICY IF EXISTS "toda_insert_policy" ON public.toda;
 DROP POLICY IF EXISTS "toda_update_lgu_admin" ON public.toda;
 DROP POLICY IF EXISTS "toda_update_toda_admin" ON public.toda;
+DROP POLICY IF EXISTS "toda_update_policy" ON public.toda;
 DROP POLICY IF EXISTS "toda_delete_policy" ON public.toda;
 DROP POLICY IF EXISTS "allow_toda_registration_insert" ON public.toda;
 DROP POLICY IF EXISTS "public_view_active_toda" ON public.toda;
@@ -676,24 +678,29 @@ DROP POLICY IF EXISTS "audit_log_manage_lgu" ON public.audit_log;
 -- ============================================================================
 
 -- lgu_admin
+DROP POLICY IF EXISTS "lgu_admin_select_policy" ON public.lgu_admin;
 CREATE POLICY "lgu_admin_select_policy"
     ON public.lgu_admin FOR SELECT TO authenticated
     USING (public.is_lgu_admin() OR auth_user_id = (SELECT auth.uid()));
 
+DROP POLICY IF EXISTS "lgu_admin_insert_policy" ON public.lgu_admin;
 CREATE POLICY "lgu_admin_insert_policy"
     ON public.lgu_admin FOR INSERT TO authenticated
     WITH CHECK (public.is_lgu_admin());
 
+DROP POLICY IF EXISTS "lgu_admin_update_policy" ON public.lgu_admin;
 CREATE POLICY "lgu_admin_update_policy"
     ON public.lgu_admin FOR UPDATE TO authenticated
     USING (public.is_lgu_admin() OR auth_user_id = (SELECT auth.uid()))
     WITH CHECK (public.is_lgu_admin() OR auth_user_id = (SELECT auth.uid()));
 
+DROP POLICY IF EXISTS "lgu_admin_delete_policy" ON public.lgu_admin;
 CREATE POLICY "lgu_admin_delete_policy"
     ON public.lgu_admin FOR DELETE TO authenticated
     USING (public.is_lgu_admin());
 
 -- toda
+DROP POLICY IF EXISTS "toda_select_policy" ON public.toda;
 CREATE POLICY "toda_select_policy"
     ON public.toda FOR SELECT TO anon, authenticated
     USING (
@@ -703,6 +710,7 @@ CREATE POLICY "toda_select_policy"
         OR toda_id = public.get_current_toda_admin_toda_id()
     );
 
+DROP POLICY IF EXISTS "toda_insert_policy" ON public.toda;
 CREATE POLICY "toda_insert_policy"
     ON public.toda FOR INSERT TO anon, authenticated
     WITH CHECK (
@@ -710,6 +718,7 @@ CREATE POLICY "toda_insert_policy"
         OR public.is_lgu_admin()
     );
 
+DROP POLICY IF EXISTS "toda_update_policy" ON public.toda;
 CREATE POLICY "toda_update_policy"
     ON public.toda FOR UPDATE TO authenticated
     USING (
@@ -721,19 +730,23 @@ CREATE POLICY "toda_update_policy"
         OR toda_id = public.get_current_toda_admin_toda_id()
     );
 
+DROP POLICY IF EXISTS "toda_delete_policy" ON public.toda;
 CREATE POLICY "toda_delete_policy"
     ON public.toda FOR DELETE TO authenticated
     USING (public.is_lgu_admin());
 
 -- toda_admin
+DROP POLICY IF EXISTS "toda_admin_select_policy" ON public.toda_admin;
 CREATE POLICY "toda_admin_select_policy"
     ON public.toda_admin FOR SELECT TO anon, authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "toda_admin_insert_policy" ON public.toda_admin;
 CREATE POLICY "toda_admin_insert_policy"
     ON public.toda_admin FOR INSERT TO anon, authenticated
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "toda_admin_update_policy" ON public.toda_admin;
 CREATE POLICY "toda_admin_update_policy"
     ON public.toda_admin FOR UPDATE TO authenticated
     USING (
@@ -745,19 +758,23 @@ CREATE POLICY "toda_admin_update_policy"
         OR public.is_lgu_admin()
     );
 
+DROP POLICY IF EXISTS "toda_admin_delete_policy" ON public.toda_admin;
 CREATE POLICY "toda_admin_delete_policy"
     ON public.toda_admin FOR DELETE TO authenticated
     USING (public.is_lgu_admin());
 
 -- passenger
+DROP POLICY IF EXISTS "passenger_select_policy" ON public.passenger;
 CREATE POLICY "passenger_select_policy"
     ON public.passenger FOR SELECT TO anon, authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "passenger_insert_policy" ON public.passenger;
 CREATE POLICY "passenger_insert_policy"
     ON public.passenger FOR INSERT TO anon, authenticated
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "passenger_update_policy" ON public.passenger;
 CREATE POLICY "passenger_update_policy"
     ON public.passenger FOR UPDATE TO anon, authenticated
     USING (
@@ -771,19 +788,23 @@ CREATE POLICY "passenger_update_policy"
         OR (SELECT auth.uid()) IS NULL
     );
 
+DROP POLICY IF EXISTS "passenger_delete_policy" ON public.passenger;
 CREATE POLICY "passenger_delete_policy"
     ON public.passenger FOR DELETE TO authenticated
     USING (public.is_lgu_admin());
 
 -- driver
+DROP POLICY IF EXISTS "driver_select_policy" ON public.driver;
 CREATE POLICY "driver_select_policy"
     ON public.driver FOR SELECT TO anon, authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "driver_insert_policy" ON public.driver;
 CREATE POLICY "driver_insert_policy"
     ON public.driver FOR INSERT TO anon, authenticated
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "driver_update_policy" ON public.driver;
 CREATE POLICY "driver_update_policy"
     ON public.driver FOR UPDATE TO anon, authenticated
     USING (
@@ -799,6 +820,7 @@ CREATE POLICY "driver_update_policy"
         OR (SELECT auth.uid()) IS NULL
     );
 
+DROP POLICY IF EXISTS "driver_delete_policy" ON public.driver;
 CREATE POLICY "driver_delete_policy"
     ON public.driver FOR DELETE TO authenticated
     USING (
@@ -807,42 +829,51 @@ CREATE POLICY "driver_delete_policy"
     );
 
 -- driver_verification
+DROP POLICY IF EXISTS "driver_verification_select_policy" ON public.driver_verification;
 CREATE POLICY "driver_verification_select_policy"
     ON public.driver_verification FOR SELECT TO anon, authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "driver_verification_insert_policy" ON public.driver_verification;
 CREATE POLICY "driver_verification_insert_policy"
     ON public.driver_verification FOR INSERT TO anon, authenticated
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "driver_verification_update_policy" ON public.driver_verification;
 CREATE POLICY "driver_verification_update_policy"
     ON public.driver_verification FOR UPDATE TO anon, authenticated
     USING (true)
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "driver_verification_delete_policy" ON public.driver_verification;
 CREATE POLICY "driver_verification_delete_policy"
     ON public.driver_verification FOR DELETE TO authenticated
     USING (public.is_lgu_admin());
 
 -- fare_matrix
+DROP POLICY IF EXISTS "fare_matrix_select_policy" ON public.fare_matrix;
 CREATE POLICY "fare_matrix_select_policy"
     ON public.fare_matrix FOR SELECT TO anon, authenticated
     USING (is_active = TRUE OR public.is_lgu_admin());
 
+DROP POLICY IF EXISTS "fare_matrix_insert_policy" ON public.fare_matrix;
 CREATE POLICY "fare_matrix_insert_policy"
     ON public.fare_matrix FOR INSERT TO authenticated
     WITH CHECK (public.is_lgu_admin());
 
+DROP POLICY IF EXISTS "fare_matrix_update_policy" ON public.fare_matrix;
 CREATE POLICY "fare_matrix_update_policy"
     ON public.fare_matrix FOR UPDATE TO authenticated
     USING (public.is_lgu_admin())
     WITH CHECK (public.is_lgu_admin());
 
+DROP POLICY IF EXISTS "fare_matrix_delete_policy" ON public.fare_matrix;
 CREATE POLICY "fare_matrix_delete_policy"
     ON public.fare_matrix FOR DELETE TO authenticated
     USING (public.is_lgu_admin());
 
 -- booking (Fixes critical RLS block & provides full driver-passenger sync)
+DROP POLICY IF EXISTS "booking_select_policy" ON public.booking;
 CREATE POLICY "booking_select_policy"
     ON public.booking FOR SELECT TO anon, authenticated
     USING (
@@ -854,10 +885,12 @@ CREATE POLICY "booking_select_policy"
         OR (SELECT auth.uid()) IS NULL
     );
 
+DROP POLICY IF EXISTS "booking_insert_policy" ON public.booking;
 CREATE POLICY "booking_insert_policy"
     ON public.booking FOR INSERT TO anon, authenticated
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "booking_update_policy" ON public.booking;
 CREATE POLICY "booking_update_policy"
     ON public.booking FOR UPDATE TO anon, authenticated
     USING (
@@ -877,109 +910,133 @@ CREATE POLICY "booking_update_policy"
         OR (SELECT auth.uid()) IS NULL
     );
 
+DROP POLICY IF EXISTS "booking_delete_policy" ON public.booking;
 CREATE POLICY "booking_delete_policy"
     ON public.booking FOR DELETE TO authenticated
     USING (public.is_lgu_admin());
 
 -- dispatch_attempt
+DROP POLICY IF EXISTS "dispatch_attempt_select_policy" ON public.dispatch_attempt;
 CREATE POLICY "dispatch_attempt_select_policy"
     ON public.dispatch_attempt FOR SELECT TO anon, authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "dispatch_attempt_insert_policy" ON public.dispatch_attempt;
 CREATE POLICY "dispatch_attempt_insert_policy"
     ON public.dispatch_attempt FOR INSERT TO anon, authenticated
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "dispatch_attempt_update_policy" ON public.dispatch_attempt;
 CREATE POLICY "dispatch_attempt_update_policy"
     ON public.dispatch_attempt FOR UPDATE TO anon, authenticated
     USING (true)
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "dispatch_attempt_delete_policy" ON public.dispatch_attempt;
 CREATE POLICY "dispatch_attempt_delete_policy"
     ON public.dispatch_attempt FOR DELETE TO authenticated
     USING (public.is_lgu_admin());
 
 -- shared_trip_match
+DROP POLICY IF EXISTS "shared_trip_match_select_policy" ON public.shared_trip_match;
 CREATE POLICY "shared_trip_match_select_policy"
     ON public.shared_trip_match FOR SELECT TO anon, authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "shared_trip_match_insert_policy" ON public.shared_trip_match;
 CREATE POLICY "shared_trip_match_insert_policy"
     ON public.shared_trip_match FOR INSERT TO anon, authenticated
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "shared_trip_match_update_policy" ON public.shared_trip_match;
 CREATE POLICY "shared_trip_match_update_policy"
     ON public.shared_trip_match FOR UPDATE TO anon, authenticated
     USING (true)
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "shared_trip_match_delete_policy" ON public.shared_trip_match;
 CREATE POLICY "shared_trip_match_delete_policy"
     ON public.shared_trip_match FOR DELETE TO authenticated
     USING (public.is_lgu_admin());
 
 -- cancellation_record
+DROP POLICY IF EXISTS "cancellation_record_select_policy" ON public.cancellation_record;
 CREATE POLICY "cancellation_record_select_policy"
     ON public.cancellation_record FOR SELECT TO anon, authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "cancellation_record_insert_policy" ON public.cancellation_record;
 CREATE POLICY "cancellation_record_insert_policy"
     ON public.cancellation_record FOR INSERT TO anon, authenticated
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "cancellation_record_update_policy" ON public.cancellation_record;
 CREATE POLICY "cancellation_record_update_policy"
     ON public.cancellation_record FOR UPDATE TO authenticated
     USING (public.is_lgu_admin())
     WITH CHECK (public.is_lgu_admin());
 
+DROP POLICY IF EXISTS "cancellation_record_delete_policy" ON public.cancellation_record;
 CREATE POLICY "cancellation_record_delete_policy"
     ON public.cancellation_record FOR DELETE TO authenticated
     USING (public.is_lgu_admin());
 
 -- gps_log
+DROP POLICY IF EXISTS "gps_log_select_policy" ON public.gps_log;
 CREATE POLICY "gps_log_select_policy"
     ON public.gps_log FOR SELECT TO anon, authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "gps_log_insert_policy" ON public.gps_log;
 CREATE POLICY "gps_log_insert_policy"
     ON public.gps_log FOR INSERT TO anon, authenticated
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "gps_log_update_policy" ON public.gps_log;
 CREATE POLICY "gps_log_update_policy"
     ON public.gps_log FOR UPDATE TO authenticated
     USING (public.is_lgu_admin())
     WITH CHECK (public.is_lgu_admin());
 
+DROP POLICY IF EXISTS "gps_log_delete_policy" ON public.gps_log;
 CREATE POLICY "gps_log_delete_policy"
     ON public.gps_log FOR DELETE TO authenticated
     USING (public.is_lgu_admin());
 
 -- rating
+DROP POLICY IF EXISTS "rating_select_policy" ON public.rating;
 CREATE POLICY "rating_select_policy"
     ON public.rating FOR SELECT TO anon, authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "rating_insert_policy" ON public.rating;
 CREATE POLICY "rating_insert_policy"
     ON public.rating FOR INSERT TO anon, authenticated
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "rating_update_policy" ON public.rating;
 CREATE POLICY "rating_update_policy"
     ON public.rating FOR UPDATE TO authenticated
     USING (public.is_lgu_admin())
     WITH CHECK (public.is_lgu_admin());
 
+DROP POLICY IF EXISTS "rating_delete_policy" ON public.rating;
 CREATE POLICY "rating_delete_policy"
     ON public.rating FOR DELETE TO authenticated
     USING (public.is_lgu_admin());
 
 -- incident_report
+DROP POLICY IF EXISTS "incident_report_select_policy" ON public.incident_report;
 CREATE POLICY "incident_report_select_policy"
     ON public.incident_report FOR SELECT TO anon, authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "incident_report_insert_policy" ON public.incident_report;
 CREATE POLICY "incident_report_insert_policy"
     ON public.incident_report FOR INSERT TO anon, authenticated
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "incident_report_update_policy" ON public.incident_report;
 CREATE POLICY "incident_report_update_policy"
     ON public.incident_report FOR UPDATE TO authenticated
     USING (
@@ -995,33 +1052,40 @@ CREATE POLICY "incident_report_update_policy"
         )
     );
 
+DROP POLICY IF EXISTS "incident_report_delete_policy" ON public.incident_report;
 CREATE POLICY "incident_report_delete_policy"
     ON public.incident_report FOR DELETE TO authenticated
     USING (public.is_lgu_admin());
 
 -- notification
+DROP POLICY IF EXISTS "notification_select_policy" ON public.notification;
 CREATE POLICY "notification_select_policy"
     ON public.notification FOR SELECT TO anon, authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "notification_insert_policy" ON public.notification;
 CREATE POLICY "notification_insert_policy"
     ON public.notification FOR INSERT TO anon, authenticated
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "notification_update_policy" ON public.notification;
 CREATE POLICY "notification_update_policy"
     ON public.notification FOR UPDATE TO anon, authenticated
     USING (true)
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "notification_delete_policy" ON public.notification;
 CREATE POLICY "notification_delete_policy"
     ON public.notification FOR DELETE TO authenticated
     USING (public.is_lgu_admin());
 
 -- announcement
+DROP POLICY IF EXISTS "announcement_select_policy" ON public.announcement;
 CREATE POLICY "announcement_select_policy"
     ON public.announcement FOR SELECT TO anon, authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "announcement_insert_policy" ON public.announcement;
 CREATE POLICY "announcement_insert_policy"
     ON public.announcement FOR INSERT TO authenticated
     WITH CHECK (
@@ -1029,6 +1093,7 @@ CREATE POLICY "announcement_insert_policy"
         OR toda_id = public.get_current_toda_admin_toda_id()
     );
 
+DROP POLICY IF EXISTS "announcement_update_policy" ON public.announcement;
 CREATE POLICY "announcement_update_policy"
     ON public.announcement FOR UPDATE TO authenticated
     USING (
@@ -1040,6 +1105,7 @@ CREATE POLICY "announcement_update_policy"
         OR toda_id = public.get_current_toda_admin_toda_id()
     );
 
+DROP POLICY IF EXISTS "announcement_delete_policy" ON public.announcement;
 CREATE POLICY "announcement_delete_policy"
     ON public.announcement FOR DELETE TO authenticated
     USING (
@@ -1048,16 +1114,19 @@ CREATE POLICY "announcement_delete_policy"
     );
 
 -- analytics_log
+DROP POLICY IF EXISTS "analytics_log_select_policy" ON public.analytics_log;
 CREATE POLICY "analytics_log_select_policy"
     ON public.analytics_log FOR SELECT TO authenticated
     USING (public.is_lgu_admin() OR (SELECT auth.uid()) IS NOT NULL);
 
+DROP POLICY IF EXISTS "analytics_log_manage_policy" ON public.analytics_log;
 CREATE POLICY "analytics_log_manage_policy"
     ON public.analytics_log FOR ALL TO authenticated
     USING (public.is_lgu_admin())
     WITH CHECK (public.is_lgu_admin());
 
 -- analytics_report (Fixes "Auth RLS Initialization Plan" on analytics_report)
+DROP POLICY IF EXISTS "analytics_report_select_policy" ON public.analytics_report;
 CREATE POLICY "analytics_report_select_policy"
     ON public.analytics_report FOR SELECT TO authenticated
     USING (
@@ -1067,6 +1136,7 @@ CREATE POLICY "analytics_report_select_policy"
         )
     );
 
+DROP POLICY IF EXISTS "analytics_report_insert_policy" ON public.analytics_report;
 CREATE POLICY "analytics_report_insert_policy"
     ON public.analytics_report FOR INSERT TO authenticated
     WITH CHECK (
@@ -1076,16 +1146,19 @@ CREATE POLICY "analytics_report_insert_policy"
         )
     );
 
+DROP POLICY IF EXISTS "analytics_report_update_policy" ON public.analytics_report;
 CREATE POLICY "analytics_report_update_policy"
     ON public.analytics_report FOR UPDATE TO authenticated
     USING (public.is_lgu_admin())
     WITH CHECK (public.is_lgu_admin());
 
+DROP POLICY IF EXISTS "analytics_report_delete_policy" ON public.analytics_report;
 CREATE POLICY "analytics_report_delete_policy"
     ON public.analytics_report FOR DELETE TO authenticated
     USING (public.is_lgu_admin());
 
 -- audit_log (Fixes "Auth RLS Initialization Plan" on audit_log)
+DROP POLICY IF EXISTS "audit_log_select_policy" ON public.audit_log;
 CREATE POLICY "audit_log_select_policy"
     ON public.audit_log FOR SELECT TO anon, authenticated
     USING (
@@ -1096,10 +1169,12 @@ CREATE POLICY "audit_log_select_policy"
         OR (SELECT auth.uid()) IS NULL
     );
 
+DROP POLICY IF EXISTS "audit_log_insert_policy" ON public.audit_log;
 CREATE POLICY "audit_log_insert_policy"
     ON public.audit_log FOR INSERT TO anon, authenticated
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "audit_log_manage_lgu" ON public.audit_log;
 CREATE POLICY "audit_log_manage_lgu"
     ON public.audit_log FOR ALL TO authenticated
     USING (public.is_lgu_admin())
@@ -1191,19 +1266,23 @@ DROP POLICY IF EXISTS "storage_objects_insert_all" ON storage.objects;
 DROP POLICY IF EXISTS "storage_objects_update_all" ON storage.objects;
 DROP POLICY IF EXISTS "storage_objects_delete_policy" ON storage.objects;
 
+DROP POLICY IF EXISTS "storage_objects_select_all" ON storage.objects;
 CREATE POLICY "storage_objects_select_all"
     ON storage.objects FOR SELECT TO anon, authenticated
     USING (true);
 
+DROP POLICY IF EXISTS "storage_objects_insert_all" ON storage.objects;
 CREATE POLICY "storage_objects_insert_all"
     ON storage.objects FOR INSERT TO anon, authenticated
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "storage_objects_update_all" ON storage.objects;
 CREATE POLICY "storage_objects_update_all"
     ON storage.objects FOR UPDATE TO anon, authenticated
     USING (true)
     WITH CHECK (true);
 
+DROP POLICY IF EXISTS "storage_objects_delete_policy" ON storage.objects;
 CREATE POLICY "storage_objects_delete_policy"
     ON storage.objects FOR DELETE TO authenticated
     USING (
