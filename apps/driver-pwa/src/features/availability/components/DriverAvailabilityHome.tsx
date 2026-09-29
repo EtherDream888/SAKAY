@@ -25,6 +25,7 @@ import MapView from '../../../common/components/MapView';
 import SakayToast from '../../../common/components/SakayToast';
 import { supabase } from '../../../services/supabaseClient';
 import { fetchAccreditedTodas } from '../../../services/driverApiService';
+import { getCurrentDevicePosition, getCachedDevicePosition } from '@sakay/shared';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { useDriverSession } from '../../../contexts/DriverSessionContext';
 
@@ -67,6 +68,35 @@ export const DriverAvailabilityHome: React.FC = () => {
   const [availableTodas, setAvailableTodas] = useState<Array<{ id: string; name: string; acronym: string; barangay: string; terminalLocation: string }>>([]);
   const [todaModalOpen, setTodaModalOpen] = useState(false);
   const [recenterTrigger, setRecenterTrigger] = useState(0);
+
+  // Always attempt to get actual driver device position on mount (matching passenger Dashboard)
+  useEffect(() => {
+    getCurrentDevicePosition()
+      .then((coords) => {
+        setProfile((prev) => ({
+          ...prev,
+          currentLat: coords.latitude,
+          currentLng: coords.longitude,
+        }));
+        setRecenterTrigger((prev) => prev + 1);
+
+        const activeDriverId = localStorage.getItem('sakay_driver_id');
+        if (activeDriverId) {
+          supabase
+            .from('driver')
+            .update({
+              current_latitude: coords.latitude,
+              current_longitude: coords.longitude,
+              last_location_update: new Date().toISOString(),
+            })
+            .eq('driver_id', activeDriverId)
+            .then(() => {});
+        }
+      })
+      .catch((err) => {
+        console.warn('[DriverAvailabilityHome] Mount position error:', err);
+      });
+  }, [locationPermissionOpen]);
 
   // Load live Supabase profile and accredited TODAs on mount
   useEffect(() => {
@@ -151,25 +181,48 @@ export const DriverAvailabilityHome: React.FC = () => {
           const todaObj = Array.isArray(driverData.toda) ? driverData.toda[0] : driverData.toda;
           const todaNameStr = todaObj ? `${todaObj.toda_name} (${todaObj.toda_acronym})` : '';
 
-          setProfile((prev) => ({
-            ...prev,
-            id: driverData.driver_id,
-            name: driverData.full_name || prev.name,
-            phone: driverData.contact_number || prev.phone,
-            email: driverData.email || prev.email,
-            vehiclePlate: plateNumber || prev.vehiclePlate,
-            licenseNumber: licenseNumber || prev.licenseNumber,
-            franchiseNumber: franchiseNumber || prev.franchiseNumber,
-            todaName: todaNameStr || prev.todaName,
-            selectedTodaId: todaObj?.toda_id || prev.selectedTodaId,
-            rating: Number(driverData.weighted_average_rating) || 5.0,
-            totalTrips: completedTripsCount || 0,
-            accountStatus: driverData.account_status,
-            verificationStage: 'Stage 2 Approved',
-            isOnline: driverData.availability_status === 'Available',
-            currentLat: driverData.current_latitude ? Number(driverData.current_latitude) : prev.currentLat,
-            currentLng: driverData.current_longitude ? Number(driverData.current_longitude) : prev.currentLng,
-          }));
+          const cached = getCachedDevicePosition();
+          const resolvedLat = cached?.latitude || (driverData.current_latitude ? Number(driverData.current_latitude) : 13.4117);
+          const resolvedLng = cached?.longitude || (driverData.current_longitude ? Number(driverData.current_longitude) : 121.1803);
+
+          setProfile((prev) => {
+            const hasPrevRealLat = prev.currentLat && prev.currentLat !== 13.4117 && prev.currentLat !== 13.367554;
+            const hasPrevRealLng = prev.currentLng && prev.currentLng !== 121.1803 && prev.currentLng !== 121.168617;
+            const finalLat = hasPrevRealLat ? prev.currentLat : resolvedLat;
+            const finalLng = hasPrevRealLng ? prev.currentLng : resolvedLng;
+
+            return {
+              ...prev,
+              id: driverData.driver_id,
+              name: driverData.full_name || prev.name,
+              phone: driverData.contact_number || prev.phone,
+              email: driverData.email || prev.email,
+              vehiclePlate: plateNumber || prev.vehiclePlate,
+              licenseNumber: licenseNumber || prev.licenseNumber,
+              franchiseNumber: franchiseNumber || prev.franchiseNumber,
+              todaName: todaNameStr || prev.todaName,
+              selectedTodaId: todaObj?.toda_id || prev.selectedTodaId,
+              rating: Number(driverData.weighted_average_rating) || 5.0,
+              totalTrips: completedTripsCount || 0,
+              accountStatus: driverData.account_status,
+              verificationStage: 'Stage 2 Approved',
+              isOnline: driverData.availability_status === 'Available',
+              currentLat: finalLat,
+              currentLng: finalLng,
+            };
+          });
+
+          if (cached?.latitude && cached?.longitude && driverData.driver_id) {
+            supabase
+              .from('driver')
+              .update({
+                current_latitude: cached.latitude,
+                current_longitude: cached.longitude,
+                last_location_update: new Date().toISOString(),
+              })
+              .eq('driver_id', driverData.driver_id)
+              .then(() => {});
+          }
         }
       } catch (err) {
         console.warn('[DriverAvailabilityHome] Live profile sync note:', err);
@@ -204,40 +257,47 @@ export const DriverAvailabilityHome: React.FC = () => {
     setProfile((prev) => ({ ...prev, isOnline: nextState }));
     
     // Update Supabase
-    if (profile.id && profile.id !== 'test-driver-001') {
+    const activeDriverId = profile.id || localStorage.getItem('sakay_driver_id') || '11111111-1111-1111-1111-111111111111';
+    if (activeDriverId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeDriverId)) {
       try {
         await supabase
           .from('driver')
           .update({ availability_status: nextState ? 'Available' : 'Offline' })
-          .eq('driver_id', profile.id);
+          .eq('driver_id', activeDriverId);
       } catch (err) {
         console.warn('[DriverAvailabilityHome] Failed to sync availability_status:', err);
       }
     }
   };
 
-  const handleRecenter = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setProfile((prev) => ({
-            ...prev,
-            currentLat: pos.coords.latitude,
-            currentLng: pos.coords.longitude,
-          }));
-          setRecenterTrigger((prev) => prev + 1);
-        },
-        () => {
-          setRecenterTrigger((prev) => prev + 1);
-        },
-        { enableHighAccuracy: true, timeout: 5000 }
-      );
-    } else {
+  const handleRecenter = async () => {
+    try {
+      const coords = await getCurrentDevicePosition();
+      setProfile((prev) => ({
+        ...prev,
+        currentLat: coords.latitude,
+        currentLng: coords.longitude,
+      }));
+      setRecenterTrigger((prev) => prev + 1);
+
+      const activeDriverId = localStorage.getItem('sakay_driver_id');
+      if (activeDriverId) {
+        supabase
+          .from('driver')
+          .update({
+            current_latitude: coords.latitude,
+            current_longitude: coords.longitude,
+            last_location_update: new Date().toISOString(),
+          })
+          .eq('driver_id', activeDriverId)
+          .then(() => {});
+      }
+    } catch {
       setRecenterTrigger((prev) => prev + 1);
     }
   };
 
-  const handleAllowLocation = (saveAlways: boolean) => {
+  const handleAllowLocation = async (saveAlways: boolean) => {
     sessionStorage.setItem('sakay_driver_just_logged_in', 'false');
     sessionStorage.setItem('sakay_driver_location_prompt_dismissed', 'true');
     if (saveAlways) {
@@ -246,33 +306,29 @@ export const DriverAvailabilityHome: React.FC = () => {
       sessionStorage.setItem('sakay_driver_location_permission', 'once');
     }
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const { latitude, longitude } = pos.coords;
-          setProfile((prev) => ({
-            ...prev,
-            currentLat: latitude,
-            currentLng: longitude,
-          }));
-          setRecenterTrigger((prev) => prev + 1);
+    try {
+      const coords = await getCurrentDevicePosition();
+      setProfile((prev) => ({
+        ...prev,
+        currentLat: coords.latitude,
+        currentLng: coords.longitude,
+      }));
+      setRecenterTrigger((prev) => prev + 1);
 
-          const activeDriverId = localStorage.getItem('sakay_driver_id');
-          if (activeDriverId) {
-            supabase
-              .from('driver')
-              .update({
-                current_latitude: latitude,
-                current_longitude: longitude,
-                last_location_update: new Date().toISOString(),
-              })
-              .eq('driver_id', activeDriverId)
-              .then(() => {});
-          }
-        },
-        (err) => console.warn('[DriverAvailabilityHome] Geolocation note:', err.message),
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 1000 }
-      );
+      const activeDriverId = localStorage.getItem('sakay_driver_id');
+      if (activeDriverId) {
+        supabase
+          .from('driver')
+          .update({
+            current_latitude: coords.latitude,
+            current_longitude: coords.longitude,
+            last_location_update: new Date().toISOString(),
+          })
+          .eq('driver_id', activeDriverId)
+          .then(() => {});
+      }
+    } catch (err: any) {
+      console.warn('[DriverAvailabilityHome] Geolocation note:', err?.message || err);
     }
     setLocationPermissionOpen(false);
   };

@@ -195,9 +195,6 @@ export const createBooking = async (payload: CreateBookingPayload): Promise<Book
     estimated_distance_km: payload.estimated_distance_km,
     estimated_fare: payload.estimated_fare,
     booking_status: 'Pending',
-    driver_latitude: payload.pickup_latitude + 0.004,
-    driver_longitude: payload.pickup_longitude + 0.003,
-    eta_minutes: 4,
     created_at: dbData.created_at || now,
     updated_at: dbData.created_at || now,
   };

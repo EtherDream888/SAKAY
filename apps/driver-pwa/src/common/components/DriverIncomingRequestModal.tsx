@@ -31,28 +31,23 @@ export const DriverIncomingRequestModal: React.FC = () => {
   const handleAcceptRequest = async () => {
     if (!incomingRequest) return;
 
-    const driverPayload = {
-      driver_id: profile.id || 'test-driver-001',
-      driver_name: profile.name || 'Drayber',
-      driver_phone: profile.phone || '',
-      franchise_no: profile.franchiseNumber || 'MTOP-PENDING',
-      vehicle_plate: profile.vehiclePlate || 'N/A',
-      toda_name: profile.todaName || 'TODA',
-    };
+    const activeDriverId = profile.id || localStorage.getItem('sakay_driver_id') || '11111111-1111-1111-1111-111111111111';
 
     // Explicit Supabase update
     try {
+      const updatePayload: any = {
+        booking_status: 'Accepted',
+        accepted_at: new Date().toISOString(),
+      };
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeDriverId)) {
+        updatePayload.driver_id = activeDriverId;
+      }
+
       const { error } = await supabase
         .from('booking')
-        .update({
-          booking_status: 'Accepted',
-          accepted_at: new Date().toISOString(),
-          ...(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(driverPayload.driver_id)
-            ? { driver_id: driverPayload.driver_id }
-            : {}),
-        })
+        .update(updatePayload)
         .eq('booking_id', incomingRequest.booking_id)
-        .eq('booking_status', 'Pending'); // Concurrency check
+        .in('booking_status', ['Pending', 'Searching Driver']); // Concurrency check
 
       if (error) {
         console.warn('[DriverIncomingRequestModal] acceptBooking DB sync warning:', error.message);
@@ -60,9 +55,15 @@ export const DriverIncomingRequestModal: React.FC = () => {
         return;
       }
 
-      // Also mark attempt as Accepted
+      // Also mark attempt as Accepted with responded_at timestamp
       if (currentAttemptId) {
-        await supabase.from('dispatch_attempt').update({ response_status: 'Accepted' }).eq('attempt_id', currentAttemptId);
+        await supabase
+          .from('dispatch_attempt')
+          .update({
+            response_status: 'Accepted',
+            responded_at: new Date().toISOString(),
+          })
+          .eq('attempt_id', currentAttemptId);
       }
     } catch (err: any) {
       console.warn('[DriverIncomingRequestModal] acceptBooking DB sync exception:', err);

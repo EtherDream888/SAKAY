@@ -24,6 +24,7 @@ import { useLanguage } from "../../../../utils/LanguageContext";
 import { supabase } from "../../../../services/supabaseClient";
 import SuccessModal from "../../../../common/components/SuccessModal";
 import { createBooking } from "../../../../services/bookingService";
+import { startDispatch } from "../../../../services/dispatchService";
 import { calculateFare } from "@sakay/shared";
 
 interface LocationState {
@@ -170,7 +171,7 @@ const BookSummary: React.FC = () => {
     });
 
     setSeatFare(result.seatFare);
-    setFare(result.tripType === "Shared" ? (result.sharedEstimate || result.finalFare) : result.finalFare);
+    setFare(tripType === "Shared" ? (result.sharedEstimate || result.finalFare) : result.finalFare);
 
     setLoading(false);
   };
@@ -222,11 +223,10 @@ const BookSummary: React.FC = () => {
       });
 
       // Start tiered dispatch process in the background
-      import("../../../../services/dispatchService").then(({ startDispatch }) => {
-        startDispatch(newBooking.booking_id).catch((err) => console.error("Dispatch failed:", err));
-      });
+      startDispatch(newBooking.booking_id).catch((err) => console.error("Dispatch failed:", err));
 
       setCreatedBookingId(newBooking.booking_id);
+      sessionStorage.setItem("current_active_booking_id", newBooking.booking_id);
       setBookingLoading(false);
       setSuccessOpen(true);
     } catch (err: any) {
@@ -243,6 +243,9 @@ const BookSummary: React.FC = () => {
     sessionStorage.removeItem("trip_dropoff");
     sessionStorage.removeItem("trip_passengers");
     sessionStorage.removeItem("trip_type");
+    if (createdBookingId) {
+      sessionStorage.setItem("current_active_booking_id", createdBookingId);
+    }
     // Transition directly into Trip Monitoring screen with history replacement
     navigate("/trip-monitoring", { replace: true, state: { bookingId: createdBookingId } });
   };

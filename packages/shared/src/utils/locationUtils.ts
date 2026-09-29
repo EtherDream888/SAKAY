@@ -21,6 +21,11 @@ export const calculateHaversineKm = (
 };
 
 /**
+ * Calculates straight-line distance in kilometers between two GPS coordinates (alias for calculateHaversineKm)
+ */
+export const getDistanceKm = calculateHaversineKm;
+
+/**
  * Formats distance into a human-friendly string (e.g. "450 m" or "2.3 km")
  */
 export const formatDistance = (km: number): string => {
@@ -91,4 +96,131 @@ export const getOSRMRoute = async (
     ],
     source: 'haversine',
   };
+};
+
+export interface LocationCoords {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  timestamp?: number;
+}
+
+/**
+ * Retrieves cached device position from localStorage if available
+ */
+export const getCachedDevicePosition = (): LocationCoords | null => {
+  if (typeof window === "undefined" || !window.localStorage) return null;
+  try {
+    const lat = localStorage.getItem("user_lat");
+    const lng = localStorage.getItem("user_lng");
+    if (lat && lng) {
+      const parsedLat = parseFloat(lat);
+      const parsedLng = parseFloat(lng);
+      if (!isNaN(parsedLat) && !isNaN(parsedLng) && parsedLat !== 0 && parsedLng !== 0) {
+        return { latitude: parsedLat, longitude: parsedLng };
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+};
+
+/**
+ * Requests real device location with high-accuracy first and fast low-accuracy (network/Wi-Fi) fallback
+ */
+export const getCurrentDevicePosition = (): Promise<LocationCoords> => {
+  return new Promise((resolve, reject) => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      reject(new Error("Geolocation is not supported by this browser/device."));
+      return;
+    }
+
+    const saveSuccess = (position: GeolocationPosition) => {
+      const coords: LocationCoords = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        timestamp: position.timestamp,
+      };
+
+      try {
+        localStorage.setItem("user_lat", coords.latitude.toString());
+        localStorage.setItem("user_lng", coords.longitude.toString());
+        localStorage.setItem("gps_permission", "true");
+        localStorage.setItem("sakay_driver_location_permission", "always");
+      } catch {}
+
+      resolve(coords);
+    };
+
+    const tryLowAccuracy = () => {
+      navigator.geolocation.getCurrentPosition(
+        saveSuccess,
+        (error) => {
+          let message = "An error occurred retrieving location.";
+          if (error.code === error.PERMISSION_DENIED) {
+            message = "Location permission denied by user.";
+          } else if (error.code === error.POSITION_UNAVAILABLE) {
+            message = "Location information is unavailable.";
+          } else if (error.code === error.TIMEOUT) {
+            message = "Location request timed out.";
+          }
+          reject(new Error(message));
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 8000,
+          maximumAge: 60000,
+        }
+      );
+    };
+
+    // Try high accuracy first (e.g. mobile GPS), fallback quickly to low accuracy (Wi-Fi/cellular/network)
+    navigator.geolocation.getCurrentPosition(
+      saveSuccess,
+      (error) => {
+        if (error.code === error.PERMISSION_DENIED) {
+          reject(new Error("Location permission denied by user."));
+          return;
+        }
+        tryLowAccuracy();
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 4000,
+        maximumAge: 10000,
+      }
+    );
+  });
+};
+
+/**
+ * Watches real device position with continuous updates
+ */
+export const watchDevicePosition = (
+  onCoords: (coords: LocationCoords) => void,
+  onError?: (err: Error) => void
+): number | null => {
+  if (typeof window === "undefined" || !navigator.geolocation) return null;
+
+  return navigator.geolocation.watchPosition(
+    (pos) => {
+      const coords: LocationCoords = {
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+        timestamp: pos.timestamp,
+      };
+      try {
+        localStorage.setItem("user_lat", coords.latitude.toString());
+        localStorage.setItem("user_lng", coords.longitude.toString());
+      } catch {}
+      onCoords(coords);
+    },
+    (err) => {
+      if (onError) onError(new Error(err.message));
+    },
+    { enableHighAccuracy: false, timeout: 15000, maximumAge: 5000 }
+  );
 };

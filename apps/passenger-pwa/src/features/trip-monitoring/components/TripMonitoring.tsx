@@ -41,6 +41,7 @@ import type { BookingRecord } from '@sakay/shared';
 import { formatShortBookingId, calculateHaversineKm, formatDistance } from '@sakay/shared';
 import { supabase } from '../../../services/supabaseClient';
 import { useLanguage } from '../../../utils/LanguageContext';
+import { startDispatch } from '../../../services/dispatchService';
 
 const mapBookingStatus = (rawStatus: string): any => {
   if (rawStatus === 'Pending') return 'Searching Driver';
@@ -51,6 +52,7 @@ const mapBookingStatus = (rawStatus: string): any => {
   if (rawStatus === 'Arrived at Destination') return 'Arrived at Destination';
   if (rawStatus === 'Completed') return 'Completed';
   if (rawStatus === 'Cancelled') return 'Cancelled';
+  if (rawStatus === 'No Driver Found') return 'No Driver Found';
   return rawStatus || 'Searching Driver';
 };
 
@@ -251,6 +253,26 @@ export const TripMonitoring: React.FC = () => {
   const stateBookingId = (location.state as { bookingId?: string })?.bookingId;
   const activeBookingId = stateBookingId || sessionStorage.getItem('current_active_booking_id') || 'BKG-DEMO-001';
 
+  useEffect(() => {
+    if (stateBookingId) {
+      sessionStorage.setItem('current_active_booking_id', stateBookingId);
+    }
+  }, [stateBookingId]);
+
+  const handleRetrySearch = async () => {
+    try {
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeBookingId)) {
+        await supabase.from('booking').update({ booking_status: 'Pending' }).eq('booking_id', activeBookingId);
+        await supabase.from('dispatch_attempt').delete().eq('booking_id', activeBookingId);
+      }
+      setBooking((prev) => prev ? { ...prev, booking_status: 'Searching Driver' as any } : prev);
+      startDispatch(activeBookingId).catch(console.error);
+      setToastMessage(language === 'tl' ? 'Muling naghahanap ng drayber...' : 'Retrying driver search...');
+    } catch (err) {
+      console.warn('Retry search failed:', err);
+    }
+  };
+
   const [booking, setBooking] = useState<BookingRecord | null>(() => {
     return getBooking(activeBookingId) || {
       booking_id: activeBookingId,
@@ -450,6 +472,10 @@ export const TripMonitoring: React.FC = () => {
           const todaInfo = driverInfo?.toda ? (Array.isArray(driverInfo.toda) ? driverInfo.toda[0] : driverInfo.toda) : null;
 
           const mappedStatus = mapBookingStatus(d.booking_status);
+
+          if (d.booking_status === 'Pending' || d.booking_status === 'Searching Driver') {
+            startDispatch(activeBookingId).catch((err) => console.error('[TripMonitoring] Dispatch resume note:', err));
+          }
 
           const drvLat = driverInfo?.current_latitude ?? d.driver_latitude;
           const drvLng = driverInfo?.current_longitude ?? d.driver_longitude;
@@ -840,6 +866,8 @@ export const TripMonitoring: React.FC = () => {
           label={
             status === 'Searching Driver'
               ? (language === 'tl' ? 'Naghahanap ng pinakamalapit na Tricycle...' : 'Finding nearest tricycle...')
+              : status === 'No Driver Found'
+              ? (language === 'tl' ? 'Walang nahanap na drayber sa ngayon' : 'No driver available right now')
               : status === 'Driver Assigned' || status === 'Driver En Route'
               ? (language === 'tl'
                   ? `Papunta na ang Driver • ${formatDistance(driverToPickupKm)} (~${Math.max(1, Math.round(driverToPickupKm * 3))} min)`
@@ -858,6 +886,8 @@ export const TripMonitoring: React.FC = () => {
             backgroundColor:
               status === 'Searching Driver'
                 ? '#F59E0B'
+                : status === 'No Driver Found'
+                ? '#DC2626'
                 : status === 'Driver Arrived'
                 ? '#1E8E3E'
                 : '#0F172A',
@@ -978,38 +1008,74 @@ export const TripMonitoring: React.FC = () => {
           </Box>
         </Box>
 
-        {/* Driver Identity Card */}
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Avatar sx={{ width: 48, height: 48, backgroundColor: '#FF6B00', fontWeight: 800, fontSize: '20px' }}>
-              {driverName.charAt(0)}
-            </Avatar>
-            <Box>
-              <Typography sx={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>
-                {driverName}
-              </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <StarIcon sx={{ fontSize: 14, color: '#FBBC04' }} />
-                <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>
-                  4.9
-                </Typography>
-                <Typography sx={{ fontSize: '12px', color: '#64748B' }}>
-                  • {todaName.split(' ')[0]}
-                </Typography>
-              </Box>
+        {status === 'No Driver Found' ? (
+          <Box sx={{ p: 2, backgroundColor: '#FEF2F2', borderRadius: '16px', border: '1.5px solid #FCA5A5', textAlign: 'center' }}>
+            <Typography sx={{ fontWeight: 800, fontSize: '15px', color: '#991B1B' }}>
+              {language === 'tl' ? 'Walang available na drayber sa ngayon' : 'No driver available right now'}
+            </Typography>
+            <Typography sx={{ fontSize: '12px', color: '#B91C1C', mt: 0.5, mb: 2 }}>
+              {language === 'tl'
+                ? 'Maaaring offline o may biyahe ang mga drayber sa iyong lugar. Subukang mag-search muli.'
+                : 'Nearby drivers may be offline or on trips. You can retry searching.'}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                fullWidth
+                onClick={() => {
+                  sessionStorage.removeItem('current_active_booking_id');
+                  navigate('/dashboard');
+                }}
+                sx={{ borderRadius: '12px', textTransform: 'none', fontWeight: 700 }}
+              >
+                {language === 'tl' ? 'Bumalik sa Home' : 'Back to Home'}
+              </Button>
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={handleRetrySearch}
+                sx={{ borderRadius: '12px', backgroundColor: '#FF6B00', textTransform: 'none', fontWeight: 800, '&:hover': { backgroundColor: '#E55F00' } }}
+              >
+                {language === 'tl' ? 'Subukan Muli' : 'Retry Search'}
+              </Button>
             </Box>
           </Box>
+        ) : (
+          /* Driver Identity Card */
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Avatar sx={{ width: 48, height: 48, backgroundColor: '#FF6B00', fontWeight: 800, fontSize: '20px' }}>
+                {driverName.charAt(0)}
+              </Avatar>
+              <Box>
+                <Typography sx={{ fontSize: '16px', fontWeight: 800, color: '#0F172A' }}>
+                  {status === 'Searching Driver' ? (language === 'tl' ? 'Naghahanap ng Drayber...' : 'Looking for Driver...') : driverName}
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <StarIcon sx={{ fontSize: 14, color: '#FBBC04' }} />
+                  <Typography sx={{ fontSize: '12px', fontWeight: 700, color: '#0F172A' }}>
+                    4.9
+                  </Typography>
+                  <Typography sx={{ fontSize: '12px', color: '#64748B' }}>
+                    • {todaName.split(' ')[0]}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
 
-          {/* Quick Communication Actions */}
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton onClick={() => (window.location.href = `tel:${driverPhone}`)} sx={{ backgroundColor: '#E6F4EA', color: '#1E8E3E' }}>
-              <PhoneIcon fontSize="small" />
-            </IconButton>
-            <IconButton onClick={handleOpenCommModal} sx={{ backgroundColor: '#FFF8F0', color: '#FF6B00' }}>
-              <MessageIcon fontSize="small" />
-            </IconButton>
+            {/* Quick Communication Actions (only available once driver assigned) */}
+            {status !== 'Searching Driver' && (
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <IconButton onClick={() => (window.location.href = `tel:${driverPhone}`)} sx={{ backgroundColor: '#E6F4EA', color: '#1E8E3E' }}>
+                  <PhoneIcon fontSize="small" />
+                </IconButton>
+                <IconButton onClick={handleOpenCommModal} sx={{ backgroundColor: '#FFF8F0', color: '#FF6B00' }}>
+                  <MessageIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            )}
           </Box>
-        </Box>
+        )}
 
         {/* Driver En Route Proximity Box */}
         {(status === 'Driver Assigned' || status === 'Driver En Route') && (
@@ -1161,7 +1227,7 @@ export const TripMonitoring: React.FC = () => {
               {language === 'tl' ? 'Nabayaran Ko Na (I Paid)' : 'I Paid'}
             </Button>
           </Box>
-        ) : status !== 'Completed' && (
+        ) : status !== 'Completed' && status !== 'No Driver Found' && (
           <Box sx={{ pt: 1, borderTop: '1px solid #F1F5F9', mt: 0.5 }}>
             {/* Initial Collapsed View: Slide to Finish Trip (Disabled until driver clicks Start Trip) */}
             <Box
