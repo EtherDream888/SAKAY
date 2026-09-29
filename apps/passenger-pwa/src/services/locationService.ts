@@ -222,24 +222,36 @@ export interface RecentDestination {
   timestamp: number;
 }
 
-export const getRecentDestinations = (): RecentDestination[] => {
+export const getRecentsStorageKey = (passengerId?: string): string => {
+  const id =
+    passengerId ||
+    localStorage.getItem("sakay_passenger_id") ||
+    localStorage.getItem("sakay_passenger_phone");
+  return id ? `sakay_recent_destinations_${id}` : `sakay_recent_destinations_guest`;
+};
+
+export const getRecentDestinations = (passengerId?: string): RecentDestination[] => {
   try {
-    const raw = localStorage.getItem("sakay_recent_destinations");
+    const key = getRecentsStorageKey(passengerId);
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 };
 
-export const saveRecentDestination = (dest: {
-  name: string;
-  address: string;
-  lat: number;
-  lng: number;
-}): RecentDestination[] => {
+export const saveRecentDestination = (
+  dest: {
+    name: string;
+    address: string;
+    lat: number;
+    lng: number;
+  },
+  passengerId?: string
+): RecentDestination[] => {
   try {
-    if (!dest.name || !dest.lat || !dest.lng) return getRecentDestinations();
-    const existing = getRecentDestinations();
+    if (!dest.name || !dest.lat || !dest.lng) return getRecentDestinations(passengerId);
+    const existing = getRecentDestinations(passengerId);
     // Filter out duplicates (same name or within 50 meters)
     const filtered = existing.filter((item) => {
       const isSameName = item.name.trim().toLowerCase() === dest.name.trim().toLowerCase();
@@ -257,7 +269,8 @@ export const saveRecentDestination = (dest: {
     };
 
     const updated = [newItem, ...filtered].slice(0, 10);
-    localStorage.setItem("sakay_recent_destinations", JSON.stringify(updated));
+    const key = getRecentsStorageKey(passengerId);
+    localStorage.setItem(key, JSON.stringify(updated));
     return updated;
   } catch (e) {
     console.error("Error saving recent destination:", e);
@@ -265,69 +278,56 @@ export const saveRecentDestination = (dest: {
   }
 };
 
-export const clearRecentDestinations = (): void => {
+export const clearRecentDestinations = (passengerId?: string): void => {
   try {
+    const key = getRecentsStorageKey(passengerId);
+    localStorage.removeItem(key);
+    // Clear legacy global un-scoped key as well
     localStorage.removeItem("sakay_recent_destinations");
   } catch {}
 };
 
-// Verified prominent local Calapan City landmarks
+// Verified prominent local Calapan City landmarks (strictly limited to 5 verified popular places)
 export const CURATED_CALAPAN_PLACES: PlaceSuggestion[] = [
   {
     id: "calapan_market",
     name: "Calapan Public Market",
     distance: "1.2 km",
-    address: "Juan Luna Street, San Vicente North, Calapan City, Oriental Mindoro",
-    lat: 13.4132,
+    address: "J. Luna Street, San Vicente North, Calapan City, Oriental Mindoro",
+    lat: 13.4131,
     lng: 121.1789,
   },
   {
-    id: "calapan_terminal",
-    name: "Calapan Grand Central Terminal",
-    distance: "2.8 km",
-    address: "Strong Republic Nautical Highway, Guinobatan, Calapan City, Oriental Mindoro",
-    lat: 13.3862,
-    lng: 121.1685,
-  },
-  {
     id: "calapan_port",
-    name: "Calapan Port (Pier)",
+    name: "Calapan Port",
     distance: "2.5 km",
-    address: "San Antonio, Calapan City, Oriental Mindoro",
-    lat: 13.4277,
-    lng: 121.1825,
-  },
-  {
-    id: "citymall_calapan",
-    name: "CityMall Calapan",
-    distance: "2.1 km",
-    address: "Roxas Drive, Lumangbayan, Calapan City, Oriental Mindoro",
-    lat: 13.3985,
-    lng: 121.1780,
+    address: "Port Access Road, San Antonio, Calapan City, Oriental Mindoro",
+    lat: 13.4283,
+    lng: 121.1946,
   },
   {
     id: "calapan_city_hall",
-    name: "Calapan City Hall",
+    name: "City Hall",
     distance: "3.2 km",
-    address: "City Government Center, Guinobatan, Calapan City, Oriental Mindoro",
-    lat: 13.3888,
-    lng: 121.1819,
+    address: "Calapan New City Hall, M. Roxas Drive, Guinobatan, Calapan City, Oriental Mindoro",
+    lat: 13.3791,
+    lng: 121.1832,
   },
   {
     id: "xentro_mall",
-    name: "Xentro Mall Calapan",
+    name: "Xentro Mall",
     distance: "1.4 km",
-    address: "J.P. Rizal Street, San Vicente Central, Calapan City, Oriental Mindoro",
-    lat: 13.4146,
-    lng: 121.1804,
+    address: "M. Roxas Drive, Sto. Niño, Calapan City, Oriental Mindoro",
+    lat: 13.4030,
+    lng: 121.1838,
   },
   {
-    id: "puregold_calapan",
-    name: "Puregold Calapan",
-    distance: "1.6 km",
-    address: "Roxas Drive, Guinobatan, Calapan City, Oriental Mindoro",
-    lat: 13.4042,
-    lng: 121.1764,
+    id: "citymall_calapan",
+    name: "City Mall",
+    distance: "2.1 km",
+    address: "Roxas Drive, Ilaya, Calapan City, Oriental Mindoro",
+    lat: 13.4131,
+    lng: 121.1845,
   },
 ];
 

@@ -77,6 +77,7 @@ const Login: React.FC = () => {
       localStorage.setItem('sakay_passenger_phone', phone63);
       localStorage.setItem('sakay_passenger_name', 'Maria Santos');
       localStorage.setItem('sakay_passenger_id', '99999999-9999-9999-9999-999999999999');
+      localStorage.removeItem('sakay_recent_destinations');
 
       // Guarantee test passenger record exists in public.passenger
       supabase
