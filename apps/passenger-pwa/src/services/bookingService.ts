@@ -101,7 +101,7 @@ export const createBooking = async (payload: CreateBookingPayload): Promise<Book
   isCreatingBooking = true;
   const now = new Date().toISOString();
   
-  let validPassengerId = payload.passenger_id;
+  let validPassengerId = payload.passenger_id || localStorage.getItem('sakay_passenger_id');
 
   // 1. Resolve passenger UUID from active session if available
   try {
@@ -120,6 +120,13 @@ export const createBooking = async (payload: CreateBookingPayload): Promise<Book
     }
   } catch (e) {
     // ignore
+  }
+
+  if (!payload.passenger_name) {
+    payload.passenger_name = localStorage.getItem('sakay_passenger_name') || 'Maria Santos';
+  }
+  if (!payload.passenger_phone) {
+    payload.passenger_phone = localStorage.getItem('sakay_passenger_phone') || '+639123456789';
   }
 
   // 2. If validPassengerId is still not a valid UUID, look up first registered passenger in Supabase

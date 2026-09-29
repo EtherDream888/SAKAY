@@ -127,6 +127,23 @@ export const DriverLogin: React.FC = () => {
           verificationStage: 'Stage 2 Approved',
         })
       );
+
+      // Guarantee driver record is online and verified in Supabase
+      supabase
+        .from('driver')
+        .upsert({
+          driver_id: '11111111-1111-1111-1111-111111111111',
+          full_name: 'Juan Dela Cruz',
+          contact_number: phone63,
+          plate_number: 'ABC 123',
+          account_status: 'Verified',
+          is_online: true,
+          current_latitude: 13.4124,
+          current_longitude: 121.1834,
+          last_location_update: new Date().toISOString(),
+        })
+        .then(() => {});
+
       setSuccess(true);
       setTimeout(() => {
         navigate('/driver/home', { replace: true });

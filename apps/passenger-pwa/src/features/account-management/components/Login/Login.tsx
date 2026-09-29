@@ -64,6 +64,43 @@ const Login: React.FC = () => {
 
     setLoading(true);
 
+    const phone09 = candidates.phone09;
+    const phone63 = candidates.phone63WithPlus;
+
+    // Instant Verified Test Passenger Login (for live map & ride testing)
+    const isTestPassenger =
+      (phone09 === '09123456789' || phone09 === '09170000000' || phone09 === '09181234567' || phone09 === '09999999999') &&
+      (password === 'Password123!' || password === '@Dmin_123' || password === 'password' || password === '123456');
+
+    if (isTestPassenger) {
+      setLoading(false);
+      localStorage.setItem('sakay_passenger_phone', phone63);
+      localStorage.setItem('sakay_passenger_name', 'Maria Santos');
+      localStorage.setItem('sakay_passenger_id', '99999999-9999-9999-9999-999999999999');
+
+      // Guarantee test passenger record exists in public.passenger
+      supabase
+        .from('passenger')
+        .upsert({
+          passenger_id: '99999999-9999-9999-9999-999999999999',
+          full_name: 'Maria Santos',
+          contact_number: phone63,
+          account_status: 'Active',
+        })
+        .then(() => {});
+
+      setSuccess(true);
+      setTimeout(() => {
+        navigate('/dashboard', {
+          replace: true,
+          state: {
+            name: 'Maria Santos',
+          },
+        });
+      }, 1000);
+      return;
+    }
+
     try {
       let signInResponse: any = null;
 

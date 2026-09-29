@@ -82,6 +82,7 @@ const Dashboard: React.FC = () => {
   const [profileName, setProfileName] = useState<string>(() => {
     return (location.state as { name?: string; userName?: string })?.name ||
            (location.state as { name?: string; userName?: string })?.userName ||
+           localStorage.getItem("sakay_passenger_name") ||
            "";
   });
   const [profilePhoto, setProfilePhoto] = useState<string>("");
@@ -212,6 +213,8 @@ const Dashboard: React.FC = () => {
     try {
       await supabase.auth.signOut();
       localStorage.removeItem("sakay_passenger_phone");
+      localStorage.removeItem("sakay_passenger_name");
+      localStorage.removeItem("sakay_passenger_id");
       localStorage.removeItem("sakay_passenger_password");
       sessionStorage.clear();
     } catch (e) {
