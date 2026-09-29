@@ -93,11 +93,9 @@ const RegistrationSuccess: React.FC = () => {
         <PrimaryButton
           fullWidth
           onClick={() => {
-            localStorage.removeItem("gps_permission");
-            sessionStorage.removeItem("gps_permission_session");
             navigate("/dashboard", {
               replace: true,
-              state: { userName: state?.name, freshLogin: true },
+              state: { userName: state?.name },
             });
           }}
         >

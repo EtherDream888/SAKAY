@@ -4,6 +4,7 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import IconButton from "@mui/material/IconButton";
 import InputBase from "@mui/material/InputBase";
+import Button from "@mui/material/Button";
 import Divider from "@mui/material/Divider";
 import CircularProgress from "@mui/material/CircularProgress";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -13,15 +14,22 @@ import LocationOnIcon from "@mui/icons-material/LocationOn";
 import NorthEastIcon from "@mui/icons-material/NorthEast";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
 import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
+import HistoryIcon from "@mui/icons-material/History";
 import splashBg from "@sakay/shared/src/assets/images/webp/splash-bg.webp";
 import { TYPOGRAPHY_TOKENS } from "@sakay/shared";
 
-import type { PlaceSuggestion } from "../../../../services/locationService";
+import type { PlaceSuggestion, RecentDestination } from "../../../../services/locationService";
 import {
   searchPlaces,
   DEFAULT_CALAPAN_CENTER,
   getCurrentDevicePosition,
   reverseGeocodeCoordinates,
+  getRecentDestinations,
+  saveRecentDestination,
+  clearRecentDestinations,
+  calculateDistanceKm,
+  formatDistance,
+  CURATED_CALAPAN_PLACES,
 } from "../../../../services/locationService";
 import { useLanguage } from "../../../../utils/LanguageContext";
 import MapLocationPicker from "../Dashboard/MapLocationPicker";
@@ -71,11 +79,16 @@ const SetPlace: React.FC = () => {
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
+  const [recentDestinations, setRecentDestinations] = useState<RecentDestination[]>(() => getRecentDestinations());
+
   // Retrieve user's current GPS coordinates if available
   const userLat = parseFloat(localStorage.getItem("user_lat") || DEFAULT_CALAPAN_CENTER.latitude.toString());
   const userLng = parseFloat(localStorage.getItem("user_lng") || DEFAULT_CALAPAN_CENTER.longitude.toString());
 
-  const currentSearchQuery = activeTarget === "pickup" ? pickupText : dropoffText;
+  const rawQuery = activeTarget === "pickup" ? pickupText : dropoffText;
+  const isDefaultCurrentLocation =
+    rawQuery === "Kasalukuyang Lokasyon" || rawQuery === "Current Location";
+  const currentSearchQuery = isDefaultCurrentLocation ? "" : rawQuery;
 
   // Live debounced place search
   useEffect(() => {
@@ -100,7 +113,15 @@ const SetPlace: React.FC = () => {
     setDropoffText(temp);
   };
 
-  const handleSelectPlace = (place: PlaceSuggestion) => {
+  const handleSelectPlace = (place: { name: string; address?: string; lat: number; lng: number }) => {
+    saveRecentDestination({
+      name: place.name,
+      address: place.address || place.name,
+      lat: place.lat,
+      lng: place.lng,
+    });
+    setRecentDestinations(getRecentDestinations());
+
     const selectedObj = {
       address: place.name,
       lat: place.lat,
@@ -577,7 +598,7 @@ const SetPlace: React.FC = () => {
         </Box>
       </Box>
 
-      {/* Autocomplete Suggestions List matching SET PLACE.png and SET PLACE (1).png */}
+      {/* Suggestions or Recent Destinations Container */}
       <Box
         className="hide-scrollbar"
         sx={{
@@ -587,88 +608,350 @@ const SetPlace: React.FC = () => {
           paddingBottom: "calc(var(--safe-area-bottom) + 20px)",
         }}
       >
-        {loading ? (
-          <Box sx={{ display: "flex", justifyContent: "center", padding: "32px" }}>
-            <CircularProgress size={28} sx={{ color: "#FF6B00" }} />
-          </Box>
+        {currentSearchQuery.trim().length >= 2 ? (
+          /* Active Search Results */
+          loading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", padding: "32px" }}>
+              <CircularProgress size={28} sx={{ color: "#FF6B00" }} />
+            </Box>
+          ) : suggestions.length > 0 ? (
+            suggestions.map((place, idx) => (
+              <React.Fragment key={place.id}>
+                <Box
+                  onClick={() => handleSelectPlace(place)}
+                  sx={{
+                    padding: "16px 20px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "16px",
+                    cursor: "pointer",
+                    transition: "background-color 0.15s ease",
+                    "&:hover": { backgroundColor: "#F8FAFC" },
+                  }}
+                >
+                  {/* Left Pin Icon in grey circle + Distance label */}
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: "2px",
+                      minWidth: "40px",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: "36px",
+                        height: "36px",
+                        borderRadius: "50%",
+                        backgroundColor: "#F1F5F9",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <LocationOnOutlinedIcon sx={{ color: "#64748B", fontSize: "20px" }} />
+                    </Box>
+                    <Typography
+                      sx={{
+                        fontSize: "11px",
+                        fontWeight: 500,
+                        color: "#94A3B8",
+                        fontFamily: "Poppins, sans-serif",
+                      }}
+                    >
+                      {place.distance}
+                    </Typography>
+                  </Box>
+
+                  {/* Center Title with query highlight & Subtitle Address */}
+                  <Box sx={{ flexGrow: 1, overflow: "hidden" }}>
+                    {renderHighlightedPlaceName(place.name, currentSearchQuery)}
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        color: "#64748B",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        marginTop: "2px",
+                        fontFamily: "Poppins, sans-serif",
+                      }}
+                    >
+                      {place.address}
+                    </Typography>
+                  </Box>
+
+                  {/* Right Top-Right Arrow Icon */}
+                  <IconButton size="small" sx={{ color: "#0F172A" }}>
+                    <NorthEastIcon sx={{ fontSize: "20px" }} />
+                  </IconButton>
+                </Box>
+                {idx < suggestions.length - 1 && (
+                  <Divider sx={{ borderColor: "#F1F5F9" }} />
+                )}
+              </React.Fragment>
+            ))
+          ) : (
+            <Box sx={{ p: "36px 20px", textAlign: "center" }}>
+              <Typography sx={{ fontSize: "14px", color: "#64748B", fontFamily: "Poppins, sans-serif" }}>
+                {language === "tl" ? "Walang nahanap na lugar sa Calapan." : "No places found in Calapan."}
+              </Typography>
+            </Box>
+          )
         ) : (
-          suggestions.map((place, idx) => (
-            <React.Fragment key={place.id}>
-              <Box
-                onClick={() => handleSelectPlace(place)}
-                sx={{
-                  padding: "16px 20px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "16px",
-                  cursor: "pointer",
-                  transition: "background-color 0.15s ease",
-                  "&:hover": { backgroundColor: "#F8FAFC" },
-                }}
-              >
-                {/* Left Pin Icon in grey circle + Distance label */}
+          /* Empty Search Query: Option B (Recent Destinations + Verified Popular Calapan Landmarks) */
+          <Box>
+            {recentDestinations.length > 0 && (
+              <Box>
                 <Box
                   sx={{
                     display: "flex",
-                    flexDirection: "column",
                     alignItems: "center",
-                    gap: "2px",
-                    minWidth: "40px",
+                    justifyContent: "space-between",
+                    px: "20px",
+                    pt: "16px",
+                    pb: "8px",
                   }}
                 >
-                  <Box
-                    sx={{
-                      width: "36px",
-                      height: "36px",
-                      borderRadius: "50%",
-                      backgroundColor: "#F1F5F9",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <LocationOnOutlinedIcon sx={{ color: "#64748B", fontSize: "20px" }} />
-                  </Box>
                   <Typography
                     sx={{
                       fontSize: "11px",
-                      fontWeight: 500,
-                      color: "#94A3B8",
-                      fontFamily: "Poppins, sans-serif",
-                    }}
-                  >
-                    {place.distance}
-                  </Typography>
-                </Box>
-
-                {/* Center Title with query highlight & Subtitle Address */}
-                <Box sx={{ flexGrow: 1, overflow: "hidden" }}>
-                  {renderHighlightedPlaceName(place.name, currentSearchQuery)}
-                  <Typography
-                    sx={{
-                      fontSize: "12px",
+                      fontWeight: 700,
                       color: "#64748B",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      marginTop: "2px",
+                      letterSpacing: "0.6px",
+                      textTransform: "uppercase",
                       fontFamily: "Poppins, sans-serif",
                     }}
                   >
-                    {place.address}
+                    {language === "tl" ? "Nakalipas na mga Destinasyon" : "Recent Destinations"}
                   </Typography>
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      clearRecentDestinations();
+                      setRecentDestinations([]);
+                    }}
+                    sx={{
+                      color: "#94A3B8",
+                      fontSize: "11px",
+                      textTransform: "none",
+                      p: 0,
+                      minWidth: "auto",
+                      fontFamily: "Poppins, sans-serif",
+                      "&:hover": { color: "#EF4444" },
+                    }}
+                  >
+                    {language === "tl" ? "Burahin Lahat" : "Clear All"}
+                  </Button>
                 </Box>
 
-                {/* Right Top-Right Arrow Icon */}
-                <IconButton size="small" sx={{ color: "#0F172A" }}>
-                  <NorthEastIcon sx={{ fontSize: "20px" }} />
-                </IconButton>
+                {recentDestinations.map((place, idx) => {
+                  const distKm = calculateDistanceKm(userLat, userLng, place.lat, place.lng);
+                  const distLabel = formatDistance(distKm);
+                  return (
+                    <React.Fragment key={place.id}>
+                      <Box
+                        onClick={() => handleSelectPlace(place)}
+                        sx={{
+                          padding: "14px 20px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "16px",
+                          cursor: "pointer",
+                          transition: "background-color 0.15s ease",
+                          "&:hover": { backgroundColor: "#F8FAFC" },
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            gap: "2px",
+                            minWidth: "40px",
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: "36px",
+                              height: "36px",
+                              borderRadius: "50%",
+                              backgroundColor: "#F1F5F9",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                            }}
+                          >
+                            <HistoryIcon sx={{ color: "#64748B", fontSize: "20px" }} />
+                          </Box>
+                          <Typography
+                            sx={{
+                              fontSize: "11px",
+                              fontWeight: 500,
+                              color: "#94A3B8",
+                              fontFamily: "Poppins, sans-serif",
+                            }}
+                          >
+                            {distLabel}
+                          </Typography>
+                        </Box>
+
+                        <Box sx={{ flexGrow: 1, overflow: "hidden" }}>
+                          <Typography
+                            sx={{
+                              fontSize: "14px",
+                              fontWeight: 600,
+                              color: "#0F172A",
+                              fontFamily: "Poppins, sans-serif",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {place.name}
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontSize: "12px",
+                              color: "#64748B",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              marginTop: "2px",
+                              fontFamily: "Poppins, sans-serif",
+                            }}
+                          >
+                            {place.address}
+                          </Typography>
+                        </Box>
+
+                        <IconButton size="small" sx={{ color: "#0F172A" }}>
+                          <NorthEastIcon sx={{ fontSize: "20px" }} />
+                        </IconButton>
+                      </Box>
+                      {idx < recentDestinations.length - 1 && (
+                        <Divider sx={{ borderColor: "#F1F5F9" }} />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </Box>
-              {idx < suggestions.length - 1 && (
-                <Divider sx={{ borderColor: "#F1F5F9" }} />
-              )}
-            </React.Fragment>
-          ))
+            )}
+
+            {/* Verified Popular Places in Calapan (Option B) */}
+            <Box
+              sx={{
+                px: "20px",
+                pt: recentDestinations.length > 0 ? "20px" : "16px",
+                pb: "8px",
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  color: "#64748B",
+                  letterSpacing: "0.6px",
+                  textTransform: "uppercase",
+                  fontFamily: "Poppins, sans-serif",
+                }}
+              >
+                {language === "tl" ? "Mga Kilalang Lugar sa Calapan" : "Popular Places in Calapan"}
+              </Typography>
+            </Box>
+
+            {CURATED_CALAPAN_PLACES.map((place, idx) => {
+              const distKm = calculateDistanceKm(userLat, userLng, place.lat, place.lng);
+              const distLabel = formatDistance(distKm);
+              return (
+                <React.Fragment key={place.id}>
+                  <Box
+                    onClick={() => handleSelectPlace(place)}
+                    sx={{
+                      padding: "14px 20px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "16px",
+                      cursor: "pointer",
+                      transition: "background-color 0.15s ease",
+                      "&:hover": { backgroundColor: "#F8FAFC" },
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: "2px",
+                        minWidth: "40px",
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: "36px",
+                          height: "36px",
+                          borderRadius: "50%",
+                          backgroundColor: "#F1F5F9",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <LocationOnOutlinedIcon sx={{ color: "#64748B", fontSize: "20px" }} />
+                      </Box>
+                      <Typography
+                        sx={{
+                          fontSize: "11px",
+                          fontWeight: 500,
+                          color: "#94A3B8",
+                          fontFamily: "Poppins, sans-serif",
+                        }}
+                      >
+                        {distLabel}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ flexGrow: 1, overflow: "hidden" }}>
+                      <Typography
+                        sx={{
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "#0F172A",
+                          fontFamily: "Poppins, sans-serif",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {place.name}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: "12px",
+                          color: "#64748B",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          marginTop: "2px",
+                          fontFamily: "Poppins, sans-serif",
+                        }}
+                      >
+                        {place.address}
+                      </Typography>
+                    </Box>
+
+                    <IconButton size="small" sx={{ color: "#0F172A" }}>
+                      <NorthEastIcon sx={{ fontSize: "20px" }} />
+                    </IconButton>
+                  </Box>
+                  {idx < CURATED_CALAPAN_PLACES.length - 1 && (
+                    <Divider sx={{ borderColor: "#F1F5F9" }} />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </Box>
         )}
       </Box>
 
@@ -678,6 +961,14 @@ const SetPlace: React.FC = () => {
         onClose={() => setMapPickerOpen(false)}
         initialCoords={{ lat: userLat, lng: userLng }}
         onConfirmLocation={(loc) => {
+          saveRecentDestination({
+            name: loc.address,
+            address: loc.address,
+            lat: loc.lat,
+            lng: loc.lng,
+          });
+          setRecentDestinations(getRecentDestinations());
+
           const selectedObj = {
             address: loc.address,
             lat: loc.lat,

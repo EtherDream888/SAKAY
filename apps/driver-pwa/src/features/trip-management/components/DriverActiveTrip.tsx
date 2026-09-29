@@ -29,7 +29,7 @@ import MapView from '../../../common/components/MapView';
 import { supabase } from '../../../services/supabaseClient';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { useDriverSession } from '../../../contexts/DriverSessionContext';
-import { calculateHaversineKm, formatDistance } from '@sakay/shared';
+import { calculateDistanceKm, formatDistance } from '@sakay/shared';
 import { DriverFeedbackModal } from '../../feedback/components/DriverFeedbackModal';
 import { DriverCommunicationModal } from '../../communication/components/DriverCommunicationModal';
 import { DriverCancelModal } from '../../../common/components/DriverCancelModal';
@@ -63,6 +63,7 @@ export const DriverActiveTrip: React.FC = () => {
   const [dragY, setDragY] = useState(0);
   const isDraggingSheet = useRef(false);
   const startY = useRef(0);
+  const maxProgressRef = useRef(0);
 
   // Additional Shared Passenger State
   const [pairedPassenger, setPairedPassenger] = useState<string | null>(null);
@@ -363,16 +364,26 @@ export const DriverActiveTrip: React.FC = () => {
   const dropoffLat = Number(booking?.dropoff_latitude) || 13.4180;
   const dropoffLng = Number(booking?.dropoff_longitude) || 121.1850;
 
-  const pickupDistKm = calculateHaversineKm(driverLocation.lat, driverLocation.lng, pickupLat, pickupLng);
-  const dropoffDistKm = calculateHaversineKm(driverLocation.lat, driverLocation.lng, dropoffLat, dropoffLng);
-  const totalTripKm = calculateHaversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng) || 1.5;
+  const pickupDistKm = calculateDistanceKm(driverLocation.lat, driverLocation.lng, pickupLat, pickupLng);
+  const dropoffDistKm = calculateDistanceKm(driverLocation.lat, driverLocation.lng, dropoffLat, dropoffLng);
+  const totalTripKm = calculateDistanceKm(pickupLat, pickupLng, dropoffLat, dropoffLng) || 1.5;
 
-  const rawProgress = Math.round(((totalTripKm - dropoffDistKm) / totalTripKm) * 100);
-  const computedProgress = Math.min(100, Math.max(0, isNaN(rawProgress) ? 0 : rawProgress));
+  const isOngoing = booking?.booking_status === 'Trip Ongoing';
+  const isArrived = booking?.booking_status === 'Arrived at Destination';
+
+  let computedProgress = 0;
+  if (isArrived || paymentConfirmed || passengerFinished) {
+    computedProgress = 100;
+  } else if (isOngoing) {
+    const rawProgress = Math.round(((totalTripKm - dropoffDistKm) / totalTripKm) * 100);
+    const proximityProgress = dropoffDistKm <= 0.08 ? 95 : Math.max(5, rawProgress);
+    computedProgress = Math.min(95, Math.max(maxProgressRef.current, proximityProgress));
+    maxProgressRef.current = computedProgress;
+  }
 
   const passengerName = booking?.passenger_name || 'Passenger';
   const passengerPhone = booking?.passenger_phone || '+63 917 123 4567';
-  const dropoffAddress = booking?.dropoff_address || 'Calapan City Public Market';
+  const dropoffAddress = booking?.dropoff_address || 'Calapan Public Market';
 
   const isPreTrip =
     booking?.booking_status === 'Accepted' ||

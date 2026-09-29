@@ -23,7 +23,7 @@ import { DriverCommunicationModal } from '../../communication/components/DriverC
 import { supabase } from '../../../services/supabaseClient';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { useDriverSession } from '../../../contexts/DriverSessionContext';
-import { calculateHaversineKm, formatDistance, getCurrentDevicePosition, watchDevicePosition } from '@sakay/shared';
+import { calculateDistanceKm, formatDistance, getCurrentDevicePosition, watchDevicePosition } from '@sakay/shared';
 
 export const DriverNavigation: React.FC = () => {
   const { language } = useLanguage();
@@ -190,7 +190,7 @@ export const DriverNavigation: React.FC = () => {
   const fare = booking?.estimated_fare || 18.0;
   const pickupLat = Number(booking?.pickup_latitude) || 13.4150;
   const pickupLng = Number(booking?.pickup_longitude) || 121.1825;
-  const pickupDistanceKm = calculateHaversineKm(driverLocation.lat, driverLocation.lng, pickupLat, pickupLng);
+  const pickupDistanceKm = calculateDistanceKm(driverLocation.lat, driverLocation.lng, pickupLat, pickupLng);
   const etaMinutes = Math.max(1, Math.round((pickupDistanceKm / 20) * 60));
 
   return (

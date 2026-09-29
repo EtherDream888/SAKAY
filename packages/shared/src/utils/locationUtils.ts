@@ -1,29 +1,26 @@
 /**
- * Calculates Haversine distance in kilometers between two GPS coordinates
+ * Calculates planar coordinate distance in kilometers (standard equirectangular projection)
  */
-export const calculateHaversineKm = (
+export const calculateDistanceKm = (
   lat1: number,
   lon1: number,
   lat2: number,
   lon2: number
 ): number => {
-  const R = 6371; // Earth radius in km
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c * 100) / 100;
+  const latDiff = (lat2 - lat1) * 110.574;
+  const lonDiff = (lon2 - lon1) * 108.29;
+  return Math.round(Math.sqrt(latDiff * latDiff + lonDiff * lonDiff) * 100) / 100;
 };
 
 /**
- * Calculates straight-line distance in kilometers between two GPS coordinates (alias for calculateHaversineKm)
+ * Backward compatibility alias for distance calculation
  */
-export const getDistanceKm = calculateHaversineKm;
+export const calculateHaversineKm = calculateDistanceKm;
+
+/**
+ * Calculates straight-line distance in kilometers between two GPS coordinates
+ */
+export const getDistanceKm = calculateDistanceKm;
 
 /**
  * Formats distance into a human-friendly string (e.g. "450 m" or "2.3 km")
@@ -39,7 +36,7 @@ export interface RouteResult {
   distanceKm: number;
   durationMin: number;
   coordinates: [number, number][]; // [lat, lng]
-  source: 'osrm' | 'haversine';
+  source: 'osrm' | 'road_estimate';
 }
 
 /**
@@ -83,7 +80,7 @@ export const getOSRMRoute = async (
   }
 
   // Fallback if public road routing servers are unreachable
-  const straightKm = calculateHaversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
+  const straightKm = calculateDistanceKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
   const estimatedKm = Math.round(straightKm * 1.3 * 100) / 100;
   const estimatedMin = Math.max(1, Math.round((estimatedKm / 20) * 60));
 
@@ -94,7 +91,7 @@ export const getOSRMRoute = async (
       [pickupLat, pickupLng],
       [dropoffLat, dropoffLng],
     ],
-    source: 'haversine',
+    source: 'road_estimate',
   };
 };
 

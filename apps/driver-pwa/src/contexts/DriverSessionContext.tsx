@@ -81,7 +81,9 @@ export const DriverSessionProvider: React.FC<{ children: ReactNode }> = ({ child
   // GPS Tracking (App-Level with high-accuracy + network fallback and DB sync)
   useEffect(() => {
     const storedPerm = localStorage.getItem('sakay_driver_location_permission');
+    const prompted = localStorage.getItem('sakay_driver_location_prompted') === 'true';
     if (storedPerm === 'denied') return;
+    if (storedPerm !== 'always' && storedPerm !== 'once' && !prompted) return;
 
     const applyLiveCoords = (latitude: number, longitude: number) => {
       setProfile((prev) => ({

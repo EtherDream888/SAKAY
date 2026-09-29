@@ -92,15 +92,28 @@ const Dashboard: React.FC = () => {
   const [tulongOpen, setTulongOpen] = useState<boolean>(false);
   const [notificationsOpen, setNotificationsOpen] = useState<boolean>(false);
 
-  // Location Permission Modal State: Open if location has not been granted or if fresh login
+  // Location Permission Modal State: Open ONLY on very first instance if never prompted before and not already granted
   const [permissionModalOpen, setPermissionModalOpen] = useState<boolean>(() => {
-    const isFresh = (location.state as { freshLogin?: boolean })?.freshLogin;
-    if (isFresh) return true;
+    const prompted = localStorage.getItem("sakay_passenger_location_prompted") === "true";
     const gpsPermission = localStorage.getItem("gps_permission");
+    if (prompted || gpsPermission === "true") return false;
     return gpsPermission === null;
   });
   const [permissionRequesting, setPermissionRequesting] = useState<boolean>(false);
   const [permissionError, setPermissionError] = useState<string>("");
+
+  // Check if browser native permission is already granted; if so, never prompt
+  useEffect(() => {
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: "geolocation" }).then((result) => {
+        if (result.state === "granted") {
+          localStorage.setItem("gps_permission", "true");
+          localStorage.setItem("sakay_passenger_location_prompted", "true");
+          setPermissionModalOpen(false);
+        }
+      }).catch(() => {});
+    }
+  }, []);
 
   // Map coordinates and recenter trigger state
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(() => {
@@ -148,17 +161,14 @@ const Dashboard: React.FC = () => {
   }, []);
 
   // Handle Permission Request from Dialog
-  const handleAllowLocation = async (persist: boolean) => {
+  const handleAllowLocation = async (_persist: boolean) => {
     setPermissionRequesting(true);
     setPermissionError("");
 
     try {
       const coords = await getCurrentDevicePosition();
-      if (persist) {
-        localStorage.setItem("gps_permission", "true");
-      } else {
-        sessionStorage.setItem("gps_permission_session", "true");
-      }
+      localStorage.setItem("sakay_passenger_location_prompted", "true");
+      localStorage.setItem("gps_permission", "true");
 
       setUserLocation({ lat: coords.latitude, lng: coords.longitude });
       setRecenterTrigger((prev) => prev + 1);
@@ -168,6 +178,7 @@ const Dashboard: React.FC = () => {
       const errMsg = err instanceof Error ? err.message : (language === 'tl' ? "Hindi makuha ang iyong lokasyon." : "Unable to get your location.");
       setPermissionError(errMsg);
       setPermissionRequesting(false);
+      localStorage.setItem("sakay_passenger_location_prompted", "true");
       localStorage.setItem("gps_permission", "false");
       setTimeout(() => {
         setPermissionModalOpen(false);
@@ -176,6 +187,7 @@ const Dashboard: React.FC = () => {
   };
 
   const handleDenyLocation = () => {
+    localStorage.setItem("sakay_passenger_location_prompted", "true");
     localStorage.setItem("gps_permission", "false");
     setPermissionModalOpen(false);
   };

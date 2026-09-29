@@ -22,7 +22,7 @@ const LocationPermission: React.FC = () => {
   const [requesting, setRequesting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>("");
 
-  const handleRequestLocation = async (persistPermission: boolean) => {
+  const handleRequestLocation = async (_persistPermission: boolean) => {
     setRequesting(true);
     setErrorMessage("");
 
@@ -30,11 +30,8 @@ const LocationPermission: React.FC = () => {
       // Trigger real browser/device Geolocation API
       const coords = await getCurrentDevicePosition();
 
-      if (persistPermission) {
-        localStorage.setItem("gps_permission", "true");
-      } else {
-        sessionStorage.setItem("gps_permission_session", "true");
-      }
+      localStorage.setItem("sakay_passenger_location_prompted", "true");
+      localStorage.setItem("gps_permission", "true");
 
       // Real coordinates acquired -> proceed
       navigate(destination, {
@@ -53,6 +50,7 @@ const LocationPermission: React.FC = () => {
       setRequesting(false);
 
       // Store explicit denial/failure
+      localStorage.setItem("sakay_passenger_location_prompted", "true");
       localStorage.setItem("gps_permission", "false");
 
       // Give user 1.5s to read the message before moving forward
@@ -68,6 +66,7 @@ const LocationPermission: React.FC = () => {
   };
 
   const handleDeny = () => {
+    localStorage.setItem("sakay_passenger_location_prompted", "true");
     localStorage.setItem("gps_permission", "false");
     navigate(destination, { replace: true, state: { hasGps: false } });
   };

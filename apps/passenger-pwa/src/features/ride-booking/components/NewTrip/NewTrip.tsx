@@ -48,23 +48,15 @@ import {
 } from "../../../../services/bookingService";
 import { TYPOGRAPHY_TOKENS } from "@sakay/shared";
 
-const haversineDistanceKm = (
+const calculateCoordinateDistanceKm = (
   lat1: number,
   lon1: number,
   lat2: number,
   lon2: number
 ): number => {
-  const R = 6371; // km
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+  const latDiff = (lat2 - lat1) * 110.574;
+  const lonDiff = (lon2 - lon1) * 108.29;
+  return Math.round(Math.sqrt(latDiff * latDiff + lonDiff * lonDiff) * 100) / 100;
 };
 
 const NewTrip: React.FC = () => {
@@ -325,11 +317,11 @@ const NewTrip: React.FC = () => {
         setRouteCoordinates(routeRes.coordinates);
       }
     } catch {
-      roadDist = haversineDistanceKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng) * 1.25;
+      roadDist = calculateCoordinateDistanceKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng) * 1.25;
     }
 
     if (roadDist <= 0) {
-      roadDist = haversineDistanceKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng) * 1.25;
+      roadDist = calculateCoordinateDistanceKm(pickup.lat, pickup.lng, dropoff.lat, dropoff.lng) * 1.25;
     }
 
     roadDist = Math.max(0.5, Number(roadDist.toFixed(2)));

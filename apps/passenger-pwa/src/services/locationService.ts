@@ -29,7 +29,7 @@ export interface RouteResult {
   distanceKm: number;
   durationMin: number;
   coordinates: [number, number][]; // [lat, lng]
-  source: "osrm" | "haversine";
+  source: "osrm" | "road_estimate";
 }
 
 // Fallback Default Center: Calapan City Hall, Oriental Mindoro
@@ -184,26 +184,23 @@ export const watchDevicePosition = (
 };
 
 /**
- * Calculates Haversine distance in kilometers between two coordinates
+ * Calculates planar coordinate distance in kilometers (standard equirectangular projection)
  */
-export const calculateHaversineKm = (
+export const calculateDistanceKm = (
   lat1: number,
   lon1: number,
   lat2: number,
   lon2: number
 ): number => {
-  const R = 6371; // Earth radius in km
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c * 100) / 100;
+  const latDiff = (lat2 - lat1) * 110.574;
+  const lonDiff = (lon2 - lon1) * 108.29;
+  return Math.round(Math.sqrt(latDiff * latDiff + lonDiff * lonDiff) * 100) / 100;
 };
+
+/**
+ * Backward compatibility alias for distance calculation
+ */
+export const calculateHaversineKm = calculateDistanceKm;
 
 /**
  * Formats distance into a human-friendly string (e.g. "450 m" or "2.3 km")
@@ -215,68 +212,127 @@ export const formatDistance = (km: number): string => {
   return `${km.toFixed(1)} km`;
 };
 
-// Curated prominent local Calapan City landmarks
+// Recent Destination Interface and Local Storage Helpers
+export interface RecentDestination {
+  id: string;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+  timestamp: number;
+}
+
+export const getRecentDestinations = (): RecentDestination[] => {
+  try {
+    const raw = localStorage.getItem("sakay_recent_destinations");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const saveRecentDestination = (dest: {
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+}): RecentDestination[] => {
+  try {
+    if (!dest.name || !dest.lat || !dest.lng) return getRecentDestinations();
+    const existing = getRecentDestinations();
+    // Filter out duplicates (same name or within 50 meters)
+    const filtered = existing.filter((item) => {
+      const isSameName = item.name.trim().toLowerCase() === dest.name.trim().toLowerCase();
+      const dist = calculateDistanceKm(item.lat, item.lng, dest.lat, dest.lng);
+      return !isSameName && dist > 0.05;
+    });
+
+    const newItem: RecentDestination = {
+      id: `recent_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: dest.name,
+      address: dest.address,
+      lat: dest.lat,
+      lng: dest.lng,
+      timestamp: Date.now(),
+    };
+
+    const updated = [newItem, ...filtered].slice(0, 10);
+    localStorage.setItem("sakay_recent_destinations", JSON.stringify(updated));
+    return updated;
+  } catch (e) {
+    console.error("Error saving recent destination:", e);
+    return [];
+  }
+};
+
+export const clearRecentDestinations = (): void => {
+  try {
+    localStorage.removeItem("sakay_recent_destinations");
+  } catch {}
+};
+
+// Verified prominent local Calapan City landmarks
 export const CURATED_CALAPAN_PLACES: PlaceSuggestion[] = [
   {
     id: "calapan_market",
     name: "Calapan Public Market",
     distance: "1.2 km",
-    address: "San Vicente North, Calapan City, Oriental Mindoro",
-    lat: 13.4116,
-    lng: 121.1802,
+    address: "Juan Luna Street, San Vicente North, Calapan City, Oriental Mindoro",
+    lat: 13.4132,
+    lng: 121.1789,
   },
   {
     id: "calapan_terminal",
-    name: "Calapan Public Terminal",
-    distance: "1.7 km",
-    address: "Aurora Boulevard, Calapan City, Oriental Mindoro",
-    lat: 13.4120,
-    lng: 121.1810,
-  },
-  {
-    id: "lumangbayan_hall",
-    name: "Lumangbayan Barangay Hall",
-    distance: "9 m",
-    address: "Molave Street, Calapan City, Oriental Mindoro",
-    lat: 13.4115,
-    lng: 121.1803,
+    name: "Calapan Grand Central Terminal",
+    distance: "2.8 km",
+    address: "Strong Republic Nautical Highway, Guinobatan, Calapan City, Oriental Mindoro",
+    lat: 13.3862,
+    lng: 121.1685,
   },
   {
     id: "calapan_port",
     name: "Calapan Port (Pier)",
-    distance: "2.4 km",
+    distance: "2.5 km",
     address: "San Antonio, Calapan City, Oriental Mindoro",
-    lat: 13.4248,
-    lng: 121.1812,
+    lat: 13.4277,
+    lng: 121.1825,
+  },
+  {
+    id: "citymall_calapan",
+    name: "CityMall Calapan",
+    distance: "2.1 km",
+    address: "Roxas Drive, Lumangbayan, Calapan City, Oriental Mindoro",
+    lat: 13.3985,
+    lng: 121.1780,
   },
   {
     id: "calapan_city_hall",
     name: "Calapan City Hall",
-    distance: "3.1 km",
-    address: "Guinobatan, Calapan City, Oriental Mindoro",
-    lat: 13.3980,
-    lng: 121.1824,
+    distance: "3.2 km",
+    address: "City Government Center, Guinobatan, Calapan City, Oriental Mindoro",
+    lat: 13.3888,
+    lng: 121.1819,
   },
   {
     id: "xentro_mall",
     name: "Xentro Mall Calapan",
-    distance: "1.5 km",
-    address: "JP Rizal Street, Calapan City, Oriental Mindoro",
-    lat: 13.4130,
-    lng: 121.1790,
+    distance: "1.4 km",
+    address: "J.P. Rizal Street, San Vicente Central, Calapan City, Oriental Mindoro",
+    lat: 13.4146,
+    lng: 121.1804,
   },
   {
     id: "puregold_calapan",
     name: "Puregold Calapan",
-    distance: "1.4 km",
-    address: "Roxas Drive, Calapan City, Oriental Mindoro",
-    lat: 13.4120,
-    lng: 121.1800,
+    distance: "1.6 km",
+    address: "Roxas Drive, Guinobatan, Calapan City, Oriental Mindoro",
+    lat: 13.4042,
+    lng: 121.1764,
   },
 ];
 
 /**
- * Searches places via Nominatim OpenStreetMap Geocoding API with local fallback
+ * Searches places via Nominatim OpenStreetMap Geocoding API with recent destinations integration
  */
 export const searchPlaces = async (
   query: string,
@@ -285,29 +341,44 @@ export const searchPlaces = async (
 ): Promise<PlaceSuggestion[]> => {
   const cleanQuery = query.trim();
 
-  // If query is short, return local landmarks with calculated distance from user's coordinates
+  // If query is short, return empty array (handled in UI by recents & curated)
   if (cleanQuery.length < 2) {
-    return CURATED_CALAPAN_PLACES.map((p) => {
-      const distKm = calculateHaversineKm(userLat, userLng, p.lat, p.lng);
+    return [];
+  }
+
+  // Check matching recent destinations first
+  const recentMatches: PlaceSuggestion[] = getRecentDestinations()
+    .filter(
+      (p) =>
+        p.name.toLowerCase().includes(cleanQuery.toLowerCase()) ||
+        p.address.toLowerCase().includes(cleanQuery.toLowerCase())
+    )
+    .map((p) => {
+      const distKm = calculateDistanceKm(userLat, userLng, p.lat, p.lng);
+      return {
+        id: p.id,
+        name: p.name,
+        address: p.address,
+        distance: formatDistance(distKm),
+        lat: p.lat,
+        lng: p.lng,
+      };
+    });
+
+  // Check curated landmarks
+  const curatedMatches: PlaceSuggestion[] = CURATED_CALAPAN_PLACES
+    .filter(
+      (p) =>
+        p.name.toLowerCase().includes(cleanQuery.toLowerCase()) ||
+        p.address.toLowerCase().includes(cleanQuery.toLowerCase())
+    )
+    .map((p) => {
+      const distKm = calculateDistanceKm(userLat, userLng, p.lat, p.lng);
       return {
         ...p,
         distance: formatDistance(distKm),
       };
     });
-  }
-
-  // Filter curated places first
-  const localMatches = CURATED_CALAPAN_PLACES.filter(
-    (p) =>
-      p.name.toLowerCase().includes(cleanQuery.toLowerCase()) ||
-      p.address.toLowerCase().includes(cleanQuery.toLowerCase())
-  ).map((p) => {
-    const distKm = calculateHaversineKm(userLat, userLng, p.lat, p.lng);
-    return {
-      ...p,
-      distance: formatDistance(distKm),
-    };
-  });
 
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
@@ -327,7 +398,7 @@ export const searchPlaces = async (
     const remotePlaces: PlaceSuggestion[] = data.map((item: any) => {
       const lat = parseFloat(item.lat);
       const lng = parseFloat(item.lon);
-      const distKm = calculateHaversineKm(userLat, userLng, lat, lng);
+      const distKm = calculateDistanceKm(userLat, userLng, lat, lng);
       const name = item.name || item.display_name.split(",")[0];
       return {
         id: `nom_${item.place_id}`,
@@ -339,9 +410,14 @@ export const searchPlaces = async (
       };
     });
 
-    const combined = [...localMatches];
+    const combined = [...recentMatches];
+    curatedMatches.forEach((cp) => {
+      if (!combined.some((item) => calculateDistanceKm(item.lat, item.lng, cp.lat, cp.lng) < 0.05)) {
+        combined.push(cp);
+      }
+    });
     remotePlaces.forEach((rp) => {
-      if (!combined.some((cp) => calculateHaversineKm(cp.lat, cp.lng, rp.lat, rp.lng) < 0.1)) {
+      if (!combined.some((item) => calculateDistanceKm(item.lat, item.lng, rp.lat, rp.lng) < 0.1)) {
         combined.push(rp);
       }
     });
@@ -349,7 +425,13 @@ export const searchPlaces = async (
     return combined.slice(0, 8);
   } catch (err) {
     console.warn("Place search API fallback:", err);
-    return localMatches;
+    const combined = [...recentMatches];
+    curatedMatches.forEach((cp) => {
+      if (!combined.some((item) => calculateDistanceKm(item.lat, item.lng, cp.lat, cp.lng) < 0.05)) {
+        combined.push(cp);
+      }
+    });
+    return combined;
   }
 };
 
@@ -427,7 +509,7 @@ export const getOSRMRoute = async (
   }
 
   // Fallback if public road routing servers are unreachable
-  const straightKm = calculateHaversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
+  const straightKm = calculateDistanceKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
   const estimatedKm = Math.round(straightKm * 1.3 * 100) / 100;
   const estimatedMin = Math.max(1, Math.round((estimatedKm / 20) * 60));
 
@@ -438,6 +520,6 @@ export const getOSRMRoute = async (
       [pickupLat, pickupLng],
       [dropoffLat, dropoffLng],
     ],
-    source: "haversine",
+    source: "road_estimate",
   };
 };

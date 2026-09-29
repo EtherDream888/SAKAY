@@ -186,14 +186,10 @@ const Login: React.FC = () => {
       setLoading(false);
       setSuccess(true);
       setTimeout(() => {
-        localStorage.removeItem("gps_permission");
-        sessionStorage.removeItem("gps_permission_session");
-
         navigate("/dashboard", {
           replace: true,
           state: {
             name: user?.user_metadata?.full_name || "Passenger",
-            freshLogin: true,
           },
         });
       }, 1200);

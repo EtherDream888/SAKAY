@@ -44,6 +44,9 @@ export const MapView: React.FC<MapViewProps> = ({
   const routeLayersRef = useRef<L.LayerGroup | null>(null);
   const [roadCoords, setRoadCoords] = useState<[number, number][]>(routeCoordinates || []);
   const lastFetchRef = useRef<{ startLat: number; startLng: number; endLat: number; endLng: number } | null>(null);
+  const lastFetchTimeRef = useRef<number>(0);
+  const userInteractedRef = useRef<boolean>(false);
+  const routeFittedKeyRef = useRef<string | null>(null);
 
   // Initialize Leaflet Map
   useEffect(() => {
@@ -93,6 +96,14 @@ export const MapView: React.FC<MapViewProps> = ({
 
     mapInstanceRef.current = map;
 
+    // Track user gesture interaction so GPS ticks do not override manual zoom or pan
+    map.on("dragstart", () => {
+      userInteractedRef.current = true;
+    });
+    map.on("zoomstart", () => {
+      userInteractedRef.current = true;
+    });
+
     const resizeTimer = setTimeout(() => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.invalidateSize();
@@ -119,36 +130,49 @@ export const MapView: React.FC<MapViewProps> = ({
     let endPoint: { lat: number; lng: number } | null = null;
 
     if (dropoffLocation && dropoffLocation.lat !== 0) {
-      // In trip to destination: route from driver or pickup to dropoff
-      startPoint = pickupLocation && pickupLocation.lat !== 0 ? pickupLocation : userLocation;
+      // In trip to destination: dynamic route from live driver to dropoff
+      startPoint = userLocation && userLocation.lat !== 0 ? userLocation : (pickupLocation && pickupLocation.lat !== 0 ? pickupLocation : null);
       endPoint = dropoffLocation;
     } else if (pickupLocation && pickupLocation.lat !== 0 && userLocation && userLocation.lat !== 0) {
       // Pre-trip: en route from driver location to passenger pickup
       startPoint = userLocation;
       endPoint = pickupLocation;
+    } else if (pickupLocation && pickupLocation.lat !== 0 && dropoffLocation && dropoffLocation.lat !== 0) {
+      startPoint = pickupLocation;
+      endPoint = dropoffLocation;
     }
 
     if (startPoint && startPoint.lat !== 0 && endPoint && endPoint.lat !== 0) {
-      // Prevent excessive OSRM recalculation. If endPoint is the same, keep existing route.
+      const now = Date.now();
+      // Allow dynamic rerouting if driver moved > 35m or destination changed, throttled to 7s
       if (lastFetchRef.current) {
-        const dLat = Math.abs(lastFetchRef.current.endLat - endPoint.lat);
-        const dLng = Math.abs(lastFetchRef.current.endLng - endPoint.lng);
-        if (dLat < 0.0005 && dLng < 0.0005 && roadCoords.length > 0) {
+        const dEndLat = Math.abs(lastFetchRef.current.endLat - endPoint.lat);
+        const dEndLng = Math.abs(lastFetchRef.current.endLng - endPoint.lng);
+        const dStartLat = Math.abs(lastFetchRef.current.startLat - startPoint.lat);
+        const dStartLng = Math.abs(lastFetchRef.current.startLng - startPoint.lng);
+
+        const movedSignificantly = dStartLat > 0.00035 || dStartLng > 0.00035;
+        const endChanged = dEndLat > 0.0005 || dEndLng > 0.0005;
+        const timePassed = now - lastFetchTimeRef.current > 7000;
+
+        if (!endChanged && (!movedSignificantly || !timePassed) && roadCoords.length > 0) {
           return;
         }
       }
 
       let isMounted = true;
+      lastFetchTimeRef.current = now;
+      lastFetchRef.current = {
+        startLat: startPoint.lat,
+        startLng: startPoint.lng,
+        endLat: endPoint.lat,
+        endLng: endPoint.lng,
+      };
+
       getOSRMRoute(startPoint.lat, startPoint.lng, endPoint.lat, endPoint.lng)
         .then((result) => {
           if (isMounted && result.coordinates && result.coordinates.length >= 2) {
             setRoadCoords(result.coordinates);
-            lastFetchRef.current = {
-              startLat: startPoint!.lat,
-              startLng: startPoint!.lng,
-              endLat: endPoint!.lat,
-              endLng: endPoint!.lng,
-            };
           }
         })
         .catch((err) => {
@@ -170,7 +194,6 @@ export const MapView: React.FC<MapViewProps> = ({
     userLocation?.lat,
     userLocation?.lng,
     routeCoordinates,
-    roadCoords.length
   ]);
 
   // Handle Updates: Markers, Road Route Polyline, Panning
@@ -281,22 +304,40 @@ export const MapView: React.FC<MapViewProps> = ({
       routeLayers.addLayer(routeCasing);
       routeLayers.addLayer(routeLine);
 
-      const bounds = L.latLngBounds(activeRoutePoints);
-      map.fitBounds(bounds, {
-        padding: [60, 60],
-        maxZoom: 16,
-      });
-    } else if (typeof userLocation?.lat === "number" && !isNaN(userLocation.lat) && typeof userLocation?.lng === "number" && !isNaN(userLocation.lng)) {
+      // Fit map bounds to show the entire road journey ONLY ONCE when route first loads or destination changes!
+      const endPointKey = `${activeRoutePoints[activeRoutePoints.length - 1][0]}_${activeRoutePoints[activeRoutePoints.length - 1][1]}`;
+      if (!userInteractedRef.current && routeFittedKeyRef.current !== endPointKey) {
+        routeFittedKeyRef.current = endPointKey;
+        const bounds = L.latLngBounds(activeRoutePoints);
+        map.fitBounds(bounds, {
+          padding: [60, 60],
+          maxZoom: 16,
+        });
+      } else if (!userInteractedRef.current && typeof userLocation?.lat === "number" && !isNaN(userLocation.lat) && typeof userLocation?.lng === "number" && !isNaN(userLocation.lng)) {
+        map.panTo([userLocation.lat, userLocation.lng], { animate: true });
+      }
+    } else if (!userInteractedRef.current && typeof userLocation?.lat === "number" && !isNaN(userLocation.lat) && typeof userLocation?.lng === "number" && !isNaN(userLocation.lng)) {
       map.panTo([userLocation.lat, userLocation.lng], { animate: true });
     }
   }, [userLocation, pickupLocation, dropoffLocation, roadCoords, routeCoordinates, recenterTrigger]);
 
-  // Recenter trigger listener
+  // Recenter trigger listener (explicit user click)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
+    userInteractedRef.current = false;
 
-    if (typeof userLocation?.lat === "number" && !isNaN(userLocation.lat) && typeof userLocation?.lng === "number" && !isNaN(userLocation.lng)) {
+    const activeRoutePoints: [number, number][] =
+      roadCoords && roadCoords.length >= 2
+        ? roadCoords
+        : routeCoordinates && routeCoordinates.length >= 2
+        ? routeCoordinates
+        : [];
+
+    if (activeRoutePoints.length >= 2) {
+      const bounds = L.latLngBounds(activeRoutePoints);
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 16 });
+    } else if (typeof userLocation?.lat === "number" && !isNaN(userLocation.lat) && typeof userLocation?.lng === "number" && !isNaN(userLocation.lng)) {
       map.flyTo([userLocation.lat, userLocation.lng], zoom, { duration: 0.8 });
     } else if (typeof center?.lat === "number" && !isNaN(center.lat) && typeof center?.lng === "number" && !isNaN(center.lng)) {
       map.flyTo([center.lat, center.lng], zoom, { duration: 0.8 });

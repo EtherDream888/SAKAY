@@ -25,6 +25,7 @@ import { supabase } from "../../../../services/supabaseClient";
 import SuccessModal from "../../../../common/components/SuccessModal";
 import { createBooking } from "../../../../services/bookingService";
 import { startDispatch } from "../../../../services/dispatchService";
+import { saveRecentDestination } from "../../../../services/locationService";
 import { calculateFare } from "@sakay/shared";
 
 interface LocationState {
@@ -33,18 +34,10 @@ interface LocationState {
   lng: number;
 }
 
-const haversineDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371; // km
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+const calculateCoordinateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const latDiff = (lat2 - lat1) * 110.574;
+  const lonDiff = (lon2 - lon1) * 108.29;
+  return Math.sqrt(latDiff * latDiff + lonDiff * lonDiff);
 };
 
 const BookSummary: React.FC = () => {
@@ -151,7 +144,7 @@ const BookSummary: React.FC = () => {
         throw new Error("No routes returned by OSRM");
       }
     } catch {
-      roadDistance = haversineDistance(p.lat, p.lng, d.lat, d.lng) * 1.3;
+      roadDistance = calculateCoordinateDistance(p.lat, p.lng, d.lat, d.lng) * 1.3;
       source = "fallback";
     }
 
@@ -238,6 +231,21 @@ const BookSummary: React.FC = () => {
 
   const handleSuccessClose = () => {
     setSuccessOpen(false);
+    // Save destination to recent destinations
+    const rawDropoff = sessionStorage.getItem("trip_dropoff");
+    if (rawDropoff) {
+      try {
+        const parsed = JSON.parse(rawDropoff);
+        if (parsed.address && parsed.lat && parsed.lng) {
+          saveRecentDestination({
+            name: parsed.address.split(",")[0] || parsed.address,
+            address: parsed.address,
+            lat: parsed.lat,
+            lng: parsed.lng,
+          });
+        }
+      } catch {}
+    }
     // Clear trip input session data
     sessionStorage.removeItem("trip_pickup");
     sessionStorage.removeItem("trip_dropoff");

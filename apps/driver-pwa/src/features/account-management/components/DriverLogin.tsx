@@ -103,9 +103,6 @@ export const DriverLogin: React.FC = () => {
 
     if (isTestDriver) {
       setLoading(false);
-      sessionStorage.setItem('sakay_driver_just_logged_in', 'true');
-      sessionStorage.removeItem('sakay_driver_location_prompt_dismissed');
-      localStorage.removeItem('sakay_driver_location_permission');
       localStorage.setItem('sakay_driver_phone', phone63);
       localStorage.setItem('sakay_driver_id', '11111111-1111-1111-1111-111111111111');
       localStorage.setItem(
@@ -244,10 +241,6 @@ export const DriverLogin: React.FC = () => {
           .eq('driver_id', driverData.driver_id)
           .then(() => {});
       }
-
-      sessionStorage.setItem('sakay_driver_just_logged_in', 'true');
-      sessionStorage.removeItem('sakay_driver_location_prompt_dismissed');
-      localStorage.removeItem('sakay_driver_location_permission');
 
       localStorage.setItem('sakay_driver_phone', phone63);
       localStorage.setItem('sakay_driver_id', driverData.driver_id);

@@ -38,7 +38,7 @@ import PassengerCancelModal from '../../../common/components/PassengerCancelModa
 import SakayToast from '../../../common/components/SakayToast';
 import { getBooking, cancelBooking, updateBookingState } from '../../../services/bookingService';
 import type { BookingRecord } from '@sakay/shared';
-import { formatShortBookingId, calculateHaversineKm, formatDistance } from '@sakay/shared';
+import { formatShortBookingId, calculateDistanceKm, formatDistance } from '@sakay/shared';
 import { supabase } from '../../../services/supabaseClient';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { startDispatch } from '../../../services/dispatchService';
@@ -317,6 +317,7 @@ export const TripMonitoring: React.FC = () => {
   const [dragY, setDragY] = useState(0);
   const isDraggingRef = useRef(false);
   const startYRef = useRef(0);
+  const maxProgressRef = useRef(5);
 
   const handleCopyBookingId = () => {
     if (activeBookingId) {
@@ -751,15 +752,18 @@ export const TripMonitoring: React.FC = () => {
   const dropoffLat = booking?.dropoff_latitude || 13.4150;
   const dropoffLng = booking?.dropoff_longitude || 121.1810;
 
-  const totalTripKm = calculateHaversineKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
-  const driverToPickupKm = calculateHaversineKm(driverPos.lat, driverPos.lng, pickupLat, pickupLng);
-  const driverToDropoffKm = calculateHaversineKm(driverPos.lat, driverPos.lng, dropoffLat, dropoffLng);
+  const totalTripKm = calculateDistanceKm(pickupLat, pickupLng, dropoffLat, dropoffLng);
+  const driverToPickupKm = calculateDistanceKm(driverPos.lat, driverPos.lng, pickupLat, pickupLng);
+  const driverToDropoffKm = calculateDistanceKm(driverPos.lat, driverPos.lng, dropoffLat, dropoffLng);
 
   let tripProgress = 0;
   if (status === 'Trip Ongoing') {
     if (totalTripKm > 0) {
-      const remainingKm = Math.min(totalTripKm, driverToDropoffKm);
-      tripProgress = Math.max(5, Math.min(95, Math.round(((totalTripKm - remainingKm) / totalTripKm) * 100)));
+      const rawPct = Math.round(((totalTripKm - driverToDropoffKm) / totalTripKm) * 100);
+      const proximityPct = driverToDropoffKm <= 0.08 ? 95 : Math.max(5, rawPct);
+      const computed = Math.min(95, Math.max(maxProgressRef.current, proximityPct));
+      maxProgressRef.current = computed;
+      tripProgress = computed;
     } else {
       tripProgress = 50;
     }
@@ -958,11 +962,11 @@ export const TripMonitoring: React.FC = () => {
           gap: 1.5,
           zIndex: 20,
           width: '100%',
-          maxHeight: isExpanded ? '78vh' : '38vh',
+          maxHeight: isExpanded ? '85vh' : '52vh',
           transform: dragY !== 0 ? `translateY(${dragY}px)` : 'none',
           transition: isDraggingRef.current ? 'none' : 'max-height 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.2s ease',
           boxShadow: '0 -8px 24px rgba(0, 0, 0, 0.08)',
-          overflowY: isExpanded ? 'auto' : 'hidden',
+          overflowY: 'auto',
         }}
       >
         {/* Drag Handle Bar */}
@@ -1228,45 +1232,32 @@ export const TripMonitoring: React.FC = () => {
             </Button>
           </Box>
         ) : status !== 'Completed' && status !== 'No Driver Found' && (
-          <Box sx={{ pt: 1, borderTop: '1px solid #F1F5F9', mt: 0.5 }}>
-            {/* Initial Collapsed View: Slide to Finish Trip (Disabled until driver clicks Start Trip) */}
-            <Box
-              sx={{
-                opacity: isExpanded ? 0 : 1,
-                maxHeight: isExpanded ? '0px' : '140px',
-                overflow: 'hidden',
-                transition: 'opacity 0.3s ease, max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-                pointerEvents: isExpanded ? 'none' : 'auto',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                width: '100%',
-              }}
-            >
-              <SlideToFinish
-                onFinish={handlePassengerFinishTrip}
-                language={language}
-                disabled={status !== 'Trip Ongoing'}
-              />
-            </Box>
+          <Box sx={{ pt: 1, borderTop: '1px solid #F1F5F9', mt: 0.5, width: '100%' }}>
+            {/* Slide to Finish Trip (Always clearly visible and accessible when status === 'Trip Ongoing') */}
+            {status === 'Trip Ongoing' && (
+              <Box sx={{ width: '100%', mb: isExpanded ? 1.5 : 0 }}>
+                <SlideToFinish
+                  onFinish={handlePassengerFinishTrip}
+                  language={language}
+                  disabled={false}
+                />
+              </Box>
+            )}
 
-            {/* Revealed Expanded View: Visually Separated Slide to Cancel */}
-            <Box
-              sx={{
-                opacity: isExpanded ? 1 : 0,
-                maxHeight: isExpanded ? '140px' : '0px',
-                overflow: 'hidden',
-                transition: 'opacity 0.3s ease, max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-                pointerEvents: isExpanded ? 'auto' : 'none',
-                mt: isExpanded ? 1 : 0,
-                pt: isExpanded ? 1.5 : 0,
-                borderTop: isExpanded ? '1px dashed #FCA5A5' : 'none',
-                textAlign: 'center',
-                width: '100%',
-              }}
-            >
-              <SlideToCancel onCancel={() => setCancelModalOpen(true)} language={language} />
-            </Box>
+            {/* Slide to Cancel (Visible when pre-trip, or when sheet is expanded) */}
+            {(status !== 'Trip Ongoing' || isExpanded) && (
+              <Box
+                sx={{
+                  width: '100%',
+                  mt: isExpanded && status === 'Trip Ongoing' ? 1 : 0,
+                  pt: isExpanded && status === 'Trip Ongoing' ? 1.5 : 0,
+                  borderTop: isExpanded && status === 'Trip Ongoing' ? '1px dashed #FCA5A5' : 'none',
+                  textAlign: 'center',
+                }}
+              >
+                <SlideToCancel onCancel={() => setCancelModalOpen(true)} language={language} />
+              </Box>
+            )}
           </Box>
         )}
 

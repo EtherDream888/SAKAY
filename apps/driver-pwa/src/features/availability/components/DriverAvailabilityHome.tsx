@@ -15,6 +15,8 @@ import {
   Radio,
   Avatar,
   Divider,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import StarIcon from '@mui/icons-material/Star';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
@@ -57,20 +59,40 @@ export const DriverAvailabilityHome: React.FC = () => {
 
 
   // Location Permission Modal State (matching iOS permission prompt)
+  // Only opens on the very first instance if never prompted before and not already granted
   const [locationPermissionOpen, setLocationPermissionOpen] = useState(() => {
-    const justLoggedIn = sessionStorage.getItem('sakay_driver_just_logged_in') === 'true';
-    const dismissedInSession = sessionStorage.getItem('sakay_driver_location_prompt_dismissed') === 'true';
-    if (justLoggedIn) return true;
-    if (dismissedInSession) return false;
-    return localStorage.getItem('sakay_driver_location_permission') !== 'always';
+    const prompted = localStorage.getItem('sakay_driver_location_prompted') === 'true';
+    const perm = localStorage.getItem('sakay_driver_location_permission');
+    if (prompted || perm === 'always' || perm === 'once') return false;
+    return true;
   });
 
+  const [isRequestingLocation, setIsRequestingLocation] = useState(false);
+  const [locationError, setLocationError] = useState<string>('');
   const [availableTodas, setAvailableTodas] = useState<Array<{ id: string; name: string; acronym: string; barangay: string; terminalLocation: string }>>([]);
   const [todaModalOpen, setTodaModalOpen] = useState(false);
   const [recenterTrigger, setRecenterTrigger] = useState(0);
 
-  // Always attempt to get actual driver device position on mount (matching passenger Dashboard)
+  // Check if browser native permission is already granted; if so, never prompt and record
   useEffect(() => {
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+        if (result.state === 'granted') {
+          localStorage.setItem('sakay_driver_location_prompted', 'true');
+          localStorage.setItem('sakay_driver_location_permission', 'always');
+          setLocationPermissionOpen(false);
+        }
+      }).catch(() => {});
+    }
+  }, []);
+
+  // Attempt to get actual driver device position on mount ONLY if permission was already granted
+  useEffect(() => {
+    const perm = localStorage.getItem('sakay_driver_location_permission');
+    const prompted = localStorage.getItem('sakay_driver_location_prompted') === 'true';
+    if (perm !== 'always' && perm !== 'once' && !prompted) return;
+    if (perm === 'denied') return;
+
     getCurrentDevicePosition()
       .then((coords) => {
         setProfile((prev) => ({
@@ -298,16 +320,13 @@ export const DriverAvailabilityHome: React.FC = () => {
   };
 
   const handleAllowLocation = async (saveAlways: boolean) => {
-    sessionStorage.setItem('sakay_driver_just_logged_in', 'false');
-    sessionStorage.setItem('sakay_driver_location_prompt_dismissed', 'true');
-    if (saveAlways) {
-      localStorage.setItem('sakay_driver_location_permission', 'always');
-    } else {
-      sessionStorage.setItem('sakay_driver_location_permission', 'once');
-    }
-
+    setIsRequestingLocation(true);
+    setLocationError('');
     try {
       const coords = await getCurrentDevicePosition();
+      localStorage.setItem('sakay_driver_location_prompted', 'true');
+      localStorage.setItem('sakay_driver_location_permission', 'always');
+
       setProfile((prev) => ({
         ...prev,
         currentLat: coords.latitude,
@@ -327,15 +346,21 @@ export const DriverAvailabilityHome: React.FC = () => {
           .eq('driver_id', activeDriverId)
           .then(() => {});
       }
+      setIsRequestingLocation(false);
+      setLocationPermissionOpen(false);
     } catch (err: any) {
       console.warn('[DriverAvailabilityHome] Geolocation note:', err?.message || err);
+      setIsRequestingLocation(false);
+      setLocationError(
+        language === 'tl'
+          ? 'Hindi ma-access ang GPS. Pakisuyong i-on ang Location sa settings ng iyong device.'
+          : 'Unable to access GPS. Please turn on Location in your device settings.'
+      );
     }
-    setLocationPermissionOpen(false);
   };
 
   const handleDenyLocation = () => {
-    sessionStorage.setItem('sakay_driver_just_logged_in', 'false');
-    sessionStorage.setItem('sakay_driver_location_prompt_dismissed', 'true');
+    localStorage.setItem('sakay_driver_location_prompted', 'true');
     localStorage.setItem('sakay_driver_location_permission', 'denied');
     setLocationPermissionOpen(false);
   };
@@ -726,18 +751,25 @@ export const DriverAvailabilityHome: React.FC = () => {
               color: '#475569',
               lineHeight: 1.5,
               fontFamily: 'Poppins, sans-serif',
+              mb: locationError ? '12px' : 0,
             }}
           >
             {language === 'tl'
               ? 'Ginagamit ang iyong lokasyon para makahanap ng malapit na pasahero at masubaybayan ang iyong biyahe sa mapa.'
               : 'Your location is used to find nearby passengers and track your trip on the map.'}
           </Typography>
+          {locationError && (
+            <Alert severity="warning" sx={{ mt: '12px', fontSize: '12px', borderRadius: '12px', textAlign: 'left' }}>
+              {locationError}
+            </Alert>
+          )}
         </Box>
 
         <Divider sx={{ borderColor: '#E2E8F0' }} />
 
         <Button
           fullWidth
+          disabled={isRequestingLocation}
           onClick={() => handleAllowLocation(false)}
           sx={{
             py: '14px',
@@ -757,6 +789,7 @@ export const DriverAvailabilityHome: React.FC = () => {
 
         <Button
           fullWidth
+          disabled={isRequestingLocation}
           onClick={() => handleAllowLocation(true)}
           sx={{
             py: '14px',
@@ -769,13 +802,18 @@ export const DriverAvailabilityHome: React.FC = () => {
             '&:hover': { backgroundColor: '#FFF8F0' },
           }}
         >
-          {language === 'tl' ? 'Habang Ginagamit ang App' : 'While Using the App'}
+          {isRequestingLocation ? (
+            <CircularProgress size={20} sx={{ color: '#FF6B00' }} />
+          ) : (
+            language === 'tl' ? 'Habang Ginagamit ang App' : 'While Using the App'
+          )}
         </Button>
 
         <Divider sx={{ borderColor: '#E2E8F0' }} />
 
         <Button
           fullWidth
+          disabled={isRequestingLocation}
           onClick={handleDenyLocation}
           sx={{
             py: '14px',
