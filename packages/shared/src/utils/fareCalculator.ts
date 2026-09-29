@@ -3,19 +3,10 @@
  * Adheres to Calapan City Ordinance Fare Matrix Rules and Ride Sharing Rules.
  */
 
-export interface TariffConfig {
-  baseFare: number;       // Base seat fare for first X km (default: 15.00)
-  baseDistanceKm: number; // Included base distance in km (default: 2.0)
-  succeedingRate: number; // Rate per succeeding km (default: 1.00)
-  capacity: number;       // Total tricycle capacity (default: 4)
-}
-
-export const DEFAULT_TARIFF: TariffConfig = {
-  baseFare: 15.0,
-  baseDistanceKm: 2.0,
-  succeedingRate: 1.0,
-  capacity: 4,
-};
+import type { TariffConfig } from '../config/policyConfig';
+import { DEFAULT_TARIFF } from '../config/policyConfig';
+export type { TariffConfig };
+export { DEFAULT_TARIFF };
 
 export interface RouteSegment {
   distanceKm: number;
