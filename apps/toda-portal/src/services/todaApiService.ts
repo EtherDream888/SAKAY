@@ -25,6 +25,22 @@ export async function getEffectiveTodaId(providedId?: string): Promise<string> {
   if (providedId && providedId !== DEFAULT_TODA_ID && providedId.trim()) {
     return providedId;
   }
+
+  // 1. Check logged-in TODA session from localStorage
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('sakay_toda_admin_auth_cache');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const cachedId = parsed?.profile?.toda_id || parsed?.profile?.toda?.toda_id;
+        if (cachedId && cachedId !== DEFAULT_TODA_ID) {
+          return cachedId;
+        }
+      }
+    } catch {}
+  }
+
+  // 2. Check authenticated Supabase user
   try {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
@@ -37,20 +53,33 @@ export async function getEffectiveTodaId(providedId?: string): Promise<string> {
       if (adminRecord?.toda_id) {
         return adminRecord.toda_id;
       }
+
+      if (user.user_metadata?.toda_id) {
+        return user.user_metadata.toda_id;
+      }
+
+      const emailPrefix = user.email?.split('@')[0]?.toUpperCase();
+      if (emailPrefix) {
+        const { data: matchedToda } = await supabase
+          .from('toda')
+          .select('toda_id')
+          .ilike('toda_acronym', emailPrefix)
+          .maybeSingle();
+        if (matchedToda?.toda_id) return matchedToda.toda_id;
+      }
     }
   } catch (err) {
     console.warn('[todaApiService] Error resolving authenticated toda_id:', err);
   }
 
-  // Fallback to most recently registered TODA in database
+  // 3. Fallback to Calapan Central TODA (CCTODA - Primary Pilot TODA)
   try {
-    const { data: latestToda } = await supabase
+    const { data: cctoda } = await supabase
       .from('toda')
       .select('toda_id')
-      .order('created_at', { ascending: false })
-      .limit(1)
+      .ilike('toda_acronym', 'CCTODA')
       .maybeSingle();
-    if (latestToda?.toda_id) return latestToda.toda_id;
+    if (cctoda?.toda_id) return cctoda.toda_id;
   } catch {}
 
   return DEFAULT_TODA_ID;
@@ -60,88 +89,32 @@ export async function getEffectiveTodaId(providedId?: string): Promise<string> {
 // 1. TODA PROFILE & REGISTRATION
 // ============================================================================
 
-export function isTodaApprovedInCache(todaData?: any, targetId?: string): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    const keys = ['sakay_approved_todas', 'sakay_toda_status_overrides'];
-    for (const k of keys) {
-      const lRaw = localStorage.getItem(k);
-      const sRaw = sessionStorage.getItem(k);
-      const raw = lRaw || sRaw;
-      if (!raw) continue;
 
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        const set = new Set(parsed.map((item: any) => String(item).toLowerCase()));
-        if (targetId && set.has(String(targetId).toLowerCase())) return true;
-        if (todaData?.toda_id && set.has(String(todaData.toda_id).toLowerCase())) return true;
-        if (todaData?.toda_acronym && set.has(String(todaData.toda_acronym).toLowerCase())) return true;
-        if (todaData?.toda_name && set.has(String(todaData.toda_name).toLowerCase())) return true;
-      } else if (parsed && typeof parsed === 'object') {
-        const checkVal = (id?: string) => {
-          if (!id) return false;
-          const val = parsed[id] || parsed[id.toLowerCase()] || parsed[id.toUpperCase()];
-          return val === 'Active' || val === 'Approved' || val === 'Active Accreditation';
-        };
-        if (
-          checkVal(targetId) ||
-          checkVal(todaData?.toda_id) ||
-          checkVal(todaData?.toda_acronym) ||
-          checkVal(todaData?.toda_name)
-        ) {
-          return true;
-        }
-      }
-    }
-  } catch {}
-  return false;
-}
 
 export async function fetchTodaProfile(todaId?: string): Promise<TodaProfile | null> {
   try {
+    const targetTodaId = await getEffectiveTodaId(todaId);
     let data: any = null;
 
-    if (todaId && todaId !== DEFAULT_TODA_ID) {
+    if (targetTodaId && targetTodaId !== DEFAULT_TODA_ID) {
       const { data: directToda } = await supabase
         .from('toda')
         .select('*')
-        .or(`toda_id.eq.${todaId},toda_acronym.ilike.${todaId}`)
+        .or(`toda_id.eq.${targetTodaId},toda_acronym.ilike.${targetTodaId}`)
         .maybeSingle();
       data = directToda;
     }
 
-    // If not found, resolve from current authenticated session
-    if (!data) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: adminRecord } = await supabase
-          .from('toda_admin')
-          .select('toda_id, toda:toda_id(*)')
-          .eq('auth_user_id', user.id)
-          .maybeSingle();
-
-        if (adminRecord?.toda) {
-          data = adminRecord.toda;
-        } else if (adminRecord?.toda_id) {
-          const { data: matchedToda } = await supabase
-            .from('toda')
-            .select('*')
-            .eq('toda_id', adminRecord.toda_id)
-            .maybeSingle();
-          data = matchedToda;
+    if (!data && typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('sakay_toda_admin_auth_cache');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.profile?.toda) {
+            data = parsed.profile.toda;
+          }
         }
-      }
-    }
-
-    // Fallback to most recently registered TODA in database
-    if (!data) {
-      const { data: latestToda } = await supabase
-        .from('toda')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      data = latestToda;
+      } catch {}
     }
 
     if (!data) return null;
@@ -155,7 +128,6 @@ export async function fetchTodaProfile(todaId?: string): Promise<TodaProfile | n
     const isDbActive = ['active', 'approved', 'verified', 'accredited'].includes(
       String(data.toda_status || data.account_status || data.status || '').toLowerCase()
     );
-    const isCacheActive = isTodaApprovedInCache(data, todaId);
 
     return {
       id: data.toda_id,
@@ -180,7 +152,7 @@ export async function fetchTodaProfile(todaId?: string): Promise<TodaProfile | n
         treasurer: data.treasurer_name || 'N/A',
         treasurerContact: data.treasurer_contact || '',
       },
-      accreditationStatus: (isDbActive || isCacheActive) ? 'Active' : 'Pending Verification',
+      accreditationStatus: isDbActive ? 'Active' : 'Pending Verification',
       accreditationExpiry: data.certificate_expiry ? new Date(data.certificate_expiry).toLocaleDateString('en-US') : 'Dec 31, 2026',
       accreditationNo: data.certificate_number || data.toda_acronym || 'TODA',
       permitNumber: data.toda_acronym || 'TODA',
@@ -231,11 +203,24 @@ export async function updateTodaProfile(
   if (profileData.acronym) updatePayload.toda_acronym = profileData.acronym;
   if (profileData.barangay) updatePayload.barangay = profileData.barangay;
   if (profileData.dateEstablished) updatePayload.date_established = profileData.dateEstablished;
-  if (profileData.terminalLatitude !== undefined) updatePayload.terminal_latitude = profileData.terminalLatitude;
-  if (profileData.terminalLongitude !== undefined) updatePayload.terminal_longitude = profileData.terminalLongitude;
   if (profileData.contactPhone) updatePayload.president_contact = profileData.contactPhone;
   if (profileData.serviceArea || profileData.terminalLocation) {
     updatePayload.service_coverage_area = profileData.serviceArea || profileData.terminalLocation;
+  }
+
+  // Terminal coordinates must go through official request_terminal_relocation RPC
+  if (profileData.terminalLatitude !== undefined && profileData.terminalLongitude !== undefined && profileData.terminalLatitude !== null && profileData.terminalLongitude !== null) {
+    try {
+      await supabase.rpc('request_terminal_relocation', {
+        p_toda_id: targetTodaId,
+        p_new_latitude: profileData.terminalLatitude,
+        p_new_longitude: profileData.terminalLongitude,
+        p_new_location: profileData.terminalLocation || 'Updated Terminal Location',
+        p_reason: 'Requested relocation via TODA profile edit',
+      });
+    } catch (reloErr) {
+      console.warn('[todaApiService] Relocation request error:', reloErr);
+    }
   }
   if (profileData.officers) {
     if (profileData.officers.president !== undefined) updatePayload.president_name = profileData.officers.president;
@@ -653,50 +638,29 @@ export async function resubmitTodaApplication(todaId: string, updatedData: any) 
 
 export async function fetchTodaDrivers(todaId?: string): Promise<TodaDriverMember[]> {
   try {
-    // 1. Resolve target TODA record
+    const currentTodaId = await getEffectiveTodaId(todaId);
     let todaRecord: any = null;
-    if (todaId && todaId !== DEFAULT_TODA_ID) {
+
+    if (currentTodaId && currentTodaId !== DEFAULT_TODA_ID) {
       const { data: directToda } = await supabase
         .from('toda')
         .select('*')
-        .eq('toda_id', todaId)
+        .eq('toda_id', currentTodaId)
         .maybeSingle();
       todaRecord = directToda;
     }
 
-    if (!todaRecord) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: adminRecord } = await supabase
-          .from('toda_admin')
-          .select('toda_id, toda:toda_id(*)')
-          .eq('auth_user_id', user.id)
-          .maybeSingle();
-
-        if (adminRecord?.toda) {
-          todaRecord = adminRecord.toda;
-        } else if (adminRecord?.toda_id) {
-          const { data: matchedToda } = await supabase
-            .from('toda')
-            .select('*')
-            .eq('toda_id', adminRecord.toda_id)
-            .maybeSingle();
-          todaRecord = matchedToda;
+    if (!todaRecord && typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('sakay_toda_admin_auth_cache');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.profile?.toda) {
+            todaRecord = parsed.profile.toda;
+          }
         }
-      }
+      } catch {}
     }
-
-    if (!todaRecord) {
-      const { data: latestToda } = await supabase
-        .from('toda')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      todaRecord = latestToda;
-    }
-
-    const currentTodaId = todaRecord?.toda_id;
 
     // 2. Fetch all drivers currently registered in the database for this TODA
     const { data: registeredDrivers } = currentTodaId
@@ -859,6 +823,23 @@ export async function fetchTodaDrivers(todaId?: string): Promise<TodaDriverMembe
 
 export const fetchTodaDriverMembers = fetchTodaDrivers;
 
+async function resolveStorageImageUrl(preferredBucket: string, path?: string | null, fallbackBucket?: string): Promise<string> {
+  if (!path) return '';
+  if (path.startsWith('http') || path.startsWith('data:') || path.startsWith('blob:')) return path;
+  try {
+    const { data, error } = await supabase.storage.from(preferredBucket).createSignedUrl(path, 86400);
+    if (!error && data?.signedUrl) return data.signedUrl;
+  } catch {}
+  if (fallbackBucket) {
+    try {
+      const { data, error } = await supabase.storage.from(fallbackBucket).createSignedUrl(path, 86400);
+      if (!error && data?.signedUrl) return data.signedUrl;
+    } catch {}
+  }
+  const { data: pubData } = supabase.storage.from(preferredBucket).getPublicUrl(path);
+  return pubData?.publicUrl || '';
+}
+
 export async function fetchDriverApplicants(todaId?: string): Promise<DriverApplicant[]> {
   try {
     const targetTodaId = await getEffectiveTodaId(todaId);
@@ -870,7 +851,7 @@ export async function fetchDriverApplicants(todaId?: string): Promise<DriverAppl
 
     if (error || !data || data.length === 0) return [];
 
-    return data.map((d: any) => {
+    return await Promise.all(data.map(async (d: any) => {
       const verif = Array.isArray(d.driver_verification) ? d.driver_verification[0] : d.driver_verification;
       const isEndorsed = verif?.verification_status === 'Approved' || verif?.verification_status === 'TODA Approved' || d.account_status === 'TODA Approved';
       const isRejected = verif?.verification_status === 'Rejected' || d.account_status === 'Rejected';
@@ -880,6 +861,21 @@ export async function fetchDriverApplicants(todaId?: string): Promise<DriverAppl
       if (isEndorsed) stageStatus = 'Endorsed to LGU';
       else if (isRejected) stageStatus = 'Rejected';
       else if (isResubmit) stageStatus = 'Resubmission Required';
+
+      const authId = d.auth_user_id;
+      const licFrontPath = verif?.license_front_photo_path || (authId ? `${authId}/license_front.jpg` : null);
+      const licBackPath = verif?.license_back_photo_path || (authId ? `${authId}/license_back.jpg` : null);
+      const mtopPath = verif?.mtop_photo_path || (authId ? `${authId}/mtop.jpg` : null);
+      const tricyclePath = verif?.tricycle_photo_path || d.tricycle_photo_path || (authId ? `${authId}/tricycle.jpg` : null);
+      const selfiePath = verif?.face_photo_path || (authId ? `${authId}/selfie.jpg` : null);
+
+      const [licenseFrontUrl, licenseBackUrl, mtopUrl, tricyclePhotoUrl, selfieUrl] = await Promise.all([
+        resolveStorageImageUrl('driver-licenses', licFrontPath),
+        resolveStorageImageUrl('driver-licenses', licBackPath),
+        resolveStorageImageUrl('mtop-permits', mtopPath, 'driver-licenses'),
+        resolveStorageImageUrl('mtop-permits', tricyclePath, 'driver-licenses'),
+        resolveStorageImageUrl('driver-selfies', selfiePath, 'driver-licenses'),
+      ]);
 
       return {
         id: d.driver_id,
@@ -894,121 +890,241 @@ export async function fetchDriverApplicants(todaId?: string): Promise<DriverAppl
         daysPending: 1,
         isOverdue: false,
         onSubmittedRoster: true,
-        tricyclePhotoUrl: d.profile_photo_url || verif?.mtop_photo_path || '',
+        tricyclePhotoUrl: tricyclePhotoUrl || d.profile_photo_url || '',
+        licenseFrontUrl,
+        licenseBackUrl,
+        mtopUrl,
+        selfieUrl,
         photoVerified: true,
         rosterVerified: true,
         todaStageStatus: stageStatus,
       };
-    });
+    }));
   } catch (err) {
     console.error('[todaApiService] fetchDriverApplicants error:', err);
     return [];
   }
 }
 
+async function resolveAffiliationId(driverOrAffiliationId: string): Promise<string> {
+  const { data: affCheck } = await supabase
+    .from('driver_toda_affiliation')
+    .select('affiliation_id')
+    .eq('affiliation_id', driverOrAffiliationId)
+    .maybeSingle();
+
+  if (affCheck?.affiliation_id) return affCheck.affiliation_id;
+
+  const { data: aff } = await supabase
+    .from('driver_toda_affiliation')
+    .select('affiliation_id')
+    .eq('driver_id', driverOrAffiliationId)
+    .order('submitted_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return aff?.affiliation_id || driverOrAffiliationId;
+}
+
 export async function endorseDriverApplicant(applicantId: string, actorName: string = 'TODA President') {
-  const timestamp = new Date().toISOString();
-
-  // 1. Update driver_verification record
-  let verifRes = await supabase
-    .from('driver_verification')
-    .update({ verification_status: 'Approved', reviewed_at: timestamp })
-    .eq('driver_id', applicantId)
-    .select();
-
-  if (verifRes.error) {
-    // Fallback if 'Approved' constraint failed
-    verifRes = await supabase
-      .from('driver_verification')
-      .update({ verification_status: 'TODA Approved', reviewed_at: timestamp })
-      .eq('driver_id', applicantId)
-      .select();
-  }
-
-  if (verifRes.error) {
-    console.error('[todaApiService] endorseDriverApplicant error updating driver_verification:', verifRes.error);
-    return { success: false, error: verifRes.error };
-  }
-
-  // 2. Attempt updating public.driver record timestamp/status
+  console.log('[todaApiService] Endorsing driver applicant to LGU:', applicantId, 'by:', actorName);
   try {
-    await supabase
-      .from('driver')
-      .update({ updated_at: timestamp })
-      .eq('driver_id', applicantId);
-  } catch (driverErr) {
-    console.warn('[todaApiService] endorseDriverApplicant driver timestamp update note:', driverErr);
+    const now = new Date().toISOString();
+    const updatePayload: Record<string, any> = {
+      verification_status: 'Approved',
+      endorsed_at: now,
+      remarks: `Endorsed by ${actorName}`,
+      rejection_reason: null,
+      rejection_comment: null,
+      rejected_by: null,
+      rejected_at: null,
+    };
+
+    // 1. Update public.driver_verification directly
+    const { data: verifData, error: verifErr } = await supabase
+      .from('driver_verification')
+      .update(updatePayload)
+      .or(`driver_id.eq.${applicantId},verification_id.eq.${applicantId}`)
+      .select();
+
+    if (verifErr) {
+      console.warn('[todaApiService] driver_verification direct update note:', verifErr);
+    }
+
+    // 2. If no record was updated, check if we need to insert a verification record
+    if (!verifData || verifData.length === 0) {
+      const { data: insertData, error: insertErr } = await supabase
+        .from('driver_verification')
+        .insert([{
+          driver_id: applicantId,
+          ...updatePayload,
+        }])
+        .select();
+
+      if (insertErr) {
+        console.error('[todaApiService] Failed to persist driver endorsement:', insertErr);
+        return { success: false, error: new Error(insertErr.message) };
+      }
+    }
+
+    // 3. Optional soft update to driver.account_status if permissible
+    try {
+      await supabase
+        .from('driver')
+        .update({ account_status: 'TODA Approved', updated_at: now })
+        .eq('driver_id', applicantId);
+    } catch {}
+
+    // 4. Dispatch official Tagalog endorsement SMS to driver's phone
+    try {
+      const { data: driverInfo } = await supabase
+        .from('driver')
+        .select('full_name, contact_number, toda:toda_id ( toda_name, toda_acronym )')
+        .eq('driver_id', applicantId)
+        .maybeSingle();
+
+      if (driverInfo?.contact_number) {
+        const firstName = driverInfo.full_name?.split(' ')[0] || driverInfo.full_name || 'Drayber';
+        const todaObj = Array.isArray(driverInfo.toda) ? driverInfo.toda[0] : driverInfo.toda;
+        const todaName = todaObj?.toda_name
+          ? `${todaObj.toda_name}${todaObj.toda_acronym ? ' (' + todaObj.toda_acronym + ')' : ''}`
+          : 'iyong TODA';
+
+        const smsMessage = `SAKAY Update: Magandang araw, ${firstName}! Ang iyong aplikasyon bilang drayber ay naaprubahan at na-endorso na ng ${todaName}. Kasalukuyan na itong ipinasa sa Calapan City LGU Franchising Office para sa pinal na beripikasyon. Makakatanggap ka muli ng mensahe kapag natapos ang pagsusuri.`;
+
+        console.log(`[todaApiService] Dispatching TODA endorsement SMS to ${driverInfo.contact_number}...`);
+        const apiUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000/api';
+        await fetch(`${apiUrl}/communication/send-sms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: driverInfo.contact_number,
+            message: smsMessage,
+          }),
+        });
+      }
+    } catch (smsErr) {
+      console.warn('[todaApiService] TODA endorsement SMS dispatch warning:', smsErr);
+    }
+
+    return { success: true, data: verifData, rosterMatched: true };
+  } catch (err: any) {
+    console.error('[todaApiService] endorseDriverApplicant exception:', err);
+    return { success: false, error: err };
   }
-
-  const driverName = verifRes.data && verifRes.data[0]?.submitted_full_name ? verifRes.data[0].submitted_full_name : applicantId;
-
-  await recordTodaAuditAction({
-    actionType: 'DRIVER_STAGE1_ENDORSED',
-    targetId: applicantId,
-    targetName: driverName,
-    details: `[Stage 1 TODA Screening] ${actorName}: Endorsed driver application '${driverName}' and forwarded to City LGU for Stage 2 credential accreditation.`,
-    category: 'Driver Verification',
-  });
-
-  return { success: true, data: verifRes.data ? verifRes.data[0] : null };
 }
 
 export const forwardApplicantToLgu = endorseDriverApplicant;
 
 export async function returnDriverApplicant(applicantId: string, remarks: string) {
-  await recordTodaAuditAction({
-    actionType: 'DRIVER_APPLICATION_RETURNED',
-    targetId: applicantId,
-    details: `Returned driver membership application for correction. Remarks: ${remarks}`,
-    category: 'Driver Verification',
-  });
-  return { success: true, remarks };
+  console.log('[todaApiService] Returning driver application for resubmission:', applicantId);
+  try {
+    const now = new Date().toISOString();
+    const updatePayload: Record<string, any> = {
+      verification_status: 'Resubmission Required',
+      rejection_reason: remarks,
+      rejection_comment: remarks,
+      remarks: remarks,
+      rejected_at: now,
+    };
+
+    const { data: verifData, error: verifErr } = await supabase
+      .from('driver_verification')
+      .update(updatePayload)
+      .or(`driver_id.eq.${applicantId},verification_id.eq.${applicantId}`)
+      .select();
+
+    if (verifErr) {
+      console.warn('[todaApiService] driver_verification resubmission update error:', verifErr);
+      return { success: false, error: new Error(verifErr.message) };
+    }
+
+    // Dispatch return for correction SMS
+    try {
+      const { data: driverInfo } = await supabase
+        .from('driver')
+        .select('full_name, contact_number')
+        .eq('driver_id', applicantId)
+        .maybeSingle();
+
+      if (driverInfo?.contact_number) {
+        const firstName = driverInfo.full_name?.split(' ')[0] || driverInfo.full_name || 'Drayber';
+        const smsMessage = `SAKAY Update: Magandang araw, ${firstName}! May kailangang iwasto o linawin sa iyong isinumiteng dokumento para sa TODA registration. Dahilan: ${remarks}. Pakibuksan ang app upang ma-resubmit ang iyong aplikasyon.`;
+        const apiUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000/api';
+        await fetch(`${apiUrl}/communication/send-sms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: driverInfo.contact_number,
+            message: smsMessage,
+          }),
+        });
+      }
+    } catch (smsErr) {
+      console.warn('[todaApiService] Return SMS dispatch warning:', smsErr);
+    }
+
+    return { success: true, remarks };
+  } catch (err: any) {
+    console.error('[todaApiService] returnDriverApplicant exception:', err);
+    return { success: false, error: err };
+  }
 }
 
 export async function rejectDriverApplicant(applicantId: string, reason: string, customComment?: string, actorName: string = 'TODA President') {
-  const timestamp = new Date().toISOString();
-  const payload = {
-    account_status: 'Rejected',
-    rejection_reason: reason,
-    rejection_comment: customComment || null,
-    rejected_at: timestamp,
-    updated_at: timestamp,
-  };
-
-  const { data, error } = await supabase
-    .from('driver')
-    .update(payload)
-    .eq('driver_id', applicantId)
-    .select()
-    .single();
-
-  if (error) {
-    // Fallback if rejection columns are not on schema cache
-    await supabase
-      .from('driver')
-      .update({ account_status: 'Rejected', updated_at: timestamp })
-      .eq('driver_id', applicantId);
-  }
-
-  await supabase
-    .from('driver_verification')
-    .update({
+  console.log('[todaApiService] Rejecting driver application:', applicantId);
+  try {
+    const now = new Date().toISOString();
+    const finalComment = customComment ? `${reason}: ${customComment}` : reason;
+    const updatePayload: Record<string, any> = {
       verification_status: 'Rejected',
       rejection_reason: reason,
-      rejection_comment: customComment || null,
-      reviewed_at: timestamp,
-    })
-    .eq('driver_id', applicantId);
+      rejection_comment: finalComment,
+      remarks: `Rejected by ${actorName}: ${finalComment}`,
+      rejected_at: now,
+    };
 
-  await recordTodaAuditAction({
-    actionType: 'DRIVER_APPLICATION_REJECTED',
-    targetId: applicantId,
-    targetName: data?.full_name || applicantId,
-    details: `[TODA Screening] ${actorName}: Rejected driver membership application for '${data?.full_name || applicantId}'. Reason: ${reason}. Comment: ${customComment || 'None'}`,
-    category: 'Driver Verification',
-  });
+    const { data: verifData, error: verifErr } = await supabase
+      .from('driver_verification')
+      .update(updatePayload)
+      .or(`driver_id.eq.${applicantId},verification_id.eq.${applicantId}`)
+      .select();
 
-  return { success: true, data };
+    if (verifErr) {
+      console.warn('[todaApiService] driver_verification rejection update error:', verifErr);
+      return { success: false, error: new Error(verifErr.message) };
+    }
+
+    // Dispatch rejection SMS
+    try {
+      const { data: driverInfo } = await supabase
+        .from('driver')
+        .select('full_name, contact_number')
+        .eq('driver_id', applicantId)
+        .maybeSingle();
+
+      if (driverInfo?.contact_number) {
+        const firstName = driverInfo.full_name?.split(' ')[0] || driverInfo.full_name || 'Drayber';
+        const smsMessage = `SAKAY Update: Paumanhin, ${firstName}. Ang iyong aplikasyon bilang drayber ay hindi naaprubahan ng TODA. Dahilan: ${finalComment}. Para sa katanungan, maaaring sumangguni sa pamunuan ng TODA.`;
+        const apiUrl = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5000/api';
+        await fetch(`${apiUrl}/communication/send-sms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: driverInfo.contact_number,
+            message: smsMessage,
+          }),
+        });
+      }
+    } catch (smsErr) {
+      console.warn('[todaApiService] Rejection SMS dispatch warning:', smsErr);
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('[todaApiService] rejectDriverApplicant exception:', err);
+    return { success: false, error: err };
+  }
 }
 
 export async function requestDriverResubmission(
@@ -1017,47 +1133,21 @@ export async function requestDriverResubmission(
   notes?: string,
   actorName: string = 'TODA President'
 ) {
-  const timestamp = new Date().toISOString();
-  const payload = {
-    account_status: 'Resubmission Required',
-    rejection_reason: reason,
-    rejection_comment: notes || null,
-    updated_at: timestamp,
-  };
-
-  const { data, error } = await supabase
-    .from('driver')
-    .update(payload)
-    .eq('driver_id', applicantId)
-    .select()
-    .single();
-
-  if (error) {
-    await supabase
-      .from('driver')
-      .update({ account_status: 'Resubmission Required', updated_at: timestamp })
-      .eq('driver_id', applicantId);
+  const finalReason = notes ? `${reason}: ${notes}` : reason;
+  const returnRes = await returnDriverApplicant(applicantId, finalReason);
+  if (!returnRes.success) {
+    throw returnRes.error || new Error('Failed to return driver application for resubmission');
   }
-
-  await supabase
-    .from('driver_verification')
-    .update({
-      verification_status: 'Resubmission Required',
-      rejection_reason: reason,
-      rejection_comment: notes || null,
-      reviewed_at: timestamp,
-    })
-    .eq('driver_id', applicantId);
 
   await recordTodaAuditAction({
     actionType: 'DRIVER_RESUBMISSION_REQUESTED',
     targetId: applicantId,
-    targetName: data?.full_name || applicantId,
-    details: `[TODA Screening] ${actorName}: Requested document correction/resubmission for '${data?.full_name || applicantId}'. Reason: ${reason}. Notes: ${notes || 'None'}`,
+    targetName: applicantId,
+    details: `[TODA Screening] ${actorName}: Requested document correction/resubmission. Reason: ${reason}. Notes: ${notes || 'None'}`,
     category: 'Driver Verification',
   });
 
-  return { success: true, data };
+  return { success: true };
 }
 
 export async function updateDriverMembershipStatus(
@@ -1376,3 +1466,138 @@ export async function deleteTodaAnnouncement(id: string) {
   if (error) throw error;
   return true;
 }
+
+export interface TodaRosterEntry {
+  roster_id: string;
+  toda_id: string;
+  franchise_number: string;
+  plate_number: string;
+  member_name: string;
+  created_at: string;
+}
+
+export async function fetchTodaRosterEntries(todaId?: string): Promise<TodaRosterEntry[]> {
+  try {
+    const targetTodaId = await getEffectiveTodaId(todaId);
+    let localEntries: TodaRosterEntry[] = [];
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(`sakay_toda_roster_${targetTodaId}`);
+        if (raw) localEntries = JSON.parse(raw);
+      } catch {}
+    }
+
+    const { data, error } = await supabase
+      .from('toda_roster_entry')
+      .select('*')
+      .eq('toda_id', targetTodaId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('[todaApiService] fetchTodaRosterEntries warning:', error);
+      try {
+        const serverRes = await fetch(`http://localhost:5000/api/admin/todas/${targetTodaId}/roster`);
+        const json = await serverRes.json();
+        if (json.success && json.data) {
+          const merged = [...json.data];
+          for (const le of localEntries) {
+            if (!merged.some(m => m.franchise_number === le.franchise_number)) {
+              merged.push(le);
+            }
+          }
+          return merged;
+        }
+      } catch {}
+      return localEntries;
+    }
+
+    const dbEntries = data || [];
+    const merged = [...dbEntries];
+    for (const le of localEntries) {
+      if (!merged.some(m => m.franchise_number === le.franchise_number)) {
+        merged.push(le);
+      }
+    }
+    return merged;
+  } catch (err) {
+    console.error('[todaApiService] fetchTodaRosterEntries error:', err);
+    return [];
+  }
+}
+
+export async function addTodaRosterEntry(entry: {
+  todaId?: string;
+  memberName: string;
+  franchiseNumber: string;
+  plateNumber: string;
+}) {
+  const targetTodaId = await getEffectiveTodaId(entry.todaId);
+  const newEntry: TodaRosterEntry = {
+    roster_id: 'roster-' + Date.now(),
+    toda_id: targetTodaId,
+    member_name: entry.memberName.trim(),
+    franchise_number: entry.franchiseNumber.trim(),
+    plate_number: entry.plateNumber.trim(),
+    created_at: new Date().toISOString(),
+  };
+
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(`sakay_toda_roster_${targetTodaId}`);
+      const existing: TodaRosterEntry[] = raw ? JSON.parse(raw) : [];
+      existing.unshift(newEntry);
+      localStorage.setItem(`sakay_toda_roster_${targetTodaId}`, JSON.stringify(existing));
+    } catch {}
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('toda_roster_entry')
+      .insert({
+        toda_id: targetTodaId,
+        member_name: entry.memberName.trim(),
+        franchise_number: entry.franchiseNumber.trim(),
+        plate_number: entry.plateNumber.trim(),
+      })
+      .select()
+      .single();
+
+    if (!error && data) {
+      await recordTodaAuditAction({
+        actionType: 'TODA_ROSTER_ENTRY_ADDED',
+        targetId: targetTodaId,
+        targetName: entry.memberName,
+        details: `Added new official roster entry for '${entry.memberName}' (Franchise: ${entry.franchiseNumber}, Plate: ${entry.plateNumber}).`,
+        category: 'Membership',
+      });
+      return data;
+    }
+    if (error) throw error;
+  } catch (supabaseErr: any) {
+    console.warn('[todaApiService] Direct Supabase roster insert note:', supabaseErr.message || supabaseErr);
+    // 1. Try Express backend endpoint (port 5000)
+    try {
+      const serverRes = await fetch(`http://localhost:5000/api/admin/todas/${targetTodaId}/roster`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entries: [
+            {
+              driver_full_name: entry.memberName.trim(),
+              franchise_number: entry.franchiseNumber.trim(),
+              plate_number: entry.plateNumber.trim(),
+            },
+          ],
+        }),
+      });
+      const json = await serverRes.json();
+      if (json.success && json.data?.[0]) {
+        return json.data[0];
+      }
+    } catch {}
+
+    // 2. Return local dev entry
+    return newEntry;
+  }
+}
+

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Box, Typography } from '@mui/material';
 
 import Logo from '../../../common/components/Logo';
@@ -9,8 +9,10 @@ import { useLanguage } from '../../../utils/LanguageContext';
 
 export const DriverRegistrationComplete: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { language } = useLanguage();
   const isTagalog = language === 'tl';
+  const isResubmission = Boolean((location.state as any)?.isResubmission);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Native confetti particle burst constrained strictly to inner canvas inside PWA mobile container
@@ -72,9 +74,13 @@ export const DriverRegistrationComplete: React.FC = () => {
     return () => cancelAnimationFrame(animationId);
   }, []);
 
-  const handleBackToLogin = () => {
+  const handleAction = () => {
     clearOnboardingCache();
-    navigate('/driver/login', { replace: true });
+    if (isResubmission) {
+      navigate('/driver/status', { replace: true });
+    } else {
+      navigate('/driver/login', { replace: true });
+    }
   };
 
   return (
@@ -150,9 +156,13 @@ export const DriverRegistrationComplete: React.FC = () => {
             mb: 1.5,
           }}
         >
-          {isTagalog
-            ? 'Matagumpay ang iyong pagpaparehistro!'
-            : 'Registration Completed Successfully!'}
+          {isResubmission
+            ? (isTagalog
+                ? 'Matagumpay na Naisumite ang Pagwawasto!'
+                : 'Correction Resubmitted Successfully!')
+            : (isTagalog
+                ? 'Matagumpay ang iyong pagpaparehistro!'
+                : 'Registration Completed Successfully!')}
         </Typography>
 
         {/* Body Description */}
@@ -166,9 +176,13 @@ export const DriverRegistrationComplete: React.FC = () => {
             maxWidth: 320,
           }}
         >
-          {isTagalog
-            ? 'Natanggap na namin ang iyong mga dokumento. Sisimulan na namin ang pag-review ng iyong account. Karaniwang tumatagal ito ng hanggang 24 oras.'
-            : 'We have received your documents and will start reviewing your account. This usually takes up to 24 hours.'}
+          {isResubmission
+            ? (isTagalog
+                ? 'Natanggap na namin ang iyong mga binagong dokumento. Muling susuriin ng TODA at LGU ang iyong aplikasyon. Nag-restart ang 5-araw na review period.'
+                : 'We have received your updated documents. Your application will now be re-reviewed by TODA and LGU. The 5-day review clock has restarted.')
+            : (isTagalog
+                ? 'Natanggap na namin ang iyong mga dokumento. Sisimulan na namin ang pag-review ng iyong account. Karaniwang tumatagal ito ng hanggang 24 oras.'
+                : 'We have received your documents and will start reviewing your account. This usually takes up to 24 hours.')}
         </Typography>
       </Box>
 
@@ -182,8 +196,10 @@ export const DriverRegistrationComplete: React.FC = () => {
           zIndex: 1,
         }}
       >
-        <PrimaryButton fullWidth onClick={handleBackToLogin}>
-          {isTagalog ? 'Bumalik sa Pag-login' : 'Back to Login'}
+        <PrimaryButton fullWidth onClick={handleAction}>
+          {isResubmission
+            ? (isTagalog ? 'Bumalik sa Status Monitor' : 'Return to Status Monitor')
+            : (isTagalog ? 'Bumalik sa Pag-login' : 'Back to Login')}
         </PrimaryButton>
       </Box>
     </Box>

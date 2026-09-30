@@ -17,11 +17,16 @@ import {
   getCachedLicenseData,
   getCachedMtopData,
   getCachedTricycleData,
+  getResubmissionSession,
+  clearResubmissionSession,
+  getRegisteredNameParts,
   LicenseExtractedData,
   MtopExtractedData,
+  type FaultyDocType,
 } from '../../../services/driverOnboardingCache';
 import { submitFinalDriverRegistration } from '../../../services/driverApiService';
 import { fetchAccreditedTodas } from '../../../services/driverApiService';
+import { splitNameParts } from '../../../services/licenseOcrService';
 
 interface ReviewFieldRowProps {
   label: string;
@@ -81,21 +86,45 @@ export const DriverConfirmAllInfo: React.FC = () => {
   const state = location.state as {
     phone?: string;
     driverName?: string;
+    firstName?: string;
+    middleName?: string;
+    lastName?: string;
+    suffix?: string;
     extracted?: LicenseExtractedData;
     mtopExtracted?: MtopExtractedData;
+    isResubmission?: boolean;
+    faultyDocuments?: FaultyDocType[];
+    issues?: any[];
   } | undefined;
+
+  const resubSession = getResubmissionSession();
+  const isResubmission = Boolean(state?.isResubmission || resubSession?.isResubmission);
+  const faultyDocuments: FaultyDocType[] =
+    (state?.faultyDocuments as FaultyDocType[]) ||
+    resubSession?.faultyDocuments ||
+    [];
+
+  const resolvedFaultyDocs: FaultyDocType[] = isResubmission
+    ? (faultyDocuments.length > 0 ? faultyDocuments : ['license'])
+    : ['license', 'mtop', 'tricycle', 'selfie'];
+
+  const showLicenseSections = resolvedFaultyDocs.includes('license');
+  const showMtopSection = resolvedFaultyDocs.includes('mtop');
+  const showTricycleSection = resolvedFaultyDocs.includes('tricycle');
+  const showFaceSection = resolvedFaultyDocs.includes('selfie');
 
   const cachedLicense = getCachedLicenseData();
   const cachedMtop = getCachedMtopData();
+  const registered = getRegisteredNameParts();
 
   const licenseData: LicenseExtractedData = state?.extracted || cachedLicense || {
     frontPhoto: '',
     backPhoto: '',
-    fullName: state?.driverName || 'Juan Dela Cruz',
-    firstName: 'Juan',
-    middleName: 'Dela',
-    lastName: 'Cruz',
-    suffix: '',
+    fullName: state?.driverName || registered.fullName || 'Juan Dela Cruz',
+    firstName: state?.firstName || registered.firstName || 'Juan',
+    middleName: state?.middleName ?? registered.middleName ?? '',
+    lastName: state?.lastName || registered.lastName || 'Dela Cruz',
+    suffix: state?.suffix || registered.suffix || '',
     dob: '1987-05-21',
     gender: 'Lalaki',
     address: 'Calapan City, Oriental Mindoro',
@@ -119,12 +148,21 @@ export const DriverConfirmAllInfo: React.FC = () => {
     scannedAt: new Date().toISOString(),
   };
 
-  // Helper name decomposition if specific fields missing
-  const nameParts = (licenseData.fullName || '').trim().split(/\s+/);
-  const firstName = licenseData.firstName || (nameParts.length > 0 ? nameParts[0] : '');
-  const lastName = licenseData.lastName || (nameParts.length > 1 ? nameParts[nameParts.length - 1] : '');
-  const middleName = licenseData.middleName || (nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '');
-  const suffix = licenseData.suffix || '';
+  // Prioritize explicit name parts, registered name parts, or smart compound-aware name splitting
+  let firstName = licenseData.firstName || registered.firstName || '';
+  let middleName = (licenseData.middleName !== undefined && licenseData.middleName !== '')
+    ? licenseData.middleName
+    : (registered.middleName || '');
+  let lastName = licenseData.lastName || registered.lastName || '';
+  let suffix = licenseData.suffix || registered.suffix || '';
+
+  if ((!firstName || !lastName) && licenseData.fullName) {
+    const parsed = splitNameParts(licenseData.fullName);
+    if (!firstName) firstName = parsed.firstName;
+    if (!middleName) middleName = parsed.middleName;
+    if (!lastName) lastName = parsed.lastName;
+    if (!suffix) suffix = parsed.suffix;
+  }
 
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -154,8 +192,12 @@ export const DriverConfirmAllInfo: React.FC = () => {
     try {
       const res = await submitFinalDriverRegistration(targetPhone);
       if (res.success) {
+        clearResubmissionSession();
         console.log('[DriverConfirmAllInfo] Registration submitted successfully!');
-        navigate('/driver/registration-complete', { replace: true });
+        navigate('/driver/registration-complete', {
+          replace: true,
+          state: { isResubmission },
+        });
       } else {
         setSubmitError(
           res.error ||
@@ -202,7 +244,13 @@ export const DriverConfirmAllInfo: React.FC = () => {
         }}
       >
         <IconButton
-          onClick={() => navigate('/driver/tricycle-instructions', { state })}
+          onClick={() => {
+            if (isResubmission) {
+              navigate(-1);
+            } else {
+              navigate('/driver/tricycle-instructions', { state });
+            }
+          }}
           sx={{
             width: 44,
             height: 44,
@@ -242,7 +290,9 @@ export const DriverConfirmAllInfo: React.FC = () => {
             mb: 0.75,
           }}
         >
-          {isTagalog ? 'Kumpirmahin ang lahat ng iyong Impormasyon' : 'Confirm All Your Information'}
+          {isResubmission
+            ? (isTagalog ? 'Kumpirmahin ang mga Iniwasang Dokumento' : 'Confirm Resubmitted Information')
+            : (isTagalog ? 'Kumpirmahin ang lahat ng iyong Impormasyon' : 'Confirm All Your Information')}
         </Typography>
 
         <Typography
@@ -254,217 +304,278 @@ export const DriverConfirmAllInfo: React.FC = () => {
             mb: 2.5,
           }}
         >
-          {isTagalog
-            ? 'Pakisuri kung tama ang lahat ng detalye mula sa bawat hakbang.'
-            : 'Please review and ensure all details from each step are correct.'}
+          {isResubmission
+            ? (isTagalog
+                ? 'Pakisuri ang mga binagong impormasyon bago muling isumite ang iyong aplikasyon.'
+                : 'Please review your corrected information before resubmitting your application.')
+            : (isTagalog
+                ? 'Pakisuri kung tama ang lahat ng detalye mula sa bawat hakbang.'
+                : 'Please review and ensure all details from each step are correct.')}
         </Typography>
 
-        {/* SECTION A: Personal na Impormasyon */}
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', mb: 1.5 }}>
-            <Typography sx={{ flex: 1, minWidth: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
-              {isTagalog ? 'Personal na Impormasyon' : 'Personal Information'}
-            </Typography>
-            <Typography
-              onClick={() => navigate('/driver/confirm-license-info', { state: { ...state, isEditMode: true } })}
+        {isResubmission && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              backgroundColor: '#FFFBEB',
+              border: '1px solid #FDE68A',
+              borderRadius: '10px',
+              p: '12px 16px',
+              mb: 2.5,
+            }}
+          >
+            <Box
               sx={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                backgroundColor: '#F59E0B',
                 flexShrink: 0,
-                whiteSpace: 'nowrap',
-                fontSize: '12px',
-                fontWeight: 700,
-                color: '#FF6B00',
-                cursor: 'pointer',
-                px: 1.5,
-                py: 0.4,
-                borderRadius: '6px',
-                backgroundColor: '#FFF5EF',
-                border: '1px solid #FFD6B8',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-                '&:hover': {
-                  backgroundColor: '#FFEAD9',
-                  borderColor: '#FF6B00',
-                },
               }}
-            >
-              {isTagalog ? 'I-edit' : 'Edit'}
+            />
+            <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#92400E', lineHeight: 1.4 }}>
+              {isTagalog
+                ? 'Ipinapakita lamang ang mga dokumentong hiniling na iwasto at muling isumite.'
+                : 'Showing only the documents requested for correction and resubmission.'}
             </Typography>
           </Box>
+        )}
 
-          <ReviewFieldRow label={isTagalog ? "UNANG PANGALAN" : "FIRST NAME"} value={firstName} />
-          <ReviewFieldRow label={isTagalog ? "GITNANG PANGALAN" : "MIDDLE NAME"} value={middleName || 'N/A'} />
-          <ReviewFieldRow label={isTagalog ? "APELYIDO" : "LAST NAME"} value={lastName} />
-          <ReviewFieldRow label="SUFFIX" value={suffix || 'N/A'} />
-          <ReviewFieldRow label={isTagalog ? "PETSA NG KAPANGANAKAN" : "DATE OF BIRTH"} value={licenseData.dob} />
-          <ReviewFieldRow label={isTagalog ? "KASARIAN" : "GENDER"} value={licenseData.gender} />
-          <ReviewFieldRow label={isTagalog ? "TIRAHAN" : "ADDRESS"} value={licenseData.address} />
-          <ReviewFieldRow label={isTagalog ? "KINABABALIKANG TODA" : "AFFILIATED TODA"} value={todaName} />
-          <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
-        </Box>
+        {/* SECTION A & B: Personal Details & Driver's License */}
+        {showLicenseSections && (
+          <>
+            {/* SECTION A: Personal na Impormasyon */}
+            <Box sx={{ mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', mb: 1.5 }}>
+                <Typography sx={{ flex: 1, minWidth: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
+                  {isTagalog ? 'Personal na Impormasyon' : 'Personal Information'}
+                </Typography>
+                <Typography
+                  onClick={() =>
+                    navigate('/driver/confirm-license-info', {
+                      state: {
+                        ...state,
+                        extracted: {
+                          ...licenseData,
+                          firstName,
+                          middleName,
+                          lastName,
+                          suffix,
+                        },
+                        isEditMode: true,
+                        isResubmission,
+                        faultyDocuments,
+                      },
+                    })
+                  }
+                  sx={{
+                    flexShrink: 0,
+                    whiteSpace: 'nowrap',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: '#FF6B00',
+                    cursor: 'pointer',
+                    px: 1.5,
+                    py: 0.4,
+                    borderRadius: '6px',
+                    backgroundColor: '#FFF5EF',
+                    border: '1px solid #FFD6B8',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.15s ease',
+                    '&:hover': {
+                      backgroundColor: '#FFEAD9',
+                      borderColor: '#FF6B00',
+                    },
+                  }}
+                >
+                  {isTagalog ? 'I-edit' : 'Edit'}
+                </Typography>
+              </Box>
 
-        {/* SECTION B: Driver's License */}
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', mb: 1.5 }}>
-            <Typography sx={{ flex: 1, minWidth: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
-              Driver's License
-            </Typography>
-            <Typography
-              onClick={() => navigate('/driver/confirm-license-info', { state: { ...state, isEditMode: true } })}
-              sx={{
-                flexShrink: 0,
-                whiteSpace: 'nowrap',
-                fontSize: '12px',
-                fontWeight: 700,
-                color: '#FF6B00',
-                cursor: 'pointer',
-                px: 1.5,
-                py: 0.4,
-                borderRadius: '6px',
-                backgroundColor: '#FFF5EF',
-                border: '1px solid #FFD6B8',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-                '&:hover': {
-                  backgroundColor: '#FFEAD9',
-                  borderColor: '#FF6B00',
-                },
-              }}
-            >
-              {isTagalog ? 'I-edit' : 'Edit'}
-            </Typography>
-          </Box>
+              <ReviewFieldRow label={isTagalog ? "UNANG PANGALAN" : "FIRST NAME"} value={firstName || 'Juan'} />
+              <ReviewFieldRow label={isTagalog ? "GITNANG PANGALAN" : "MIDDLE NAME"} value={middleName?.trim() ? middleName : 'N/A'} />
+              <ReviewFieldRow label={isTagalog ? "APELYIDO" : "LAST NAME"} value={lastName || 'Dela Cruz'} />
+              <ReviewFieldRow label="SUFFIX" value={suffix?.trim() ? suffix : 'N/A'} />
+              <ReviewFieldRow label={isTagalog ? "PETSA NG KAPANGANAKAN" : "DATE OF BIRTH"} value={licenseData.dob} />
+              <ReviewFieldRow label={isTagalog ? "KASARIAN" : "GENDER"} value={licenseData.gender} />
+              <ReviewFieldRow label={isTagalog ? "TIRAHAN" : "ADDRESS"} value={licenseData.address} />
+              <ReviewFieldRow label={isTagalog ? "KINABABALIKANG TODA" : "AFFILIATED TODA"} value={todaName} />
+              <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
+            </Box>
 
-          <ReviewFieldRow label={isTagalog ? "NUMERO NG LISENSYA" : "DRIVER'S LICENSE NUMBER"} value={licenseData.licenseNumber} />
-          <ReviewFieldRow label="RESTRICTIONS" value={licenseData.dlCodes} />
-          <ReviewFieldRow label={isTagalog ? "PETSA NG PAGKAPASO (EXPIRATION)" : "EXPIRATION DATE"} value={licenseData.expirationDate} />
-          <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
-        </Box>
+            {/* SECTION B: Driver's License */}
+            <Box sx={{ mb: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', mb: 1.5 }}>
+                <Typography sx={{ flex: 1, minWidth: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
+                  Driver's License
+                </Typography>
+                <Typography
+                  onClick={() => navigate('/driver/confirm-license-info', { state: { ...state, isEditMode: true, isResubmission, faultyDocuments } })}
+                  sx={{
+                    flexShrink: 0,
+                    whiteSpace: 'nowrap',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    color: '#FF6B00',
+                    cursor: 'pointer',
+                    px: 1.5,
+                    py: 0.4,
+                    borderRadius: '6px',
+                    backgroundColor: '#FFF5EF',
+                    border: '1px solid #FFD6B8',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'all 0.15s ease',
+                    '&:hover': {
+                      backgroundColor: '#FFEAD9',
+                      borderColor: '#FF6B00',
+                    },
+                  }}
+                >
+                  {isTagalog ? 'I-edit' : 'Edit'}
+                </Typography>
+              </Box>
+
+              <ReviewFieldRow label={isTagalog ? "NUMERO NG LISENSYA" : "DRIVER'S LICENSE NUMBER"} value={licenseData.licenseNumber} />
+              <ReviewFieldRow label="RESTRICTIONS" value={licenseData.dlCodes} />
+              <ReviewFieldRow label={isTagalog ? "PETSA NG PAGKAPASO (EXPIRATION)" : "EXPIRATION DATE"} value={licenseData.expirationDate} />
+              <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
+            </Box>
+          </>
+        )}
 
         {/* SECTION C: Motorcycle Tricycle Operator's Permit */}
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', mb: 1.5 }}>
-            <Typography sx={{ flex: 1, minWidth: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
-              {isTagalog ? "Permiso ng Prangkisa (MTOP)" : "Motorized Tricycle Operator's Permit (MTOP)"}
-            </Typography>
-            <Typography
-              onClick={() => navigate('/driver/confirm-mtop-info', { state: { ...state, isEditMode: true } })}
-              sx={{
-                flexShrink: 0,
-                whiteSpace: 'nowrap',
-                fontSize: '12px',
-                fontWeight: 700,
-                color: '#FF6B00',
-                cursor: 'pointer',
-                px: 1.5,
-                py: 0.4,
-                borderRadius: '6px',
-                backgroundColor: '#FFF5EF',
-                border: '1px solid #FFD6B8',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-                '&:hover': {
-                  backgroundColor: '#FFEAD9',
-                  borderColor: '#FF6B00',
-                },
-              }}
-            >
-              {isTagalog ? 'I-edit' : 'Edit'}
-            </Typography>
-          </Box>
+        {showMtopSection && (
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', mb: 1.5 }}>
+              <Typography sx={{ flex: 1, minWidth: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
+                {isTagalog ? "Permiso ng Prangkisa (MTOP)" : "Motorized Tricycle Operator's Permit (MTOP)"}
+              </Typography>
+              <Typography
+                onClick={() => navigate('/driver/confirm-mtop-info', { state: { ...state, isEditMode: true, isResubmission, faultyDocuments } })}
+                sx={{
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  color: '#FF6B00',
+                  cursor: 'pointer',
+                  px: 1.5,
+                  py: 0.4,
+                  borderRadius: '6px',
+                  backgroundColor: '#FFF5EF',
+                  border: '1px solid #FFD6B8',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                  '&:hover': {
+                    backgroundColor: '#FFEAD9',
+                    borderColor: '#FF6B00',
+                  },
+                }}
+              >
+                {isTagalog ? 'I-edit' : 'Edit'}
+              </Typography>
+            </Box>
 
-          <ReviewFieldRow label={isTagalog ? "REHISTRADONG MAY-ARI / OPERATOR" : "REGISTERED OWNER / OPERATOR"} value={mtopData.operatorName} />
-          <ReviewFieldRow label={isTagalog ? "PRANGKISA" : "FRANCHISE NO."} value={mtopData.franchiseNumber} />
-          <ReviewFieldRow label="PLATE NUMBER" value={mtopData.plateNumber} />
-          <ReviewFieldRow label="CHASSIS NUMBER" value={mtopData.chassisNumber} />
-          <ReviewFieldRow label="MOTOR NUMBER" value={mtopData.motorNumber} />
-          <ReviewFieldRow label="VEHICLE MAKE" value={mtopData.vehicleMake} />
-          <ReviewFieldRow label="YEAR MODEL" value={mtopData.yearModel || 'N/A'} />
-          <ReviewFieldRow label={isTagalog ? "AWTORISADONG RUTA / ZONA" : "AUTHORIZED ROUTE / ZONE"} value={mtopData.authorizedRoute} />
-          <ReviewFieldRow label={isTagalog ? "PETSA NG PAGKAPASO (EXPIRATION)" : "EXPIRATION DATE"} value={mtopData.expirationDate} />
-          <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
-        </Box>
+            <ReviewFieldRow label={isTagalog ? "REHISTRADONG MAY-ARI / OPERATOR" : "REGISTERED OWNER / OPERATOR"} value={mtopData.operatorName} />
+            <ReviewFieldRow label={isTagalog ? "PRANGKISA" : "FRANCHISE NO."} value={mtopData.franchiseNumber} />
+            <ReviewFieldRow label="PLATE NUMBER" value={mtopData.plateNumber} />
+            <ReviewFieldRow label="CHASSIS NUMBER" value={mtopData.chassisNumber} />
+            <ReviewFieldRow label="MOTOR NUMBER" value={mtopData.motorNumber} />
+            <ReviewFieldRow label="VEHICLE MAKE" value={mtopData.vehicleMake} />
+            <ReviewFieldRow label="YEAR MODEL" value={mtopData.yearModel || 'N/A'} />
+            <ReviewFieldRow label={isTagalog ? "AWTORISADONG RUTA / ZONA" : "AUTHORIZED ROUTE / ZONE"} value={mtopData.authorizedRoute} />
+            <ReviewFieldRow label={isTagalog ? "PETSA NG PAGKAPASO (EXPIRATION)" : "EXPIRATION DATE"} value={mtopData.expirationDate} />
+            <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
+          </Box>
+        )}
 
         {/* SECTION D: Unit ng Tricycle */}
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', mb: 1.5 }}>
-            <Typography sx={{ flex: 1, minWidth: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
-              {isTagalog ? 'Unit ng Tricycle' : 'Tricycle Unit'}
-            </Typography>
-            <Typography
-              onClick={() => navigate('/driver/tricycle-instructions', { state: { ...state, isEditMode: true } })}
-              sx={{
-                flexShrink: 0,
-                whiteSpace: 'nowrap',
-                fontSize: '12px',
-                fontWeight: 700,
-                color: '#FF6B00',
-                cursor: 'pointer',
-                px: 1.5,
-                py: 0.4,
-                borderRadius: '6px',
-                backgroundColor: '#FFF5EF',
-                border: '1px solid #FFD6B8',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-                '&:hover': {
-                  backgroundColor: '#FFEAD9',
-                  borderColor: '#FF6B00',
-                },
-              }}
-            >
-              {isTagalog ? 'I-edit' : 'Edit'}
-            </Typography>
-          </Box>
+        {showTricycleSection && (
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', mb: 1.5 }}>
+              <Typography sx={{ flex: 1, minWidth: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
+                {isTagalog ? 'Unit ng Tricycle' : 'Tricycle Unit'}
+              </Typography>
+              <Typography
+                onClick={() => navigate('/driver/scan-tricycle', { state: { ...state, isEditMode: true, isResubmission, faultyDocuments } })}
+                sx={{
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  color: '#FF6B00',
+                  cursor: 'pointer',
+                  px: 1.5,
+                  py: 0.4,
+                  borderRadius: '6px',
+                  backgroundColor: '#FFF5EF',
+                  border: '1px solid #FFD6B8',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                  '&:hover': {
+                    backgroundColor: '#FFEAD9',
+                    borderColor: '#FF6B00',
+                  },
+                }}
+              >
+                {isTagalog ? 'I-edit' : 'Edit'}
+              </Typography>
+            </Box>
 
-          <ReviewFieldRow label={isTagalog ? "LARAWAN NG TRICYCLE" : "TRICYCLE PHOTO"} value={isTagalog ? "Nakuha (Na-verify)" : "Captured (Verified)"} />
-          <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
-        </Box>
+            <ReviewFieldRow label={isTagalog ? "LARAWAN NG TRICYCLE" : "TRICYCLE PHOTO"} value={isTagalog ? "Nakuha (Na-verify)" : "Captured (Verified)"} />
+            <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
+          </Box>
+        )}
 
         {/* SECTION E: Beripikasyon ng Mukha */}
-        <Box sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', mb: 1.5 }}>
-            <Typography sx={{ flex: 1, minWidth: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
-              {isTagalog ? 'Beripikasyon ng Mukha' : 'Face Verification'}
-            </Typography>
-            <Typography
-              onClick={() => navigate('/driver/scan-face', { state: { ...state, isEditMode: true } })}
-              sx={{
-                flexShrink: 0,
-                whiteSpace: 'nowrap',
-                fontSize: '12px',
-                fontWeight: 700,
-                color: '#FF6B00',
-                cursor: 'pointer',
-                px: 1.5,
-                py: 0.4,
-                borderRadius: '6px',
-                backgroundColor: '#FFF5EF',
-                border: '1px solid #FFD6B8',
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'all 0.15s ease',
-                '&:hover': {
-                  backgroundColor: '#FFEAD9',
-                  borderColor: '#FF6B00',
-                },
-              }}
-            >
-              {isTagalog ? 'I-edit' : 'Edit'}
-            </Typography>
-          </Box>
+        {showFaceSection && (
+          <Box sx={{ mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', mb: 1.5 }}>
+              <Typography sx={{ flex: 1, minWidth: 0, fontSize: '15px', fontWeight: 800, color: '#0F172A', lineHeight: 1.3 }}>
+                {isTagalog ? 'Beripikasyon ng Mukha' : 'Face Verification'}
+              </Typography>
+              <Typography
+                onClick={() => navigate('/driver/scan-face', { state: { ...state, isEditMode: true, isResubmission, faultyDocuments } })}
+                sx={{
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  color: '#FF6B00',
+                  cursor: 'pointer',
+                  px: 1.5,
+                  py: 0.4,
+                  borderRadius: '6px',
+                  backgroundColor: '#FFF5EF',
+                  border: '1px solid #FFD6B8',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.15s ease',
+                  '&:hover': {
+                    backgroundColor: '#FFEAD9',
+                    borderColor: '#FF6B00',
+                  },
+                }}
+              >
+                {isTagalog ? 'I-edit' : 'Edit'}
+              </Typography>
+            </Box>
 
-          <ReviewFieldRow label={isTagalog ? "STATUS NG MATCH" : "MATCH STATUS"} value={isTagalog ? "Magkatugma (Na-verify)" : "Matched (Verified)"} />
-          <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
-        </Box>
+            <ReviewFieldRow label={isTagalog ? "STATUS NG MATCH" : "MATCH STATUS"} value={isTagalog ? "Magkatugma (Na-verify)" : "Matched (Verified)"} />
+            <Box sx={{ width: '100%', height: '1px', backgroundColor: '#E2E8F0', mt: 2.25, mb: 1 }} />
+          </Box>
+        )}
 
         {/* Confirmation Checkbox */}
         <Box
@@ -491,9 +602,13 @@ export const DriverConfirmAllInfo: React.FC = () => {
             }}
           />
           <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#0F172A', lineHeight: 1.35 }}>
-            {isTagalog
-              ? 'Kinukumpirma kong tama ang lahat ng impormasyong aking isinumite.'
-              : 'I confirm that all the information I submitted is correct.'}
+            {isResubmission
+              ? (isTagalog
+                  ? 'Kinukumpirma kong tama ang lahat ng mga binagong impormasyong aking isinumite.'
+                  : 'I confirm that all the corrected information I submitted is accurate.')
+              : (isTagalog
+                  ? 'Kinukumpirma kong tama ang lahat ng impormasyong aking isinumite.'
+                  : 'I confirm that all the information I submitted is correct.')}
           </Typography>
         </Box>
       </Box>
@@ -521,6 +636,8 @@ export const DriverConfirmAllInfo: React.FC = () => {
         >
           {submitting
             ? (isTagalog ? 'Isina-save...' : 'Saving...')
+            : isResubmission
+            ? (isTagalog ? 'Muling Isumite ang Aplikasyon' : 'Resubmit Application')
             : (isTagalog ? 'Magpatuloy' : 'Submit Application')}
         </PrimaryButton>
       </Box>

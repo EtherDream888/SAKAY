@@ -15,6 +15,9 @@ import todaPortalRoutes from './routes/todaPortalRoutes';
 import authRoutes from './routes/authRoutes';
 import communicationRoutes from './routes/communicationRoutes';
 import ocrRoutes from './routes/ocrRoutes';
+import schedulerRoutes from './routes/schedulerRoutes';
+import rosterRoutes from './routes/rosterRoutes';
+import { startSlaScheduler } from './services/slaSchedulerService';
 
 dotenv.config();
 
@@ -77,6 +80,8 @@ app.use('/api/toda', todaPortalRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/communication', communicationRoutes);
 app.use('/api/ocr', ocrRoutes);
+app.use('/api/scheduler', schedulerRoutes);
+app.use('/api/admin/todas/:todaId/roster', rosterRoutes);
 
 // 404 Catch-All Handler
 app.use((_req: Request, res: Response) => {
@@ -102,6 +107,9 @@ app.listen(PORT, () => {
   console.log(`   ➜ Local: http://localhost:${PORT}`);
   console.log(`   ➜ Health: http://localhost:${PORT}/api/health`);
   console.log(`=============================================`);
+
+  // Start background SLA & credential expiry scheduler daemon
+  startSlaScheduler();
 });
 
 export default app;

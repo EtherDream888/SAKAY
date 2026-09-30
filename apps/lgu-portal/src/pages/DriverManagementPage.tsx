@@ -74,7 +74,10 @@ export const DriverManagementPage: React.FC = () => {
       d.barangay.toLowerCase().includes(q);
 
     const matchesVerification =
-      verificationFilter === 'All' || d.verificationStatus === verificationFilter;
+      verificationFilter === 'All' ||
+      (verificationFilter === 'Pending'
+        ? (d.verificationStatus === 'Pending' || d.verificationStatus === 'Endorsed to LGU')
+        : d.verificationStatus === verificationFilter);
     const matchesOnline = onlineFilter === 'All' || d.onlineStatus === onlineFilter;
 
     return matchesSearch && matchesVerification && matchesOnline;
@@ -82,9 +85,12 @@ export const DriverManagementPage: React.FC = () => {
 
   const verificationOptions: FilterOption[] = [
     { label: 'All Verifications', value: 'All' },
+    { label: 'Endorsed to LGU', value: 'Endorsed to LGU' },
+    { label: 'Resubmission Required', value: 'Resubmission Required' },
     { label: 'Verified', value: 'Verified' },
     { label: 'Pending Verification', value: 'Pending' },
     { label: 'Suspended', value: 'Suspended' },
+    { label: 'Rejected', value: 'Rejected' },
   ];
 
   const onlineOptions: FilterOption[] = [
@@ -206,6 +212,20 @@ export const DriverManagementPage: React.FC = () => {
                           <Typography sx={{ fontWeight: 600, fontSize: '13px', color: 'var(--mac-text-primary)' }}>
                             {driver.name}
                           </Typography>
+                          {driver.isResubmitted && (
+                            <Chip
+                              label="Resubmitted"
+                              size="small"
+                              sx={{
+                                fontSize: '9.5px',
+                                fontWeight: 700,
+                                backgroundColor: '#FEF3C7',
+                                color: '#B45309',
+                                border: '1px solid #FCD34D',
+                                height: 22,
+                              }}
+                            />
+                          )}
                           {driver.isOverdue5Days && (
                             <Chip
                               label="Overdue >5 Days"
@@ -252,7 +272,23 @@ export const DriverManagementPage: React.FC = () => {
                     </Box>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
-                    <StatusBadge status={driver.verificationStatus as any} />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <StatusBadge status={driver.verificationStatus as any} />
+                      {driver.isResubmitted && (
+                        <Chip
+                          label="Resubmitted"
+                          size="small"
+                          sx={{
+                            fontSize: '9px',
+                            fontWeight: 700,
+                            backgroundColor: '#FEF3C7',
+                            color: '#B45309',
+                            border: '1px solid #FCD34D',
+                            height: 20,
+                          }}
+                        />
+                      )}
+                    </Box>
                   </TableCell>
                   <TableCell sx={{ py: 2.2, px: 3 }}>
                     <StatusBadge status={driver.accountStatus as any} />

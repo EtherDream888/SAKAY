@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/supabase';
+import { sendRawSms } from '../services/smsService';
 
 const router = Router();
 
@@ -104,7 +105,7 @@ router.post('/:id/verify', async (req: Request, res: Response) => {
         .from('driver')
         .update(updatePayload)
         .eq('driver_id', id)
-        .select()
+        .select('*, toda:toda_id ( toda_name, toda_acronym )')
         .single();
 
       if (error) throw error;
@@ -117,6 +118,18 @@ router.post('/:id/verify', async (req: Request, res: Response) => {
           performed_at: new Date().toISOString(),
         },
       ]);
+
+      // Dispatch official Tagalog approval SMS
+      if (data?.contact_number) {
+        try {
+          const firstName = data.full_name?.split(' ')[0] || data.full_name || 'Drayber';
+          const todaName = data.toda?.toda_name || 'TODA';
+          const smsMsg = `SAKAY Alert: Magandang araw, ${firstName}! Ang iyong aplikasyon bilang drayber ay opisyal nang inaprubahan ng City LGU Franchising Office at ${todaName}. Beripikado na ang iyong account! Maaari ka nang mag-log in sa SAKAY Driver app upang magsimulang pumasada. Ingat sa biyahe!`;
+          await sendRawSms(data.contact_number, smsMsg);
+        } catch (smsErr) {
+          console.warn('[driverRoutes] LGU verification SMS dispatch error:', smsErr);
+        }
+      }
 
       return res.json({
         success: true,

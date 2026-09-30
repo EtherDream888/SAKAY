@@ -307,7 +307,7 @@ export async function fetchDriverProfile(driverId?: string) {
       accountStatus: data.account_status,
       isOnline: data.availability_status === 'Online',
       isPaused: data.availability_status === 'Paused',
-      verificationStage: data.account_status === 'Verified' || data.account_status === 'Active' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
+      verificationStage: data.account_status === 'Verified' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
       currentLat: data.current_latitude ? Number(data.current_latitude) : 13.4117,
       currentLng: data.current_longitude ? Number(data.current_longitude) : 121.1803,
     };
@@ -453,14 +453,32 @@ export async function fetchDriverEarnings(driverId?: string) {
 export async function fetchDriverNotifications(): Promise<any[]> {
   try {
     const client = await getSecureLookupClient();
-    const { data, error } = await client
-      .from('announcement')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const { data: { user } } = await client.auth.getUser();
+    let driverId: string | null = null;
+    if (user?.id) {
+      const { data: d } = await client.from('driver').select('driver_id').eq('auth_user_id', user.id).maybeSingle();
+      driverId = d?.driver_id || null;
+    }
 
-    if (error || !data || data.length === 0) return [];
+    const [announcementsRes, notifsRes] = await Promise.all([
+      client.from('announcement').select('*').order('created_at', { ascending: false }).limit(20),
+      driverId
+        ? client.from('notification').select('*').or(`recipient_id.eq.${driverId},driver_id.eq.${driverId}`).order('sent_at', { ascending: false }).limit(20)
+        : Promise.resolve({ data: [] as any[], error: null }),
+    ]);
 
-    return data.map((a: any) => ({
+    const notifs = (notifsRes.data || []).map((n: any) => ({
+      id: n.notification_id || n.id,
+      title: n.title,
+      message: n.message,
+      category: 'TODA Announcement',
+      type: 'alert',
+      time: n.sent_at ? new Date(n.sent_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recent',
+      timestamp: n.sent_at ? new Date(n.sent_at).toLocaleDateString('en-US') : 'Recent',
+      read: false,
+    }));
+
+    const announcements = (announcementsRes.data || []).map((a: any) => ({
       id: a.announcement_id,
       title: a.title,
       message: a.message || a.content || '',
@@ -470,6 +488,8 @@ export async function fetchDriverNotifications(): Promise<any[]> {
       timestamp: a.created_at ? new Date(a.created_at).toLocaleDateString('en-US') : 'Recent',
       read: false,
     }));
+
+    return [...notifs, ...announcements];
   } catch {
     return [];
   }
@@ -1164,6 +1184,8 @@ export async function saveDriverLicenseVerification(
       ocr_dl_codes: ocrDlCodesStr || formData.dlCodes,
       submitted_dl_codes: formData.dlCodes,
       license_expiry: parseDateForDb(formData.expirationDate),
+      license_front_photo_path: frontStoragePath,
+      license_back_photo_path: backStoragePath,
       mime_type: 'image/jpeg',
       file_size: totalSizeBytes > 0 ? totalSizeBytes : null,
       scan_status: 'Clean',
@@ -1199,6 +1221,8 @@ export async function saveDriverLicenseVerification(
           submitted_address: formData.address,
           submitted_dl_codes: formData.dlCodes,
           license_expiry: parseDateForDb(formData.expirationDate),
+          license_front_photo_path: frontStoragePath,
+          license_back_photo_path: backStoragePath,
           submitted_at: new Date().toISOString(),
         };
         const { error: fallbackErr } = await supabase
@@ -1229,6 +1253,8 @@ export async function saveDriverLicenseVerification(
           submitted_address: formData.address,
           submitted_dl_codes: formData.dlCodes,
           license_expiry: parseDateForDb(formData.expirationDate),
+          license_front_photo_path: frontStoragePath,
+          license_back_photo_path: backStoragePath,
           submitted_at: new Date().toISOString(),
         };
         const { error: fallbackInsertErr } = await supabase
@@ -1408,6 +1434,7 @@ export async function saveDriverMtopVerification(
           submitted_operator_name: formData.operatorName,
           submitted_plate_number: formData.plateNumber,
           franchise_expiry: parseDateForDb(formData.expirationDate),
+          ...(mtopStoragePath ? { mtop_photo_path: mtopStoragePath } : {}),
         })
         .eq('verification_id', verifId);
     } else {
@@ -1419,6 +1446,7 @@ export async function saveDriverMtopVerification(
           submitted_operator_name: formData.operatorName,
           submitted_plate_number: formData.plateNumber,
           franchise_expiry: parseDateForDb(formData.expirationDate),
+          ...(mtopStoragePath ? { mtop_photo_path: mtopStoragePath } : {}),
         })
         .select('verification_id')
         .single();
@@ -1481,6 +1509,24 @@ export async function saveDriverSelfieVerification(
             });
         }
         console.log('[DRIVER SELFIE SAVE] Selfie photo uploaded successfully:', selfiePath);
+
+        // Persist face_photo_path to driver_verification
+        try {
+          const { data: drv } = await supabase
+            .from('driver')
+            .select('driver_id')
+            .eq('auth_user_id', authUserId)
+            .maybeSingle();
+          if (drv?.driver_id) {
+            await supabase
+              .from('driver_verification')
+              .update({ face_photo_path: selfiePath, face_verification_status: 'Passed' })
+              .eq('driver_id', drv.driver_id);
+          }
+        } catch (dbErr) {
+          console.warn('[DRIVER SELFIE SAVE] Non-blocking DB update warning:', dbErr);
+        }
+
         return { success: true, selfieStoragePath: selfiePath };
       } catch (storageException) {
         console.warn('[DRIVER SELFIE SAVE] Storage upload exception:', storageException);
@@ -1536,6 +1582,28 @@ export async function saveDriverTricycleVerification(
             });
         }
         console.log('[DRIVER TRICYCLE SAVE] Tricycle unit photo uploaded successfully:', tricyclePath);
+
+        // Persist tricycle_photo_path to driver_verification & driver
+        try {
+          const { data: drv } = await supabase
+            .from('driver')
+            .select('driver_id')
+            .eq('auth_user_id', authUserId)
+            .maybeSingle();
+          if (drv?.driver_id) {
+            await supabase
+              .from('driver_verification')
+              .update({ tricycle_photo_path: tricyclePath })
+              .eq('driver_id', drv.driver_id);
+            await supabase
+              .from('driver')
+              .update({ tricycle_photo_path: tricyclePath })
+              .eq('driver_id', drv.driver_id);
+          }
+        } catch (dbErr) {
+          console.warn('[DRIVER TRICYCLE SAVE] Non-blocking DB update warning:', dbErr);
+        }
+
         return { success: true, tricycleStoragePath: tricyclePath };
       } catch (storageException) {
         console.warn('[DRIVER TRICYCLE SAVE] Storage upload exception:', storageException);
@@ -1585,7 +1653,11 @@ export async function submitFinalDriverRegistration(
     const tricycle = cache?.step3_tricycle;
     const face = cache?.step5_face;
 
-    const tricyclePath = tricycle?.photoUrl ? `${authUserId}/tricycle.jpg` : null;
+    const frontPath = `${authUserId}/license_front.jpg`;
+    const backPath = `${authUserId}/license_back.jpg`;
+    const mtopPath = `${authUserId}/mtop.jpg`;
+    const tricyclePath = `${authUserId}/tricycle.jpg`;
+    const selfiePath = `${authUserId}/selfie.jpg`;
 
     // 1. Resolve Driver Record
     const { data: driverRows } = await supabase
@@ -1629,6 +1701,9 @@ export async function submitFinalDriverRegistration(
 
     // 2. Update public.driver with allowable profile details (name, dob, address)
     const driverPayload: Record<string, any> = {
+      account_status: 'Pending Verification',
+      rejection_reason: null,
+      rejection_comment: null,
       updated_at: new Date().toISOString(),
     };
     if (license?.fullName) driverPayload.full_name = license.fullName;
@@ -1684,10 +1759,19 @@ export async function submitFinalDriverRegistration(
       franchise_expiry: mtop?.expirationDate ? parseDateForDb(mtop?.expirationDate) : null,
       mtop_expiry: mtop?.expirationDate ? parseDateForDb(mtop?.expirationDate) : null,
       submitted_authorized_route: mtop?.authorizedRoute || null,
+      license_front_photo_path: frontPath,
+      license_back_photo_path: backPath,
+      mtop_photo_path: mtopPath,
       tricycle_photo_path: tricyclePath,
+      face_photo_path: selfiePath,
       face_verification_status: face?.faceMatchPassed === false ? 'Flagged' : 'Passed',
       scan_status: 'Clean',
       verification_status: 'Pending',
+      rejection_reason: null,
+      rejection_comment: null,
+      rejected_by: null,
+      rejected_at: null,
+      remarks: 'Resubmitted by driver applicant with updated documents',
       submitted_at: new Date().toISOString(),
     };
 
@@ -1704,16 +1788,41 @@ export async function submitFinalDriverRegistration(
       submitted_operator_name: mtop?.operatorName || null,
       submitted_plate_number: mtop?.plateNumber || null,
       franchise_expiry: mtop?.expirationDate ? parseDateForDb(mtop?.expirationDate) : null,
+      license_front_photo_path: frontPath,
+      license_back_photo_path: backPath,
+      mtop_photo_path: mtopPath,
+      tricycle_photo_path: tricyclePath,
+      face_photo_path: selfiePath,
       scan_status: 'Clean',
       verification_status: 'Pending',
+      rejection_reason: null,
+      rejection_comment: null,
+      rejected_by: null,
+      rejected_at: null,
+      remarks: 'Resubmitted by driver applicant with updated documents',
       submitted_at: new Date().toISOString(),
     };
 
     const { data: existingVerif } = await supabase
       .from('driver_verification')
-      .select('verification_id')
+      .select('verification_id, verification_status, endorsed_at')
       .eq('driver_id', driverId)
       .maybeSingle();
+
+    const isResubmission =
+      existingVerif?.verification_status === 'Resubmission Required' ||
+      Boolean(existingVerif?.endorsed_at) ||
+      Boolean(localStorage.getItem('sakay_driver_resubmission_session'));
+
+    const targetVerificationStatus = isResubmission ? 'Endorsed to LGU' : 'Pending';
+
+    verifPayload.verification_status = targetVerificationStatus;
+    fallbackVerifPayload.verification_status = targetVerificationStatus;
+
+    if (isResubmission) {
+      verifPayload.remarks = 'Resubmitted by driver applicant with updated documents';
+      fallbackVerifPayload.remarks = 'Resubmitted by driver applicant with updated documents';
+    }
 
     if (existingVerif) {
       const { error: updateVerifErr } = await supabase
@@ -1741,6 +1850,13 @@ export async function submitFinalDriverRegistration(
       }
     }
 
+    if (isResubmission) {
+      try {
+        localStorage.setItem('sakay_driver_just_resubmitted', 'true');
+        localStorage.removeItem('sakay_driver_resubmission_session');
+      } catch {}
+    }
+
     console.log('[FINAL REGISTRATION SUBMIT] Complete submission finalized successfully for driver:', driverId);
     return { success: true };
   } catch (err: any) {
@@ -1755,6 +1871,67 @@ export async function submitFinalDriverRegistration(
   }
 }
 
+/**
+ * Checks if a driver is documentarily restricted (expired license, MTOP, or unaccredited TODA)
+ * Authoritative DB-backed check (Rule 24.1 - 24.3)
+ */
+export async function checkDriverDocumentaryRestriction(driverId: string) {
+  try {
+    const { data, error } = await supabase.rpc('is_driver_documentarily_restricted', {
+      p_driver_id: driverId,
+    });
+    if (error) {
+      console.warn('[driverApiService] checkDriverDocumentaryRestriction warning:', error);
+      return { is_restricted: false, reasons: [] };
+    }
+    return data || { is_restricted: false, reasons: [] };
+  } catch (err) {
+    console.warn('[driverApiService] checkDriverDocumentaryRestriction error:', err);
+    return { is_restricted: false, reasons: [] };
+  }
+}
 
+/**
+ * Submits renewed driver documents for LGU verification (Rule 24.2)
+ * Does NOT directly mutate driver expiry dates; puts into pending renewal status.
+ */
+export async function submitDriverRenewal(
+  driverId: string,
+  licenseExpiry?: string,
+  mtopExpiry?: string,
+  licensePhotoUrl?: string,
+  mtopPhotoUrl?: string
+) {
+  const { data, error } = await supabase.rpc('submit_driver_renewal', {
+    p_driver_id: driverId,
+    p_license_expiry: licenseExpiry || null,
+    p_mtop_expiry: mtopExpiry || null,
+    p_license_photo_url: licensePhotoUrl || null,
+    p_mtop_photo_url: mtopPhotoUrl || null,
+  });
+  if (error) throw error;
+  return data;
+}
 
+/**
+ * Selects an active TODA affiliation while driver is Offline (Rule 3.1, 3.10)
+ */
+export async function selectActiveDriverAffiliation(affiliationId: string) {
+  const { data, error } = await supabase.rpc('select_active_driver_affiliation', {
+    p_affiliation_id: affiliationId,
+  });
+  if (error) throw error;
+  return data;
+}
 
+/**
+ * Resubmits a driver application returned under Resubmission Required (Rule 3.6, 3.8)
+ */
+export async function resubmitDriverApplication(affiliationId: string, documents?: any) {
+  const { data, error } = await supabase.rpc('resubmit_driver_application', {
+    p_affiliation_id: affiliationId,
+    p_submitted_documents: documents || null,
+  });
+  if (error) throw error;
+  return data;
+}

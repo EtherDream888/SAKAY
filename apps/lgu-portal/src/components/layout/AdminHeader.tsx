@@ -32,29 +32,49 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
     let isMounted = true;
     const fetchNotifications = async () => {
       try {
-        const { data: logs } = await supabase
-          .from('audit_log')
-          .select('*')
-          .order('performed_at', { ascending: false })
-          .limit(8);
+        const [notifsRes, logsRes] = await Promise.all([
+          supabase
+            .from('notification')
+            .select('*')
+            .eq('recipient_id', 'lgu_admin')
+            .order('sent_at', { ascending: false })
+            .limit(10),
+          supabase
+            .from('audit_log')
+            .select('*')
+            .order('performed_at', { ascending: false })
+            .limit(6),
+        ]);
 
-        if (isMounted && logs && logs.length > 0) {
-          const items: NotificationItem[] = logs.map((log: any) => {
-            const timeVal = log.performed_at || log.created_at;
-            return {
-              id: log.log_id,
-              title: log.action_type ? log.action_type.replace(/_/g, ' ') : 'Administrative Activity',
-              description: log.details || '',
-              time: timeVal ? new Date(timeVal).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Recent',
-              read: false,
-              unread: true,
-              type: (log.category || 'System').toLowerCase(),
-            };
-          });
-          setNotifications(items);
+        const notifItems: NotificationItem[] = (notifsRes.data || []).map((n: any) => ({
+          id: n.notification_id || n.id,
+          title: n.title,
+          description: n.message,
+          time: n.sent_at ? new Date(n.sent_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+          read: false,
+          unread: true,
+          type: 'alert',
+        }));
+
+        const logItems: NotificationItem[] = (logsRes.data || []).map((log: any) => {
+          const timeVal = log.performed_at || log.created_at;
+          return {
+            id: log.log_id,
+            title: log.action_type ? log.action_type.replace(/_/g, ' ') : 'Administrative Activity',
+            description: log.details || '',
+            time: timeVal ? new Date(timeVal).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+            read: false,
+            unread: true,
+            type: (log.category || 'System').toLowerCase(),
+          };
+        });
+
+        const combined = [...notifItems, ...logItems];
+        if (isMounted && combined.length > 0) {
+          setNotifications(combined.slice(0, 10));
         }
       } catch (err) {
-        console.warn('[AdminHeader] Could not load audit notifications:', err);
+        console.warn('[AdminHeader] Could not load notifications:', err);
       }
     };
 

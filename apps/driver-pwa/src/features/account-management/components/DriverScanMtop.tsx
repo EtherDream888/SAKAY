@@ -10,6 +10,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CameraswitchIcon from '@mui/icons-material/Cameraswitch';
 import FlashOnIcon from '@mui/icons-material/FlashOn';
 import FlashOffIcon from '@mui/icons-material/FlashOff';
+import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 
 import Logo from '../../../common/components/Logo';
 import { useLanguage } from '../../../utils/LanguageContext';
@@ -272,7 +273,13 @@ export const DriverScanMtop: React.FC = () => {
         }}
       >
         <IconButton
-          onClick={() => navigate('/driver/mtop-instructions', { state })}
+          onClick={() => {
+            if ((state as any)?.isResubmission) {
+              navigate('/driver/status');
+            } else {
+              navigate('/driver/mtop-instructions', { state });
+            }
+          }}
           sx={{
             width: 44,
             height: 44,
@@ -288,6 +295,34 @@ export const DriverScanMtop: React.FC = () => {
 
         <Logo color="orange" width={110} />
       </Box>
+
+      {/* Resubmission Banner if MTOP was flagged */}
+      {(state as any)?.isResubmission && (
+        <Box
+          sx={{
+            px: 2.5,
+            py: 1,
+            backgroundColor: '#FFFBEB',
+            borderBottom: '1px solid #FDE68A',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.2,
+            zIndex: 14,
+          }}
+        >
+          <WarningAmberRoundedIcon sx={{ color: '#D97706', fontSize: 20, flexShrink: 0 }} />
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontSize: '11px', fontWeight: 800, color: '#B45309', textTransform: 'uppercase', lineHeight: 1.2 }}>
+              {isTagalog ? 'Kailangang Iwasto: MTOP / Prangkisa' : 'Required Correction: MTOP / Franchise'}
+            </Typography>
+            <Typography sx={{ fontSize: '12px', color: '#92400E', fontWeight: 600, lineHeight: 1.3, mt: 0.25 }} noWrap>
+              {(state as any)?.issues?.find((i: any) => i.documentType === 'mtop')?.notes ||
+                (state as any)?.rejectionReason ||
+                'Clearer MTOP document scan required'}
+            </Typography>
+          </Box>
+        </Box>
+      )}
 
       {/* 2. Main Scanner Viewport Area */}
       <Box

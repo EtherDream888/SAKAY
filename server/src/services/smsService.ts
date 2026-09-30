@@ -3,9 +3,13 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Android SMS Gateway Configuration (capcom6/android-sms-gateway)
-const gatewayUrl = (process.env.SMS_GATEWAY_URL || '').trim().replace(/\/+$/, '');
-const gatewayLogin = (process.env.SMS_GATEWAY_LOGIN || '').trim();
-const gatewayPassword = (process.env.SMS_GATEWAY_PASSWORD || '').trim();
+const getGatewayConfig = () => ({
+  url: (process.env.SMS_GATEWAY_URL || '').trim().replace(/\/+$/, ''),
+  login: (process.env.SMS_GATEWAY_LOGIN || '').trim(),
+  password: (process.env.SMS_GATEWAY_PASSWORD || '').trim(),
+  simNumber: parseInt(process.env.SMS_GATEWAY_SIM_NUMBER || '1', 10),
+  deviceId: (process.env.SMS_GATEWAY_DEVICE_ID || '').trim(),
+});
 
 // In-memory OTP cache with 5-minute TTL
 interface OtpEntry {
@@ -51,6 +55,8 @@ async function sendViaAndroidGateway(
   formattedPhone: string,
   messageText: string
 ): Promise<{ success: boolean; message?: string; error?: string }> {
+  const { url: gatewayUrl, login: gatewayLogin, password: gatewayPassword, simNumber: configuredSim, deviceId } = getGatewayConfig();
+
   if (!gatewayUrl) {
     return { success: false, error: 'SMS Gateway URL not configured.' };
   }
@@ -70,8 +76,6 @@ async function sendViaAndroidGateway(
     headers['Authorization'] = `Bearer ${gatewayPassword}`;
   }
 
-  const configuredSim = parseInt(process.env.SMS_GATEWAY_SIM_NUMBER || '2', 10);
-
   // Payload matching capcom6/android-sms-gateway specifications
   const payload: Record<string, any> = {
     phoneNumbers: [formattedPhone],
@@ -83,8 +87,8 @@ async function sendViaAndroidGateway(
     payload.simNumber = configuredSim;
   }
 
-  if (process.env.SMS_GATEWAY_DEVICE_ID) {
-    payload.deviceId = process.env.SMS_GATEWAY_DEVICE_ID.trim();
+  if (deviceId) {
+    payload.deviceId = deviceId;
   }
 
   // Attempt up to 2 times with a 15-second timeout to allow dozing phones to wake Wi-Fi radio
@@ -147,6 +151,8 @@ export const sendRawSms = async (
   console.log(`   ➜ Recipient : ${formattedPhone}`);
   console.log(`   ➜ Message   : "${messageText}"`);
   console.log(`======================================================\n`);
+
+  const { url: gatewayUrl } = getGatewayConfig();
 
   // 1. Try Android SMS Gateway if configured
   if (gatewayUrl) {

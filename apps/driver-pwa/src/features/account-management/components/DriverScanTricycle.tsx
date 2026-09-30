@@ -325,7 +325,13 @@ export const DriverScanTricycle: React.FC = () => {
         }}
       >
         <IconButton
-          onClick={() => navigate('/driver/tricycle-instructions', { state })}
+          onClick={() => {
+            if ((state as any)?.isResubmission) {
+              navigate('/driver/status');
+            } else {
+              navigate('/driver/tricycle-instructions', { state });
+            }
+          }}
           sx={{
             width: 44,
             height: 44,
@@ -341,6 +347,34 @@ export const DriverScanTricycle: React.FC = () => {
 
         <Logo color="orange" width={110} />
       </Box>
+
+      {/* Resubmission Banner if Tricycle Photo was flagged */}
+      {(state as any)?.isResubmission && (
+        <Box
+          sx={{
+            px: 2.5,
+            py: 1,
+            backgroundColor: '#FFFBEB',
+            borderBottom: '1px solid #FDE68A',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.2,
+            zIndex: 14,
+          }}
+        >
+          <WarningAmberRoundedIcon sx={{ color: '#D97706', fontSize: 20, flexShrink: 0 }} />
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontSize: '11px', fontWeight: 800, color: '#B45309', textTransform: 'uppercase', lineHeight: 1.2 }}>
+              {isTagalog ? 'Kailangang Iwasto: Larawan ng Tricycle' : 'Required Correction: Tricycle Photo'}
+            </Typography>
+            <Typography sx={{ fontSize: '12px', color: '#92400E', fontWeight: 600, lineHeight: 1.3, mt: 0.25 }} noWrap>
+              {(state as any)?.issues?.find((i: any) => i.documentType === 'tricycle')?.notes ||
+                (state as any)?.rejectionReason ||
+                'Clearer tricycle photo required'}
+            </Typography>
+          </Box>
+        </Box>
+      )}
 
       {/* 2. Main Scanner Viewport Area */}
       <Box

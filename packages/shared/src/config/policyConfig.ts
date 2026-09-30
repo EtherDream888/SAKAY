@@ -71,7 +71,26 @@ export const OTP_EXPIRATION_MINUTES = 5;
 export const OTP_EXPIRATION_MS = OTP_EXPIRATION_MINUTES * 60 * 1000;
 
 // ============================================================================
-// 5. UNIFIED POLICY CONSTANTS OBJECT
+// 5. ONBOARDING, ACCREDITATION & SLA TIMERS (Batch 1 - Rules 2.5, 3.5, 3.7, 24.4)
+// ============================================================================
+
+/** Driver application combined review deadline in calendar days (Rule 3.5) */
+export const DRIVER_APPLICATION_REVIEW_DEADLINE_DAYS = 5;
+
+/** Reviewer reminder threshold in calendar days (Rule 3.7) */
+export const DRIVER_APPLICATION_STAGE_REMINDER_DAYS = 3;
+
+/** Upheld incident reports threshold triggering supervisory review (Rule 2.5) */
+export const TODA_INCIDENT_REPORT_FLAG_THRESHOLD = 3;
+
+/** Rolling evaluation window in calendar days for TODA incidents (Rule 2.5) */
+export const TODA_INCIDENT_REPORT_WINDOW_DAYS = 60;
+
+/** Document and accreditation expiry advance reminder intervals in days (Rule 24.4) */
+export const DOCUMENT_EXPIRY_REMINDER_DAYS = [30, 14, 3] as const;
+
+// ============================================================================
+// 6. UNIFIED POLICY CONSTANTS OBJECT
 // ============================================================================
 
 export const POLICY_CONSTANTS = {
@@ -88,6 +107,14 @@ export const POLICY_CONSTANTS = {
     OTP_EXPIRATION_MINUTES,
     OTP_EXPIRATION_MS,
   },
+  ONBOARDING: {
+    DRIVER_APPLICATION_REVIEW_DEADLINE_DAYS,
+    DRIVER_APPLICATION_STAGE_REMINDER_DAYS,
+    TODA_INCIDENT_REPORT_FLAG_THRESHOLD,
+    TODA_INCIDENT_REPORT_WINDOW_DAYS,
+    DOCUMENT_EXPIRY_REMINDER_DAYS,
+  },
 } as const;
 
 export type PolicyConstants = typeof POLICY_CONSTANTS;
+

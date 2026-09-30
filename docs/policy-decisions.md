@@ -226,3 +226,45 @@ This document records the architectural and regulatory decisions for SAKAY polic
 3. `'Busy'`: Driver currently assigned to an accepted booking or executing an active trip.
 
 *(Eliminates non-canonical `'Online'` and `'Paused'` strings from database mutations)*.
+
+---
+
+## 3. Batch 1 Architectural Decisions & Policy Clarifications
+
+### PI-01 (Approved Option C - Temporary Testing Variant): Calapan City Service Area Boundary Gate
+- **Decision**: Implement a database-backed booking-creation boundary gate (`public.service_area_config`) enforced server-side before booking insertion (`check_booking_service_area_gate`).
+- **Temporary Scope**: For development and acceptance testing, the allowed service area is set to all of Calapan City using a center point at Calapan City Hall (Latitude: `13.4115° N`, Longitude: `121.1803° E`) with an interim testing radius of `16.0 km`.
+- **Geographic Coverage & Municipality Boundaries**:
+  - Real-world verification confirms this 16 km circle encompasses all 62 Calapan City mainland barangays.
+  - However, because municipal boundaries are irregular polygons, this circular radius also temporarily overlaps with portions of neighbouring municipalities (e.g., Baco Poblacion is located at ~`13.3586° N, 121.0983° E`, approximately `10.64 km` from Calapan City Hall, well within the 16 km circle).
+- **Enforcement**: Pickups outside this radius are blocked server-side and trigger Tagalog error: *"Ang iyong lokasyon ng pagsakay ay nasa labas ng opisyal na nasasakupan ng SAKAY (Calapan City Service Area)."*
+- **Pilot Narrowing Path**: The architecture allows instant narrowing to pilot barangay / terminal radius without code changes using `set_pilot_service_area(p_toda_id, p_radius_km)`.
+- **Data Note**: The official **Xentro Mall TODA** record does not exist yet in `public.toda` (Calapan Central TODA / CCTODA is currently seeded). Once Xentro Mall TODA is accredited by the LGU, its DB-stored terminal coordinates will seed the pilot narrowing radius.
+
+### PI-13: Documentary Restriction Scope & Expiry Cascade (Rules 24.1 – 24.5)
+- **Decision**: Driver eligibility to accept dispatches and enter `Available` status is strictly gated by credential validity (Driver's License, MTOP Franchise, and TODA Accreditation Certificate).
+- **Asia/Manila Date Authority**: Expirations are evaluated strictly against calendar date in `Asia/Manila` timezone (`(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::DATE`).
+- **Non-Punitive Restriction**: Expired credentials trigger immediate documentary restriction (cannot go `Available`), but do NOT change `driver.account_status` (driver remains `Verified`), and record zero (0) disciplinary strikes.
+- **Active Trip Safety**: If a credential expires while a driver is executing an active trip (`availability_status = 'Busy'`), the driver is permitted to finish the trip safely. The scheduled runner or availability transition forces the driver `Offline` once the vehicle returns to `Available`.
+- **Secure Renewal Path (Rule 24.2)**: Drivers cannot edit authoritative expiry columns. Document renewals are submitted to pending staging columns in `driver_verification` (`submit_driver_renewal`), requiring future calendar dates, and become authoritative only after LGU Administrator review (`verify_driver_renewal`).
+- **Multi-Affiliation Accreditation Cascade (Rule 24.3)**: If a TODA's accreditation certificate expires, all drivers whose active selection points to that TODA are documentarily restricted from going online. Drivers affiliated with multiple TODAs can switch their active selection to another accredited, unexpired TODA while `Offline`.
+
+### PI-14: Two-Stage Application Resubmission Resume Point (Decision A)
+- **Decision**: When a driver resubmits an application returned for corrections:
+  - If the application was returned at the **LGU verification stage** (`lgu_verification_status = 'Resubmission Required'`), it resumes at the LGU stage. The TODA endorsement remains intact (`toda_endorsement_status = 'Endorsed'`), and `lgu_verification_status` is reset to `'Pending'`.
+  - If the application was returned at the **TODA screening stage** (`toda_endorsement_status = 'Resubmission Required'`), it resumes at the TODA stage (`toda_endorsement_status = 'Submitted'`).
+  - In both cases, the 5-calendar-day review clock restarts (`resubmitted_at = CURRENT_TIMESTAMP`).
+
+---
+
+## 4. Open Policy Questions
+
+### Open Question 1: Post-Rejection Driver Affiliation Rules (Rule 3.9)
+- **Question**: When a driver's affiliation application to a specific TODA is rejected for ineligibility or fraud (Rule 3.8), is the driver barred from applying to other TODAs, or is the rejection specific only to that TODA?
+- **Status**: `Open / Pending Policy Owner Determination`
+- **Current Batch 1 Implementation**:
+  - Rejection grounds are strictly limited to `ineligible` or `fraudulent` (document errors must use Return/Resubmission).
+  - The policy text does not specify whether a driver rejected by one TODA may apply to another.
+  - In Batch 1, re-application after rejection requires an audited administrative action (`allow_driver_reapplication(p_affiliation_id, p_reason)`) by the TODA or LGU administrator.
+  - Permanently disqualified drivers (`is_permanently_disqualified = TRUE`, Rule 3.9) are globally disqualified from all TODAs and can never be cleared by `allow_driver_reapplication`.
+

@@ -14,6 +14,12 @@ import {
   Tab,
   Avatar,
   Chip,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
 } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import GavelIcon from '@mui/icons-material/Gavel';
@@ -22,6 +28,7 @@ import InsertPhotoIcon from '@mui/icons-material/InsertPhoto';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ShieldIcon from '@mui/icons-material/Shield';
+import AddIcon from '@mui/icons-material/Add';
 
 import { TodaDriverMember, DriverExemptionRequest, EvidenceFileItem } from '../types/toda';
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
@@ -35,10 +42,18 @@ import {
   suspendTodaDriver,
   reactivateTodaDriver,
   recordTodaAuditAction,
+  fetchTodaRosterEntries,
+  addTodaRosterEntry,
+  fetchTodaProfile,
+  TodaRosterEntry,
 } from '../services/todaApiService';
+import { useAuth } from '../contexts/AuthContext';
 
 // toda driver roster membership, strikes record, and suspension management
 export const TodaDriverMembershipPage: React.FC = () => {
+  const { todaAdminProfile } = useAuth();
+  const effectiveTodaId = todaAdminProfile?.toda_id;
+
   const [activeTab, setActiveTab] = useState<number>(0);
   const [drivers, setDrivers] = useState<TodaDriverMember[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -61,15 +76,24 @@ export const TodaDriverMembershipPage: React.FC = () => {
   const [exemptionDecisionModalOpen, setExemptionDecisionModalOpen] = useState(false);
   const [previewDocument, setPreviewDocument] = useState<EvidenceFileItem | null>(null);
 
+  // Master Roster (Rule 2.4)
+  const [rosterEntries, setRosterEntries] = useState<TodaRosterEntry[]>([]);
+  const [rosterAddModalOpen, setRosterAddModalOpen] = useState(false);
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newFranchiseNumber, setNewFranchiseNumber] = useState('');
+  const [newPlateNumber, setNewPlateNumber] = useState('');
+  const [rosterSubmitting, setRosterSubmitting] = useState(false);
+  const [rosterError, setRosterError] = useState<string | null>(null);
+
   const loadDrivers = () => {
     setIsLoading(true);
-    import('../services/todaApiService').then(({ fetchTodaProfile }) => {
-      fetchTodaProfile().then(profile => {
-        if (profile) setTodaStatus(profile.accreditationStatus);
-      });
+    const targetId = effectiveTodaId || todaAdminProfile?.toda_id;
+
+    fetchTodaProfile(targetId).then((profile) => {
+      if (profile) setTodaStatus(profile.accreditationStatus);
     });
 
-    fetchTodaDriverMembers()
+    fetchTodaDriverMembers(targetId)
       .then((data) => {
         setDrivers(data || []);
       })
@@ -80,11 +104,46 @@ export const TodaDriverMembershipPage: React.FC = () => {
       .finally(() => {
         setIsLoading(false);
       });
+
+    fetchTodaRosterEntries(targetId)
+      .then((entries) => {
+        setRosterEntries(entries || []);
+      })
+      .catch((err) => {
+        console.warn('[TodaMembership] Failed to fetch roster entries:', err);
+      });
+  };
+
+  const handleAddRosterSubmit = async () => {
+    if (!newMemberName.trim() || !newFranchiseNumber.trim()) {
+      setRosterError('Member name and franchise number are required.');
+      return;
+    }
+    const targetId = effectiveTodaId || todaAdminProfile?.toda_id;
+    setRosterSubmitting(true);
+    setRosterError(null);
+    try {
+      const added = await addTodaRosterEntry({
+        todaId: targetId,
+        memberName: newMemberName.trim(),
+        franchiseNumber: newFranchiseNumber.trim(),
+        plateNumber: newPlateNumber.trim() || newFranchiseNumber.trim(),
+      });
+      setRosterEntries((prev) => [added, ...prev]);
+      setRosterAddModalOpen(false);
+      setNewMemberName('');
+      setNewFranchiseNumber('');
+      setNewPlateNumber('');
+    } catch (err: any) {
+      setRosterError(err.message || 'Failed to add roster entry');
+    } finally {
+      setRosterSubmitting(false);
+    }
   };
 
   useEffect(() => {
     loadDrivers();
-  }, []);
+  }, [effectiveTodaId]);
 
   // Filter Logic
   const filteredDrivers = drivers.filter((drv) => {
@@ -254,6 +313,7 @@ export const TodaDriverMembershipPage: React.FC = () => {
         >
           <Tab icon={<PeopleIcon sx={{ fontSize: 20 }} />} iconPosition="start" label={`Accredited Driver Roster (${totalCount})`} />
           <Tab icon={<GavelIcon sx={{ fontSize: 20 }} />} iconPosition="start" label={`Strike Exemption Appeals (${exemptions.length})`} />
+          <Tab icon={<DescriptionIcon sx={{ fontSize: 20 }} />} iconPosition="start" label={`Master Roster (${rosterEntries.length})`} />
         </Tabs>
       </Box>
 
@@ -442,7 +502,7 @@ export const TodaDriverMembershipPage: React.FC = () => {
             </Table>
           </TableContainer>
         </>
-      ) : (
+      ) : activeTab === 1 ? (
         /* 5. Strike Exemption Appeals Tab */
         <TableContainer
           component={Paper}
@@ -512,6 +572,90 @@ export const TodaDriverMembershipPage: React.FC = () => {
             </TableBody>
           </Table>
         </TableContainer>
+      ) : (
+        /* 6. Official Master Roster Tab (Rule 2.4) */
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+            <Box>
+              <Typography sx={{ fontSize: '18px', fontWeight: 700, color: 'var(--mac-text-primary)' }}>
+                Official TODA Master Roster Registry
+              </Typography>
+              <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-secondary)', mt: 0.5 }}>
+                Pre-accredited drivers, vehicle plates, and franchise numbers. Driver applicants matching this registry pass Rule 2.4 screening.
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setRosterError(null);
+                setRosterAddModalOpen(true);
+              }}
+              sx={{
+                backgroundColor: 'var(--sakay-orange)',
+                '&:hover': { backgroundColor: '#D97706' },
+                textTransform: 'none',
+                fontWeight: 600,
+                borderRadius: '8px',
+                px: 2.5,
+              }}
+            >
+              Add Roster Member
+            </Button>
+          </Box>
+
+          <TableContainer
+            component={Paper}
+            elevation={0}
+            sx={{
+              borderRadius: 'var(--mac-radius-lg)',
+              border: '1px solid var(--mac-border-color)',
+              boxShadow: 'var(--mac-shadow-card)',
+              overflow: 'hidden',
+            }}
+          >
+            <Table>
+              <TableHead sx={{ backgroundColor: '#FAFAFC' }}>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Member Full Name</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Franchise Number</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Vehicle Plate Number</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Date Added</TableCell>
+                  <TableCell sx={{ fontWeight: 600, fontSize: '12px', color: 'var(--mac-text-muted)', py: 2, px: 3 }}>Screening Status</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {rosterEntries.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center" sx={{ py: 6, color: 'var(--mac-text-muted)' }}>
+                      No master roster entries recorded yet. Click "Add Roster Member" to register franchise members.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  rosterEntries.map((entry) => (
+                    <TableRow key={entry.roster_id || `${entry.franchise_number}-${entry.plate_number}`}>
+                      <TableCell sx={{ py: 2, px: 3, fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                        {entry.member_name}
+                      </TableCell>
+                      <TableCell sx={{ py: 2, px: 3, color: 'var(--mac-text-primary)' }}>
+                        {entry.franchise_number}
+                      </TableCell>
+                      <TableCell sx={{ py: 2, px: 3, color: 'var(--mac-text-primary)' }}>
+                        {entry.plate_number}
+                      </TableCell>
+                      <TableCell sx={{ py: 2, px: 3, color: 'var(--mac-text-muted)', fontSize: '13px' }}>
+                        {entry.created_at ? new Date(entry.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Registered'}
+                      </TableCell>
+                      <TableCell sx={{ py: 2, px: 3 }}>
+                        <Chip label="Rule 2.4 Active Roster" size="small" sx={{ backgroundColor: '#E6F4EA', color: '#137333', fontWeight: 600, fontSize: '11px' }} />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Box>
       )}
 
       {/* 6. Strike Exemption Appeal Centered Modal with Clickable Evidence */}
@@ -679,6 +823,66 @@ export const TodaDriverMembershipPage: React.FC = () => {
         confirmVariant="orange"
         onConfirm={handleReactivateRequest}
       />
+
+      {/* Add Master Roster Member Dialog (Rule 2.4) */}
+      <Dialog open={rosterAddModalOpen} onClose={() => setRosterAddModalOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, fontSize: '16px' }}>
+          Add Official Master Roster Entry (Rule 2.4)
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-secondary)', mb: 2 }}>
+            Register driver and franchise details in the official TODA master roster. Applications matching this record will be verified automatically.
+          </Typography>
+          {rosterError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {rosterError}
+            </Alert>
+          )}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <TextField
+              label="Member Full Name"
+              required
+              fullWidth
+              value={newMemberName}
+              onChange={(e) => setNewMemberName(e.target.value)}
+              placeholder="e.g. Juan dela Cruz"
+            />
+            <TextField
+              label="Franchise Number"
+              required
+              fullWidth
+              value={newFranchiseNumber}
+              onChange={(e) => setNewFranchiseNumber(e.target.value)}
+              placeholder="e.g. FR-CAL-2026-001"
+            />
+            <TextField
+              label="Vehicle Plate Number"
+              fullWidth
+              value={newPlateNumber}
+              onChange={(e) => setNewPlateNumber(e.target.value)}
+              placeholder="e.g. 123-ABC"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setRosterAddModalOpen(false)} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleAddRosterSubmit}
+            variant="contained"
+            disabled={rosterSubmitting}
+            sx={{
+              backgroundColor: 'var(--sakay-orange)',
+              '&:hover': { backgroundColor: '#D97706' },
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            {rosterSubmitting ? 'Adding...' : 'Add to Master Roster'}
+          </Button>
+        </DialogActions>
+      </Dialog>
       </>
       )}
     </Box>

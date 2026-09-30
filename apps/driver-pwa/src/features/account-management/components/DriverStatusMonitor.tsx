@@ -6,6 +6,7 @@ import {
   Paper,
   Chip,
   IconButton,
+  Button,
   Switch,
   Snackbar,
   Alert,
@@ -21,6 +22,12 @@ import PrimaryButton from '../../../common/components/PrimaryButton';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { supabase } from '../../../services/supabaseClient';
 import { lookupDriverByPhoneSecure } from '../../../services/driverApiService';
+import {
+  parseRejectionComment,
+  hydrateOnboardingCacheFromExisting,
+  saveResubmissionSession,
+  type FaultyDocType,
+} from '../../../services/driverOnboardingCache';
 
 export const DriverStatusMonitor: React.FC = () => {
   const navigate = useNavigate();
@@ -40,14 +47,18 @@ export const DriverStatusMonitor: React.FC = () => {
   const [rejectionReason, setRejectionReason] = useState<string | undefined>(state?.rejectionReason);
   const [rejectionComment, setRejectionComment] = useState<string | undefined>(state?.rejectionComment);
 
-  const [notifyEnabled, setNotifyEnabled] = useState(true);
+  const [notifyEnabled, setNotifyEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('sakay_driver_notify_status');
+    return saved !== null ? saved === 'true' : true;
+  });
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState('');
   const [isDocIncomplete, setIsDocIncomplete] = useState(false);
   const [incompleteDriverInfo, setIncompleteDriverInfo] = useState<{ phone: string; driverName: string } | null>(null);
+  const [isResubmittedApplication, setIsResubmittedApplication] = useState(false);
 
-  const checkStatus = async () => {
-    setLoading(true);
+  const checkStatus = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       let driverData: any = null;
 
@@ -133,12 +144,12 @@ export const DriverStatusMonitor: React.FC = () => {
             isOnline: false,
             isPaused: false,
             accountStatus: driverData.account_status,
-            verificationStage: driverData.account_status === 'Verified' || driverData.account_status === 'Active' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
+            verificationStage: driverData.account_status === 'Verified' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
           })
         );
 
-        // If approved by LGU (Active / Verified) -> Immediately transition to Active Map
-        if (driverData.account_status === 'Active' || driverData.account_status === 'Verified') {
+        // If approved by LGU (Verified) -> Immediately transition to Active Map
+        if (driverData.account_status === 'Verified') {
           navigate('/driver/home', { replace: true });
           return;
         }
@@ -147,14 +158,34 @@ export const DriverStatusMonitor: React.FC = () => {
         if (driverData.driver_id) {
           const { data: verif } = await supabase
             .from('driver_verification')
-            .select('verification_status, submitted_license_number, remarks')
+            .select('verification_status, submitted_license_number, remarks, rejection_reason, rejection_comment')
             .eq('driver_id', driverData.driver_id)
+            .order('submitted_at', { ascending: false })
+            .limit(1)
             .maybeSingle();
+
+          const isJustResubmitted =
+            localStorage.getItem('sakay_driver_just_resubmitted') === 'true' ||
+            Boolean(verif?.remarks?.toLowerCase().includes('resubmitted')) ||
+            verif?.verification_status === 'Endorsed to LGU';
+
+          setIsResubmittedApplication(isJustResubmitted);
 
           if (driverData.account_status === 'Rejected' || verif?.verification_status === 'Rejected') {
             setProfileStatus('Rejected');
-            setRejectionReason(verif?.remarks || state?.rejectionReason || 'Application rejected');
-            setRejectionComment(state?.rejectionComment);
+            setRejectionReason(verif?.rejection_reason || verif?.remarks || state?.rejectionReason || 'Application rejected');
+            setRejectionComment(verif?.rejection_comment || state?.rejectionComment);
+            setLoading(false);
+            return;
+          }
+
+          if (
+            (driverData.account_status === 'Resubmission Required' || verif?.verification_status === 'Resubmission Required') &&
+            !isJustResubmitted
+          ) {
+            setProfileStatus('Resubmission Required');
+            setRejectionReason(verif?.rejection_reason || verif?.remarks || driverData.rejection_reason || state?.rejectionReason || 'Documentary Issue');
+            setRejectionComment(verif?.rejection_comment || driverData.rejection_comment || state?.rejectionComment || 'Clearer license scan required');
             setLoading(false);
             return;
           }
@@ -187,16 +218,54 @@ export const DriverStatusMonitor: React.FC = () => {
     } catch (err) {
       console.warn('[DriverStatusMonitor] Status check warning:', err);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
   React.useEffect(() => {
-    checkStatus();
+    checkStatus(false);
+
+    // 1. Periodic background polling every 3.5s to ensure status stays reactive
+    const pollInterval = setInterval(() => {
+      checkStatus(true);
+    }, 3500);
+
+    // 2. Realtime listener for immediate status transition
+    const channel = supabase
+      .channel('driver-status-live')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'driver',
+        },
+        () => {
+          checkStatus(true);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'driver_verification',
+        },
+        () => {
+          checkStatus(true);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(pollInterval);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleToggleNotify = (checked: boolean) => {
     setNotifyEnabled(checked);
+    localStorage.setItem('sakay_driver_notify_status', String(checked));
     setSnackbarMsg(
       checked
         ? (isTagalog
@@ -210,8 +279,106 @@ export const DriverStatusMonitor: React.FC = () => {
   };
 
   const isRejected = profileStatus === 'Rejected';
+  const isResubmissionRequired = profileStatus === 'Resubmission Required';
   // True when TODA has endorsed the driver but LGU has not yet given final approval
   const isEndorsedToLgu = profileStatus === 'Endorsed to LGU';
+
+  const [isResubmitting, setIsResubmitting] = useState(false);
+
+  const parsedReturn = parseRejectionComment(rejectionComment, rejectionReason);
+  const [hydrating, setHydrating] = useState(false);
+
+  const handleStartCorrection = async () => {
+    setHydrating(true);
+    try {
+      const driverId = localStorage.getItem('sakay_driver_id') || '';
+      const phone = localStorage.getItem('sakay_driver_phone') || state?.phone || '';
+      if (driverId) {
+        await hydrateOnboardingCacheFromExisting(driverId, phone);
+      }
+
+      const firstFaulty: FaultyDocType = parsedReturn.faultyDocuments[0] || 'license';
+      const routeMap: Record<FaultyDocType, string> = {
+        license: '/driver/scan-license-front',
+        mtop: '/driver/scan-mtop',
+        tricycle: '/driver/scan-tricycle',
+        selfie: '/driver/scan-face',
+      };
+
+      saveResubmissionSession({
+        isResubmission: true,
+        faultyDocuments: parsedReturn.faultyDocuments,
+        issues: parsedReturn.issues,
+        displayReason: parsedReturn.displayReason,
+        displayNotes: parsedReturn.displayNotes,
+      });
+
+      const targetRoute = routeMap[firstFaulty];
+      navigate(targetRoute, {
+        state: {
+          isResubmission: true,
+          faultyDocuments: parsedReturn.faultyDocuments,
+          issues: parsedReturn.issues,
+          currentDocType: firstFaulty,
+          rejectionReason,
+          rejectionComment,
+          phone,
+          driverName: localStorage.getItem('sakay_driver_profile')
+            ? JSON.parse(localStorage.getItem('sakay_driver_profile') || '{}').name
+            : '',
+        },
+      });
+    } catch (err) {
+      console.warn('[DriverStatusMonitor] Error preparing correction:', err);
+    } finally {
+      setHydrating(false);
+    }
+  };
+
+  const handleDirectResubmit = async () => {
+    setIsResubmitting(true);
+    try {
+      const driverId = localStorage.getItem('sakay_driver_id');
+      const now = new Date().toISOString();
+
+      await supabase
+        .from('driver_verification')
+        .update({
+          verification_status: 'Pending',
+          rejection_reason: null,
+          rejection_comment: null,
+          rejected_by: null,
+          rejected_at: null,
+          remarks: 'Resubmitted by driver applicant',
+          submitted_at: now,
+        })
+        .eq('driver_id', driverId);
+
+      await supabase
+        .from('driver')
+        .update({
+          account_status: 'Pending Verification',
+          rejection_reason: null,
+          rejection_comment: null,
+          updated_at: now,
+        })
+        .eq('driver_id', driverId);
+
+      setSnackbarMsg(
+        isTagalog
+          ? 'Naisumite nang muli ang iyong aplikasyon. Nag-restart ang 5-araw na review clock.'
+          : 'Application resubmitted successfully. 5-calendar-day review clock has restarted.'
+      );
+      setSnackbarOpen(true);
+      await checkStatus(false);
+    } catch (err: any) {
+      console.error('Failed to resubmit application:', err);
+      setSnackbarMsg(err.message || 'Error resubmitting application');
+      setSnackbarOpen(true);
+    } finally {
+      setIsResubmitting(false);
+    }
+  };
 
 
   return (
@@ -356,7 +523,9 @@ export const DriverStatusMonitor: React.FC = () => {
                 mb: 1.5,
               }}
             >
-              {isTagalog ? 'Nasa LGU Admin na ang Aplikasyon' : 'Application Endorsed to LGU Admin'}
+              {isResubmittedApplication
+                ? (isTagalog ? 'Naisumite na ang Pagwawasto - Kasalukuyang Sinusuri ng LGU' : 'Resubmission Submitted - Under LGU Review')
+                : (isTagalog ? 'Nasa LGU Admin na ang Aplikasyon' : 'Application Endorsed to LGU Admin')}
             </Typography>
 
             <Typography
@@ -368,9 +537,13 @@ export const DriverStatusMonitor: React.FC = () => {
                 mb: 3,
               }}
             >
-              {isTagalog
-                ? 'Matagumpay na na-endorse ng iyong TODA ang iyong aplikasyon sa City LGU Franchising Office. Pakihintay ang huling pagsusuri at pag-apruba ng LGU. Hindi mo pa maa-access ang iyong account hanggang sa mabigyan ka ng pinal na pahintulot.'
-                : 'Your application has been endorsed by your TODA to the City LGU Franchising Office. Please wait for the final review and approval of the LGU. You will not be able to access your account until final approval is granted.'}
+              {isResubmittedApplication
+                ? (isTagalog
+                    ? 'Matagumpay na naisumite ang iyong mga binagong dokumento. Kasalukuyan itong muling sinusuri ng City LGU Transport Office. Muling nag-restart ang 5-araw na review period.'
+                    : 'Your corrected documents have been submitted successfully. The City LGU Transport Office is now re-reviewing your application. The 5-day review period has restarted.')
+                : (isTagalog
+                    ? 'Matagumpay na na-endorse ng iyong TODA ang iyong aplikasyon sa City LGU Transport Office. Pakihintay ang huling pagsusuri at pag-apruba ng LGU. Hindi mo pa maa-access ang iyong account hanggang sa mabigyan ka ng pinal na pahintulot.'
+                    : 'Your application has been endorsed by your TODA to the City LGU Transport Office. Please wait for the final review and approval of the LGU. You will not be able to access your account until final approval is granted.')}
             </Typography>
 
             {/* Status ng Rehistrasyon Card */}
@@ -381,20 +554,25 @@ export const DriverStatusMonitor: React.FC = () => {
                 maxWidth: 340,
                 p: 2.5,
                 borderRadius: '16px',
-                backgroundColor: '#EFF6FF',
-                border: '1px solid #BFDBFE',
+                backgroundColor: isResubmittedApplication ? '#F5F3FF' : '#EFF6FF',
+                border: `1px solid ${isResubmittedApplication ? '#DDD6FE' : '#BFDBFE'}`,
                 textAlign: 'left',
                 mb: 2,
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography sx={{ fontSize: '12px', fontWeight: 800, color: '#1E40AF', textTransform: 'uppercase' }}>
+                <Typography sx={{ fontSize: '12px', fontWeight: 800, color: isResubmittedApplication ? '#5B21B6' : '#1E40AF', textTransform: 'uppercase' }}>
                   {isTagalog ? 'Status ng Rehistrasyon' : 'Registration Status'}
                 </Typography>
                 <Chip
-                  label="LGU Screening"
+                  label={isResubmittedApplication ? (isTagalog ? 'Pagsusuri sa Pagwawasto' : 'Resubmission Review') : 'LGU Screening'}
                   size="small"
-                  sx={{ backgroundColor: '#DBEAFE', color: '#1D4ED8', fontWeight: 800, fontSize: '11px' }}
+                  sx={{
+                    backgroundColor: isResubmittedApplication ? '#EDE9FE' : '#DBEAFE',
+                    color: isResubmittedApplication ? '#4C1D95' : '#1D4ED8',
+                    fontWeight: 800,
+                    fontSize: '11px',
+                  }}
                 />
               </Box>
             </Paper>
@@ -441,6 +619,138 @@ export const DriverStatusMonitor: React.FC = () => {
                 }}
               />
             </Paper>
+          </>
+        ) : isResubmissionRequired ? (
+          <>
+            <Box
+              sx={{
+                width: 76,
+                height: 76,
+                borderRadius: '50%',
+                backgroundColor: '#FFFBEB',
+                color: '#D97706',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mb: 3,
+                boxShadow: '0 8px 24px rgba(217, 119, 6, 0.15)',
+              }}
+            >
+              <PendingActionsIcon sx={{ fontSize: 40 }} />
+            </Box>
+
+            <Typography
+              sx={{
+                fontSize: '22px',
+                fontWeight: 800,
+                color: '#0F172A',
+                lineHeight: 1.3,
+                mb: 1.5,
+              }}
+            >
+              {isTagalog ? 'Kinakailangan ang Pagwawasto' : 'Resubmission Required'}
+            </Typography>
+
+            <Typography
+              sx={{
+                fontSize: '14px',
+                color: '#64748B',
+                lineHeight: 1.5,
+                maxWidth: 340,
+                mb: 3,
+              }}
+            >
+              {isTagalog
+                ? 'Ibinalik ng reviewer ang iyong aplikasyon dahil sa mga kulang o hindi wastong dokumento. Mag-restart ang 5-araw na review period matapos mong mai-sumite muli ang mga pagwawasto.'
+                : 'Your application was returned by the reviewer for correction. The 5-calendar-day review period restarts once resubmitted.'}
+            </Typography>
+
+            <Paper
+              elevation={0}
+              sx={{
+                width: '100%',
+                maxWidth: 340,
+                p: 2,
+                borderRadius: '16px',
+                backgroundColor: '#FFFBEB',
+                border: '1.5px solid #FDE68A',
+                textAlign: 'left',
+                mb: 3,
+              }}
+            >
+              <Typography sx={{ fontSize: '11px', fontWeight: 800, color: '#B45309', letterSpacing: '0.5px', textTransform: 'uppercase', mb: 1.5 }}>
+                {isTagalog ? 'Kailangang Iwasto na Dokumento:' : 'Documents Requiring Correction:'}
+              </Typography>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.2 }}>
+                {parsedReturn.issues.map((issue, idx) => {
+                  const docLabels: Record<FaultyDocType, string> = {
+                    license: isTagalog ? "Driver's License (Lisensya)" : "Driver's License",
+                    mtop: isTagalog ? 'MTOP / Prangkisa' : 'MTOP / Franchise',
+                    tricycle: isTagalog ? 'Larawan ng Tricycle' : 'Tricycle Photo',
+                    selfie: isTagalog ? 'Selfie / Larawan ng Mukha' : 'Driver Selfie',
+                  };
+                  return (
+                    <Box
+                      key={idx}
+                      sx={{
+                        p: 1.5,
+                        borderRadius: '10px',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid #FEF3C7',
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <Chip
+                          label={docLabels[issue.documentType] || issue.documentType}
+                          size="small"
+                          sx={{
+                            fontSize: '11px',
+                            fontWeight: 800,
+                            backgroundColor: '#FEF3C7',
+                            color: '#92400E',
+                            height: 22,
+                          }}
+                        />
+                      </Box>
+                      <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#78350F', mb: 0.25 }}>
+                        {issue.grounds}
+                      </Typography>
+                      {issue.notes && (
+                        <Typography sx={{ fontSize: '12px', color: '#92400E', fontStyle: 'italic', lineHeight: 1.35 }}>
+                          "{issue.notes}"
+                        </Typography>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Box>
+            </Paper>
+
+            <Box sx={{ width: '100%', maxWidth: 340, mb: 3, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              <PrimaryButton
+                fullWidth
+                disabled={hydrating}
+                onClick={handleStartCorrection}
+                sx={{
+                  height: '52px',
+                  borderRadius: '14px',
+                  fontSize: '15px',
+                  fontWeight: 800,
+                  backgroundColor: '#D97706',
+                  boxShadow: 'none',
+                  '&:hover': { backgroundColor: '#B45309', boxShadow: 'none' },
+                }}
+              >
+                {hydrating
+                  ? (isTagalog ? 'Inihahanda...' : 'Preparing...')
+                  : parsedReturn.faultyDocuments.length === 1
+                  ? (isTagalog ? 'Iwasto ang Dokumento' : 'Correct Document')
+                  : (isTagalog
+                      ? `Iwasto ang mga Dokumento (${parsedReturn.faultyDocuments.length})`
+                      : `Correct Documents (${parsedReturn.faultyDocuments.length})`)}
+              </PrimaryButton>
+            </Box>
           </>
         ) : (
           <>
@@ -631,7 +941,7 @@ export const DriverStatusMonitor: React.FC = () => {
         <PrimaryButton
           fullWidth
           size="large"
-          onClick={isRejected ? () => navigate('/account-selection') : checkStatus}
+          onClick={isRejected ? () => navigate('/account-selection') : () => checkStatus(false)}
           disabled={loading}
           sx={{
             backgroundColor: isRejected ? '#DC2626' : '#FF6B00',

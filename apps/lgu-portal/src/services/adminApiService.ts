@@ -95,9 +95,9 @@ export async function fetchDashboardStats(): Promise<DashboardStats> {
     ] = await Promise.all([
       supabase.from('passenger').select('*', { count: 'exact', head: true }),
       supabase.from('passenger').select('*', { count: 'exact', head: true }).eq('account_status', 'Active'),
-      supabase.from('driver').select('*', { count: 'exact', head: true }).in('account_status', ['TODA Approved', 'TODA Endorsed', 'Endorsed to LGU', 'LGU Approved', 'Active', 'Verified', 'Rejected']),
+      supabase.from('driver').select('*', { count: 'exact', head: true }).in('account_status', ['Pending Verification', 'Verified', 'Rejected', 'Suspended', 'Deactivated', 'Resubmission Required']),
       supabase.from('driver').select('*', { count: 'exact', head: true }).eq('account_status', 'Verified'),
-      supabase.from('driver').select('*', { count: 'exact', head: true }).in('account_status', ['TODA Approved', 'TODA Endorsed', 'Endorsed to LGU']),
+      supabase.from('driver_verification').select('*', { count: 'exact', head: true }).in('verification_status', ['Approved', 'TODA Approved', 'TODA Endorsed', 'Endorsed to LGU', 'Resubmission Required']).is('lgu_approved_at', null),
       supabase.from('driver').select('*', { count: 'exact', head: true }).eq('account_status', 'Suspended'),
       supabase.from('toda').select('*').order('created_at', { ascending: false }),
       supabase.from('booking').select('*', { count: 'exact', head: true }),
@@ -258,7 +258,7 @@ function extractStoragePath(bucket: string, rawVal?: string | null): string | nu
   return str;
 }
 
-async function resolveStorageDocUrl(bucket: string, rawVal?: string | null): Promise<string | null> {
+async function resolveStorageDocUrl(bucket: string, rawVal?: string | null, fallbackBucket?: string): Promise<string | null> {
   if (!rawVal) return null;
   const str = String(rawVal).trim();
   if (!str) return null;
@@ -272,6 +272,15 @@ async function resolveStorageDocUrl(bucket: string, rawVal?: string | null): Pro
       return signedData.signedUrl;
     }
   } catch {}
+
+  if (fallbackBucket) {
+    try {
+      const { data: signedData, error: sErr } = await supabase.storage.from(fallbackBucket).createSignedUrl(path, 86400);
+      if (!sErr && signedData?.signedUrl) {
+        return signedData.signedUrl;
+      }
+    } catch {}
+  }
 
   try {
     const { data: pubData } = supabase.storage.from(bucket).getPublicUrl(path);
@@ -296,61 +305,9 @@ function extractActualFilename(rawUrlOrPath?: string | null, fallback = 'Documen
   }
 }
 
-const TODA_STATUS_OVERRIDES_KEY = 'sakay_toda_status_overrides';
-const SAKAY_APPROVED_TODAS_KEY = 'sakay_approved_todas';
+// Note: In accordance with SAKAY Policy Batch 1, TODA status overrides in localStorage 
+// have been permanently purged. All status verification is strictly database-backed.
 
-function getTodaStatusOverrides(): Record<string, string> {
-  try {
-    const lRaw = localStorage.getItem(TODA_STATUS_OVERRIDES_KEY);
-    const sRaw = sessionStorage.getItem(TODA_STATUS_OVERRIDES_KEY);
-    const lObj = lRaw ? JSON.parse(lRaw) : {};
-    const sObj = sRaw ? JSON.parse(sRaw) : {};
-    return { ...sObj, ...lObj };
-  } catch {
-    return {};
-  }
-}
-
-function setTodaStatusOverride(todaId: string, status: string, acronym?: string, name?: string) {
-  try {
-    const overrides = getTodaStatusOverrides();
-    const keysToSet = [todaId, acronym, name].filter(Boolean) as string[];
-    
-    keysToSet.forEach(k => {
-      overrides[k] = status;
-      overrides[k.toLowerCase()] = status;
-      overrides[k.toUpperCase()] = status;
-    });
-
-    const payload = JSON.stringify(overrides);
-    localStorage.setItem(TODA_STATUS_OVERRIDES_KEY, payload);
-    sessionStorage.setItem(TODA_STATUS_OVERRIDES_KEY, payload);
-
-    if (status === 'Active' || status === 'Approved') {
-      try {
-        const approvedRaw = localStorage.getItem(SAKAY_APPROVED_TODAS_KEY) || sessionStorage.getItem(SAKAY_APPROVED_TODAS_KEY);
-        const approvedList: string[] = approvedRaw ? JSON.parse(approvedRaw) : [];
-        keysToSet.forEach(k => {
-          if (!approvedList.includes(k)) approvedList.push(k);
-        });
-        const appPayload = JSON.stringify(approvedList);
-        localStorage.setItem(SAKAY_APPROVED_TODAS_KEY, appPayload);
-        sessionStorage.setItem(SAKAY_APPROVED_TODAS_KEY, appPayload);
-      } catch {}
-    }
-
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('sakay_toda_status_updated', { detail: { todaId, acronym, status } }));
-      if ('BroadcastChannel' in window) {
-        try {
-          const bc = new BroadcastChannel('sakay_toda_status_channel');
-          bc.postMessage({ todaId, acronym, status });
-          bc.close();
-        } catch {}
-      }
-    }
-  } catch {}
-}
 
 export async function fetchTodaApplications(): Promise<TodaApplicationRecord[]> {
   try {
@@ -362,8 +319,6 @@ export async function fetchTodaApplications(): Promise<TodaApplicationRecord[]> 
     if (error || !data) {
       return [];
     }
-
-    const overrides = getTodaStatusOverrides();
 
     const applications = await Promise.all(data.map(async (row: any) => {
       const isOverdue = row.created_at
@@ -420,7 +375,7 @@ export async function fetchTodaApplications(): Promise<TodaApplicationRecord[]> 
         });
       }
 
-      const rawStatus = overrides[row.toda_id] || row.toda_status || row.account_status || row.status || 'Pending';
+      const rawStatus = row.toda_status || row.account_status || row.status || 'Pending';
       const currentStatus = (rawStatus === 'Active' || rawStatus === 'Approved') ? 'Approved' : rawStatus;
       const normalizedStatus =
         currentStatus === 'Approved'
@@ -477,7 +432,12 @@ export async function fetchTodaApplications(): Promise<TodaApplicationRecord[]> 
   }
 }
 
-export async function approveTodaApplication(applicationId: string, remarks?: string) {
+export async function approveTodaApplication(
+  applicationId: string,
+  remarks?: string,
+  certificateNumber?: string,
+  certificateExpiry?: string
+) {
   let todaInfo: any = null;
   try {
     const { data: fetchRes } = await supabase
@@ -488,15 +448,21 @@ export async function approveTodaApplication(applicationId: string, remarks?: st
     todaInfo = fetchRes;
   } catch {}
 
+  const exactTodaId = todaInfo?.toda_id || applicationId;
   const acronym = todaInfo?.toda_acronym || (applicationId.length <= 15 ? applicationId : undefined);
   const name = todaInfo?.toda_name;
+
+  const defaultCertNo = certificateNumber || todaInfo?.certificate_number || `CERT-LGU-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+  const defaultCertExpiry = certificateExpiry || (todaInfo?.certificate_expiry && new Date(todaInfo.certificate_expiry) > new Date() ? todaInfo.certificate_expiry : new Date(Date.now() + 3 * 365 * 24 * 60 * 60 * 1000).toISOString());
 
   let updatedData: any = null;
 
   // 1. Primary: RPC function via Supabase (SECURITY DEFINER)
   try {
     const { data: rpcRes, error: rpcErr } = await supabase.rpc('approve_toda_accreditation', {
-      p_toda_id: applicationId,
+      p_toda_id: exactTodaId,
+      p_certificate_number: defaultCertNo,
+      p_certificate_expiry: defaultCertExpiry,
       p_remarks: remarks || null,
     });
     if (!rpcErr && rpcRes && rpcRes.success && rpcRes.data) {
@@ -568,7 +534,7 @@ export async function approveTodaApplication(applicationId: string, remarks?: st
       .or(`toda_id.eq.${applicationId},toda_acronym.ilike.${applicationId}`);
   } catch {}
 
-  setTodaStatusOverride(applicationId, 'Active', acronym, name);
+  // Status updated authoritatively in Supabase database
 
   // Record audit log entry
   await recordAdminAuditAction({
@@ -627,8 +593,6 @@ export async function returnTodaApplicationForCorrection(applicationId: string, 
     } catch {}
   }
 
-  setTodaStatusOverride(applicationId, 'Resubmission Required');
-
   await recordAdminAuditAction({
     actionType: 'TODA_APPLICATION_RETURNED_FOR_CORRECTION',
     targetId: applicationId,
@@ -685,8 +649,6 @@ export async function rejectTodaApplication(applicationId: string, reason: strin
     } catch {}
   }
 
-  setTodaStatusOverride(applicationId, 'Deactivated');
-
   await recordAdminAuditAction({
     actionType: 'TODA_APPLICATION_REJECTED',
     targetId: applicationId,
@@ -713,10 +675,8 @@ export async function fetchAccreditedTodas(): Promise<AccreditedTodaRecord[]> {
 
     if (error || !data) return [];
 
-    const overrides = getTodaStatusOverrides();
-
     const activeTodas = data.filter((row: any) => {
-      const st = overrides[row.toda_id] || row.toda_status || row.account_status || row.status;
+      const st = row.toda_status || row.account_status || row.status;
       return st === 'Active' || st === 'Approved';
     });
 
@@ -740,6 +700,11 @@ export async function fetchAccreditedTodas(): Promise<AccreditedTodaRecord[]> {
       flaggedForReview: false,
       centerLat: row.terminal_latitude || 13.4115,
       centerLng: row.terminal_longitude || 121.1803,
+      terminalRelocationStatus: row.terminal_relocation_status || 'Approved',
+      pendingTerminalLat: row.pending_terminal_latitude,
+      pendingTerminalLng: row.pending_terminal_longitude,
+      pendingTerminalLocation: row.pending_terminal_location,
+      terminalRelocationRequestedAt: row.terminal_relocation_requested_at,
       documents: [],
       driverRoster: [],
     }));
@@ -838,7 +803,7 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
       const { data: verifEndorsed } = await supabase
         .from('driver_verification')
         .select('driver_id, verification_status')
-        .in('verification_status', ['Approved', 'TODA Approved', 'TODA Endorsed', 'Endorsed to LGU']);
+        .in('verification_status', ['Approved', 'TODA Approved', 'TODA Endorsed', 'Endorsed to LGU', 'Resubmission Required']);
 
       if (verifEndorsed && verifEndorsed.length > 0) {
         todaEndorsedDriverIds = verifEndorsed
@@ -850,18 +815,18 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
     }
 
     // STRICT LGU FILTERING: Only show drivers that have TODA endorsement or are in final stages
-    const allowedStatuses = ['TODA Approved', 'TODA Endorsed', 'Endorsed to LGU', 'LGU Approved', 'Active', 'Verified', 'Rejected', 'Suspended'];
+    const allowedStatuses = ['TODA Approved', 'TODA Endorsed', 'Endorsed to LGU', 'LGU Approved', 'Active', 'Verified', 'Rejected', 'Suspended', 'Resubmission Required'];
 
     // Fetch drivers in two queries: by account_status AND by TODA-endorsed IDs, merge results
     const [mainRes, endorsedRes] = await Promise.all([
       supabase
         .from('driver')
-        .select('*, toda:toda_id ( toda_id, toda_name, toda_acronym, barangay )')
+        .select('*, toda:toda_id ( toda_id, toda_name, toda_acronym, barangay ), driver_verification (*)')
         .in('account_status', allowedStatuses),
       todaEndorsedDriverIds.length > 0
         ? supabase
             .from('driver')
-            .select('*, toda:toda_id ( toda_id, toda_name, toda_acronym, barangay )')
+            .select('*, toda:toda_id ( toda_id, toda_name, toda_acronym, barangay ), driver_verification (*)')
             .in('driver_id', todaEndorsedDriverIds)
         : Promise.resolve({ data: [] }),
     ]);
@@ -881,12 +846,22 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
     if (filters?.status && filters.status !== 'All') {
       const endorsedSet = new Set(todaEndorsedDriverIds);
       if (filters.status === 'Endorsed to LGU' || filters.status === 'Pending' || filters.status === 'Pending Verification') {
-        data = data.filter((d: any) =>
-          endorsedSet.has(d.driver_id) &&
-          !['Verified', 'Active', 'LGU Approved'].includes(d.account_status)
-        );
+        data = data.filter((d: any) => {
+          const verif = Array.isArray(d.driver_verification) ? d.driver_verification[0] : d.driver_verification;
+          const isResub = d.account_status === 'Resubmission Required' || verif?.verification_status === 'Resubmission Required';
+          return (
+            (endorsedSet.has(d.driver_id) || ['TODA Approved', 'TODA Endorsed', 'Endorsed to LGU'].includes(d.account_status)) &&
+            !['Verified', 'Active', 'LGU Approved'].includes(d.account_status) &&
+            !isResub
+          );
+        });
       } else if (filters.status === 'Verified' || filters.status === 'Active') {
         data = data.filter((d: any) => ['Verified', 'Active', 'LGU Approved'].includes(d.account_status));
+      } else if (filters.status === 'Resubmission Required') {
+        data = data.filter((d: any) => {
+          const verif = Array.isArray(d.driver_verification) ? d.driver_verification[0] : d.driver_verification;
+          return d.account_status === 'Resubmission Required' || verif?.verification_status === 'Resubmission Required';
+        });
       } else {
         data = data.filter((d: any) => d.account_status === filters.status);
       }
@@ -897,15 +872,17 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
     const todaMap = new Map((todas || []).map((t: any) => [t.toda_id, t]));
     const todaEndorsedSet = new Set(todaEndorsedDriverIds);
 
-    return data.map((d: any) => {
+    return await Promise.all(data.map(async (d: any) => {
       const todaInfo = d.toda || todaMap.get(d.toda_id);
+      const verif = Array.isArray(d.driver_verification) ? d.driver_verification[0] : d.driver_verification;
 
-      // Stage 2 LGU final approval: ONLY driver.account_status in ('Verified', 'Active', 'LGU Approved')
-      const isFullyApproved = ['Verified', 'Active', 'LGU Approved'].includes(d.account_status);
-      const isRejected = d.account_status === 'Rejected';
+      // Stage 2 LGU final approval: ONLY driver.account_status === 'Verified'
+      const isFullyApproved = d.account_status === 'Verified';
+      const isRejected = d.account_status === 'Rejected' || verif?.verification_status === 'Rejected';
       const isSuspended = d.account_status === 'Suspended';
+      const isResubmission = d.account_status === 'Resubmission Required' || verif?.verification_status === 'Resubmission Required';
       // Stage 1 TODA endorsement: driver is in driver_verification with 'Approved' but NOT yet LGU-approved
-      const isTodaEndorsed = todaEndorsedSet.has(d.driver_id) && !isFullyApproved;
+      const isTodaEndorsed = (todaEndorsedSet.has(d.driver_id) || ['TODA Approved', 'TODA Endorsed', 'Endorsed to LGU'].includes(d.account_status)) && !isFullyApproved && !isResubmission && !isRejected;
 
       let verificationStatus: DriverRecord['verificationStatus'];
       let lguVerificationStatus: DriverRecord['lguVerificationStatus'];
@@ -919,6 +896,14 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
         verificationStatus = 'Suspended';
         lguVerificationStatus = 'Suspended';
         accountStatus = 'Inactive';
+      } else if (isResubmission) {
+        verificationStatus = 'Resubmission Required';
+        lguVerificationStatus = 'Resubmission Required';
+        accountStatus = 'Inactive';
+      } else if (isRejected) {
+        verificationStatus = 'Rejected';
+        lguVerificationStatus = 'Rejected';
+        accountStatus = 'Inactive';
       } else if (isTodaEndorsed) {
         // Intermediate: awaiting LGU final review/approval
         verificationStatus = 'Endorsed to LGU';
@@ -930,165 +915,363 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
         accountStatus = 'Inactive';
       }
 
-      return {
-        id: d.driver_id,
-        name: d.full_name || 'Driver Applicant',
-        licenseNo: d.license_number || 'N/A',
-        licenseExpiry: d.license_expiry || '2026-12-31',
-        licenseStatus: 'Valid',
-        mtopNo: d.franchise_number || 'N/A',
-        mtopExpiry: d.license_expiry || '2026-12-31',
-        mtopStatus: 'Valid',
-        mtopOperatorName: d.full_name,
-        todaName: todaInfo?.toda_name || 'Calapan Central TODA',
-        todaId: d.toda_id || '',
-        vehiclePlate: d.plate_number || 'N/A',
-        franchiseNo: d.franchise_number || 'N/A',
-        franchiseExpiry: '2026-12-31',
-        todaVerificationStatus: 'Verified',
-        lguVerificationStatus,
-        verificationStatus,
-        accountStatus,
-        onlineStatus: d.availability_status === 'Available' || d.availability_status === 'Busy' ? 'Online' : 'Offline',
-        rating: Number(d.weighted_average_rating) || 5.0,
-        ratingCount: 0,
-        phone: d.contact_number || '',
-        barangay: d.barangay_service_area || todaInfo?.barangay || 'Calapan City',
-        strikesCount: 0,
-        strikeHistory: [],
-        documents: [
-          { name: "Driver's License (Professional)", type: 'PDF / Image', status: 'Verified' },
-          { name: 'MTOP Franchise Clearance (Calapan City)', type: 'Official LGU Permit', status: 'Verified' },
-          { name: 'Tricycle Unit Photos with TODA Sticker', type: 'Image Verification', status: 'Verified' },
-          { name: 'Barangay Clearance & Police Clearance', type: 'Certified Clearance', status: 'Verified' },
-        ],
-      };
-    });
+      const authId = d.auth_user_id;
+      const licFrontPath = verif?.license_front_photo_path || (authId ? `${authId}/license_front.jpg` : null);
+      const licBackPath = verif?.license_back_photo_path || (authId ? `${authId}/license_back.jpg` : null);
+      const mtopPath = verif?.mtop_photo_path || (authId ? `${authId}/mtop.jpg` : null);
+      const tricyclePath = verif?.tricycle_photo_path || d.tricycle_photo_path || (authId ? `${authId}/tricycle.jpg` : null);
+      const selfiePath = verif?.face_photo_path || (authId ? `${authId}/selfie.jpg` : null);
+
+      const [licFrontUrl, licBackUrl, mtopUrl, tricycleUrl, selfieUrl] = await Promise.all([
+        resolveStorageDocUrl('driver-licenses', licFrontPath),
+        resolveStorageDocUrl('driver-licenses', licBackPath),
+        resolveStorageDocUrl('mtop-permits', mtopPath, 'driver-licenses'),
+        resolveStorageDocUrl('mtop-permits', tricyclePath, 'driver-licenses'),
+        resolveStorageDocUrl('driver-selfies', selfiePath, 'driver-licenses'),
+      ]);
+
+        // Parse faulty list if driver has rejection_comment with JSON
+        let faultyList: string[] = [];
+        if (verif?.rejection_comment && verif.rejection_comment.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(verif.rejection_comment);
+            if (Array.isArray(parsed.faultyDocuments)) {
+              faultyList = parsed.faultyDocuments;
+            }
+          } catch {}
+        }
+
+        const isResubmitted = Boolean(
+          verif?.remarks?.toLowerCase().includes('resubmitted') ||
+          (verif?.submitted_at && verif?.rejected_at && new Date(verif.submitted_at) > new Date(verif.rejected_at))
+        );
+
+        const getDocStatus = (docType: string): 'Verified' | 'Pending Inspection' | 'Resubmission Required' => {
+          if (isFullyApproved) return 'Verified';
+          if (faultyList.includes(docType) && !isResubmitted) return 'Resubmission Required';
+          return 'Pending Inspection';
+        };
+
+        const documents = [
+          {
+            id: 'doc-license',
+            docType: 'license' as const,
+            name: "Driver's License (Front & Back)",
+            type: 'Identification Proof',
+            status: getDocStatus('license'),
+            url: licFrontUrl || licBackUrl,
+            urls: [licFrontUrl, licBackUrl].filter(Boolean) as string[],
+          },
+          {
+            id: 'doc-mtop',
+            docType: 'mtop' as const,
+            name: 'MTOP Franchise Permit',
+            type: 'Official LGU Permit',
+            status: getDocStatus('mtop'),
+            url: mtopUrl,
+            urls: [mtopUrl].filter(Boolean) as string[],
+          },
+          {
+            id: 'doc-tricycle',
+            docType: 'tricycle' as const,
+            name: 'Tricycle Unit Inspection Photo',
+            type: 'Vehicle Compliance Photo',
+            status: getDocStatus('tricycle'),
+            url: tricycleUrl,
+            urls: [tricycleUrl].filter(Boolean) as string[],
+          },
+          {
+            id: 'doc-selfie',
+            docType: 'selfie' as const,
+            name: 'Driver Face / Selfie Verification',
+            type: 'Biometric Verification',
+            status: getDocStatus('selfie'),
+            url: selfieUrl,
+            urls: [selfieUrl].filter(Boolean) as string[],
+          },
+        ];
+
+        return {
+          id: d.driver_id,
+          name: d.full_name || 'Driver Applicant',
+          licenseNo: d.license_number || verif?.submitted_license_number || 'N/A',
+          licenseExpiry: d.license_expiry || verif?.license_expiry || '2026-12-31',
+          licenseStatus: 'Valid',
+          mtopNo: d.franchise_number || verif?.submitted_franchise_number || 'N/A',
+          mtopExpiry: d.license_expiry || verif?.franchise_expiry || '2026-12-31',
+          mtopStatus: 'Valid',
+          mtopOperatorName: verif?.submitted_operator_name || d.full_name,
+          todaName: todaInfo?.toda_name || 'Calapan Central TODA',
+          todaId: d.toda_id || '',
+          vehiclePlate: d.plate_number || verif?.submitted_plate_number || 'N/A',
+          franchiseNo: d.franchise_number || verif?.submitted_franchise_number || 'N/A',
+          franchiseExpiry: verif?.franchise_expiry || '2026-12-31',
+          todaVerificationStatus: 'Verified',
+          lguVerificationStatus,
+          verificationStatus,
+          accountStatus,
+          onlineStatus: d.availability_status === 'Available' || d.availability_status === 'Busy' ? 'Online' : 'Offline',
+          rating: Number(d.weighted_average_rating) || 5.0,
+          ratingCount: 0,
+          phone: d.contact_number || '',
+          barangay: d.barangay_service_area || todaInfo?.barangay || 'Calapan City',
+          rejectionReason: verif?.rejection_reason || d.rejection_reason || undefined,
+          rejectionComment: verif?.rejection_comment || d.rejection_comment || undefined,
+          strikesCount: 0,
+          strikeHistory: [],
+          isResubmitted,
+          resubmittedAt: verif?.submitted_at || undefined,
+          documents,
+        };
+      }));
   } catch (err) {
     console.error('[adminApiService] fetchDrivers exception:', err);
     return [];
   }
 }
 
+async function resolveLguAffiliationId(driverOrAffiliationId: string): Promise<string> {
+  const { data: affCheck } = await supabase
+    .from('driver_toda_affiliation')
+    .select('affiliation_id')
+    .eq('affiliation_id', driverOrAffiliationId)
+    .maybeSingle();
+
+  if (affCheck?.affiliation_id) return affCheck.affiliation_id;
+
+  const { data: aff } = await supabase
+    .from('driver_toda_affiliation')
+    .select('affiliation_id')
+    .eq('driver_id', driverOrAffiliationId)
+    .order('submitted_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return aff?.affiliation_id || driverOrAffiliationId;
+}
+
 export async function verifyDriver(driverId: string, franchiseNumber?: string) {
-  const updatePayload: any = { account_status: 'Verified', updated_at: new Date().toISOString() };
-  if (franchiseNumber) updatePayload.franchise_number = franchiseNumber;
+  console.log('[adminApiService] Verifying driver accreditation for:', driverId);
+  try {
+    const now = new Date().toISOString();
 
-  // 1. Update driver record to 'Verified' — this is the LGU Stage 2 final approval.
-  // NOTE: We do NOT touch driver_verification.verification_status here because
-  // 'Approved' in driver_verification already represents TODA Stage 1 endorsement.
-  // LGU final approval is tracked exclusively via driver.account_status = 'Verified'.
-  let { data, error } = await supabase
-    .from('driver')
-    .update(updatePayload)
-    .eq('driver_id', driverId)
-    .select();
+    // 1. Update driver_verification
+    const { error: verifErr } = await supabase
+      .from('driver_verification')
+      .update({
+        verification_status: 'Approved',
+        lgu_approved_at: now,
+        remarks: 'Approved & Accredited by City LGU Franchising Office',
+      })
+      .or(`driver_id.eq.${driverId},verification_id.eq.${driverId}`);
 
-  if (error || !data || data.length === 0) {
-    const retryRes = await supabase
+    if (verifErr) {
+      console.warn('[adminApiService] driver_verification update note:', verifErr);
+    }
+
+    // 2. Update driver record
+    const updatePayload: Record<string, any> = {
+      account_status: 'Verified',
+      updated_at: now,
+    };
+    if (franchiseNumber) {
+      updatePayload.franchise_number = franchiseNumber;
+    }
+
+    const { data: driverData, error: driverErr } = await supabase
       .from('driver')
       .update(updatePayload)
       .eq('driver_id', driverId)
-      .select();
-    if (retryRes.error) {
-      throw new Error(`verifyDriver failed: ${retryRes.error.message}`);
+      .select('*, toda:toda_id ( toda_name, toda_acronym )')
+      .maybeSingle();
+
+    if (driverErr) {
+      console.warn('[adminApiService] driver account_status update warning:', driverErr);
     }
-    data = retryRes.data;
+
+    // 3. Dispatch official Tagalog approval SMS to driver's phone
+    if (driverData?.contact_number) {
+      try {
+        const firstName = driverData.full_name?.split(' ')[0] || driverData.full_name || 'Drayber';
+        const todaInfo = Array.isArray(driverData.toda) ? driverData.toda[0] : driverData.toda;
+        const todaName = todaInfo?.toda_name || 'TODA';
+        const smsMessage = `SAKAY Alert: Magandang araw, ${firstName}! Ang iyong aplikasyon bilang drayber ay opisyal nang inaprubahan ng City LGU Franchising Office at ${todaName}. Beripikado na ang iyong account! Maaari ka nang mag-log in sa SAKAY Driver app upang magsimulang pumasada. Ingat sa biyahe!`;
+
+        console.log(`[adminApiService] Dispatching LGU approval SMS to ${driverData.contact_number}...`);
+        await fetch(`${API_BASE_URL}/communication/send-sms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: driverData.contact_number,
+            message: smsMessage,
+          }),
+        });
+      } catch (smsErr) {
+        console.warn('[adminApiService] Approval SMS dispatch warning:', smsErr);
+      }
+    }
+
+    return { success: true, data: driverData };
+  } catch (err: any) {
+    console.error('[adminApiService] verifyDriver exception:', err);
+    throw err;
   }
-
-  await recordAdminAuditAction({
-    actionType: 'DRIVER_STAGE2_VERIFIED',
-    targetId: driverId,
-    details: `LGU Admin approved and accredited driver '${data && data[0]?.full_name ? data[0].full_name : driverId}'. Driver now has full access to the Driver PWA map.`,
-    category: 'Verification',
-  });
-
-  return { success: true, data: data ? data[0] : null };
 }
 
 export async function rejectDriver(driverId: string, reason: string, notes?: string) {
-  const timestamp = new Date().toISOString();
-  const updatePayload: any = {
-    account_status: 'Rejected',
-    rejection_reason: reason,
-    rejection_comment: notes || null,
-    rejected_at: timestamp,
-    updated_at: timestamp,
-  };
+  console.log('[adminApiService] Rejecting driver application:', driverId);
+  try {
+    const now = new Date().toISOString();
+    const finalComment = notes ? `${reason}: ${notes}` : reason;
 
-  const { data, error } = await supabase
-    .from('driver')
-    .update(updatePayload)
-    .eq('driver_id', driverId)
-    .select();
+    const { error: verifErr } = await supabase
+      .from('driver_verification')
+      .update({
+        verification_status: 'Rejected',
+        rejection_reason: reason,
+        rejection_comment: finalComment,
+        remarks: `Rejected by City LGU: ${finalComment}`,
+        rejected_at: now,
+      })
+      .or(`driver_id.eq.${driverId},verification_id.eq.${driverId}`);
 
-  if (error) {
-    await supabase
-      .from('driver')
-      .update({ account_status: 'Rejected', updated_at: timestamp })
-      .eq('driver_id', driverId);
+    if (verifErr) {
+      console.warn('[adminApiService] driver_verification rejection note:', verifErr);
+    }
+
+    try {
+      await supabase
+        .from('driver')
+        .update({ account_status: 'Rejected', updated_at: now })
+        .eq('driver_id', driverId);
+    } catch {}
+
+    // Dispatch rejection SMS
+    try {
+      const { data: dInfo } = await supabase
+        .from('driver')
+        .select('full_name, contact_number')
+        .eq('driver_id', driverId)
+        .maybeSingle();
+
+      if (dInfo?.contact_number) {
+        const firstName = dInfo.full_name?.split(' ')[0] || dInfo.full_name || 'Drayber';
+        const smsMessage = `SAKAY Alert: Paumanhin, ${firstName}. Ang iyong aplikasyon bilang drayber ay hindi naaprubahan ng City LGU. Dahilan: ${reason}. Para sa katanungan, maaaring sumangguni sa City Franchising Office.`;
+        await fetch(`${API_BASE_URL}/communication/send-sms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: dInfo.contact_number,
+            message: smsMessage,
+          }),
+        });
+      }
+    } catch (smsErr) {
+      console.warn('[adminApiService] Rejection SMS dispatch warning:', smsErr);
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('[adminApiService] rejectDriver exception:', err);
+    throw err;
   }
-
-  await supabase
-    .from('driver_verification')
-    .update({
-      verification_status: 'Rejected',
-      rejection_reason: reason,
-      rejection_comment: notes || null,
-      reviewed_at: timestamp,
-    })
-    .eq('driver_id', driverId);
-
-  await recordAdminAuditAction({
-    actionType: 'DRIVER_STAGE2_REJECTED',
-    targetId: driverId,
-    details: `LGU Admin rejected driver application for '${data && data[0]?.full_name ? data[0].full_name : driverId}'. Reason: ${reason}. Notes: ${notes || 'None'}`,
-    category: 'Verification',
-  });
-
-  return { success: true, data: data ? data[0] : null };
 }
 
-export async function returnDriverForCorrection(driverId: string, reason: string, notes?: string) {
-  const timestamp = new Date().toISOString();
-  const updatePayload: any = {
-    account_status: 'Resubmission Required',
-    rejection_reason: reason,
-    rejection_comment: notes || null,
-    updated_at: timestamp,
-  };
+export interface ReturnIssuePayload {
+  documentType: 'license' | 'mtop' | 'tricycle' | 'selfie';
+  grounds: string;
+  notes: string;
+}
 
-  const { data, error } = await supabase
-    .from('driver')
-    .update(updatePayload)
-    .eq('driver_id', driverId)
-    .select();
+export async function returnDriverForCorrection(
+  driverId: string,
+  reason: string,
+  notes?: string,
+  issues?: ReturnIssuePayload[]
+) {
+  console.log('[adminApiService] Returning driver application for correction:', driverId, { reason, notes, issues });
+  try {
+    const now = new Date().toISOString();
 
-  if (error) {
-    await supabase
-      .from('driver')
-      .update({ account_status: 'Resubmission Required', updated_at: timestamp })
-      .eq('driver_id', driverId);
+    const ORDERED_TYPES: ('license' | 'mtop' | 'tricycle' | 'selfie')[] = ['license', 'mtop', 'tricycle', 'selfie'];
+    const faultyDocuments = issues && issues.length > 0
+      ? ORDERED_TYPES.filter((t) => issues.some((i) => i.documentType === t))
+      : ['license'];
+
+    const structuredPayload = {
+      faultyDocuments,
+      issues: issues || [{ documentType: 'license', grounds: reason, notes: notes || reason }],
+      displayReason: reason,
+      displayNotes: notes || reason,
+      returnedAt: now,
+    };
+
+    const finalCommentJson = JSON.stringify(structuredPayload);
+
+    const { error: verifErr } = await supabase
+      .from('driver_verification')
+      .update({
+        verification_status: 'Resubmission Required',
+        rejection_reason: reason,
+        rejection_comment: finalCommentJson,
+        remarks: `Returned for correction by City LGU: ${notes || reason}`,
+        rejected_at: now,
+      })
+      .or(`driver_id.eq.${driverId},verification_id.eq.${driverId}`);
+
+    if (verifErr) {
+      console.warn('[adminApiService] driver_verification return note:', verifErr);
+    }
+
+    try {
+      await supabase
+        .from('driver')
+        .update({
+          account_status: 'Resubmission Required',
+          rejection_reason: reason,
+          rejection_comment: finalCommentJson,
+          updated_at: now,
+        })
+        .eq('driver_id', driverId);
+    } catch {}
+
+    // Dispatch return for correction SMS
+    try {
+      const { data: dInfo } = await supabase
+        .from('driver')
+        .select('full_name, contact_number')
+        .eq('driver_id', driverId)
+        .maybeSingle();
+
+      if (dInfo?.contact_number) {
+        const firstName = dInfo.full_name?.split(' ')[0] || dInfo.full_name || 'Drayber';
+        const docNamesTagalog: Record<string, string> = {
+          license: "Driver's License",
+          mtop: 'MTOP / Franchise',
+          tricycle: 'Photo ng Tricycle',
+          selfie: 'Photo / Selfie',
+        };
+        const docListStr = faultyDocuments.map((d) => docNamesTagalog[d] || d).join(', ');
+        const smsMessage = `SAKAY Alert: Magandang araw, ${firstName}! May kailangang iwasto sa iyong ${docListStr} para sa SAKAY Driver registration. Dahilan: ${notes || reason}. Pakibuksan ang app upang mai-resubmit ang iyong dokumento.`;
+
+        await fetch(`${API_BASE_URL}/communication/send-sms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: dInfo.contact_number,
+            message: smsMessage,
+          }),
+        });
+      }
+    } catch (smsErr) {
+      console.warn('[adminApiService] Return for correction SMS dispatch warning:', smsErr);
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('[adminApiService] returnDriverForCorrection exception:', err);
+    throw err;
   }
-
-  await supabase
-    .from('driver_verification')
-    .update({
-      verification_status: 'Resubmission Required',
-      rejection_reason: reason,
-      rejection_comment: notes || null,
-      reviewed_at: timestamp,
-    })
-    .eq('driver_id', driverId);
-
-  await recordAdminAuditAction({
-    actionType: 'DRIVER_RESUBMISSION_REQUESTED',
-    targetId: driverId,
-    details: `LGU Admin requested document resubmission/correction for '${data && data[0]?.full_name ? data[0].full_name : driverId}'. Reason: ${reason}. Notes: ${notes || 'None'}`,
-    category: 'Verification',
-  });
-
-  return { success: true, data: data ? data[0] : null };
 }
 
 
@@ -1097,43 +1280,62 @@ export async function fetchTodaDrivers(todaId: string): Promise<DriverRecord[]> 
   try {
     const { data, error } = await supabase
       .from('driver')
-      .select('*, toda:toda_id(toda_id, toda_name, toda_acronym, barangay)')
+      .select('*, toda:toda_id(toda_id, toda_name, toda_acronym, barangay), driver_verification(*)')
       .eq('toda_id', todaId)
       .order('created_at', { ascending: false });
 
     if (error || !data) return [];
-    return data.map((d: any) => ({
-      id: d.driver_id,
-      name: d.full_name,
-      licenseNo: d.license_number || 'N/A',
-      licenseExpiry: d.license_expiry || '2026-12-31',
-      licenseStatus: 'Valid',
-      mtopNo: d.franchise_number || 'N/A',
-      mtopExpiry: d.license_expiry || '2026-12-31',
-      mtopStatus: 'Valid',
-      mtopOperatorName: d.full_name,
-      todaName: d.toda?.toda_name || 'TODA Association',
-      todaId: d.toda_id || todaId,
-      vehiclePlate: d.plate_number || 'N/A',
-      franchiseNo: d.franchise_number || 'N/A',
-      franchiseExpiry: '2026-12-31',
-      todaVerificationStatus: 'Verified',
-      lguVerificationStatus: d.account_status === 'Verified' ? 'Verified' : 'Pending',
-      verificationStatus: d.account_status === 'Verified' ? 'Verified' : 'Pending',
-      accountStatus: d.account_status === 'Suspended' ? 'Inactive' : 'Active',
-      onlineStatus: d.availability_status === 'Available' || d.availability_status === 'Busy' ? 'Online' : 'Offline',
-      rating: Number(d.weighted_average_rating) || 5.0,
-      ratingCount: 0,
-      phone: d.contact_number,
-      barangay: d.barangay_service_area || d.toda?.barangay || 'Calapan City',
-      strikesCount: 0,
-      strikeHistory: [],
-      documents: [
-        { name: "Driver's License (Professional)", type: 'PDF / Image', status: 'Verified' },
-        { name: 'MTOP Franchise Clearance (Calapan City)', type: 'Official LGU Permit', status: 'Verified' },
-        { name: 'Tricycle Unit Photos with TODA Sticker', type: 'Image Verification', status: 'Verified' },
-        { name: 'Barangay Clearance & Police Clearance', type: 'Certified Clearance', status: 'Verified' },
-      ],
+    return await Promise.all(data.map(async (d: any) => {
+      const verif = Array.isArray(d.driver_verification) ? d.driver_verification[0] : d.driver_verification;
+      const authId = d.auth_user_id;
+      const licFrontPath = verif?.license_front_photo_path || (authId ? `${authId}/license_front.jpg` : null);
+      const licBackPath = verif?.license_back_photo_path || (authId ? `${authId}/license_back.jpg` : null);
+      const mtopPath = verif?.mtop_photo_path || (authId ? `${authId}/mtop.jpg` : null);
+      const tricyclePath = verif?.tricycle_photo_path || d.tricycle_photo_path || (authId ? `${authId}/tricycle.jpg` : null);
+      const selfiePath = verif?.face_photo_path || (authId ? `${authId}/selfie.jpg` : null);
+
+      const [licFrontUrl, licBackUrl, mtopUrl, tricycleUrl, selfieUrl] = await Promise.all([
+        resolveStorageDocUrl('driver-licenses', licFrontPath),
+        resolveStorageDocUrl('driver-licenses', licBackPath),
+        resolveStorageDocUrl('mtop-permits', mtopPath, 'driver-licenses'),
+        resolveStorageDocUrl('mtop-permits', tricyclePath, 'driver-licenses'),
+        resolveStorageDocUrl('driver-selfies', selfiePath, 'driver-licenses'),
+      ]);
+
+      return {
+        id: d.driver_id,
+        name: d.full_name,
+        licenseNo: d.license_number || verif?.submitted_license_number || 'N/A',
+        licenseExpiry: d.license_expiry || verif?.license_expiry || '2026-12-31',
+        licenseStatus: 'Valid',
+        mtopNo: d.franchise_number || verif?.submitted_franchise_number || 'N/A',
+        mtopExpiry: d.license_expiry || verif?.franchise_expiry || '2026-12-31',
+        mtopStatus: 'Valid',
+        mtopOperatorName: verif?.submitted_operator_name || d.full_name,
+        todaName: d.toda?.toda_name || 'TODA Association',
+        todaId: d.toda_id || todaId,
+        vehiclePlate: d.plate_number || verif?.submitted_plate_number || 'N/A',
+        franchiseNo: d.franchise_number || verif?.submitted_franchise_number || 'N/A',
+        franchiseExpiry: verif?.franchise_expiry || '2026-12-31',
+        todaVerificationStatus: 'Verified',
+        lguVerificationStatus: d.account_status === 'Verified' ? 'Verified' : 'Pending',
+        verificationStatus: d.account_status === 'Verified' ? 'Verified' : 'Pending',
+        accountStatus: d.account_status === 'Suspended' ? 'Inactive' : 'Active',
+        onlineStatus: d.availability_status === 'Available' || d.availability_status === 'Busy' ? 'Online' : 'Offline',
+        rating: Number(d.weighted_average_rating) || 5.0,
+        ratingCount: 0,
+        phone: d.contact_number,
+        barangay: d.barangay_service_area || d.toda?.barangay || 'Calapan City',
+        strikesCount: 0,
+        strikeHistory: [],
+        documents: [
+          { name: "Driver's License (Front)", type: 'Identification Proof', status: 'Verified', url: licFrontUrl },
+          { name: "Driver's License (Back)", type: 'Identification Proof', status: 'Verified', url: licBackUrl },
+          { name: 'MTOP Franchise Permit', type: 'Official LGU Permit', status: 'Verified', url: mtopUrl },
+          { name: 'Tricycle Unit Inspection Photo', type: 'Vehicle Compliance Photo', status: 'Verified', url: tricycleUrl },
+          { name: 'Driver Face / Selfie Verification', type: 'Biometric Verification', status: 'Verified', url: selfieUrl },
+        ],
+      };
     }));
   } catch (err) {
     console.error('[adminApiService] fetchTodaDrivers error:', err);
@@ -1941,4 +2143,146 @@ export async function fetchOperationalReports(): Promise<OperationalReportsData>
     };
   }
 }
+
+// ============================================================================
+// 15. TERMINAL RELOCATION & DOCUMENT RENEWAL MANAGEMENT (Batch 1 Rules 2.2, 24.2)
+// ============================================================================
+
+/**
+ * Fetches TODAs with pending terminal relocation requests (Rule 2.2)
+ */
+export async function fetchPendingTerminalRelocations() {
+  try {
+    const { data, error } = await supabase
+      .from('toda')
+      .select('toda_id, toda_name, toda_acronym, terminal_latitude, terminal_longitude, service_coverage_area, pending_terminal_latitude, pending_terminal_longitude, pending_terminal_location, terminal_relocation_status, terminal_relocation_requested_at')
+      .eq('terminal_relocation_status', 'Pending LGU Re-approval')
+      .order('terminal_relocation_requested_at', { ascending: false });
+
+    if (error) {
+      console.warn('[adminApiService] fetchPendingTerminalRelocations warning:', error);
+      return [];
+    }
+    return data || [];
+  } catch (err) {
+    console.error('[adminApiService] fetchPendingTerminalRelocations error:', err);
+    return [];
+  }
+}
+
+/**
+ * Approves a pending terminal relocation (Rule 2.2)
+ */
+export async function approveTerminalRelocation(todaId: string, remarks?: string) {
+  const { data, error } = await supabase.rpc('approve_terminal_relocation', {
+    p_toda_id: todaId,
+    p_remarks: remarks || null,
+  });
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Rejects a pending terminal relocation (Rule 2.2)
+ */
+export async function rejectTerminalRelocation(todaId: string, reason?: string) {
+  const { data, error } = await supabase.rpc('reject_terminal_relocation', {
+    p_toda_id: todaId,
+    p_reason: reason || null,
+  });
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Fetches pending driver document renewals (Rule 24.2)
+ */
+export async function fetchPendingDriverRenewals() {
+  try {
+    const { data, error } = await supabase
+      .from('driver_verification')
+      .select(`
+        driver_id,
+        submitted_license_number,
+        submitted_plate_number,
+        pending_license_expiry,
+        pending_mtop_expiry,
+        pending_license_photo_url,
+        pending_mtop_photo_url,
+        renewal_status,
+        driver:driver_id (
+          driver_id,
+          full_name,
+          contact_number,
+          license_expiry,
+          mtop_expiry,
+          toda:toda_id (toda_name, toda_acronym)
+        )
+      `)
+      .eq('renewal_status', 'Pending LGU Verification');
+
+    if (error) {
+      console.warn('[adminApiService] fetchPendingDriverRenewals warning:', error);
+      return [];
+    }
+    return data || [];
+  } catch (err) {
+    console.error('[adminApiService] fetchPendingDriverRenewals error:', err);
+    return [];
+  }
+}
+
+/**
+ * Verifies or rejects a driver document renewal (Rule 24.2)
+ */
+export async function verifyDriverRenewal(driverId: string, approved: boolean, remarks?: string) {
+  const { data, error } = await supabase.rpc('verify_driver_renewal', {
+    p_driver_id: driverId,
+    p_approved: approved,
+    p_remarks: remarks || null,
+  });
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Fetches open administrative review flags (Batch 1 Rules 2.4, 3.2, 3.7)
+ */
+export async function fetchAdminReviewFlags() {
+  try {
+    const { data, error } = await supabase
+      .from('admin_review_flag')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('[adminApiService] fetchAdminReviewFlags warning:', error);
+      return [];
+    }
+    return data || [];
+  } catch (err) {
+    console.error('[adminApiService] fetchAdminReviewFlags error:', err);
+    return [];
+  }
+}
+
+/**
+ * Resolves an administrative review flag
+ */
+export async function resolveAdminReviewFlag(flagId: string, resolution: string) {
+  const { data, error } = await supabase
+    .from('admin_review_flag')
+    .update({
+      status: 'Resolved',
+      resolution: resolution,
+      resolved_at: new Date().toISOString(),
+    })
+    .eq('flag_id', flagId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 

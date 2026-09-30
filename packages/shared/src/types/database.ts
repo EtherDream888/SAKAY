@@ -26,6 +26,13 @@ export interface Toda {
   active_driver_count: number;
   toda_status: 'Pending Verification' | 'Active' | 'Suspended' | 'Deactivated';
   account_status?: 'Pending Verification' | 'Active' | 'Suspended' | 'Deactivated';
+  certificate_number?: string;
+  certificate_expiry?: string;
+  pending_terminal_latitude?: number;
+  pending_terminal_longitude?: number;
+  pending_terminal_location?: string;
+  terminal_relocation_status?: 'None' | 'Pending LGU Re-approval' | 'Approved' | 'Rejected';
+  terminal_relocation_requested_at?: string;
   created_at: string;
 }
 
@@ -89,6 +96,15 @@ export interface Driver {
   current_latitude?: number;
   current_longitude?: number;
   last_location_update?: string;
+  is_permanently_disqualified?: boolean;
+  disqualification_reason?: string;
+  disqualified_at?: string;
+  disqualified_by?: string;
+  rejection_reason?: string;
+  rejection_comment?: string;
+  lgu_approved_at?: string;
+  endorsed_at?: string;
+  mtop_expiry?: string;
   created_at: string;
   updated_at: string;
 }
@@ -118,6 +134,13 @@ export interface DriverVerification {
   submitted_plate_number?: string;
   license_expiry?: string;
   franchise_expiry?: string;
+  is_duplicate_license?: boolean;
+  is_duplicate_mtop?: boolean;
+  pending_license_expiry?: string;
+  pending_mtop_expiry?: string;
+  pending_license_photo_url?: string;
+  pending_mtop_photo_url?: string;
+  renewal_status?: 'Pending LGU Verification' | 'Approved' | 'Rejected';
   mime_type?: string;
   file_size?: number;
   scan_status: 'Clean' | 'Flagged';
@@ -222,11 +245,14 @@ export interface IncidentReport {
 
 export interface Notification {
   notification_id: string;
+  recipient_id?: string;
+  subject_id?: string;
+  threshold_days?: number;
   passenger_id?: string;
   driver_id?: string;
   title: string;
   message: string;
-  notification_type: 'Booking' | 'System' | 'Policy' | 'TODA';
+  notification_type: string;
   is_read: boolean;
   sent_at: string;
 }
@@ -244,9 +270,74 @@ export interface AuditLog {
   log_id: string;
   toda_admin_id?: string;
   lgu_admin_id?: string;
+  actor_id?: string;
+  actor_role?: string;
   action_type: string;
   target_id?: string;
   details?: string;
+  before_state?: Record<string, any>;
+  after_state?: Record<string, any>;
   performed_at: string;
+}
+
+export interface DriverTodaAffiliation {
+  affiliation_id: string;
+  driver_id: string;
+  toda_id: string;
+  toda_membership_number?: string;
+  toda_endorsement_status: 'Submitted' | 'Endorsed' | 'Resubmission Required' | 'Rejected';
+  toda_endorsed_at?: string;
+  toda_endorsed_by?: string;
+  toda_rejection_reason?: string;
+  toda_return_notes?: string;
+  lgu_verification_status: 'Pending' | 'Approved' | 'Resubmission Required' | 'Rejected';
+  lgu_verified_at?: string;
+  lgu_verified_by?: string;
+  lgu_rejection_reason?: string;
+  lgu_return_notes?: string;
+  is_active_selection: boolean;
+  submitted_at: string;
+  resubmitted_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminReviewFlag {
+  flag_id: string;
+  flag_type: 'ROSTER_MISMATCH' | 'TODA_EXCESS_INCIDENTS' | 'APPLICATION_OVERDUE' | 'DUPLICATE_LICENSE' | 'DUPLICATE_PLATE' | 'PERMANENT_DISQUALIFICATION';
+  subject_type: 'toda' | 'driver_application' | 'driver';
+  subject_id: string;
+  source_rule: string;
+  status: 'Open' | 'Under Review' | 'Resolved' | 'Dismissed';
+  details?: Record<string, any>;
+  resolution?: string;
+  resolved_by?: string;
+  resolved_at?: string;
+  assigned_role: 'lgu_admin' | 'toda_admin';
+  created_at: string;
+}
+
+export interface ServiceAreaConfig {
+  config_id: string;
+  area_name: string;
+  center_latitude: number;
+  center_longitude: number;
+  radius_km: number;
+  is_active: boolean;
+  toda_id?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TodaRosterEntry {
+  roster_id: string;
+  toda_id: string;
+  driver_full_name: string;
+  franchise_number?: string;
+  plate_number?: string;
+  normalized_name?: string;
+  normalized_franchise?: string;
+  normalized_plate?: string;
+  created_at: string;
 }
 

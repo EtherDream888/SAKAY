@@ -25,6 +25,8 @@ import {
   getCachedMtopData,
   getCachedLicenseData,
   saveMtopScanData,
+  getNextCorrectionRoute,
+  type FaultyDocType,
 } from '../../../services/driverOnboardingCache';
 import { saveDriverMtopVerification } from '../../../services/driverApiService';
 
@@ -282,7 +284,11 @@ export const DriverConfirmMtopInfo: React.FC = () => {
       if (saveRes.success) {
         saveMtopScanData(formData, targetPhone);
         console.log('[DriverConfirmMtopInfo] MTOP Verification Saved Successfully:', saveRes);
-        const targetRoute = isEditMode ? '/driver/confirm-all-info' : '/driver/tricycle-instructions';
+        let targetRoute = isEditMode ? '/driver/confirm-all-info' : '/driver/tricycle-instructions';
+        if ((state as any)?.isResubmission && (state as any)?.faultyDocuments) {
+          const next = getNextCorrectionRoute('mtop', (state as any).faultyDocuments as FaultyDocType[]);
+          targetRoute = next.nextRoute;
+        }
         navigate(targetRoute, {
           replace: true,
           state: {
@@ -468,7 +474,7 @@ export const DriverConfirmMtopInfo: React.FC = () => {
           <SakayMtopInput
             label={isTagalog ? "REHISTRADONG MAY-ARI / OPERATOR" : "REGISTERED OWNER / OPERATOR"}
             value={formData.operatorName}
-            onChange={(val) => handleFieldChange('operatorName', val.toUpperCase())}
+            onChange={(val) => handleFieldChange('operatorName', val)}
             placeholder="Dela Cruz, Juan G."
             error={hasAttemptedSubmit && isFieldEmpty(formData.operatorName)}
             helperText={hasAttemptedSubmit && isFieldEmpty(formData.operatorName) ? (isTagalog ? 'Kinakailangan ang impormasyong ito.' : 'This information is required.') : ''}
@@ -480,9 +486,10 @@ export const DriverConfirmMtopInfo: React.FC = () => {
               <SakayMtopInput
                 label={isTagalog ? "PRANGKISA" : "FRANCHISE NO."}
                 value={formData.franchiseNumber}
-                onChange={(val) => handleFieldChange('franchiseNumber', val.replace(/\D/g, '').slice(0, 6))}
-                error={hasAttemptedSubmit && (isFieldEmpty(formData.franchiseNumber) || formData.franchiseNumber.length < 3)}
-                helperText={hasAttemptedSubmit && (isFieldEmpty(formData.franchiseNumber) || formData.franchiseNumber.length < 3) ? (isTagalog ? 'Kailangan ng numero ng prangkisa.' : 'Franchise number is required.') : ''}
+                onChange={(val) => handleFieldChange('franchiseNumber', val.slice(0, 25))}
+                placeholder="FR-CAL-101"
+                error={hasAttemptedSubmit && isFieldEmpty(formData.franchiseNumber)}
+                helperText={hasAttemptedSubmit && isFieldEmpty(formData.franchiseNumber) ? (isTagalog ? 'Kailangan ng numero ng prangkisa.' : 'Franchise number is required.') : ''}
               />
             </Box>
             <Box sx={{ flex: '1 1 50%', minWidth: 0 }}>

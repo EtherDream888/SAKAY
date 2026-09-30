@@ -85,6 +85,10 @@ export interface DriverApplicant {
   isOverdue: boolean; // >3 days warning
   onSubmittedRoster: boolean; // Master Roster Mismatch detection
   tricyclePhotoUrl: string;
+  licenseFrontUrl?: string;
+  licenseBackUrl?: string;
+  mtopUrl?: string;
+  selfieUrl?: string;
   photoVerified: boolean;
   rosterVerified: boolean;
   todaStageStatus: 'Awaiting Screening' | 'Submitted' | 'TODA Review' | 'TODA Endorsed' | 'Endorsed to LGU' | 'Rejected' | 'Resubmission Required';

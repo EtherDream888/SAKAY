@@ -18,17 +18,28 @@ export const DriverPrepareDocuments: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useLanguage();
-  const state = location.state as { phone?: string; driverName?: string } | undefined;
+  const state = location.state as {
+    phone?: string;
+    driverName?: string;
+    isResubmission?: boolean;
+    rejectionReason?: string;
+    rejectionComment?: string;
+  } | undefined;
 
   const handleBack = () => {
-    navigate('/driver/privacy-policy', { state });
+    if (state?.isResubmission) {
+      navigate('/driver/status');
+    } else {
+      navigate('/driver/privacy-policy', { state });
+    }
   };
 
   const handleContinue = () => {
     navigate('/driver/prepare-license', {
       state: {
-        driverName: state?.driverName || 'Aurelio Bautista',
-        phone: state?.phone || '09181234567',
+        ...state,
+        driverName: state?.driverName || 'Driver',
+        phone: state?.phone || localStorage.getItem('sakay_driver_phone') || '',
       },
     });
   };
@@ -137,6 +148,30 @@ export const DriverPrepareDocuments: React.FC = () => {
         >
           {t.prepareDocsSubtitle}
         </Typography>
+
+        {state?.rejectionReason && (
+          <Box
+            sx={{
+              p: 2,
+              mb: 2.5,
+              borderRadius: '14px',
+              backgroundColor: '#FFFBEB',
+              border: '1.5px solid #FDE68A',
+            }}
+          >
+            <Typography sx={{ fontSize: '11px', fontWeight: 800, color: '#B45309', textTransform: 'uppercase', letterSpacing: '0.4px', mb: 0.5 }}>
+              Kailangang Iwasto / Required Correction
+            </Typography>
+            <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#92400E', mb: 0.5 }}>
+              {state.rejectionReason}
+            </Typography>
+            {state.rejectionComment && (
+              <Typography sx={{ fontSize: '12.5px', color: '#78350F' }}>
+                "{state.rejectionComment}"
+              </Typography>
+            )}
+          </Box>
+        )}
 
         {/* Bullet Points */}
         <Box

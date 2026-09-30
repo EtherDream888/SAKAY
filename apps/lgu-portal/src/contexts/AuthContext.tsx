@@ -229,8 +229,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (data?.user) break;
       }
 
-      // Demo fallback if hosted Supabase Auth has not seeded auth user yet
-      const isDemoLgu = (cleanEmail.toLowerCase() === 'admin@gmail.com' || cleanEmail.toLowerCase() === 'admin@sakay.ph') &&
+      // Demo fallback if hosted Supabase Auth has not seeded auth user yet (DEV ONLY)
+      const isDemoLgu = Boolean(import.meta.env.DEV) &&
+        (cleanEmail.toLowerCase() === 'admin@gmail.com' || cleanEmail.toLowerCase() === 'admin@sakay.ph') &&
         (password === 'admin123' || password === 'Password123!' || password === 'admin');
 
       if (signInError && isDemoLgu) {
@@ -362,6 +363,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const isDemoMode = Boolean(session?.access_token === 'demo-lgu-token');
+
   return (
     <AuthContext.Provider
       value={{
@@ -375,6 +378,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         refreshProfile,
       }}
     >
+      {isDemoMode && (
+        <div
+          role="alert"
+          style={{
+            backgroundColor: '#b91c1c',
+            color: '#ffffff',
+            textAlign: 'center',
+            padding: '8px 16px',
+            fontWeight: 700,
+            fontSize: '13px',
+            letterSpacing: '0.04em',
+            zIndex: 99999,
+            position: 'sticky',
+            top: 0,
+            boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+          }}
+        >
+          <span>⚠️</span>
+          <span>DEMO MODE - no database permissions (Synthetic session active; mutations will fail real RLS policies)</span>
+        </div>
+      )}
       {children}
     </AuthContext.Provider>
   );

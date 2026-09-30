@@ -1,5 +1,23 @@
 import React, { useState } from 'react';
-import { Box, Typography, Avatar, Rating, Button, Chip, Snackbar, Alert } from '@mui/material';
+import {
+  Box,
+  Typography,
+  Avatar,
+  Rating,
+  Button,
+  Chip,
+  Snackbar,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  FormControl,
+  Select,
+  MenuItem,
+  IconButton,
+} from '@mui/material';
 import StarIcon from '@mui/icons-material/Star';
 import PersonIcon from '@mui/icons-material/Person';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
@@ -7,6 +25,66 @@ import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
 import FlashOnIcon from '@mui/icons-material/FlashOn';
 import ShieldIcon from '@mui/icons-material/Shield';
+import AssignmentReturnIcon from '@mui/icons-material/AssignmentReturn';
+import DeleteIcon from '@mui/icons-material/Delete';
+import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+
+export type FaultyDocumentType = 'license' | 'mtop' | 'tricycle' | 'selfie';
+
+export interface ReturnIssueItem {
+  id: string;
+  documentType: FaultyDocumentType;
+  grounds: string;
+  notes: string;
+}
+
+const DOCUMENT_TYPE_OPTIONS: { value: FaultyDocumentType; label: string; desc: string }[] = [
+  { value: 'license', label: "Driver's License (Lisensya)", desc: 'Harap at likod ng lisensya' },
+  { value: 'mtop', label: 'MTOP / Franchise Document', desc: 'Permit at prangkisa mula sa LGU/TODA' },
+  { value: 'tricycle', label: 'Photo of Tricycle Unit', desc: 'Larawan ng buong tricycle at body number' },
+  { value: 'selfie', label: 'Driver Photo / Selfie', desc: 'Malinaw na larawan ng mukha' },
+];
+
+const GROUNDS_BY_DOC_TYPE: Record<FaultyDocumentType, string[]> = {
+  license: [
+    'Illegible / Blurry Scans (Malabo o hindi mabasa)',
+    'Documentary Issue (Kulang o may depekto)',
+    'Expired License (Paso na ang lisensya)',
+    'Data Mismatch (TODA Roster vs License)',
+    'Cut-off / Incomplete Edges',
+    'Iba pa / Other Grounds',
+  ],
+  mtop: [
+    'Illegible / Blurry Document (Hindi mabasa ang prangkisa)',
+    'Expired MTOP / Franchise',
+    'Franchise Number / Plate Mismatch',
+    'Missing Operator / Signature Details',
+    'Iba pa / Other Grounds',
+  ],
+  tricycle: [
+    'Unclear Tricycle Unit Photo (Malabo ang kuha ng tricycle)',
+    'Body Number / Sidecar Plate Not Visible',
+    'Wrong Color Scheme / Toda Decal Missing',
+    'Unit Does Not Match Registered Specs',
+    'Iba pa / Other Grounds',
+  ],
+  selfie: [
+    'Face Not Clear / Lighting Issue (Madilim o malabo)',
+    'Face Cut-off / Not Centered',
+    'Face Does Not Match ID Photo',
+    'Wearing Sunglasses / Face Obstructed',
+    'Iba pa / Other Grounds',
+  ],
+};
+
+const DEFAULT_NOTES_BY_DOC_TYPE: Record<FaultyDocumentType, string> = {
+  license: 'Clearer license scan required',
+  mtop: 'Please provide a clear copy showing the franchise number and validity date',
+  tricycle: 'Tricycle unit photo must clearly show the sidecar body number',
+  selfie: 'Please take selfie in a well-lit area without sunglasses or cap',
+};
 
 import { DriverRecord } from '../../mockData/adminData';
 import { MacCenterModal } from './MacCenterModal';
@@ -22,6 +100,7 @@ import {
   reactivateDriver,
   issueDriverStrike,
   recordAdminAuditAction,
+  verifyDriverRenewal,
 } from '../../services/adminApiService';
 
 interface DriverDetailModalProps {
@@ -39,16 +118,112 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
   onStatusChange,
   onDriverUpdated,
 }) => {
-  const [selectedDoc, setSelectedDoc] = useState<{ name: string; type: string } | null>(null);
+  const [docList, setDocList] = useState(driver?.documents || []);
+  const [selectedDoc, setSelectedDoc] = useState<{ doc: DriverRecord['documents'][number]; index: number } | null>(null);
   const [reminderSent, setReminderSent] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState<string | null>(null);
 
   // Dialog states
   const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [returnSummaryDialogOpen, setReturnSummaryDialogOpen] = useState(false);
+  const [configureDocIssue, setConfigureDocIssue] = useState<{
+    docType: FaultyDocumentType;
+    docName: string;
+    grounds: string;
+    notes: string;
+  } | null>(null);
+  const [returnIssues, setReturnIssues] = useState<ReturnIssueItem[]>([]);
+
+  React.useEffect(() => {
+    if (driver) {
+      setDocList(driver.documents || []);
+
+      let initialIssues: ReturnIssueItem[] = [];
+      if (driver.rejectionComment && driver.rejectionComment.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(driver.rejectionComment);
+          if (Array.isArray(parsed.issues)) {
+            initialIssues = parsed.issues;
+          } else if (Array.isArray(parsed.faultyDocuments)) {
+            initialIssues = parsed.faultyDocuments.map((docKey: string, idx: number) => ({
+              id: String(idx + 1),
+              documentType: docKey as FaultyDocumentType,
+              grounds: parsed.displayReason || GROUNDS_BY_DOC_TYPE[docKey as FaultyDocumentType]?.[0] || 'Documentary Issue',
+              notes: parsed.displayNotes || DEFAULT_NOTES_BY_DOC_TYPE[docKey as FaultyDocumentType] || 'Resubmission required',
+            }));
+          }
+        } catch {}
+      }
+      setReturnIssues(initialIssues);
+    }
+  }, [driver, open]);
+
+  const handleApproveDocument = (index: number) => {
+    if (index < 0 || index >= docList.length) return;
+    const targetDoc = docList[index];
+    const updated = [...docList];
+    updated[index] = { ...targetDoc, status: 'Verified' };
+    setDocList(updated);
+
+    if (targetDoc.docType) {
+      setReturnIssues((prev) => prev.filter((i) => i.documentType !== targetDoc.docType));
+    }
+    setSelectedDoc(null);
+    setSnackbarMsg(`"${targetDoc.name}" has been inspected and marked as Verified.`);
+  };
+
+  const handleStartResubmitForDoc = (doc: DriverRecord['documents'][number]) => {
+    const docType: FaultyDocumentType = doc.docType || 'license';
+    const existing = returnIssues.find((i) => i.documentType === docType);
+    setConfigureDocIssue({
+      docType,
+      docName: doc.name,
+      grounds: existing?.grounds || GROUNDS_BY_DOC_TYPE[docType][0],
+      notes: existing?.notes || DEFAULT_NOTES_BY_DOC_TYPE[docType] || '',
+    });
+    setSelectedDoc(null);
+  };
+
+  const handleSaveDocIssue = () => {
+    if (!configureDocIssue) return;
+    const { docType, grounds, notes } = configureDocIssue;
+
+    setDocList((prev) =>
+      prev.map((d) => (d.docType === docType ? { ...d, status: 'Resubmission Required' } : d))
+    );
+
+    setReturnIssues((prev) => {
+      const filtered = prev.filter((i) => i.documentType !== docType);
+      return [
+        ...filtered,
+        {
+          id: docType,
+          documentType: docType,
+          grounds,
+          notes,
+        },
+      ];
+    });
+
+    setSnackbarMsg(`"${configureDocIssue.docName}" marked as Resubmission Required.`);
+    setConfigureDocIssue(null);
+  };
+
+  const handleEditIssueFromSummary = (issue: ReturnIssueItem) => {
+    const doc = docList.find((d) => d.docType === issue.documentType);
+    setConfigureDocIssue({
+      docType: issue.documentType,
+      docName: doc?.name || DOCUMENT_TYPE_OPTIONS.find((o) => o.value === issue.documentType)?.label || issue.documentType,
+      grounds: issue.grounds,
+      notes: issue.notes,
+    });
+  };
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
   const [reactivateDialogOpen, setReactivateDialogOpen] = useState(false);
   const [strikeDialogOpen, setStrikeDialogOpen] = useState(false);
+  const [renewalApproveDialogOpen, setRenewalApproveDialogOpen] = useState(false);
+  const [renewalRejectDialogOpen, setRenewalRejectDialogOpen] = useState(false);
 
   if (!driver) return null;
 
@@ -98,6 +273,51 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
       setSnackbarMsg(`Error: ${(err as Error).message}`);
     }
     setRejectDialogOpen(false);
+  };
+
+  /**
+   * Action Handler: Return Driver Application for Resubmission (Rule 3.8)
+   */
+  const handleReturnConfirm = async () => {
+    try {
+      const summaryReason = returnIssues
+        .map((i) => {
+          const docLabel = DOCUMENT_TYPE_OPTIONS.find((d) => d.value === i.documentType)?.label || i.documentType;
+          return `${docLabel}: ${i.grounds}`;
+        })
+        .join('; ');
+
+      const summaryNotes = returnIssues
+        .map((i) => {
+          const docLabel = DOCUMENT_TYPE_OPTIONS.find((d) => d.value === i.documentType)?.label || i.documentType;
+          return `${docLabel}: ${i.notes}`;
+        })
+        .join('; ');
+
+      await returnDriverForCorrection(
+        driver.id,
+        summaryReason,
+        summaryNotes,
+        returnIssues.map((i) => ({
+          documentType: i.documentType,
+          grounds: i.grounds,
+          notes: i.notes,
+        }))
+      );
+      setSnackbarMsg(`Driver application for ${driver.name} returned for resubmission.`);
+      const updated: DriverRecord = {
+        ...driver,
+        accountStatus: 'Inactive',
+        verificationStatus: 'Resubmission Required',
+        lguVerificationStatus: 'Resubmission Required',
+      };
+      if (onDriverUpdated) onDriverUpdated(updated);
+      if (onStatusChange) onStatusChange(driver.id, 'Inactive');
+    } catch (err) {
+      console.error('[DriverDetailModal] Return error:', err);
+      setSnackbarMsg(`Error: ${(err as Error).message}`);
+    }
+    setReturnSummaryDialogOpen(false);
   };
 
   /**
@@ -182,6 +402,51 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
     setTimeout(() => setReminderSent(false), 3000);
   };
 
+  /**
+   * Action Handler: Approve Driver Document Renewal (Rule 24.2)
+   */
+  const handleRenewalApproveConfirm = async () => {
+    try {
+      await verifyDriverRenewal(driver.id, true);
+      setSnackbarMsg(`Driver ${driver.name} document renewal approved.`);
+      const updated: DriverRecord = {
+        ...driver,
+        renewalStatus: 'Approved',
+        licenseExpiry: driver.pendingLicenseExpiry || driver.licenseExpiry,
+        mtopExpiry: driver.pendingMtopExpiry || driver.mtopExpiry,
+        pendingLicenseExpiry: undefined,
+        pendingMtopExpiry: undefined,
+      };
+      if (onDriverUpdated) onDriverUpdated(updated);
+    } catch (err) {
+      console.error('[DriverDetailModal] Renewal approval error:', err);
+      setSnackbarMsg(`Error: ${(err as Error).message}`);
+    }
+    setRenewalApproveDialogOpen(false);
+  };
+
+  /**
+   * Action Handler: Reject Driver Document Renewal (Rule 24.2)
+   */
+  const handleRenewalRejectConfirm = async (reason?: string) => {
+    const finalReason = reason || 'Non-compliant renewed documents.';
+    try {
+      await verifyDriverRenewal(driver.id, false, finalReason);
+      setSnackbarMsg(`Driver ${driver.name} document renewal rejected.`);
+      const updated: DriverRecord = {
+        ...driver,
+        renewalStatus: 'Rejected',
+        pendingLicenseExpiry: undefined,
+        pendingMtopExpiry: undefined,
+      };
+      if (onDriverUpdated) onDriverUpdated(updated);
+    } catch (err) {
+      console.error('[DriverDetailModal] Renewal rejection error:', err);
+      setSnackbarMsg(`Error: ${(err as Error).message}`);
+    }
+    setRenewalRejectDialogOpen(false);
+  };
+
   // Strike level calculation
   const getStrikeLevel = (count: number) => {
     if (count === 0) return { label: 'Compliant (0 Strikes)', color: '#1E8E3E', bg: '#E6F4EA', border: '#A8DADC' };
@@ -192,6 +457,32 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
 
   const strikeLevel = getStrikeLevel(driver.strikesCount);
 
+  const hasResubmissionIssues = docList.some((d) => d.status === 'Resubmission Required');
+  const allDocumentsVerified = docList.length > 0 && docList.every((d) => d.status === 'Verified');
+
+  let primaryActionLabel = '';
+  let primaryActionColor: 'primary' | 'warning' | 'error' = 'primary';
+  let primaryActionDisabled = false;
+  let onPrimaryAction: () => void = () => {};
+
+  if (!isVerified) {
+    if (hasResubmissionIssues) {
+      primaryActionLabel = 'Return for Resubmission';
+      primaryActionColor = 'warning';
+      primaryActionDisabled = false;
+      onPrimaryAction = () => setReturnSummaryDialogOpen(true);
+    } else {
+      primaryActionLabel = 'Approve Stage 2 Verification';
+      primaryActionColor = 'primary';
+      primaryActionDisabled = !allDocumentsVerified;
+      onPrimaryAction = () => setVerifyDialogOpen(true);
+    }
+  } else {
+    primaryActionLabel = isAccountActive ? 'Suspend Driver' : 'Reactivate Driver';
+    primaryActionColor = isAccountActive ? 'error' : 'primary';
+    onPrimaryAction = isAccountActive ? () => setSuspendDialogOpen(true) : () => setReactivateDialogOpen(true);
+  }
+
   return (
     <>
       <MacCenterModal
@@ -201,22 +492,100 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
         subtitle={`License No: ${driver.licenseNo} • ${driver.todaName}`}
         badge={<StatusBadge status={driver.accountStatus as any} />}
         maxWidth={840}
-        primaryActionLabel={
-          !isVerified
-            ? 'Approve Stage 2 Verification'
-            : isAccountActive
-            ? 'Suspend Driver'
-            : 'Reactivate Driver'
-        }
-        onPrimaryAction={() => {
-          if (!isVerified) setVerifyDialogOpen(true);
-          else if (isAccountActive) setSuspendDialogOpen(true);
-          else setReactivateDialogOpen(true);
-        }}
+        primaryActionLabel={primaryActionLabel}
+        primaryActionColor={primaryActionColor}
+        primaryActionDisabled={primaryActionDisabled}
+        onPrimaryAction={onPrimaryAction}
         secondaryActionLabel={!isVerified ? 'Reject Application' : 'Close'}
         secondaryActionColor={!isVerified ? 'error' : 'inherit'}
         onSecondaryAction={!isVerified ? () => setRejectDialogOpen(true) : onClose}
+        extraActions={undefined}
       >
+        {/* Resubmission Required Alert Banner */}
+        {driver.verificationStatus === 'Resubmission Required' && (() => {
+          let displayReason = driver.rejectionReason || 'Documentary Issue';
+          let displayNotes = driver.rejectionComment || 'Clearer license scan required';
+          let faultyList: string[] = [];
+
+          if (driver.rejectionComment && driver.rejectionComment.startsWith('{')) {
+            try {
+              const parsed = JSON.parse(driver.rejectionComment);
+              if (parsed.displayReason) displayReason = parsed.displayReason;
+              if (parsed.displayNotes) displayNotes = parsed.displayNotes;
+              if (Array.isArray(parsed.faultyDocuments)) {
+                faultyList = parsed.faultyDocuments;
+              }
+            } catch {}
+          }
+
+          const docLabels: Record<string, string> = {
+            license: "Driver's License",
+            mtop: 'MTOP / Franchise',
+            tricycle: 'Photo ng Tricycle',
+            selfie: 'Photo / Selfie',
+          };
+
+          return (
+            <Box
+              sx={{
+                backgroundColor: '#FFFBEB',
+                border: '1.5px solid #F59E0B',
+                borderRadius: '12px',
+                p: '16px 20px',
+                mb: 3,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                  <Chip
+                    label="Resubmission Required"
+                    size="small"
+                    sx={{
+                      backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                      color: '#B45309',
+                      fontWeight: 700,
+                      fontSize: '11px',
+                      border: '1px solid rgba(245, 158, 11, 0.4)',
+                    }}
+                  />
+                  <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#92400E' }}>
+                    Application Returned for Resubmission
+                  </Typography>
+                </Box>
+              </Box>
+
+              {faultyList.length > 0 && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 1, flexWrap: 'wrap' }}>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#78350F' }}>
+                    Faulty Document(s):
+                  </Typography>
+                  {faultyList.map((docKey) => (
+                    <Chip
+                      key={docKey}
+                      label={docLabels[docKey] || docKey}
+                      size="small"
+                      sx={{
+                        backgroundColor: '#FEF3C7',
+                        color: '#92400E',
+                        fontWeight: 600,
+                        fontSize: '11px',
+                        border: '1px solid #FDE68A',
+                      }}
+                    />
+                  ))}
+                </Box>
+              )}
+
+              <Typography sx={{ fontSize: '12.5px', color: '#78350F', mt: 0.5, lineHeight: 1.5 }}>
+                <span style={{ fontWeight: 700 }}>Grounds:</span> {displayReason}
+              </Typography>
+              <Typography sx={{ fontSize: '12.5px', color: '#78350F', mt: 0.5, lineHeight: 1.5 }}>
+                <span style={{ fontWeight: 700 }}>Reviewer Notes:</span> {displayNotes}
+              </Typography>
+            </Box>
+          );
+        })()}
+
         {/* Header Profile Summary Bar */}
         <Box
           sx={{
@@ -410,48 +779,142 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
           </Box>
         </Box>
 
+        {/* Section 4B: Pending Document Renewal Review (Rule 24.2) */}
+        {(driver.renewalStatus === 'Pending LGU Verification' || Boolean(driver.pendingLicenseExpiry || driver.pendingMtopExpiry)) && (
+          <Box sx={{ mb: 4, backgroundColor: '#FFFBEB', border: '1px solid #FCD34D', borderRadius: '12px', padding: '20px' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <VerifiedUserIcon sx={{ color: '#D97706', fontSize: 20 }} />
+                <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: '#92400E', textTransform: 'uppercase' }}>
+                  Pending Document Renewal Application (Rule 24.2)
+                </Typography>
+              </Box>
+              <Chip label="Pending LGU Verification" size="small" sx={{ backgroundColor: '#FEF3C7', color: '#92400E', fontWeight: 600, fontSize: '11px' }} />
+            </Box>
+
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 2.5 }}>
+              {driver.pendingLicenseExpiry && (
+                <Box sx={{ backgroundColor: '#FFFFFF', p: 1.5, borderRadius: '8px', border: '1px solid #FDE68A' }}>
+                  <Typography sx={{ fontSize: '11px', color: '#92400E', fontWeight: 600 }}>Proposed License Expiry</Typography>
+                  <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#1F2937' }}>{driver.pendingLicenseExpiry}</Typography>
+                  <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)' }}>Current: {driver.licenseExpiry}</Typography>
+                </Box>
+              )}
+              {driver.pendingMtopExpiry && (
+                <Box sx={{ backgroundColor: '#FFFFFF', p: 1.5, borderRadius: '8px', border: '1px solid #FDE68A' }}>
+                  <Typography sx={{ fontSize: '11px', color: '#92400E', fontWeight: 600 }}>Proposed MTOP Expiry</Typography>
+                  <Typography sx={{ fontSize: '14px', fontWeight: 700, color: '#1F2937' }}>{driver.pendingMtopExpiry}</Typography>
+                  <Typography sx={{ fontSize: '11px', color: 'var(--mac-text-muted)' }}>Current: {driver.mtopExpiry}</Typography>
+                </Box>
+              )}
+            </Box>
+
+            <Box sx={{ display: 'flex', gap: 1.5, justifyContent: 'flex-end' }}>
+              <Button
+                variant="outlined"
+                color="error"
+                size="small"
+                onClick={() => setRenewalRejectDialogOpen(true)}
+                sx={{ textTransform: 'none', fontWeight: 600, fontSize: '12px' }}
+              >
+                Reject Renewal
+              </Button>
+              <Button
+                variant="contained"
+                size="small"
+                onClick={() => setRenewalApproveDialogOpen(true)}
+                sx={{ backgroundColor: '#D97706', '&:hover': { backgroundColor: '#B45309' }, textTransform: 'none', fontWeight: 600, fontSize: '12px' }}
+              >
+                Approve & Update Expiry
+              </Button>
+            </Box>
+          </Box>
+        )}
+
         {/* Section 5: Verification Credentials */}
         <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, mb: 2 }}>
-            <VerifiedUserIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
-            <Typography sx={{ fontSize: '12.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-              4. Verification Documents ({driver.documents.length})
-            </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+              <VerifiedUserIcon fontSize="small" sx={{ color: 'var(--sakay-orange)' }} />
+              <Typography sx={{ fontSize: '12.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                4. Verification Documents ({docList.length})
+              </Typography>
+            </Box>
+            {!isVerified && !allDocumentsVerified && !hasResubmissionIssues && (
+              <Typography sx={{ fontSize: '11px', color: '#D97706', fontWeight: 600 }}>
+                * Inspect and verify all 4 documents to enable Stage 2 Approval
+              </Typography>
+            )}
           </Box>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {driver.documents.map((doc, idx) => (
-              <Box
-                key={idx}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '14px 18px',
-                  borderRadius: '10px',
-                  border: '1px solid var(--mac-border-color)',
-                  backgroundColor: '#FFFFFF',
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <VerifiedUserIcon sx={{ color: doc.status === 'Verified' ? '#34A853' : '#FBBC04', fontSize: '17.6' }} />
-                  <Box>
-                    <Typography sx={{ fontSize: '13.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                      {doc.name}
-                    </Typography>
-                    <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mt: '3px' }}>
-                      {doc.type} • Status: <span style={{ fontWeight: 600, color: '#1E8E3E' }}>{doc.status}</span>
-                    </Typography>
+            {docList.map((doc, idx) => {
+              const isDocVerified = doc.status === 'Verified';
+              const isDocResubmit = doc.status === 'Resubmission Required';
+
+              return (
+                <Box
+                  key={idx}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '14px 18px',
+                    borderRadius: '10px',
+                    border: '1px solid',
+                    borderColor: isDocVerified ? '#BBF7D0' : isDocResubmit ? '#FCD34D' : 'var(--mac-border-color)',
+                    backgroundColor: isDocVerified ? '#F0FDF4' : isDocResubmit ? '#FFFBEB' : '#FFFFFF',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    {isDocVerified ? (
+                      <CheckCircleIcon sx={{ color: '#16A34A', fontSize: 20 }} />
+                    ) : isDocResubmit ? (
+                      <AssignmentReturnIcon sx={{ color: '#D97706', fontSize: 20 }} />
+                    ) : (
+                      <VerifiedUserIcon sx={{ color: '#94A3B8', fontSize: 20 }} />
+                    )}
+                    <Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography sx={{ fontSize: '13.6px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                          {doc.name}
+                        </Typography>
+                        {isDocVerified && (
+                          <Chip
+                            label="Verified"
+                            size="small"
+                            sx={{ backgroundColor: '#DCFCE7', color: '#15803D', fontWeight: 700, fontSize: '10px', height: 20 }}
+                          />
+                        )}
+                        {isDocResubmit && (
+                          <Chip
+                            label="Resubmission Required"
+                            size="small"
+                            sx={{ backgroundColor: '#FEF3C7', color: '#B45309', fontWeight: 700, fontSize: '10px', height: 20 }}
+                          />
+                        )}
+                        {!isDocVerified && !isDocResubmit && (
+                          <Chip
+                            label="Pending Inspection"
+                            size="small"
+                            sx={{ backgroundColor: '#F1F5F9', color: '#64748B', fontWeight: 600, fontSize: '10px', height: 20 }}
+                          />
+                        )}
+                      </Box>
+                      <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)', mt: '3px' }}>
+                        {doc.type}
+                      </Typography>
+                    </Box>
                   </Box>
+                  <ActionButton
+                    label="Inspect File"
+                    showArrow={false}
+                    onClick={() => setSelectedDoc({ doc, index: idx })}
+                    sx={{ height: 34, fontSize: '12.4px' }}
+                  />
                 </Box>
-                <ActionButton
-                  label="Inspect File"
-                  showArrow={false}
-                  onClick={() => setSelectedDoc({ name: doc.name, type: doc.type })}
-                  sx={{ height: 34, fontSize: '12.4px' }}
-                />
-              </Box>
-            ))}
+              );
+            })}
           </Box>
         </Box>
       </MacCenterModal>
@@ -466,6 +929,325 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
         confirmVariant="orange"
         onConfirm={handleVerifyConfirm}
       />
+
+      {/* Return for Resubmission Summary Dialog (Rule 3.8 Return Flow) */}
+      <Dialog
+        open={returnSummaryDialogOpen}
+        onClose={() => setReturnSummaryDialogOpen(false)}
+        slotProps={{
+          backdrop: {
+            sx: {
+              backgroundColor: 'rgba(0, 0, 0, 0.45)',
+              backdropFilter: 'blur(8px)',
+            },
+          },
+          paper: {
+            sx: {
+              borderRadius: 'var(--mac-radius-lg)',
+              maxWidth: 580,
+              width: '100%',
+              backgroundColor: '#FFFFFF',
+              boxShadow: 'var(--mac-shadow-popover)',
+              overflow: 'hidden',
+            },
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            padding: '20px 24px 16px 24px',
+            borderBottom: '1px solid var(--mac-border-color)',
+            fontSize: '15px',
+            fontWeight: 700,
+            color: '#92400E',
+            backgroundColor: '#FFFBEB',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.2,
+          }}
+        >
+          <AssignmentReturnIcon sx={{ color: '#D97706', fontSize: 22 }} />
+          Return Application for Resubmission
+        </DialogTitle>
+
+        <DialogContent sx={{ p: '24px !important', maxHeight: '65vh', overflowY: 'auto' }}>
+          <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-secondary)', lineHeight: 1.5, mb: 2.5 }}>
+            Review the flagged document issues below before returning the application for <strong>{driver.name}</strong> ({driver.todaName}) under <strong>Rule 3.8 Return Flow</strong>. The driver will only be required to correct and re-upload the flagged document(s).
+          </Typography>
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {returnIssues.map((issue, idx) => {
+              const doc = docList.find((d) => d.docType === issue.documentType);
+              const docName = doc?.name || DOCUMENT_TYPE_OPTIONS.find((o) => o.value === issue.documentType)?.label || issue.documentType;
+
+              return (
+                <Box
+                  key={issue.id || idx}
+                  sx={{
+                    p: 2,
+                    borderRadius: '12px',
+                    backgroundColor: '#FAFAFC',
+                    border: '1px solid #E2E8F0',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.2 }}>
+                    <Typography sx={{ fontSize: '12px', fontWeight: 800, color: '#B45309', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
+                      Faulty Document Issue #{idx + 1}
+                    </Typography>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<EditIcon sx={{ fontSize: 13 }} />}
+                      onClick={() => handleEditIssueFromSummary(issue)}
+                      sx={{
+                        height: 28,
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        textTransform: 'none',
+                        borderColor: '#D97706',
+                        color: '#B45309',
+                        borderRadius: '6px',
+                        backgroundColor: '#FFFBEB',
+                        '&:hover': {
+                          backgroundColor: '#FEF3C7',
+                          borderColor: '#B45309',
+                        },
+                      }}
+                    >
+                      Edit
+                    </Button>
+                  </Box>
+
+                  {/* Document Name - Locked text */}
+                  <Box sx={{ mb: 1.2 }}>
+                    <Typography sx={{ fontSize: '11px', fontWeight: 700, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                      Document Name
+                    </Typography>
+                    <Typography sx={{ fontSize: '13.5px', fontWeight: 700, color: 'var(--mac-text-primary)', mt: '2px' }}>
+                      {docName}
+                    </Typography>
+                  </Box>
+
+                  {/* Grounds */}
+                  <Box sx={{ mb: 1.2 }}>
+                    <Typography sx={{ fontSize: '11px', fontWeight: 700, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                      Selected Grounds
+                    </Typography>
+                    <Typography sx={{ fontSize: '13px', fontWeight: 500, color: 'var(--mac-text-secondary)', mt: '2px' }}>
+                      {issue.grounds}
+                    </Typography>
+                  </Box>
+
+                  {/* Reviewer Notes */}
+                  <Box>
+                    <Typography sx={{ fontSize: '11px', fontWeight: 700, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                      Reviewer Notes / Instructions
+                    </Typography>
+                    <Typography sx={{ fontSize: '13px', fontStyle: 'italic', color: '#334155', mt: '2px', backgroundColor: '#FFFFFF', p: '8px 12px', borderRadius: '6px', border: '1px solid #E2E8F0' }}>
+                      "{issue.notes}"
+                    </Typography>
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{ padding: '16px 24px', borderTop: '1px solid var(--mac-border-color)', backgroundColor: '#FAFAFC', gap: 1.5 }}>
+          <Button
+            onClick={() => setReturnSummaryDialogOpen(false)}
+            sx={{
+              height: 38,
+              padding: '0 18px',
+              borderRadius: '9px',
+              textTransform: 'none',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: '#334155',
+              border: '1.5px solid #94A3B8',
+              backgroundColor: '#FFFFFF',
+              '&:hover': { backgroundColor: '#F1F5F9' },
+            }}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            onClick={handleReturnConfirm}
+            variant="contained"
+            sx={{
+              height: 38,
+              padding: '0 20px',
+              borderRadius: '9px',
+              textTransform: 'none',
+              fontSize: '12px',
+              fontWeight: 700,
+              backgroundColor: '#D97706',
+              color: '#FFFFFF',
+              boxShadow: 'var(--mac-shadow-subtle)',
+              '&:hover': { backgroundColor: '#B45309' },
+            }}
+          >
+            Confirm & Return Application ({returnIssues.length} {returnIssues.length === 1 ? 'Issue' : 'Issues'})
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Configure Document Resubmission Dialog */}
+      <Dialog
+        open={Boolean(configureDocIssue)}
+        onClose={() => setConfigureDocIssue(null)}
+        slotProps={{
+          backdrop: {
+            sx: {
+              backgroundColor: 'rgba(0, 0, 0, 0.45)',
+              backdropFilter: 'blur(8px)',
+            },
+          },
+          paper: {
+            sx: {
+              borderRadius: 'var(--mac-radius-lg)',
+              maxWidth: 500,
+              width: '100%',
+              backgroundColor: '#FFFFFF',
+              boxShadow: 'var(--mac-shadow-popover)',
+              overflow: 'hidden',
+            },
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            padding: '18px 24px 14px',
+            borderBottom: '1px solid var(--mac-border-color)',
+            fontSize: '14.5px',
+            fontWeight: 700,
+            color: '#92400E',
+            backgroundColor: '#FFFBEB',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.2,
+          }}
+        >
+          <AssignmentReturnIcon sx={{ color: '#D97706', fontSize: 20 }} />
+          Configure Document Resubmission
+        </DialogTitle>
+
+        <DialogContent sx={{ p: '20px 24px !important' }}>
+          {configureDocIssue && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {/* Document Type - Locked / Non-editable */}
+              <Box>
+                <Typography sx={{ fontSize: '11px', fontWeight: 700, color: 'var(--mac-text-muted)', textTransform: 'uppercase', letterSpacing: '0.3px', mb: 0.5 }}>
+                  Target Document (Locked)
+                </Typography>
+                <Box
+                  sx={{
+                    p: '10px 14px',
+                    borderRadius: '8px',
+                    backgroundColor: '#F8FAFC',
+                    border: '1.5px solid #CBD5E1',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#0F172A' }}>
+                    {configureDocIssue.docName}
+                  </Typography>
+                  <Chip label="Selected" size="small" sx={{ backgroundColor: '#FEF3C7', color: '#B45309', fontWeight: 700, fontSize: '10px' }} />
+                </Box>
+              </Box>
+
+              {/* Grounds Dropdown */}
+              <Box>
+                <Typography sx={{ fontSize: '11px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.6, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                  Select Grounds
+                </Typography>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={configureDocIssue.grounds}
+                    onChange={(e) =>
+                      setConfigureDocIssue((prev) => (prev ? { ...prev, grounds: e.target.value } : null))
+                    }
+                    sx={{ borderRadius: '8px', fontSize: '13px', backgroundColor: '#FFFFFF' }}
+                  >
+                    {(GROUNDS_BY_DOC_TYPE[configureDocIssue.docType] || []).map((ground) => (
+                      <MenuItem key={ground} value={ground} sx={{ fontSize: '12.5px' }}>
+                        {ground}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Box>
+
+              {/* Reviewer Notes */}
+              <Box>
+                <Typography sx={{ fontSize: '11px', fontWeight: 700, color: 'var(--mac-text-primary)', mb: 0.6, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                  Reviewer Notes / Instructions for Driver
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
+                  placeholder={DEFAULT_NOTES_BY_DOC_TYPE[configureDocIssue.docType]}
+                  value={configureDocIssue.notes}
+                  onChange={(e) =>
+                    setConfigureDocIssue((prev) => (prev ? { ...prev, notes: e.target.value } : null))
+                  }
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      backgroundColor: '#FFFFFF',
+                    },
+                  }}
+                />
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ padding: '14px 24px', borderTop: '1px solid var(--mac-border-color)', backgroundColor: '#FAFAFC', gap: 1.5 }}>
+          <Button
+            onClick={() => setConfigureDocIssue(null)}
+            sx={{
+              height: 36,
+              padding: '0 16px',
+              borderRadius: '8px',
+              textTransform: 'none',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: '#334155',
+              border: '1.5px solid #94A3B8',
+              backgroundColor: '#FFFFFF',
+              '&:hover': { backgroundColor: '#F1F5F9' },
+            }}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            onClick={handleSaveDocIssue}
+            disabled={!configureDocIssue?.grounds || !configureDocIssue?.notes.trim()}
+            variant="contained"
+            sx={{
+              height: 36,
+              padding: '0 18px',
+              borderRadius: '8px',
+              textTransform: 'none',
+              fontSize: '12px',
+              fontWeight: 700,
+              backgroundColor: '#D97706',
+              color: '#FFFFFF',
+              '&:hover': { backgroundColor: '#B45309' },
+              '&.Mui-disabled': { backgroundColor: '#E5E5EA', color: '#8E8E93' },
+            }}
+          >
+            Set for Resubmission
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <MacConfirmDialog
         open={rejectDialogOpen}
@@ -513,13 +1295,40 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
         onConfirm={handleStrikeConfirm}
       />
 
+      <MacConfirmDialog
+        open={renewalApproveDialogOpen}
+        onClose={() => setRenewalApproveDialogOpen(false)}
+        title="Approve Driver Document Renewal?"
+        message={`Approve and advance license/MTOP expiry credentials for "${driver.name}". Official records will update immediately.`}
+        confirmLabel="Approve Renewal"
+        confirmVariant="orange"
+        onConfirm={handleRenewalApproveConfirm}
+      />
+
+      <MacConfirmDialog
+        open={renewalRejectDialogOpen}
+        onClose={() => setRenewalRejectDialogOpen(false)}
+        title="Reject Document Renewal?"
+        message={`Reject renewal application for "${driver.name}". The driver will be required to correct and re-upload valid documents.`}
+        confirmLabel="Reject Renewal"
+        confirmVariant="danger"
+        requireReason
+        reasonPlaceholder="Specify reason for renewal rejection (e.g. illegible photocopy, mismatched validity)..."
+        onConfirm={handleRenewalRejectConfirm}
+      />
+
       {/* Document Inspection Popover */}
       {selectedDoc && (
         <DocumentPreviewModal
           open={Boolean(selectedDoc)}
           onClose={() => setSelectedDoc(null)}
-          documentName={selectedDoc.name}
-          documentType={selectedDoc.type}
+          documentName={selectedDoc.doc.name}
+          documentType={selectedDoc.doc.type}
+          url={selectedDoc.doc.url}
+          urls={selectedDoc.doc.urls}
+          currentStatus={selectedDoc.doc.status}
+          onApproveDocument={!isVerified ? () => handleApproveDocument(selectedDoc.index) : undefined}
+          onRequestResubmit={!isVerified ? () => handleStartResubmitForDoc(selectedDoc.doc) : undefined}
         />
       )}
 

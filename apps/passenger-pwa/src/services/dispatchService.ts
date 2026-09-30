@@ -180,7 +180,7 @@ export const startDispatch = async (bookingId: string) => {
       .from('driver')
       .select('*')
       .eq('availability_status', 'Available')
-      .in('account_status', ['Active', 'Verified']);
+      .eq('account_status', 'Verified');
 
     // --- TIER 1: Priority TODA (<= 1.5km) OR Any Driver within Immediate Vicinity (<= 0.8km) ---
     console.log('[dispatchService] Executing Tier 1');
@@ -239,7 +239,7 @@ export const startDispatch = async (bookingId: string) => {
         .from('driver')
         .select('*')
         .eq('availability_status', 'Available')
-        .in('account_status', ['Active', 'Verified']);
+        .eq('account_status', 'Verified');
 
       if (currentDrivers && currentDrivers.length > 0) {
         const eligibleTier3 = currentDrivers.filter(d => {
@@ -264,7 +264,7 @@ export const startDispatch = async (bookingId: string) => {
         .from('driver')
         .select('*')
         .eq('availability_status', 'Available')
-        .in('account_status', ['Active', 'Verified']);
+        .eq('account_status', 'Verified');
 
       if (allAvailable && allAvailable.length > 0) {
         const { data: pastAttempts } = await supabase.from('dispatch_attempt').select('driver_id').eq('booking_id', bookingId);

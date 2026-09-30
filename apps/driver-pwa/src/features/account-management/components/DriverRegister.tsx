@@ -22,6 +22,7 @@ import SakayPhoneInput from '../../../common/components/SakayPhoneInput';
 import { RegisterInput } from '../../../common/components/RegisterInput';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { ensureDriverAuthSession, fetchAccreditedTodas, formatPhoneToE164, lookupDriverByPhoneSecure } from '../../../services/driverApiService';
+import { saveRegisteredNameParts } from '../../../services/driverOnboardingCache';
 
 export const formatMobileNumber = (value: string): string => {
   const digits = value.replace(/\D/g, '');
@@ -221,6 +222,13 @@ export const DriverRegister: React.FC = () => {
       localStorage.setItem('sakay_driver_phone', e164Phone);
       localStorage.setItem('sakay_driver_password', password);
       localStorage.setItem('sakay_driver_toda_id', selectedTodaId);
+      saveRegisteredNameParts({
+        firstName: firstName.trim(),
+        middleName: middleName.trim(),
+        lastName: lastName.trim(),
+        suffix: suffix.trim(),
+        fullName,
+      }, e164Phone);
     } catch {}
 
     navigate('/driver/verify-otp', {
@@ -228,6 +236,10 @@ export const DriverRegister: React.FC = () => {
         phone: e164Phone,
         password: password,
         driverName: fullName,
+        firstName: firstName.trim(),
+        middleName: middleName.trim(),
+        lastName: lastName.trim(),
+        suffix: suffix.trim(),
         todaId: selectedTodaId,
         isRecovery: false,
       },

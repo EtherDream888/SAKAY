@@ -87,17 +87,17 @@ export const LoginPage: React.FC = () => {
     setLocalError(null);
     setLocalSuccess(null);
 
-    const cleanAcronym = acronym.replace(/\s+/g, '').trim().toUpperCase();
+    const cleanInput = acronym.trim();
 
-    if (!cleanAcronym || !password) {
-      setLocalError('Please enter your TODA Acronym and password.');
+    if (!cleanInput || !password) {
+      setLocalError('Please enter your TODA Acronym or Email and password.');
       return;
     }
 
     try {
       setIsSubmitting(true);
       window.localStorage.setItem('sakay_remember_me', rememberMe.toString());
-      const res = await signIn(cleanAcronym, password);
+      const res = await signIn(cleanInput, password);
 
       if (res.success) {
         setAuthSuccessLoading(true);
@@ -105,7 +105,7 @@ export const LoginPage: React.FC = () => {
           navigate(fromLocation, { replace: true });
         }, 1800);
       } else {
-        setLocalError(res.error || 'Incorrect TODA Acronym or password. Please check your credentials and try again.');
+        setLocalError(res.error || 'Incorrect credentials. Please check your details and try again.');
       }
     } catch (err: any) {
       setLocalError(err.message || 'An unexpected error occurred during sign in.');
@@ -267,11 +267,11 @@ export const LoginPage: React.FC = () => {
                     >
                       <TextField
                         fullWidth
-                        label="TODA Acronym"
-                        placeholder="e.g. CCTODA"
+                        label="TODA Acronym or Email"
+                        placeholder="e.g. CCTODA or cctoda@toda.sakay.internal"
                         variant="outlined"
                         value={acronym}
-                        onChange={(e) => setAcronym(e.target.value.replace(/\s+/g, '').toUpperCase())}
+                        onChange={(e) => setAcronym(e.target.value)}
                         disabled={isSubmitting || authLoading}
                         autoFocus
                         sx={inputStyles}

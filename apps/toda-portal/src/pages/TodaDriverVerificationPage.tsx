@@ -29,6 +29,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import InboxIcon from '@mui/icons-material/Inbox';
 import VerifiedIcon from '@mui/icons-material/Verified';
 import ShieldIcon from '@mui/icons-material/Shield';
+import DescriptionIcon from '@mui/icons-material/Description';
 
 import { DriverApplicant } from '../types/toda';
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
@@ -39,14 +40,20 @@ import { DocumentPreviewModal } from '../components/admin/DocumentPreviewModal';
 import {
   fetchDriverApplicants,
   fetchTodaDrivers,
+  fetchTodaProfile,
+  fetchTodaRosterEntries,
   forwardApplicantToLgu,
   rejectDriverApplicant,
   requestDriverResubmission,
   recordTodaAuditAction,
 } from '../services/todaApiService';
+import { useAuth } from '../contexts/AuthContext';
 
 // toda driver application screening and lgu endorsement page
 export const TodaDriverVerificationPage: React.FC = () => {
+  const { todaAdminProfile } = useAuth();
+  const effectiveTodaId = todaAdminProfile?.toda_id;
+
   const [applicants, setApplicants] = useState<DriverApplicant[]>([]);
   const [lguVerifiedCount, setLguVerifiedCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -58,7 +65,11 @@ export const TodaDriverVerificationPage: React.FC = () => {
 
   // Selected Applicant for Review Modal
   const [selectedApplicant, setSelectedApplicant] = useState<DriverApplicant | null>(null);
-  const [previewDocModalOpen, setPreviewDocModalOpen] = useState(false);
+  const [previewDocData, setPreviewDocData] = useState<{
+    name: string;
+    type: string;
+    url?: string | null;
+  } | null>(null);
 
   // Review Checkbox States
   const [rosterChecked, setRosterChecked] = useState(false);
@@ -81,14 +92,9 @@ export const TodaDriverVerificationPage: React.FC = () => {
   const [customRejectComment, setCustomRejectComment] = useState<string>('');
 
   const PREDEFINED_REJECTION_REASONS = [
-    'Hindi natagpuan sa Master Roster ng TODA.',
-    'Hindi tugma ang impormasyong isinumite sa Master Roster.',
-    'Hindi wasto o hindi kumpleto ang impormasyon.',
-    'Hindi balido ang Driver\'s License.',
-    'Hindi balido o hindi tugma ang MTOP.',
-    'Hindi malinaw ang mga isinumiteng dokumento.',
-    'Hindi tugma ang impormasyon ng tricycle unit.',
-    'Iba pa',
+    'Hindi kwalipikado (Ineligible per City Ordinance or Regulation)',
+    'Pekeng dokumento o impormasyon (Fraudulent Documents/Information)',
+    'Hindi natagpuan sa Master Roster ng TODA',
   ];
 
   const normalizeName = (name: string): string => {
@@ -104,21 +110,38 @@ export const TodaDriverVerificationPage: React.FC = () => {
 
   const loadApplicants = () => {
     setIsLoading(true);
-    import('../services/todaApiService').then(({ fetchTodaProfile }) => {
-      fetchTodaProfile().then(profile => {
-        if (profile) setTodaStatus(profile.accreditationStatus);
-      });
+    const targetId = effectiveTodaId || todaAdminProfile?.toda_id;
+
+    fetchTodaProfile(targetId).then((profile) => {
+      if (profile) setTodaStatus(profile.accreditationStatus);
     });
 
-    Promise.all([fetchDriverApplicants(), fetchTodaDrivers()])
-      .then(([apps, drvs]) => {
-        const rosterNameSet = new Set(
-          (drvs || []).map((d) => normalizeName(d.name || (d as any).fullName || ''))
-        );
+    Promise.all([
+      fetchDriverApplicants(targetId),
+      fetchTodaDrivers(targetId),
+      fetchTodaRosterEntries(targetId),
+    ])
+      .then(([apps, drvs, rosters]) => {
+        const rosterNameSet = new Set([
+          ...(drvs || []).map((d) => normalizeName(d.name || (d as any).fullName || '')),
+          ...(rosters || []).map((r) => normalizeName(r.member_name || '')),
+        ]);
 
         const crossCheckedApps = (apps || []).map((app) => {
           const normAppName = normalizeName(app.name);
-          const isMatched = rosterNameSet.has(normAppName) || (drvs || []).some(d => normalizeName(d.name).includes(normAppName) || normAppName.includes(normalizeName(d.name)));
+          const isMatched =
+            rosterNameSet.has(normAppName) ||
+            (drvs || []).some(
+              (d) =>
+                normalizeName(d.name).includes(normAppName) ||
+                normAppName.includes(normalizeName(d.name))
+            ) ||
+            (rosters || []).some(
+              (r) =>
+                normalizeName(r.member_name).includes(normAppName) ||
+                normAppName.includes(normalizeName(r.member_name))
+            );
+
           return {
             ...app,
             onSubmittedRoster: isMatched,
@@ -141,7 +164,7 @@ export const TodaDriverVerificationPage: React.FC = () => {
 
   useEffect(() => {
     loadApplicants();
-  }, []);
+  }, [effectiveTodaId]);
 
   // Filter Logic
   const filteredApplicants = applicants.filter((app) => {
@@ -177,7 +200,7 @@ export const TodaDriverVerificationPage: React.FC = () => {
     { label: 'All Stage Statuses', value: 'All' },
     { label: 'Awaiting Screening (Pending TODA)', value: 'Awaiting Screening' },
     { label: 'TODA Review (In Progress)', value: 'TODA Review' },
-    { label: 'Endorsed to LGU (Sent to Franchising)', value: 'Endorsed to LGU' },
+    { label: 'Endorsed to LGU (Sent to LGU Review)', value: 'Endorsed to LGU' },
     { label: 'Resubmission Required', value: 'Resubmission Required' },
     { label: 'Rejected (TODA Level)', value: 'Rejected' },
   ];
@@ -671,37 +694,108 @@ export const TodaDriverVerificationPage: React.FC = () => {
             </Box>
 
             {/* Supporting Evidence View */}
-            <Box sx={{ p: 2, borderRadius: '10px', backgroundColor: '#FAFAFC', border: '1px solid var(--mac-border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                <Avatar src={selectedApplicant.tricyclePhotoUrl} variant="rounded" sx={{ width: 44, height: 44 }} />
-                <Box>
-                  <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                    Tricycle Unit Inspection Photo
-                  </Typography>
-                  <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-muted)' }}>
-                    Plate: {selectedApplicant.vehiclePlate}
-                  </Typography>
+            <Typography sx={{ fontSize: '14.5px', fontWeight: 700, color: 'var(--mac-text-primary)', mt: 1 }}>
+              Submitted Verification Documents & Photos (5)
+            </Typography>
+
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {[
+                {
+                  title: "Driver's License (Harap / Front)",
+                  subtitle: `Numero ng Lisensya: ${selectedApplicant.licenseNo} • LTO Official Card`,
+                  type: 'Identification Proof',
+                  url: selectedApplicant.licenseFrontUrl,
+                },
+                {
+                  title: "Driver's License (Likod / Back)",
+                  subtitle: 'Official LTO Conditions & Restrictions Card',
+                  type: 'Identification Proof',
+                  url: selectedApplicant.licenseBackUrl,
+                },
+                {
+                  title: 'MTOP Franchise Permit',
+                  subtitle: `Franchise Blg: ${selectedApplicant.franchiseNo} • Calapan City Franchising`,
+                  type: 'Municipal Regulatory Permit',
+                  url: selectedApplicant.mtopUrl,
+                },
+                {
+                  title: 'Larawan ng Tricycle Unit',
+                  subtitle: `Plaka Blg: ${selectedApplicant.vehiclePlate} • Side/Body View`,
+                  type: 'Vehicle Compliance Photo',
+                  url: selectedApplicant.tricyclePhotoUrl,
+                },
+                {
+                  title: 'Facial Verification / Selfie Photo',
+                  subtitle: 'Real-time Driver Liveness Biometric Verification',
+                  type: 'Biometric Verification',
+                  url: selectedApplicant.selfieUrl,
+                },
+              ].map((doc, idx) => (
+                <Box
+                  key={idx}
+                  sx={{
+                    p: 1.8,
+                    borderRadius: '10px',
+                    backgroundColor: '#FAFAFC',
+                    border: '1px solid var(--mac-border-color)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Avatar
+                      src={doc.url || ''}
+                      variant="rounded"
+                      sx={{
+                        width: 48,
+                        height: 48,
+                        backgroundColor: 'var(--sakay-orange-soft)',
+                        border: '1px solid var(--mac-border-color)',
+                      }}
+                    >
+                      <DescriptionIcon sx={{ color: 'var(--sakay-orange)', fontSize: 24 }} />
+                    </Avatar>
+                    <Box>
+                      <Typography sx={{ fontSize: '14px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                        {doc.title}
+                      </Typography>
+                      <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+                        {doc.subtitle}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<VisibilityIcon fontSize="small" />}
+                    onClick={() =>
+                      setPreviewDocData({
+                        name: `${doc.title} — ${selectedApplicant.name}`,
+                        type: doc.type,
+                        url: doc.url,
+                      })
+                    }
+                    sx={{
+                      height: 34,
+                      px: 2,
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      textTransform: 'none',
+                      color: 'var(--sakay-orange)',
+                      borderColor: 'var(--sakay-orange-border)',
+                      backgroundColor: 'var(--sakay-orange-soft)',
+                      '&:hover': {
+                        backgroundColor: 'var(--sakay-orange)',
+                        color: '#FFFFFF',
+                      },
+                    }}
+                  >
+                    Suriin ang Larawan
+                  </Button>
                 </Box>
-              </Box>
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<VisibilityIcon fontSize="small" />}
-                onClick={() => setPreviewDocModalOpen(true)}
-                sx={{
-                  height: 34,
-                  px: 2,
-                  borderRadius: '8px',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  textTransform: 'none',
-                  color: 'var(--sakay-orange)',
-                  borderColor: 'var(--sakay-orange-border)',
-                  backgroundColor: 'var(--sakay-orange-soft)',
-                }}
-              >
-                View Photo
-              </Button>
+              ))}
             </Box>
           </Box>
         </MacCenterModal>
@@ -875,12 +969,13 @@ export const TodaDriverVerificationPage: React.FC = () => {
       </Dialog>
 
       {/* Photo Preview Modal */}
-      {previewDocModalOpen && selectedApplicant && (
+      {previewDocData && (
         <DocumentPreviewModal
-          open={previewDocModalOpen}
-          onClose={() => setPreviewDocModalOpen(false)}
-          documentName={`Tricycle_Unit_Inspection_${selectedApplicant.vehiclePlate}.png`}
-          documentType="image"
+          open={Boolean(previewDocData)}
+          onClose={() => setPreviewDocData(null)}
+          documentName={previewDocData.name}
+          documentType={previewDocData.type}
+          imageUrl={previewDocData.url}
         />
       )}
 

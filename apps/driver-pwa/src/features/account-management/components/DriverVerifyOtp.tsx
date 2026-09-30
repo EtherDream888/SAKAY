@@ -236,11 +236,11 @@ export const DriverVerifyOtp: React.FC = () => {
                 isOnline: false,
                 isPaused: false,
                 accountStatus: driverData.account_status,
-                verificationStage: driverData.account_status === 'Verified' || driverData.account_status === 'Active' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
+                verificationStage: driverData.account_status === 'Verified' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
               })
             );
 
-            if (driverData.account_status === 'Active' || driverData.account_status === 'Verified') {
+            if (driverData.account_status === 'Verified') {
               navigate('/driver/home', { replace: true });
             } else if (driverData.account_status === 'Rejected') {
               navigate('/driver/status', {

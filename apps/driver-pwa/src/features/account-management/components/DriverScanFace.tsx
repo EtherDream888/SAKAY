@@ -6,6 +6,7 @@ import CameraswitchIcon from '@mui/icons-material/Cameraswitch';
 import FlashOnIcon from '@mui/icons-material/FlashOn';
 import FlashOffIcon from '@mui/icons-material/FlashOff';
 import FaceIcon from '@mui/icons-material/Face';
+import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 
 import Logo from '../../../common/components/Logo';
 import { useLanguage } from '../../../utils/LanguageContext';
@@ -21,6 +22,11 @@ export const DriverScanFace: React.FC = () => {
     phone?: string;
     driverName?: string;
     isEditMode?: boolean;
+    isResubmission?: boolean;
+    faultyDocuments?: string[];
+    issues?: { documentType: string; grounds: string; notes: string }[];
+    rejectionReason?: string;
+    rejectionComment?: string;
   } | undefined;
 
   const isEditMode = Boolean(state?.isEditMode);
@@ -247,7 +253,9 @@ export const DriverScanFace: React.FC = () => {
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
     }
-    if (isEditMode) {
+    if (state?.isResubmission) {
+      navigate('/driver/status');
+    } else if (isEditMode) {
       navigate('/driver/confirm-all-info', { state });
     } else {
       navigate('/driver/review-tricycle', { state });
@@ -297,6 +305,34 @@ export const DriverScanFace: React.FC = () => {
 
         <Logo color="orange" width={110} />
       </Box>
+
+      {/* Resubmission Banner if Selfie was flagged */}
+      {state?.isResubmission && (
+        <Box
+          sx={{
+            px: 2.5,
+            py: 1,
+            backgroundColor: '#FFFBEB',
+            borderBottom: '1px solid #FDE68A',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.2,
+            zIndex: 19,
+          }}
+        >
+          <WarningAmberRoundedIcon sx={{ color: '#D97706', fontSize: 20, flexShrink: 0 }} />
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontSize: '11px', fontWeight: 800, color: '#B45309', textTransform: 'uppercase', lineHeight: 1.2 }}>
+              {isTagalog ? 'Kailangang Iwasto: Larawan ng Mukha / Selfie' : 'Required Correction: Driver Selfie'}
+            </Typography>
+            <Typography sx={{ fontSize: '12px', color: '#92400E', fontWeight: 600, lineHeight: 1.3, mt: 0.25 }} noWrap>
+              {state?.issues?.find((i: any) => i.documentType === 'selfie')?.notes ||
+                state?.rejectionReason ||
+                'Clearer selfie photo required'}
+            </Typography>
+          </Box>
+        </Box>
+      )}
 
       {/* Hidden processing canvas */}
       <canvas ref={canvasRef} style={{ display: 'none' }} />

@@ -65,6 +65,11 @@ export interface AccreditedTodaRecord {
   flaggedForReview: boolean;
   centerLat: number;
   centerLng: number;
+  terminalRelocationStatus?: 'Approved' | 'Pending LGU Re-approval' | 'Rejected';
+  pendingTerminalLat?: number | null;
+  pendingTerminalLng?: number | null;
+  pendingTerminalLocation?: string | null;
+  terminalRelocationRequestedAt?: string | null;
   documents: {
     name: string;
     type: string;
@@ -114,12 +119,25 @@ export interface DriverRecord {
   phone: string;
   barangay: string;
   isOverdue5Days?: boolean;
+  renewalStatus?: 'Pending LGU Verification' | 'Approved' | 'Rejected' | 'None';
+  pendingLicenseExpiry?: string;
+  pendingMtopExpiry?: string;
+  pendingLicensePhotoUrl?: string;
+  pendingMtopPhotoUrl?: string;
+  rejectionReason?: string;
+  rejectionComment?: string;
   strikesCount: number;
   strikeHistory: StrikeItem[];
+  isResubmitted?: boolean;
+  resubmittedAt?: string;
   documents: {
+    id?: string;
+    docType?: 'license' | 'mtop' | 'tricycle' | 'selfie';
     name: string;
     type: string;
-    status: 'Verified' | 'Pending';
+    status: 'Verified' | 'Pending' | 'Pending Inspection' | 'Resubmission Required';
+    url?: string | null;
+    urls?: string[];
   }[];
 }
 

@@ -21,9 +21,11 @@ interface MacCenterModalProps {
   primaryActionLabel?: string;
   onPrimaryAction?: () => void;
   primaryActionColor?: 'primary' | 'error' | 'success' | 'warning';
+  primaryActionDisabled?: boolean;
   secondaryActionLabel?: string;
   onSecondaryAction?: () => void;
   secondaryActionColor?: 'inherit' | 'error' | 'primary';
+  extraActions?: React.ReactNode;
   maxWidth?: number | string;
 }
 
@@ -37,9 +39,11 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
   primaryActionLabel,
   onPrimaryAction,
   primaryActionColor = 'primary',
+  primaryActionDisabled = false,
   secondaryActionLabel = 'Close',
   onSecondaryAction,
   secondaryActionColor = 'inherit',
+  extraActions,
   maxWidth = 720,
 }) => {
   return (
@@ -114,7 +118,7 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
       </DialogContent>
 
       {/* Modal Footer */}
-      {(primaryActionLabel || secondaryActionLabel) && (
+      {(primaryActionLabel || secondaryActionLabel || extraActions) && (
         <DialogActions
           sx={{
             padding: '18px 28px 24px',
@@ -149,11 +153,14 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
             </Button>
           )}
 
+          {extraActions}
+
           {primaryActionLabel && (
             <Button
               variant="contained"
               onClick={onPrimaryAction}
               color={primaryActionColor}
+              disabled={primaryActionDisabled}
               sx={{
                 height: 40,
                 padding: '0 22px',
@@ -161,11 +168,26 @@ export const MacCenterModal: React.FC<MacCenterModalProps> = ({
                 fontSize: '11.6px',
                 fontWeight: 600,
                 textTransform: 'none',
-                backgroundColor:
-                  primaryActionColor === 'primary' ? 'var(--sakay-orange)' : undefined,
+                backgroundColor: primaryActionDisabled
+                  ? undefined
+                  : primaryActionColor === 'primary'
+                  ? 'var(--sakay-orange)'
+                  : primaryActionColor === 'warning'
+                  ? '#D97706'
+                  : undefined,
+                color: '#FFFFFF',
                 '&:hover': {
-                  backgroundColor:
-                    primaryActionColor === 'primary' ? 'var(--sakay-orange-hover)' : undefined,
+                  backgroundColor: primaryActionDisabled
+                    ? undefined
+                    : primaryActionColor === 'primary'
+                    ? 'var(--sakay-orange-hover)'
+                    : primaryActionColor === 'warning'
+                    ? '#B45309'
+                    : undefined,
+                },
+                '&.Mui-disabled': {
+                  backgroundColor: '#E2E8F0',
+                  color: '#94A3B8',
                 },
               }}
             >

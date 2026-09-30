@@ -17,16 +17,18 @@ import {
   Divider,
   CircularProgress,
   Alert,
+  TextField,
 } from '@mui/material';
 import StarIcon from '@mui/icons-material/Star';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import MyLocationIcon from '@mui/icons-material/MyLocation';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
 import MapView from '../../../common/components/MapView';
 import SakayToast from '../../../common/components/SakayToast';
 import { supabase } from '../../../services/supabaseClient';
-import { fetchAccreditedTodas } from '../../../services/driverApiService';
+import { fetchAccreditedTodas, checkDriverDocumentaryRestriction, submitDriverRenewal } from '../../../services/driverApiService';
 import { getCurrentDevicePosition, getCachedDevicePosition } from '@sakay/shared';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { useDriverSession } from '../../../contexts/DriverSessionContext';
@@ -56,8 +58,50 @@ export const DriverAvailabilityHome: React.FC = () => {
     }, 150);
   };
 
+  // Documentary Restriction & Renewal State (Rule 24.1 - 24.3)
+  const [restrictionInfo, setRestrictionInfo] = useState<{
+    is_restricted: boolean;
+    reasons: string[];
+    license_expired?: boolean;
+    mtop_expired?: boolean;
+    toda_expired?: boolean;
+    no_active_affiliation?: boolean;
+  } | null>(null);
 
+  const [renewalModalOpen, setRenewalModalOpen] = useState(false);
+  const [renewalLicenseExpiry, setRenewalLicenseExpiry] = useState('');
+  const [renewalMtopExpiry, setRenewalMtopExpiry] = useState('');
+  const [renewalSubmitting, setRenewalSubmitting] = useState(false);
+  const [renewalMsg, setRenewalMsg] = useState('');
 
+  const handleRenewalSubmit = async () => {
+    const activeDriverId = profile.id || localStorage.getItem('sakay_driver_id');
+    if (!activeDriverId) return;
+    setRenewalSubmitting(true);
+    setRenewalMsg('');
+    try {
+      await submitDriverRenewal(
+        activeDriverId,
+        renewalLicenseExpiry || undefined,
+        renewalMtopExpiry || undefined
+      );
+      setRenewalMsg(
+        language === 'tl'
+          ? 'Matagumpay na naisumite ang renewal para sa beripikasyon ng LGU.'
+          : 'Renewal submitted successfully for LGU verification.'
+      );
+      setTimeout(async () => {
+        setRenewalModalOpen(false);
+        setRenewalMsg('');
+        const restr = await checkDriverDocumentaryRestriction(activeDriverId);
+        setRestrictionInfo(restr);
+      }, 1800);
+    } catch (err: any) {
+      setRenewalMsg(err.message || 'Error submitting renewal');
+    } finally {
+      setRenewalSubmitting(false);
+    }
+  };
   // Location Permission Modal State (matching iOS permission prompt)
   // Only opens on the very first instance if never prompted before and not already granted
   const [locationPermissionOpen, setLocationPermissionOpen] = useState(() => {
@@ -171,9 +215,20 @@ export const DriverAvailabilityHome: React.FC = () => {
         const { data: driverData } = await query.maybeSingle();
 
         if (driverData) {
-          if (driverData.account_status !== 'Active' && driverData.account_status !== 'Verified') {
+          if (driverData.account_status !== 'Verified') {
             navigate('/driver/status', { replace: true });
             return;
+          }
+
+          // Authoritative check for documentary restrictions (Rule 24.1 - 24.3)
+          const restr = await checkDriverDocumentaryRestriction(driverData.driver_id);
+          setRestrictionInfo(restr);
+          if (restr?.is_restricted && driverData.availability_status === 'Available') {
+            await supabase
+              .from('driver')
+              .update({ availability_status: 'Offline' })
+              .eq('driver_id', driverData.driver_id);
+            driverData.availability_status = 'Offline';
           }
 
           const { count: completedTripsCount } = await supabase
@@ -270,8 +325,8 @@ export const DriverAvailabilityHome: React.FC = () => {
     model: 'Registered Tricycle Unit',
   };
 
-  const isDriverVerifiedInDb = profile.accountStatus === 'Active' || profile.accountStatus === 'Verified';
-  const canGoOnline = isDriverVerifiedInDb;
+  const isDriverVerifiedInDb = profile.accountStatus === 'Verified';
+  const canGoOnline = isDriverVerifiedInDb && !restrictionInfo?.is_restricted;
 
   const handleToggleOnline = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!canGoOnline) return;
@@ -279,13 +334,17 @@ export const DriverAvailabilityHome: React.FC = () => {
     setProfile((prev) => ({ ...prev, isOnline: nextState }));
     
     // Update Supabase
-    const activeDriverId = profile.id || localStorage.getItem('sakay_driver_id') || '11111111-1111-1111-1111-111111111111';
+    const activeDriverId = profile.id || localStorage.getItem('sakay_driver_id');
     if (activeDriverId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeDriverId)) {
       try {
-        await supabase
+        const { error } = await supabase
           .from('driver')
           .update({ availability_status: nextState ? 'Available' : 'Offline' })
           .eq('driver_id', activeDriverId);
+        if (error) {
+          console.warn('[DriverAvailabilityHome] Failed to sync availability_status:', error);
+          setProfile((prev) => ({ ...prev, isOnline: false }));
+        }
       } catch (err) {
         console.warn('[DriverAvailabilityHome] Failed to sync availability_status:', err);
       }
@@ -487,6 +546,66 @@ export const DriverAvailabilityHome: React.FC = () => {
           />
         </Box>
       </Paper>
+
+      {/* Documentary Restriction Warning Banner (Rule 24.2, 24.3) */}
+      {restrictionInfo?.is_restricted && (
+        <Paper
+          elevation={3}
+          sx={{
+            position: 'absolute',
+            top: 'calc(var(--safe-area-top) + 84px)',
+            left: '16px',
+            right: '16px',
+            backgroundColor: '#FEF2F2',
+            border: '1.5px solid #FCA5A5',
+            borderRadius: '16px',
+            p: 2,
+            zIndex: 25,
+            boxShadow: '0 8px 24px rgba(220, 38, 38, 0.15)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+            <WarningAmberIcon sx={{ color: '#DC2626', fontSize: 26, mt: 0.2, flexShrink: 0 }} />
+            <Box sx={{ flex: 1 }}>
+              <Typography sx={{ color: '#991B1B', fontWeight: 800, fontSize: '13px', lineHeight: 1.2 }}>
+                {language === 'tl'
+                  ? 'Pansamantalang Naka-block Mag-Online (Documentary Restriction)'
+                  : 'Service Restriction (Documentary)'}
+              </Typography>
+              <Typography sx={{ color: '#7F1D1D', fontSize: '11.5px', mt: 0.5, lineHeight: 1.4 }}>
+                {restrictionInfo.reasons && restrictionInfo.reasons.length > 0
+                  ? restrictionInfo.reasons.join('. ')
+                  : (language === 'tl' ? 'Paso na ang iyong lisensya, MTOP, o akreditasyon ng TODA.' : 'Expired license, MTOP, or TODA accreditation.')}
+              </Typography>
+              <Typography sx={{ color: '#991B1B', fontSize: '10.5px', fontStyle: 'italic', mt: 0.5 }}>
+                {language === 'tl'
+                  ? 'Hindi ito strike o administrative penalty. Kusang mawawala matapos maaprubahan ng LGU ang renewal.'
+                  : 'This is not a disciplinary strike. Restriction lifts automatically upon LGU verification.'}
+              </Typography>
+              {(restrictionInfo.license_expired || restrictionInfo.mtop_expired) && (
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={() => setRenewalModalOpen(true)}
+                  sx={{
+                    mt: 1.5,
+                    backgroundColor: '#DC2626',
+                    color: '#FFFFFF',
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    fontSize: '11.5px',
+                    borderRadius: '8px',
+                    boxShadow: 'none',
+                    '&:hover': { backgroundColor: '#B91C1C', boxShadow: 'none' },
+                  }}
+                >
+                  {language === 'tl' ? 'Mag-sumite ng Renewal' : 'Submit Document Renewal'}
+                </Button>
+              )}
+            </Box>
+          </Box>
+        </Paper>
+      )}
 
       {searchingPillVisible && (
         <Chip
@@ -828,6 +947,74 @@ export const DriverAvailabilityHome: React.FC = () => {
         >
           {language === 'tl' ? 'Huwag Payagan' : "Don't Allow"}
         </Button>
+      </Dialog>
+
+      {/* Renewal Submission Dialog (Rule 24.2) */}
+      <Dialog
+        open={renewalModalOpen}
+        onClose={() => !renewalSubmitting && setRenewalModalOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{ paper: { sx: { borderRadius: '20px', p: 1 } } }}
+      >
+        <DialogTitle sx={{ fontWeight: 800, fontSize: '16px', color: '#0F172A' }}>
+          {language === 'tl' ? 'Mag-sumite ng Document Renewal' : 'Submit Document Renewal'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: '12.5px', color: '#64748B', mb: 2 }}>
+            {language === 'tl'
+              ? 'Ilagay ang bagong petsa ng expiration ng iyong mga dokumento. Susuriin ito ng LGU bago i-update ang opisyal na rekord.'
+              : 'Enter new document expiration dates. These will be reviewed by LGU before official records update.'}
+          </Typography>
+          {renewalMsg && (
+            <Alert severity={renewalMsg.includes('Matagumpay') || renewalMsg.includes('successfully') ? 'success' : 'error'} sx={{ mb: 2 }}>
+              {renewalMsg}
+            </Alert>
+          )}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <TextField
+              label={language === 'tl' ? "Bagong Expiry ng Driver's License" : "New Driver's License Expiry"}
+              type="date"
+              slotProps={{ inputLabel: { shrink: true } }}
+              value={renewalLicenseExpiry}
+              onChange={(e) => setRenewalLicenseExpiry(e.target.value)}
+              fullWidth
+              size="small"
+            />
+            <TextField
+              label={language === 'tl' ? "Bagong Expiry ng MTOP Permit" : "New MTOP Franchise Expiry"}
+              type="date"
+              slotProps={{ inputLabel: { shrink: true } }}
+              value={renewalMtopExpiry}
+              onChange={(e) => setRenewalMtopExpiry(e.target.value)}
+              fullWidth
+              size="small"
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => setRenewalModalOpen(false)}
+            disabled={renewalSubmitting}
+            sx={{ textTransform: 'none', color: '#64748B' }}
+          >
+            {language === 'tl' ? 'Kanselahin' : 'Cancel'}
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleRenewalSubmit}
+            disabled={renewalSubmitting || (!renewalLicenseExpiry && !renewalMtopExpiry)}
+            sx={{
+              backgroundColor: '#FF6B00',
+              textTransform: 'none',
+              fontWeight: 700,
+              borderRadius: '10px',
+              '&:hover': { backgroundColor: '#E66000' },
+            }}
+          >
+            {renewalSubmitting ? (language === 'tl' ? 'Isinusumite...' : 'Submitting...') : (language === 'tl' ? 'Isumite sa LGU' : 'Submit to LGU')}
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

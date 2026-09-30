@@ -43,6 +43,22 @@ export function formatDateToMmDdYyyy(rawDate: string): string {
   return '';
 }
 
+const COMPOUND_SURNAME_PREFIXES = [
+  'de la',
+  'de los',
+  'delos',
+  'dela',
+  'del',
+  'de',
+  'san',
+  'santa',
+  'sta.',
+  'sta',
+  'santo',
+  'sto.',
+  'sto',
+];
+
 /**
  * Splits Philippine DL name into firstName, middleName, lastName, and suffix
  */
@@ -116,15 +132,52 @@ export function splitNameParts(rawName: string): {
     if (words.length > 1 && suffixes.includes(lastWordUpper)) {
       suffix = words.pop()?.toUpperCase() || '';
     }
+
     if (words.length === 1) {
       firstName = toTitleCase(words[0]);
     } else if (words.length === 2) {
       firstName = toTitleCase(words[0]);
       lastName = toTitleCase(words[1]);
-    } else if (words.length >= 3) {
-      firstName = toTitleCase(words[0]);
-      lastName = toTitleCase(words[words.length - 1]);
-      middleName = toTitleCase(words.slice(1, -1).join(' '));
+    } else {
+      // Check for compound surname prefixes starting at index 1 or later
+      let compoundSurnameStartIndex = -1;
+      for (let i = 1; i < words.length; i++) {
+        const tailLower = words.slice(i).join(' ').toLowerCase();
+        for (const prefix of COMPOUND_SURNAME_PREFIXES) {
+          if (tailLower === prefix || tailLower.startsWith(prefix + ' ')) {
+            compoundSurnameStartIndex = i;
+            break;
+          }
+        }
+        if (compoundSurnameStartIndex !== -1) break;
+      }
+
+      if (compoundSurnameStartIndex !== -1) {
+        // Compound surname found! Everything from compoundSurnameStartIndex onward is lastName
+        lastName = toTitleCase(words.slice(compoundSurnameStartIndex).join(' '));
+        const firstParts = words.slice(0, compoundSurnameStartIndex);
+        if (firstParts.length === 1) {
+          firstName = toTitleCase(firstParts[0]);
+          middleName = '';
+        } else if (firstParts.length === 2) {
+          firstName = toTitleCase(firstParts[0]);
+          middleName = toTitleCase(firstParts[1]);
+        } else {
+          middleName = toTitleCase(firstParts[firstParts.length - 1]);
+          firstName = toTitleCase(firstParts.slice(0, -1).join(' '));
+        }
+      } else {
+        // Standard Filipino FN MN LN
+        if (words.length === 3) {
+          firstName = toTitleCase(words[0]);
+          middleName = toTitleCase(words[1]);
+          lastName = toTitleCase(words[2]);
+        } else {
+          firstName = toTitleCase(words.slice(0, -2).join(' '));
+          middleName = toTitleCase(words[words.length - 2]);
+          lastName = toTitleCase(words[words.length - 1]);
+        }
+      }
     }
   }
 

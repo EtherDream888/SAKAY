@@ -224,7 +224,8 @@ const BookSummary: React.FC = () => {
       setSuccessOpen(true);
     } catch (err: any) {
       console.error("Booking error:", err);
-      setErrorMessage("May aberya sa pag-book. Pakisubukang muli.");
+      const errMsg = err?.message || "May aberya sa pag-book. Pakisubukang muli.";
+      setErrorMessage(errMsg);
       setBookingLoading(false);
     }
   };

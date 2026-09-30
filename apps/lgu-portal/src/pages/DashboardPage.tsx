@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Card, CardContent, Button, IconButton, CircularProgress } from '@mui/material';
+import { Box, Typography, Card, CardContent, Button, IconButton, CircularProgress, Chip, Dialog, DialogTitle, DialogContent, DialogActions, TextField } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
@@ -9,6 +9,7 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import CloseIcon from '@mui/icons-material/Close';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
+import FlagIcon from '@mui/icons-material/Flag';
 import { useNavigate } from 'react-router-dom';
 
 import { WelcomeHeader } from '../components/layout/WelcomeHeader';
@@ -17,7 +18,7 @@ import { DriverVerificationCard } from '../components/dashboard/DriverVerificati
 import { LiveTripsMapCard } from '../components/dashboard/LiveTripsMapCard';
 import { RecentIncidentReportsCard } from '../components/dashboard/RecentIncidentReportsCard';
 import { RecentTodaApplicationsCard } from '../components/dashboard/RecentTodaApplicationsCard';
-import { fetchDashboardStats, DashboardStats } from '../services/adminApiService';
+import { fetchDashboardStats, DashboardStats, fetchAdminReviewFlags, resolveAdminReviewFlag } from '../services/adminApiService';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -28,6 +29,12 @@ export const DashboardPage: React.FC = () => {
   // Dismissible alert states
   const [showTodaAlert, setShowTodaAlert] = useState(true);
   const [showOverdueAlert, setShowOverdueAlert] = useState(true);
+
+  // Administrative review flags (Rules 2.4, 2.5, 3.7)
+  const [adminFlags, setAdminFlags] = useState<any[]>([]);
+  const [selectedFlag, setSelectedFlag] = useState<any | null>(null);
+  const [flagResolutionText, setFlagResolutionText] = useState('');
+  const [flagDialogOpen, setFlagDialogOpen] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -44,10 +51,37 @@ export const DashboardPage: React.FC = () => {
         if (isMounted) setIsLoading(false);
       });
 
+    fetchAdminReviewFlags()
+      .then((flags) => {
+        if (isMounted) setAdminFlags(flags || []);
+      })
+      .catch((err) => {
+        console.warn('[DashboardPage] Failed to fetch admin flags:', err);
+      });
+
     return () => {
       isMounted = false;
     };
   }, []);
+
+  const handleResolveFlag = async () => {
+    if (!selectedFlag) return;
+    try {
+      await resolveAdminReviewFlag(selectedFlag.flag_id, flagResolutionText || 'Resolved by LGU Administrator');
+      setAdminFlags((prev) =>
+        prev.map((f) =>
+          f.flag_id === selectedFlag.flag_id
+            ? { ...f, status: 'Resolved', resolution: flagResolutionText || 'Resolved' }
+            : f
+        )
+      );
+      setFlagDialogOpen(false);
+      setSelectedFlag(null);
+      setFlagResolutionText('');
+    } catch (err) {
+      console.error('[DashboardPage] Flag resolve error:', err);
+    }
+  };
 
   const kpis = stats?.kpis || {
     passengers: { total: 0, active: 0, inactive: 0 },
@@ -188,6 +222,112 @@ export const DashboardPage: React.FC = () => {
             </IconButton>
           </Box>
         </Box>
+      )}
+
+      {/* 3B. Administrative Review Flags Card (Rules 2.4, 2.5, 3.7) */}
+      {adminFlags.some((f) => f.status === 'Pending') && (
+        <Card
+          sx={{
+            mb: 3.5,
+            borderRadius: 'var(--mac-radius-lg)',
+            border: '1px solid #CBD5E1',
+            backgroundColor: '#F8FAFC',
+            boxShadow: 'var(--mac-shadow-subtle)',
+            overflow: 'hidden',
+          }}
+        >
+          <Box
+            sx={{
+              p: '16px 20px',
+              backgroundColor: '#EDE9FE',
+              borderBottom: '1px solid #DDD6FE',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <FlagIcon sx={{ color: '#6D28D9', fontSize: 22 }} />
+              <Typography sx={{ fontSize: '15px', fontWeight: 700, color: '#4C1D95' }}>
+                Administrative Review Flags ({adminFlags.filter((f) => f.status === 'Pending').length} Pending Action)
+              </Typography>
+            </Box>
+            <Typography sx={{ fontSize: '12px', color: '#6D28D9', fontWeight: 500 }}>
+              Batch 1 Governance (Rules 2.4, 2.5, 3.7)
+            </Typography>
+          </Box>
+          <CardContent sx={{ p: '16px 20px !important' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+              {adminFlags
+                .filter((f) => f.status === 'Pending')
+                .slice(0, 5)
+                .map((flag) => (
+                  <Box
+                    key={flag.flag_id}
+                    sx={{
+                      p: 1.5,
+                      borderRadius: '8px',
+                      backgroundColor: '#FFFFFF',
+                      border: '1px solid #E2E8F0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 1.5,
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Chip
+                        label={flag.type}
+                        size="small"
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: '11px',
+                          backgroundColor:
+                            flag.type === 'ROSTER_MISMATCH'
+                              ? '#FEE2E2'
+                              : flag.type === 'TERMINAL_RELOCATION_PENDING'
+                              ? '#FEF3C7'
+                              : '#FFEDD5',
+                          color:
+                            flag.type === 'ROSTER_MISMATCH'
+                              ? '#DC2626'
+                              : flag.type === 'TERMINAL_RELOCATION_PENDING'
+                              ? '#D97706'
+                              : '#EA580C',
+                        }}
+                      />
+                      <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                        {flag.subject_type}: <span style={{ fontFamily: 'monospace' }}>{flag.subject_id}</span>
+                      </Typography>
+                      <Typography sx={{ fontSize: '12px', color: 'var(--mac-text-muted)' }}>
+                        Rule {flag.source_rule} • {new Date(flag.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </Typography>
+                    </Box>
+
+                    <Button
+                      size="small"
+                      variant="contained"
+                      onClick={() => {
+                        setSelectedFlag(flag);
+                        setFlagDialogOpen(true);
+                      }}
+                      sx={{
+                        backgroundColor: '#6D28D9',
+                        '&:hover': { backgroundColor: '#5B21B6' },
+                        fontSize: '12px',
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        height: 30,
+                      }}
+                    >
+                      Resolve Flag
+                    </Button>
+                  </Box>
+                ))}
+            </Box>
+          </CardContent>
+        </Card>
       )}
 
       {/* 4. Real Live KPI Summary Cards */}
@@ -399,6 +539,40 @@ export const DashboardPage: React.FC = () => {
         <RecentTodaApplicationsCard applications={stats?.recentApplications} />
         <RecentIncidentReportsCard reports={stats?.recentIncidents} />
       </Box>
+
+      {/* Flag Resolution Dialog */}
+      <Dialog open={flagDialogOpen} onClose={() => setFlagDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, fontSize: '16px' }}>
+          Resolve Administrative Flag ({selectedFlag?.type})
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-secondary)', mb: 2 }}>
+            Provide resolution notes for {selectedFlag?.subject_type} {selectedFlag?.subject_id} (Rule {selectedFlag?.source_rule}).
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            rows={3}
+            label="Resolution Notes"
+            value={flagResolutionText}
+            onChange={(e) => setFlagResolutionText(e.target.value)}
+            placeholder="e.g. Verified with manual certificate, franchise validated, or inspection completed..."
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setFlagDialogOpen(false)} sx={{ textTransform: 'none' }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleResolveFlag}
+            variant="contained"
+            sx={{ backgroundColor: '#6D28D9', '&:hover': { backgroundColor: '#5B21B6' }, textTransform: 'none', fontWeight: 600 }}
+          >
+            Mark Resolved
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

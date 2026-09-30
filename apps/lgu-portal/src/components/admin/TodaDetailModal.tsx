@@ -12,6 +12,7 @@ import {
   Avatar,
   Pagination,
   CircularProgress,
+  Button,
 } from '@mui/material';
 import MapIcon from '@mui/icons-material/Map';
 import PeopleIcon from '@mui/icons-material/People';
@@ -24,7 +25,7 @@ import { StatusBadge } from '../common/StatusBadge';
 import { ActionButton } from './ActionButton';
 import { DriverDetailModal } from './DriverDetailModal';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
-import { fetchTodaDrivers } from '../../services/adminApiService';
+import { fetchTodaDrivers, approveTerminalRelocation, rejectTerminalRelocation } from '../../services/adminApiService';
 
 interface TodaDetailModalProps {
   open: boolean;
@@ -35,6 +36,8 @@ interface TodaDetailModalProps {
 export const TodaDetailModal: React.FC<TodaDetailModalProps> = ({ open, onClose, toda }) => {
   const [page, setPage] = useState(1);
   const rowsPerPage = 10;
+  const [isRelocationLoading, setIsRelocationLoading] = useState(false);
+  const [relocationFeedback, setRelocationFeedback] = useState<string | null>(null);
 
   // Real affiliated drivers fetched from database
   const [drivers, setDrivers] = useState<DriverRecord[]>([]);
@@ -144,6 +147,71 @@ export const TodaDetailModal: React.FC<TodaDetailModalProps> = ({ open, onClose,
         badge={<StatusBadge status={toda.status as any} />}
         maxWidth={920}
       >
+        {/* Terminal Relocation Request Banner (Rule 2.2) */}
+        {(toda.terminalRelocationStatus === 'Pending LGU Re-approval' || toda.pendingTerminalLat) && (
+          <Box sx={{ mb: 3.5, backgroundColor: '#FFF7ED', border: '1px solid #FDBA74', borderRadius: '12px', padding: '18px 24px' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+              <Box>
+                <Typography sx={{ fontSize: '14.5px', fontWeight: 700, color: '#9A3412', mb: 0.5 }}>
+                  Terminal Relocation Request (Pending LGU Re-approval)
+                </Typography>
+                <Typography sx={{ fontSize: '12.5px', color: '#C2410C' }}>
+                  Requested Terminal: {toda.pendingTerminalLocation || 'New Terminal Location'} ({toda.pendingTerminalLat}, {toda.pendingTerminalLng})
+                </Typography>
+                <Typography sx={{ fontSize: '11.5px', color: 'var(--mac-text-muted)', mt: 0.5 }}>
+                  Active coordinates remain: ({toda.centerLat}, {toda.centerLng}) until approved.
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1.5 }}>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  size="small"
+                  disabled={isRelocationLoading}
+                  onClick={async () => {
+                    setIsRelocationLoading(true);
+                    try {
+                      await rejectTerminalRelocation(toda.id, 'Relocation request does not meet municipal zoning ordinances');
+                      setRelocationFeedback('Relocation rejected.');
+                    } catch (e: any) {
+                      setRelocationFeedback(`Error: ${e.message}`);
+                    } finally {
+                      setIsRelocationLoading(false);
+                    }
+                  }}
+                  sx={{ textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
+                >
+                  Reject Relocation
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  disabled={isRelocationLoading}
+                  onClick={async () => {
+                    setIsRelocationLoading(true);
+                    try {
+                      await approveTerminalRelocation(toda.id, 'Approved by LGU Transport Board');
+                      setRelocationFeedback('Terminal relocation approved and activated.');
+                    } catch (e: any) {
+                      setRelocationFeedback(`Error: ${e.message}`);
+                    } finally {
+                      setIsRelocationLoading(false);
+                    }
+                  }}
+                  sx={{ backgroundColor: '#1E8E3E', '&:hover': { backgroundColor: '#137333' }, textTransform: 'none', borderRadius: '8px', fontWeight: 600 }}
+                >
+                  Approve Relocation
+                </Button>
+              </Box>
+            </Box>
+            {relocationFeedback && (
+              <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#9A3412', mt: 1 }}>
+                {relocationFeedback}
+              </Typography>
+            )}
+          </Box>
+        )}
+
         {/* Section 1: TODA Information Grid */}
         <Box sx={{ mb: 3.5 }}>
           <Typography sx={{ fontSize: '12.4px', fontWeight: 600, color: 'var(--mac-text-muted)', textTransform: 'uppercase', mb: 1.5, letterSpacing: '0.3px' }}>

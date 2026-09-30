@@ -13,7 +13,11 @@ import Logo from '../../../common/components/Logo';
 import PrimaryButton from '../../../common/components/PrimaryButton';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { assessImageQuality } from '../../../services/imageEnhancementService';
-import { saveTricycleScanData } from '../../../services/driverOnboardingCache';
+import {
+  saveTricycleScanData,
+  getNextCorrectionRoute,
+  type FaultyDocType,
+} from '../../../services/driverOnboardingCache';
 import { saveDriverTricycleVerification } from '../../../services/driverApiService';
 
 export const DriverReviewTricycle: React.FC = () => {
@@ -73,7 +77,11 @@ export const DriverReviewTricycle: React.FC = () => {
       saveTricycleScanData(tricycleData, targetPhone);
       await saveDriverTricycleVerification(currentPhoto, targetPhone);
 
-      const targetRoute = state?.isEditMode ? '/driver/confirm-all-info' : '/driver/scan-face';
+      let targetRoute = state?.isEditMode ? '/driver/confirm-all-info' : '/driver/scan-face';
+      if ((state as any)?.isResubmission && (state as any)?.faultyDocuments) {
+        const next = getNextCorrectionRoute('tricycle', (state as any).faultyDocuments as FaultyDocType[]);
+        targetRoute = next.nextRoute;
+      }
       navigate(targetRoute, {
         state: {
           ...state,
@@ -82,7 +90,11 @@ export const DriverReviewTricycle: React.FC = () => {
       });
     } catch (err) {
       console.error('[DriverReviewTricycle] Save error:', err);
-      const targetRoute = state?.isEditMode ? '/driver/confirm-all-info' : '/driver/scan-face';
+      let targetRoute = state?.isEditMode ? '/driver/confirm-all-info' : '/driver/scan-face';
+      if ((state as any)?.isResubmission && (state as any)?.faultyDocuments) {
+        const next = getNextCorrectionRoute('tricycle', (state as any).faultyDocuments as FaultyDocType[]);
+        targetRoute = next.nextRoute;
+      }
       navigate(targetRoute, {
         state: {
           ...state,

@@ -34,7 +34,15 @@ export const DriverScanLicenseFront: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { language, t } = useLanguage();
-  const state = location.state as { phone?: string; driverName?: string } | undefined;
+  const state = location.state as {
+    phone?: string;
+    driverName?: string;
+    isResubmission?: boolean;
+    faultyDocuments?: string[];
+    issues?: any[];
+    rejectionReason?: string;
+    rejectionComment?: string;
+  } | undefined;
 
   const isTagalog = language === 'tl';
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -317,7 +325,13 @@ export const DriverScanLicenseFront: React.FC = () => {
         }}
       >
         <IconButton
-          onClick={() => navigate('/driver/prepare-license', { state })}
+          onClick={() => {
+            if (state?.isResubmission) {
+              navigate('/driver/status');
+            } else {
+              navigate('/driver/prepare-license', { state });
+            }
+          }}
           sx={{
             width: 44,
             height: 44,
@@ -333,6 +347,34 @@ export const DriverScanLicenseFront: React.FC = () => {
 
         <Logo color="orange" width={110} />
       </Box>
+
+      {/* Resubmission Banner if Driver's License was flagged */}
+      {state?.isResubmission && (
+        <Box
+          sx={{
+            px: 2.5,
+            py: 1,
+            backgroundColor: '#FFFBEB',
+            borderBottom: '1px solid #FDE68A',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.2,
+            zIndex: 14,
+          }}
+        >
+          <WarningAmberRoundedIcon sx={{ color: '#D97706', fontSize: 20, flexShrink: 0 }} />
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography sx={{ fontSize: '11px', fontWeight: 800, color: '#B45309', textTransform: 'uppercase', lineHeight: 1.2 }}>
+              {isTagalog ? 'Kailangang Iwasto / Required Correction' : 'Required Correction'}
+            </Typography>
+            <Typography sx={{ fontSize: '12px', color: '#92400E', fontWeight: 600, lineHeight: 1.3, mt: 0.25 }} noWrap>
+              {state?.issues?.find((i: any) => i.documentType === 'license')?.notes ||
+                state?.rejectionReason ||
+                'Clearer license scan required'}
+            </Typography>
+          </Box>
+        </Box>
+      )}
 
       {/* 2. Main Scanner Viewport Area */}
       <Box

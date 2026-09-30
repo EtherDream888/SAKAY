@@ -181,6 +181,10 @@ export const createBooking = async (payload: CreateBookingPayload): Promise<Book
 
   if (error || !dbData) {
     console.error('[bookingService] Supabase insert error:', error?.message);
+    const msg = error?.message || '';
+    if (msg.includes('ERR_OUT_OF_SERVICE_AREA')) {
+      throw new Error('Nasa labas ng opisyal na service area ng Calapan City ang napiling pickup location. Mangyaring pumili ng lokasyon sa loob ng lungsod.');
+    }
     throw new Error(error?.message || 'Failed to create booking');
   }
 

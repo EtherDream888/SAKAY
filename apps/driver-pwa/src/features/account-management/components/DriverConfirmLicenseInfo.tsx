@@ -26,7 +26,10 @@ import { DateCalendarPopover } from '../../../components/common/DateCalendarPopo
 import {
   getCachedLicenseData,
   saveLicenseScanData,
+  getRegisteredNameParts,
   LicenseExtractedData,
+  getNextCorrectionRoute,
+  type FaultyDocType,
 } from '../../../services/driverOnboardingCache';
 import { saveDriverLicenseVerification } from '../../../services/driverApiService';
 import { splitNameParts } from '../../../services/licenseOcrService';
@@ -407,20 +410,30 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
   const state = location.state as {
     phone?: string;
     driverName?: string;
+    firstName?: string;
+    middleName?: string;
+    lastName?: string;
+    suffix?: string;
     extracted?: LicenseExtractedData;
     isEditMode?: boolean;
+    isResubmission?: boolean;
+    faultyDocuments?: string[];
+    issues?: any[];
+    rejectionReason?: string;
+    rejectionComment?: string;
   } | undefined;
 
   const isEditMode = Boolean(state?.isEditMode);
   const cached = getCachedLicenseData();
+  const registered = getRegisteredNameParts();
   const initial: LicenseExtractedData = state?.extracted || cached || {
     frontPhoto: '',
     backPhoto: '',
-    fullName: state?.driverName || '',
-    firstName: '',
-    middleName: '',
-    lastName: '',
-    suffix: '',
+    fullName: state?.driverName || registered.fullName || 'Juan Dela Cruz',
+    firstName: state?.firstName || registered.firstName || '',
+    middleName: state?.middleName ?? registered.middleName ?? '',
+    lastName: state?.lastName || registered.lastName || '',
+    suffix: state?.suffix || registered.suffix || '',
     dob: '',
     gender: 'Lalaki',
     address: '',
@@ -430,10 +443,17 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
     scannedAt: new Date().toISOString(),
   };
 
+  // If first name or last name are empty in state or cache, prefer registered name values:
+  if (!initial.firstName && registered.firstName) initial.firstName = registered.firstName;
+  if (initial.middleName === undefined && registered.middleName !== undefined) initial.middleName = registered.middleName;
+  if (!initial.lastName && registered.lastName) initial.lastName = registered.lastName;
+  if (!initial.suffix && registered.suffix) initial.suffix = registered.suffix;
+
+  // Only fall back to splitNameParts if firstName or lastName are still missing
   if (initial.fullName && (!initial.firstName || !initial.lastName)) {
     const parts = splitNameParts(initial.fullName);
     if (!initial.firstName) initial.firstName = parts.firstName;
-    if (!initial.middleName) initial.middleName = parts.middleName;
+    if (initial.middleName === undefined || initial.middleName === '') initial.middleName = parts.middleName;
     if (!initial.lastName) initial.lastName = parts.lastName;
     if (!initial.suffix) initial.suffix = parts.suffix;
   }
@@ -551,7 +571,11 @@ export const DriverConfirmLicenseInfo: React.FC = () => {
       const saveRes = await saveDriverLicenseVerification(payloadToSave, targetPhone);
       if (saveRes.success) {
         saveLicenseScanData(formData, targetPhone);
-        const targetRoute = isEditMode ? '/driver/confirm-all-info' : '/driver/mtop-instructions';
+        let targetRoute = isEditMode ? '/driver/confirm-all-info' : '/driver/mtop-instructions';
+        if (state?.isResubmission && state?.faultyDocuments) {
+          const next = getNextCorrectionRoute('license', state.faultyDocuments as FaultyDocType[]);
+          targetRoute = next.nextRoute;
+        }
         navigate(targetRoute, {
           replace: true,
           state: {

@@ -10,6 +10,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import { NotificationPopover } from '../popovers/NotificationPopover';
 import { NotificationItem } from '../../types/toda';
 import { fetchTodaProfile } from '../../services/todaApiService';
+import { supabase } from '../../services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { LogoutConfirmModal } from '../admin/LogoutConfirmModal';
 
@@ -33,10 +34,41 @@ export const TodaHeader: React.FC<TodaHeaderProps> = ({
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
 
   useEffect(() => {
-    fetchTodaProfile().then((p) => {
-      if (p) setTodaName(p.name);
-    });
-  }, []);
+    let isMounted = true;
+    const loadData = async () => {
+      try {
+        const p = await fetchTodaProfile();
+        if (p && isMounted) {
+          setTodaName(p.name);
+          const todaId = p.id || todaAdminProfile?.toda_id;
+          if (todaId) {
+            const { data: notifs } = await supabase
+              .from('notification')
+              .select('*')
+              .eq('recipient_id', `toda_${todaId}`)
+              .order('sent_at', { ascending: false })
+              .limit(10);
+
+            if (isMounted && notifs && notifs.length > 0) {
+              setNotifications(notifs.map((n: any) => ({
+                id: n.notification_id || n.id,
+                title: n.title,
+                description: n.message,
+                time: n.sent_at ? new Date(n.sent_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Recent',
+                read: false,
+                unread: true,
+                type: n.notification_type?.toLowerCase().includes('expiry') ? 'alert' : 'info',
+              })));
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[TodaHeader] Error loading notifications:', err);
+      }
+    };
+    loadData();
+    return () => { isMounted = false; };
+  }, [todaAdminProfile]);
 
   const adminName = todaAdminProfile?.full_name || 'TODA Administrator';
   const adminEmail = todaAdminProfile?.email || user?.email || 'toda.admin@gmail.com';
