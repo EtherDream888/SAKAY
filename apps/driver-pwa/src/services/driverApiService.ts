@@ -1814,7 +1814,9 @@ export async function submitFinalDriverRegistration(
       Boolean(existingVerif?.endorsed_at) ||
       Boolean(localStorage.getItem('sakay_driver_resubmission_session'));
 
-    const targetVerificationStatus = isResubmission ? 'Endorsed to LGU' : 'Pending';
+    // driver_verification_verification_status_check allows: 'Pending', 'Approved', 'Rejected', 'Resubmission Required'
+    // An endorsed driver who resubmits maintains Stage 1 'Approved' (awaiting LGU Stage 2 review)
+    const targetVerificationStatus = isResubmission ? 'Approved' : 'Pending';
 
     verifPayload.verification_status = targetVerificationStatus;
     fallbackVerifPayload.verification_status = targetVerificationStatus;
@@ -1822,6 +1824,10 @@ export async function submitFinalDriverRegistration(
     if (isResubmission) {
       verifPayload.remarks = 'Resubmitted by driver applicant with updated documents';
       fallbackVerifPayload.remarks = 'Resubmitted by driver applicant with updated documents';
+      verifPayload.rejected_at = null;
+      verifPayload.rejected_by = null;
+      fallbackVerifPayload.rejected_at = null;
+      fallbackVerifPayload.rejected_by = null;
     }
 
     if (existingVerif) {
@@ -1855,6 +1861,21 @@ export async function submitFinalDriverRegistration(
         localStorage.setItem('sakay_driver_just_resubmitted', 'true');
         localStorage.removeItem('sakay_driver_resubmission_session');
       } catch {}
+
+      try {
+        const applicantName = license?.fullName || 'Driver applicant';
+        await supabase.from('notification').insert([
+          {
+            driver_id: driverId,
+            title: 'Driver Resubmitted Documents',
+            message: `${applicantName} resubmitted documents for Stage 2 review.`,
+            notification_type: 'Driver Resubmission',
+            is_read: false,
+          },
+        ]);
+      } catch (notifErr) {
+        console.warn('[FINAL REGISTRATION SUBMIT] Notification insert warning:', notifErr);
+      }
     }
 
     console.log('[FINAL REGISTRATION SUBMIT] Complete submission finalized successfully for driver:', driverId);

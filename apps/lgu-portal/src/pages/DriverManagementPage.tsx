@@ -75,7 +75,9 @@ export const DriverManagementPage: React.FC = () => {
 
     const matchesVerification =
       verificationFilter === 'All' ||
-      (verificationFilter === 'Pending'
+      (verificationFilter === 'Resubmitted' || verificationFilter === 'Resubmitted (Awaiting Review)'
+        ? (Boolean(d.isResubmitted) || d.verificationStatus === 'Resubmitted (Awaiting Review)')
+        : verificationFilter === 'Pending'
         ? (d.verificationStatus === 'Pending' || d.verificationStatus === 'Endorsed to LGU')
         : d.verificationStatus === verificationFilter);
     const matchesOnline = onlineFilter === 'All' || d.onlineStatus === onlineFilter;
@@ -85,6 +87,7 @@ export const DriverManagementPage: React.FC = () => {
 
   const verificationOptions: FilterOption[] = [
     { label: 'All Verifications', value: 'All' },
+    { label: 'Resubmitted (Awaiting Review)', value: 'Resubmitted' },
     { label: 'Endorsed to LGU', value: 'Endorsed to LGU' },
     { label: 'Resubmission Required', value: 'Resubmission Required' },
     { label: 'Verified', value: 'Verified' },
@@ -322,7 +325,10 @@ export const DriverManagementPage: React.FC = () => {
       {selectedDriver && (
         <DriverDetailModal
           open={Boolean(selectedDriver)}
-          onClose={() => setSelectedDriver(null)}
+          onClose={() => {
+            setSelectedDriver(null);
+            loadDrivers();
+          }}
           driver={selectedDriver}
           onDriverUpdated={handleDriverUpdated}
         />

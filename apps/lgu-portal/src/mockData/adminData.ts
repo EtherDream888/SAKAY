@@ -110,8 +110,8 @@ export interface DriverRecord {
   franchiseNo: string;
   franchiseExpiry: string;
   todaVerificationStatus: 'Verified' | 'Pending';
-  lguVerificationStatus: 'Verified' | 'Pending' | 'Suspended' | 'Endorsed to LGU' | 'Rejected' | 'Resubmission Required';
-  verificationStatus: 'Verified' | 'Pending' | 'Suspended' | 'Endorsed to LGU' | 'Rejected' | 'Resubmission Required';
+  lguVerificationStatus: 'Verified' | 'Pending' | 'Suspended' | 'Endorsed to LGU' | 'Rejected' | 'Resubmission Required' | 'Resubmitted (Awaiting Review)';
+  verificationStatus: 'Verified' | 'Pending' | 'Suspended' | 'Endorsed to LGU' | 'Rejected' | 'Resubmission Required' | 'Resubmitted (Awaiting Review)';
   accountStatus: 'Active' | 'Inactive';
   onlineStatus: 'Online' | 'Offline';
   rating: number;
@@ -135,7 +135,7 @@ export interface DriverRecord {
     docType?: 'license' | 'mtop' | 'tricycle' | 'selfie';
     name: string;
     type: string;
-    status: 'Verified' | 'Pending' | 'Pending Inspection' | 'Resubmission Required';
+    status: 'Verified' | 'Pending' | 'Pending Inspection' | 'Resubmission Required' | 'Resubmitted (Awaiting Review)';
     url?: string | null;
     urls?: string[];
   }[];

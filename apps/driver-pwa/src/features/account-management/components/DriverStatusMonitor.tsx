@@ -164,13 +164,6 @@ export const DriverStatusMonitor: React.FC = () => {
             .limit(1)
             .maybeSingle();
 
-          const isJustResubmitted =
-            localStorage.getItem('sakay_driver_just_resubmitted') === 'true' ||
-            Boolean(verif?.remarks?.toLowerCase().includes('resubmitted')) ||
-            verif?.verification_status === 'Endorsed to LGU';
-
-          setIsResubmittedApplication(isJustResubmitted);
-
           if (driverData.account_status === 'Rejected' || verif?.verification_status === 'Rejected') {
             setProfileStatus('Rejected');
             setRejectionReason(verif?.rejection_reason || verif?.remarks || state?.rejectionReason || 'Application rejected');
@@ -180,15 +173,25 @@ export const DriverStatusMonitor: React.FC = () => {
           }
 
           if (
-            (driverData.account_status === 'Resubmission Required' || verif?.verification_status === 'Resubmission Required') &&
-            !isJustResubmitted
+            driverData.account_status === 'Resubmission Required' ||
+            verif?.verification_status === 'Resubmission Required'
           ) {
+            try {
+              localStorage.removeItem('sakay_driver_just_resubmitted');
+            } catch {}
+            setIsResubmittedApplication(false);
             setProfileStatus('Resubmission Required');
             setRejectionReason(verif?.rejection_reason || verif?.remarks || driverData.rejection_reason || state?.rejectionReason || 'Documentary Issue');
             setRejectionComment(verif?.rejection_comment || driverData.rejection_comment || state?.rejectionComment || 'Clearer license scan required');
             setLoading(false);
             return;
           }
+
+          const isJustResubmitted =
+            localStorage.getItem('sakay_driver_just_resubmitted') === 'true' ||
+            Boolean(verif?.remarks?.toLowerCase().includes('resubmitted'));
+
+          setIsResubmittedApplication(isJustResubmitted);
 
           if (!verif || !verif.submitted_license_number) {
             setIsDocIncomplete(true);

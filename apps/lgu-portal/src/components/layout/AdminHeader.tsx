@@ -27,51 +27,195 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
 
-  // Load real notifications from live database
+  // Helper: Format relative timestamp
+  const formatRelativeTime = (dateStr?: string | null): string => {
+    if (!dateStr) return 'Recent';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diffSec < 60) return 'Just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour}h ago`;
+    const diffDays = Math.floor(diffHour / 24);
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // Helper: Read IDs cache from localStorage
+  const getReadNotifIds = (): Set<string> => {
+    try {
+      const raw = localStorage.getItem('sakay_lgu_read_notifs');
+      if (raw) return new Set(JSON.parse(raw));
+    } catch {}
+    return new Set();
+  };
+
+  const saveReadNotifIds = (ids: string[]) => {
+    try {
+      const current = getReadNotifIds();
+      ids.forEach((id) => current.add(id));
+      localStorage.setItem('sakay_lgu_read_notifs', JSON.stringify(Array.from(current)));
+    } catch {}
+  };
+
+  // Load real dynamic notifications from live database and operational tables
   useEffect(() => {
     let isMounted = true;
     const fetchNotifications = async () => {
       try {
-        const [notifsRes, logsRes] = await Promise.all([
+        const readSet = getReadNotifIds();
+
+        const [resubVerifs, endorsedVerifs, pendingTodas, notifsRes, logsRes] = await Promise.all([
+          supabase
+            .from('driver_verification')
+            .select('verification_id, driver_id, submitted_full_name, remarks, submitted_at, updated_at')
+            .ilike('remarks', '%resubmitted%')
+            .order('submitted_at', { ascending: false })
+            .limit(10),
+          supabase
+            .from('driver_verification')
+            .select('verification_id, driver_id, submitted_full_name, remarks, endorsed_at, submitted_at')
+            .in('verification_status', ['Approved', 'TODA Approved', 'TODA Endorsed'])
+            .is('lgu_approved_at', null)
+            .order('submitted_at', { ascending: false })
+            .limit(5),
+          supabase
+            .from('toda')
+            .select('toda_id, toda_name, toda_acronym, toda_status, account_status, created_at')
+            .in('toda_status', ['Pending', 'Pending Accreditation', 'Under Review'])
+            .order('created_at', { ascending: false })
+            .limit(5),
           supabase
             .from('notification')
             .select('*')
-            .eq('recipient_id', 'lgu_admin')
             .order('sent_at', { ascending: false })
             .limit(10),
           supabase
             .from('audit_log')
             .select('*')
             .order('performed_at', { ascending: false })
-            .limit(6),
+            .limit(5),
         ]);
 
-        const notifItems: NotificationItem[] = (notifsRes.data || []).map((n: any) => ({
-          id: n.notification_id || n.id,
-          title: n.title,
-          description: n.message,
-          time: n.sent_at ? new Date(n.sent_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Recent',
-          read: false,
-          unread: true,
-          type: 'alert',
-        }));
+        const items: NotificationItem[] = [];
+        const seenIds = new Set<string>();
 
-        const logItems: NotificationItem[] = (logsRes.data || []).map((log: any) => {
-          const timeVal = log.performed_at || log.created_at;
-          return {
-            id: log.log_id,
-            title: log.action_type ? log.action_type.replace(/_/g, ' ') : 'Administrative Activity',
-            description: log.details || '',
-            time: timeVal ? new Date(timeVal).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Recent',
-            read: false,
-            unread: true,
-            type: (log.category || 'System').toLowerCase(),
-          };
+        // 1. Direct database notifications
+        (notifsRes.data || []).forEach((n: any) => {
+          const id = `db-${n.notification_id || n.id}`;
+          if (!seenIds.has(id)) {
+            seenIds.add(id);
+            const isRead = n.is_read || readSet.has(id);
+            items.push({
+              id,
+              title: n.title,
+              description: n.message,
+              time: formatRelativeTime(n.sent_at),
+              rawTimestamp: n.sent_at,
+              category: n.notification_type?.toLowerCase().includes('resubmission') ? 'resubmission' : 'general',
+              link: '/drivers',
+              read: isRead,
+              unread: !isRead,
+              type: n.notification_type || 'alert',
+            });
+          }
         });
 
-        const combined = [...notifItems, ...logItems];
-        if (isMounted && combined.length > 0) {
-          setNotifications(combined.slice(0, 10));
+        // 2. Resubmitted driver applications
+        (resubVerifs.data || []).forEach((v: any) => {
+          const id = `resub-${v.verification_id}`;
+          if (!seenIds.has(id)) {
+            seenIds.add(id);
+            const ts = v.submitted_at || v.updated_at;
+            const isRead = readSet.has(id);
+            items.push({
+              id,
+              title: 'Driver Resubmitted Documents',
+              description: `${v.submitted_full_name || 'Driver applicant'} resubmitted updated documents for Stage 2 review.`,
+              time: formatRelativeTime(ts),
+              rawTimestamp: ts,
+              category: 'resubmission',
+              link: '/drivers',
+              read: isRead,
+              unread: !isRead,
+              type: 'resubmission',
+            });
+          }
+        });
+
+        // 3. TODA Endorsements awaiting LGU review
+        (endorsedVerifs.data || []).forEach((v: any) => {
+          if (v.remarks && v.remarks.toLowerCase().includes('resubmitted')) return;
+          const id = `endorse-${v.verification_id}`;
+          if (!seenIds.has(id)) {
+            seenIds.add(id);
+            const ts = v.endorsed_at || v.submitted_at;
+            const isRead = readSet.has(id);
+            items.push({
+              id,
+              title: 'Driver Application Endorsed',
+              description: `${v.submitted_full_name || 'Driver applicant'} endorsed by TODA for Stage 2 LGU inspection.`,
+              time: formatRelativeTime(ts),
+              rawTimestamp: ts,
+              category: 'endorsement',
+              link: '/drivers',
+              read: isRead,
+              unread: !isRead,
+              type: 'endorsement',
+            });
+          }
+        });
+
+        // 4. Pending TODA accreditation applications
+        (pendingTodas.data || []).forEach((t: any) => {
+          const id = `toda-${t.toda_id}`;
+          if (!seenIds.has(id)) {
+            seenIds.add(id);
+            const isRead = readSet.has(id);
+            items.push({
+              id,
+              title: 'TODA Accreditation Pending',
+              description: `${t.toda_name || t.toda_acronym} submitted an application for LGU accreditation.`,
+              time: formatRelativeTime(t.created_at),
+              rawTimestamp: t.created_at,
+              category: 'toda',
+              link: '/toda',
+              read: isRead,
+              unread: !isRead,
+              type: 'toda',
+            });
+          }
+        });
+
+        // 5. Recent audit activity
+        (logsRes.data || []).forEach((log: any) => {
+          const id = `log-${log.log_id}`;
+          if (!seenIds.has(id)) {
+            seenIds.add(id);
+            const timeVal = log.performed_at || log.created_at;
+            const isRead = readSet.has(id);
+            items.push({
+              id,
+              title: log.action_type ? log.action_type.replace(/_/g, ' ') : 'Administrative Activity',
+              description: log.details || '',
+              time: formatRelativeTime(timeVal),
+              rawTimestamp: timeVal,
+              category: 'system',
+              link: '/audit-logs',
+              read: isRead,
+              unread: !isRead,
+              type: (log.category || 'System').toLowerCase(),
+            });
+          }
+        });
+
+        items.sort((a, b) => new Date(b.rawTimestamp || 0).getTime() - new Date(a.rawTimestamp || 0).getTime());
+
+        if (isMounted) {
+          setNotifications(items);
         }
       } catch (err) {
         console.warn('[AdminHeader] Could not load notifications:', err);
@@ -79,8 +223,11 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
     };
 
     fetchNotifications();
+    const interval = setInterval(fetchNotifications, 15000);
+
     return () => {
       isMounted = false;
+      clearInterval(interval);
     };
   }, []);
 
@@ -101,7 +248,19 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
   const unreadCount = notifications.filter((n) => n.unread).length;
 
   const handleMarkAllAsRead = () => {
-    setNotifications(notifications.map((n) => ({ ...n, unread: false })));
+    const allIds = notifications.map((n) => n.id);
+    saveReadNotifIds(allIds);
+    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false, read: true })));
+  };
+
+  const handleNotificationClick = (item: NotificationItem) => {
+    saveReadNotifIds([item.id]);
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === item.id ? { ...n, unread: false, read: true } : n))
+    );
+    if (item.link) {
+      navigate(item.link);
+    }
   };
 
   return (
@@ -172,7 +331,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
               },
             }}
           >
-            <Badge badgeContent={unreadCount} color="error" variant="dot">
+            <Badge badgeContent={unreadCount} color="error" max={99}>
               <NotificationsNoneIcon fontSize="small" sx={{ fontSize: 19 }} />
             </Badge>
           </IconButton>
@@ -181,6 +340,7 @@ export const AdminHeader: React.FC<AdminHeaderProps> = ({
             onClose={() => setNotifOpen(false)}
             notifications={notifications}
             onMarkAllAsRead={handleMarkAllAsRead}
+            onNotificationClick={handleNotificationClick}
           />
         </Box>
 

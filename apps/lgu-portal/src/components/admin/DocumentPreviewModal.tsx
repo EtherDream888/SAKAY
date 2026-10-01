@@ -31,7 +31,7 @@ export interface DocumentPreviewModalProps {
   issueDate?: string;
   url?: string | null;
   urls?: string[];
-  currentStatus?: 'Pending' | 'Pending Inspection' | 'Verified' | 'Resubmission Required';
+  currentStatus?: 'Pending' | 'Pending Inspection' | 'Verified' | 'Resubmission Required' | 'Resubmitted (Awaiting Review)';
   onApproveDocument?: () => void;
   onRequestResubmit?: () => void;
 }
@@ -162,6 +162,13 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                   label="Verified"
                   size="small"
                   sx={{ backgroundColor: '#DCFCE7', color: '#15803D', fontWeight: 700, fontSize: '10.5px', height: 20 }}
+                />
+              )}
+              {currentStatus === 'Resubmitted (Awaiting Review)' && (
+                <Chip
+                  label="Resubmitted (Awaiting Review)"
+                  size="small"
+                  sx={{ backgroundColor: '#DBEAFE', color: '#1D4ED8', fontWeight: 700, fontSize: '10.5px', height: 20, border: '1px solid #93C5FD' }}
                 />
               )}
               {currentStatus === 'Resubmission Required' && (

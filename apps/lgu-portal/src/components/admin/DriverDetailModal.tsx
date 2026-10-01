@@ -17,6 +17,7 @@ import {
   Select,
   MenuItem,
   IconButton,
+  Badge,
 } from '@mui/material';
 import StarIcon from '@mui/icons-material/Star';
 import PersonIcon from '@mui/icons-material/Person';
@@ -30,6 +31,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 
 export type FaultyDocumentType = 'license' | 'mtop' | 'tricycle' | 'selfie';
 
@@ -86,6 +89,40 @@ const DEFAULT_NOTES_BY_DOC_TYPE: Record<FaultyDocumentType, string> = {
   selfie: 'Please take selfie in a well-lit area without sunglasses or cap',
 };
 
+export function getDocumentType(doc: {
+  docType?: FaultyDocumentType | string;
+  name?: string;
+  type?: string;
+  id?: string;
+}): FaultyDocumentType {
+  if (doc.docType && (['license', 'mtop', 'tricycle', 'selfie'] as string[]).includes(doc.docType)) {
+    return doc.docType as FaultyDocumentType;
+  }
+  const idLower = (doc.id || '').toLowerCase();
+  if (idLower.includes('license')) return 'license';
+  if (idLower.includes('mtop')) return 'mtop';
+  if (idLower.includes('tricycle')) return 'tricycle';
+  if (idLower.includes('selfie')) return 'selfie';
+
+  const nameLower = (doc.name || '').toLowerCase();
+  const typeLower = (doc.type || '').toLowerCase();
+  const combined = `${nameLower} ${typeLower}`;
+
+  if (combined.includes('license') || combined.includes('lisensya') || combined.includes('identification')) {
+    return 'license';
+  }
+  if (combined.includes('mtop') || combined.includes('franchise') || combined.includes('prangkisa') || combined.includes('permit')) {
+    return 'mtop';
+  }
+  if (combined.includes('tricycle') || combined.includes('trike') || combined.includes('unit') || combined.includes('vehicle')) {
+    return 'tricycle';
+  }
+  if (combined.includes('selfie') || combined.includes('face') || combined.includes('biometric') || combined.includes('mukha')) {
+    return 'selfie';
+  }
+  return 'license';
+}
+
 import { DriverRecord } from '../../mockData/adminData';
 import { MacCenterModal } from './MacCenterModal';
 import { MacConfirmDialog } from './MacConfirmDialog';
@@ -101,6 +138,7 @@ import {
   issueDriverStrike,
   recordAdminAuditAction,
   verifyDriverRenewal,
+  updateDriverDocumentReview,
 } from '../../services/adminApiService';
 
 interface DriverDetailModalProps {
@@ -134,18 +172,33 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
     notes: string;
   } | null>(null);
   const [returnIssues, setReturnIssues] = useState<ReturnIssueItem[]>([]);
+  const [noDocForReturnDialogOpen, setNoDocForReturnDialogOpen] = useState<boolean>(false);
+  const [unsubmittedExitDialogOpen, setUnsubmittedExitDialogOpen] = useState<boolean>(false);
+  const prevModalDriverIdRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
-    if (driver) {
-      setDocList(driver.documents || []);
+    if (driver && open) {
+      const isNewModalSession = prevModalDriverIdRef.current !== driver.id;
+      if (!isNewModalSession) return;
+      prevModalDriverIdRef.current = driver.id;
 
       let initialIssues: ReturnIssueItem[] = [];
+      let faultyList: FaultyDocumentType[] = [];
+      let verifiedList: FaultyDocumentType[] = [];
+
       if (driver.rejectionComment && driver.rejectionComment.startsWith('{')) {
         try {
           const parsed = JSON.parse(driver.rejectionComment);
-          if (Array.isArray(parsed.issues)) {
-            initialIssues = parsed.issues;
+          if (Array.isArray(parsed.issues) && parsed.issues.length > 0) {
+            initialIssues = parsed.issues.map((i: any) => ({
+              id: i.id || i.documentType,
+              documentType: i.documentType as FaultyDocumentType,
+              grounds: i.grounds || GROUNDS_BY_DOC_TYPE[i.documentType as FaultyDocumentType]?.[0] || 'Documentary Issue',
+              notes: i.notes || DEFAULT_NOTES_BY_DOC_TYPE[i.documentType as FaultyDocumentType] || 'Resubmission required',
+            }));
+            faultyList = parsed.issues.map((i: any) => i.documentType as FaultyDocumentType);
           } else if (Array.isArray(parsed.faultyDocuments)) {
+            faultyList = parsed.faultyDocuments as FaultyDocumentType[];
             initialIssues = parsed.faultyDocuments.map((docKey: string, idx: number) => ({
               id: String(idx + 1),
               documentType: docKey as FaultyDocumentType,
@@ -153,28 +206,103 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
               notes: parsed.displayNotes || DEFAULT_NOTES_BY_DOC_TYPE[docKey as FaultyDocumentType] || 'Resubmission required',
             }));
           }
+          if (Array.isArray(parsed.verifiedDocuments)) {
+            verifiedList = parsed.verifiedDocuments as FaultyDocumentType[];
+          }
         } catch {}
       }
-      setReturnIssues(initialIssues);
+
+      // Check client storage cache as well
+      if (typeof window !== 'undefined') {
+        try {
+          const cached = localStorage.getItem(`sakay_lgu_verified_docs_${driver.id}`);
+          if (cached) {
+            const parsedCache = JSON.parse(cached);
+            if (Array.isArray(parsedCache)) {
+              parsedCache.forEach((k: FaultyDocumentType) => {
+                if (!verifiedList.includes(k)) verifiedList.push(k);
+              });
+            }
+          }
+        } catch {}
+      }
+
+      const rawDocs = driver.documents || [];
+      const isResub = Boolean(driver.isResubmitted);
+      const isFullyApproved = driver.verificationStatus === 'Verified' || driver.lguVerificationStatus === 'Verified';
+
+      const normalizedDocs = rawDocs.map((d) => {
+        const dType = getDocumentType(d);
+        let status = d.status;
+        if (isFullyApproved) {
+          status = 'Verified';
+        } else if (verifiedList.includes(dType) || d.status === 'Verified') {
+          status = 'Verified';
+        } else if (isResub && faultyList.includes(dType)) {
+          // Document was flagged in past rejection and has now been resubmitted
+          status = 'Resubmitted (Awaiting Review)';
+        } else if (faultyList.includes(dType) && !isResub) {
+          status = 'Resubmission Required';
+        }
+        return {
+          ...d,
+          docType: dType,
+          status,
+        };
+      });
+
+      setDocList(normalizedDocs);
+
+      // ONLY populate returnIssues if the driver is currently sitting in 'Resubmission Required' (unresubmitted).
+      // If the driver has resubmitted (or is newly endorsed/pending), start fresh with [] so previously approved documents (like MTOP) NEVER reappear!
+      if (!isResub && driver.verificationStatus === 'Resubmission Required') {
+        setReturnIssues(initialIssues);
+      } else {
+        setReturnIssues([]);
+      }
+    } else if (!open) {
+      prevModalDriverIdRef.current = null;
     }
   }, [driver, open]);
 
-  const handleApproveDocument = (index: number) => {
-    if (index < 0 || index >= docList.length) return;
+  const handleApproveDocument = async (index: number) => {
+    if (!driver || index < 0 || index >= docList.length) return;
     const targetDoc = docList[index];
+    const docType = getDocumentType(targetDoc);
     const updated = [...docList];
-    updated[index] = { ...targetDoc, status: 'Verified' };
+    updated[index] = { ...targetDoc, docType, status: 'Verified' };
     setDocList(updated);
 
-    if (targetDoc.docType) {
-      setReturnIssues((prev) => prev.filter((i) => i.documentType !== targetDoc.docType));
-    }
+    const newReturnIssues = returnIssues.filter((i) => i.documentType !== docType);
+    setReturnIssues(newReturnIssues);
     setSelectedDoc(null);
     setSnackbarMsg(`"${targetDoc.name}" has been inspected and marked as Verified.`);
+
+    const currentVerified = updated
+      .filter((d) => d.status === 'Verified')
+      .map((d) => getDocumentType(d));
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`sakay_lgu_verified_docs_${driver.id}`, JSON.stringify(currentVerified));
+      } catch {}
+    }
+
+    const updatedDriver: DriverRecord = {
+      ...driver,
+      documents: updated,
+    };
+    if (onDriverUpdated) onDriverUpdated(updatedDriver);
+
+    try {
+      await updateDriverDocumentReview(driver.id, currentVerified);
+    } catch (err) {
+      console.warn('[DriverDetailModal] Error updating doc approval in backend:', err);
+    }
   };
 
   const handleStartResubmitForDoc = (doc: DriverRecord['documents'][number]) => {
-    const docType: FaultyDocumentType = doc.docType || 'license';
+    const docType: FaultyDocumentType = getDocumentType(doc);
     const existing = returnIssues.find((i) => i.documentType === docType);
     setConfigureDocIssue({
       docType,
@@ -185,33 +313,56 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
     setSelectedDoc(null);
   };
 
-  const handleSaveDocIssue = () => {
-    if (!configureDocIssue) return;
+  const handleSaveDocIssue = async () => {
+    if (!driver || !configureDocIssue) return;
     const { docType, grounds, notes } = configureDocIssue;
 
-    setDocList((prev) =>
-      prev.map((d) => (d.docType === docType ? { ...d, status: 'Resubmission Required' } : d))
+    const updatedDocs = docList.map((d) =>
+      getDocumentType(d) === docType
+        ? { ...d, docType, status: 'Resubmission Required' as const }
+        : d
     );
+    setDocList(updatedDocs);
 
-    setReturnIssues((prev) => {
-      const filtered = prev.filter((i) => i.documentType !== docType);
-      return [
-        ...filtered,
-        {
-          id: docType,
-          documentType: docType,
-          grounds,
-          notes,
-        },
-      ];
-    });
+    const newReturnIssues = [
+      ...returnIssues.filter((i) => i.documentType !== docType),
+      {
+        id: docType,
+        documentType: docType,
+        grounds,
+        notes,
+      },
+    ];
+    setReturnIssues(newReturnIssues);
+
+    const currentVerified = updatedDocs
+      .filter((d) => d.status === 'Verified')
+      .map((d) => getDocumentType(d));
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`sakay_lgu_verified_docs_${driver.id}`, JSON.stringify(currentVerified));
+      } catch {}
+    }
+
+    const updatedDriver: DriverRecord = {
+      ...driver,
+      documents: updatedDocs,
+    };
+    if (onDriverUpdated) onDriverUpdated(updatedDriver);
+
+    try {
+      await updateDriverDocumentReview(driver.id, currentVerified);
+    } catch (err) {
+      console.warn('[DriverDetailModal] Error updating doc issue in backend:', err);
+    }
 
     setSnackbarMsg(`"${configureDocIssue.docName}" marked as Resubmission Required.`);
     setConfigureDocIssue(null);
   };
 
   const handleEditIssueFromSummary = (issue: ReturnIssueItem) => {
-    const doc = docList.find((d) => d.docType === issue.documentType);
+    const doc = docList.find((d) => getDocumentType(d) === issue.documentType);
     setConfigureDocIssue({
       docType: issue.documentType,
       docName: doc?.name || DOCUMENT_TYPE_OPTIONS.find((o) => o.value === issue.documentType)?.label || issue.documentType,
@@ -236,6 +387,11 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
   const handleVerifyConfirm = async () => {
     try {
       await verifyDriver(driver.id);
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem(`sakay_lgu_verified_docs_${driver.id}`);
+        } catch {}
+      }
       setSnackbarMsg(`Driver ${driver.name} successfully verified and accredited.`);
       const updated: DriverRecord = {
         ...driver,
@@ -294,6 +450,27 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
         })
         .join('; ');
 
+      const ORDERED_TYPES: FaultyDocumentType[] = ['license', 'mtop', 'tricycle', 'selfie'];
+      const faultyDocuments = ORDERED_TYPES.filter((t) => returnIssues.some((i) => i.documentType === t));
+
+      const currentVerified = docList
+        .filter((d) => d.status === 'Verified' && !faultyDocuments.includes(getDocumentType(d)))
+        .map((d) => getDocumentType(d));
+
+      const structuredPayload = {
+        faultyDocuments,
+        verifiedDocuments: currentVerified,
+        issues: returnIssues.map((i) => ({
+          documentType: i.documentType,
+          grounds: i.grounds,
+          notes: i.notes,
+        })),
+        displayReason: summaryReason,
+        displayNotes: summaryNotes,
+        returnedAt: new Date().toISOString(),
+      };
+      const finalCommentJson = JSON.stringify(structuredPayload);
+
       await returnDriverForCorrection(
         driver.id,
         summaryReason,
@@ -302,21 +479,42 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
           documentType: i.documentType,
           grounds: i.grounds,
           notes: i.notes,
-        }))
+        })),
+        currentVerified
       );
+
+      const updatedDocuments = docList.map((d) => {
+        const dType = getDocumentType(d);
+        if (faultyDocuments.includes(dType)) {
+          return { ...d, docType: dType, status: 'Resubmission Required' as const };
+        }
+        return { ...d, docType: dType };
+      });
+
+      setDocList(updatedDocuments);
       setSnackbarMsg(`Driver application for ${driver.name} returned for resubmission.`);
       const updated: DriverRecord = {
         ...driver,
         accountStatus: 'Inactive',
         verificationStatus: 'Resubmission Required',
         lguVerificationStatus: 'Resubmission Required',
+        documents: updatedDocuments,
+        rejectionReason: summaryReason,
+        rejectionComment: finalCommentJson,
+        isResubmitted: false,
       };
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(`sakay_lgu_verified_docs_${driver.id}`, JSON.stringify(currentVerified));
+        } catch {}
+      }
       if (onDriverUpdated) onDriverUpdated(updated);
       if (onStatusChange) onStatusChange(driver.id, 'Inactive');
     } catch (err) {
       console.error('[DriverDetailModal] Return error:', err);
       setSnackbarMsg(`Error: ${(err as Error).message}`);
     }
+    setReturnIssues([]);
     setReturnSummaryDialogOpen(false);
   };
 
@@ -457,8 +655,25 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
 
   const strikeLevel = getStrikeLevel(driver.strikesCount);
 
-  const hasResubmissionIssues = docList.some((d) => d.status === 'Resubmission Required');
+  const pendingReturnCount = returnIssues.length;
+  const hasResubmissionIssues = pendingReturnCount > 0 || docList.some((d) => d.status === 'Resubmission Required');
   const allDocumentsVerified = docList.length > 0 && docList.every((d) => d.status === 'Verified');
+
+  const handleRequestClose = () => {
+    if (pendingReturnCount > 0) {
+      setUnsubmittedExitDialogOpen(true);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleReturnForResubmissionClick = () => {
+    if (pendingReturnCount === 0) {
+      setNoDocForReturnDialogOpen(true);
+    } else {
+      setReturnSummaryDialogOpen(true);
+    }
+  };
 
   let primaryActionLabel = '';
   let primaryActionColor: 'primary' | 'warning' | 'error' = 'primary';
@@ -466,17 +681,10 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
   let onPrimaryAction: () => void = () => {};
 
   if (!isVerified) {
-    if (hasResubmissionIssues) {
-      primaryActionLabel = 'Return for Resubmission';
-      primaryActionColor = 'warning';
-      primaryActionDisabled = false;
-      onPrimaryAction = () => setReturnSummaryDialogOpen(true);
-    } else {
-      primaryActionLabel = 'Approve Stage 2 Verification';
-      primaryActionColor = 'primary';
-      primaryActionDisabled = !allDocumentsVerified;
-      onPrimaryAction = () => setVerifyDialogOpen(true);
-    }
+    primaryActionLabel = 'Approve Stage 2 Verification';
+    primaryActionColor = 'primary';
+    primaryActionDisabled = !allDocumentsVerified || pendingReturnCount > 0;
+    onPrimaryAction = () => setVerifyDialogOpen(true);
   } else {
     primaryActionLabel = isAccountActive ? 'Suspend Driver' : 'Reactivate Driver';
     primaryActionColor = isAccountActive ? 'error' : 'primary';
@@ -487,10 +695,10 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
     <>
       <MacCenterModal
         open={open}
-        onClose={onClose}
+        onClose={handleRequestClose}
         title={driver.name}
         subtitle={`License No: ${driver.licenseNo} • ${driver.todaName}`}
-        badge={<StatusBadge status={driver.accountStatus as any} />}
+        badge={<StatusBadge status={(driver.verificationStatus && driver.verificationStatus !== 'Verified' ? driver.verificationStatus : driver.accountStatus) as any} />}
         maxWidth={840}
         primaryActionLabel={primaryActionLabel}
         primaryActionColor={primaryActionColor}
@@ -498,8 +706,55 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
         onPrimaryAction={onPrimaryAction}
         secondaryActionLabel={!isVerified ? 'Reject Application' : 'Close'}
         secondaryActionColor={!isVerified ? 'error' : 'inherit'}
-        onSecondaryAction={!isVerified ? () => setRejectDialogOpen(true) : onClose}
-        extraActions={undefined}
+        onSecondaryAction={!isVerified ? () => setRejectDialogOpen(true) : handleRequestClose}
+        extraActions={
+          !isVerified ? (
+            <Badge
+              badgeContent={pendingReturnCount}
+              color="error"
+              invisible={pendingReturnCount === 0}
+              sx={{
+                '& .MuiBadge-badge': {
+                  right: 4,
+                  top: 4,
+                  fontWeight: 700,
+                  fontSize: '11px',
+                  backgroundColor: '#DC2626',
+                  color: '#FFFFFF',
+                  boxShadow: '0 0 0 2px #FFFFFF',
+                },
+              }}
+            >
+              <Button
+                variant={pendingReturnCount > 0 ? 'contained' : 'outlined'}
+                onClick={handleReturnForResubmissionClick}
+                sx={{
+                  height: 40,
+                  padding: '0 20px',
+                  borderRadius: '8px',
+                  fontSize: '11.6px',
+                  fontWeight: 700,
+                  textTransform: 'none',
+                  ...(pendingReturnCount > 0
+                    ? {
+                        backgroundColor: '#D97706',
+                        color: '#FFFFFF',
+                        border: '1.5px solid #D97706',
+                        '&:hover': { backgroundColor: '#B45309', borderColor: '#B45309' },
+                      }
+                    : {
+                        backgroundColor: '#FFFFFF',
+                        color: '#475569',
+                        border: '1.5px solid #CBD5E1',
+                        '&:hover': { backgroundColor: '#F8FAFC', borderColor: '#94A3B8', color: '#1E293B' },
+                      }),
+                }}
+              >
+                Return for Resubmission
+              </Button>
+            </Badge>
+          ) : undefined
+        }
       >
         {/* Resubmission Required Alert Banner */}
         {driver.verificationStatus === 'Resubmission Required' && (() => {
@@ -514,6 +769,8 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
               if (parsed.displayNotes) displayNotes = parsed.displayNotes;
               if (Array.isArray(parsed.faultyDocuments)) {
                 faultyList = parsed.faultyDocuments;
+              } else if (Array.isArray(parsed.issues)) {
+                faultyList = parsed.issues.map((i: any) => i.documentType);
               }
             } catch {}
           }
@@ -581,6 +838,90 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
               </Typography>
               <Typography sx={{ fontSize: '12.5px', color: '#78350F', mt: 0.5, lineHeight: 1.5 }}>
                 <span style={{ fontWeight: 700 }}>Reviewer Notes:</span> {displayNotes}
+              </Typography>
+            </Box>
+          );
+        })()}
+
+        {/* Resubmission Received Alert Banner (Awaiting LGU Review) */}
+        {(driver.isResubmitted || driver.verificationStatus === 'Resubmitted (Awaiting Review)') && !isVerified && driver.verificationStatus !== 'Resubmission Required' && (() => {
+          let faultyList: string[] = [];
+          if (driver.rejectionComment && driver.rejectionComment.startsWith('{')) {
+            try {
+              const parsed = JSON.parse(driver.rejectionComment);
+              if (Array.isArray(parsed.faultyDocuments)) {
+                faultyList = parsed.faultyDocuments;
+              } else if (Array.isArray(parsed.issues)) {
+                faultyList = parsed.issues.map((i: any) => i.documentType);
+              }
+            } catch {}
+          }
+
+          const docLabels: Record<string, string> = {
+            license: "Driver's License",
+            mtop: 'MTOP / Franchise',
+            tricycle: 'Photo ng Tricycle',
+            selfie: 'Photo / Selfie',
+          };
+
+          return (
+            <Box
+              sx={{
+                backgroundColor: '#EFF6FF',
+                border: '1.5px solid #3B82F6',
+                borderRadius: '12px',
+                p: '16px 20px',
+                mb: 3,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2 }}>
+                  <Chip
+                    label="Resubmission Received"
+                    size="small"
+                    sx={{
+                      backgroundColor: '#DBEAFE',
+                      color: '#1D4ED8',
+                      fontWeight: 700,
+                      fontSize: '11px',
+                      border: '1px solid #93C5FD',
+                    }}
+                  />
+                  <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#1E40AF' }}>
+                    Updated Documents Awaiting LGU Re-inspection
+                  </Typography>
+                </Box>
+                {driver.resubmittedAt && (
+                  <Typography sx={{ fontSize: '11.5px', color: '#64748B', fontWeight: 500 }}>
+                    Resubmitted: {new Date(driver.resubmittedAt).toLocaleDateString()} {new Date(driver.resubmittedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Typography>
+                )}
+              </Box>
+
+              {faultyList.length > 0 && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8, mb: 1, flexWrap: 'wrap' }}>
+                  <Typography sx={{ fontSize: '12px', fontWeight: 600, color: '#1E3A8A' }}>
+                    Corrected Document(s):
+                  </Typography>
+                  {faultyList.map((docKey) => (
+                    <Chip
+                      key={docKey}
+                      label={docLabels[docKey] || docKey}
+                      size="small"
+                      sx={{
+                        backgroundColor: '#BFDBFE',
+                        color: '#1E40AF',
+                        fontWeight: 600,
+                        fontSize: '11px',
+                        border: '1px solid #93C5FD',
+                      }}
+                    />
+                  ))}
+                </Box>
+              )}
+
+              <Typography sx={{ fontSize: '12.5px', color: '#1E3A8A', lineHeight: 1.5 }}>
+                Driver <strong>{driver.name}</strong> has submitted corrected documents following the previous return. Please inspect the updated document(s) below to proceed with Stage 2 verification approval.
               </Typography>
             </Box>
           );
@@ -849,8 +1190,20 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {docList.map((doc, idx) => {
-              const isDocVerified = doc.status === 'Verified';
-              const isDocResubmit = doc.status === 'Resubmission Required';
+              const docType = getDocumentType(doc);
+              const isStagedForReturn = returnIssues.some((i) => i.documentType === docType) || doc.status === 'Resubmission Required';
+              const isDocVerified = !isStagedForReturn && doc.status === 'Verified';
+              const isDocResubmit = isStagedForReturn;
+
+              let wasFlagged = false;
+              if (driver.rejectionComment && driver.rejectionComment.startsWith('{')) {
+                try {
+                  const p = JSON.parse(driver.rejectionComment);
+                  const fList = p.faultyDocuments || (Array.isArray(p.issues) ? p.issues.map((i: any) => i.documentType) : []);
+                  wasFlagged = fList.includes(docType);
+                } catch {}
+              }
+              const isDocRecentlyResubmitted = !isStagedForReturn && !isDocVerified && (doc.status === 'Resubmitted (Awaiting Review)' || (Boolean(driver.isResubmitted) && wasFlagged));
 
               return (
                 <Box
@@ -862,8 +1215,8 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
                     padding: '14px 18px',
                     borderRadius: '10px',
                     border: '1px solid',
-                    borderColor: isDocVerified ? '#BBF7D0' : isDocResubmit ? '#FCD34D' : 'var(--mac-border-color)',
-                    backgroundColor: isDocVerified ? '#F0FDF4' : isDocResubmit ? '#FFFBEB' : '#FFFFFF',
+                    borderColor: isDocVerified ? '#BBF7D0' : isDocResubmit ? '#FCD34D' : isDocRecentlyResubmitted ? '#93C5FD' : 'var(--mac-border-color)',
+                    backgroundColor: isDocVerified ? '#F0FDF4' : isDocResubmit ? '#FFFBEB' : isDocRecentlyResubmitted ? '#EFF6FF' : '#FFFFFF',
                   }}
                 >
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -871,6 +1224,8 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
                       <CheckCircleIcon sx={{ color: '#16A34A', fontSize: 20 }} />
                     ) : isDocResubmit ? (
                       <AssignmentReturnIcon sx={{ color: '#D97706', fontSize: 20 }} />
+                    ) : isDocRecentlyResubmitted ? (
+                      <AssignmentReturnIcon sx={{ color: '#2563EB', fontSize: 20 }} />
                     ) : (
                       <VerifiedUserIcon sx={{ color: '#94A3B8', fontSize: 20 }} />
                     )}
@@ -893,7 +1248,14 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
                             sx={{ backgroundColor: '#FEF3C7', color: '#B45309', fontWeight: 700, fontSize: '10px', height: 20 }}
                           />
                         )}
-                        {!isDocVerified && !isDocResubmit && (
+                        {isDocRecentlyResubmitted && (
+                          <Chip
+                            label="Resubmitted (Awaiting Review)"
+                            size="small"
+                            sx={{ backgroundColor: '#DBEAFE', color: '#1D4ED8', fontWeight: 700, fontSize: '10px', height: 20, border: '1px solid #93C5FD' }}
+                          />
+                        )}
+                        {!isDocVerified && !isDocResubmit && !isDocRecentlyResubmitted && (
                           <Chip
                             label="Pending Inspection"
                             size="small"
@@ -977,7 +1339,7 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {returnIssues.map((issue, idx) => {
-              const doc = docList.find((d) => d.docType === issue.documentType);
+              const doc = docList.find((d) => getDocumentType(d) === issue.documentType);
               const docName = doc?.name || DOCUMENT_TYPE_OPTIONS.find((o) => o.value === issue.documentType)?.label || issue.documentType;
 
               return (
@@ -1318,19 +1680,173 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
       />
 
       {/* Document Inspection Popover */}
-      {selectedDoc && (
-        <DocumentPreviewModal
-          open={Boolean(selectedDoc)}
-          onClose={() => setSelectedDoc(null)}
-          documentName={selectedDoc.doc.name}
-          documentType={selectedDoc.doc.type}
-          url={selectedDoc.doc.url}
-          urls={selectedDoc.doc.urls}
-          currentStatus={selectedDoc.doc.status}
-          onApproveDocument={!isVerified ? () => handleApproveDocument(selectedDoc.index) : undefined}
-          onRequestResubmit={!isVerified ? () => handleStartResubmitForDoc(selectedDoc.doc) : undefined}
-        />
-      )}
+      {selectedDoc && (() => {
+        const docType = getDocumentType(selectedDoc.doc);
+        const isStaged = returnIssues.some((i) => i.documentType === docType);
+        const liveDoc = docList.find((d) => getDocumentType(d) === docType) || selectedDoc.doc;
+        const currentStatus = isStaged ? 'Resubmission Required' : liveDoc.status;
+
+        return (
+          <DocumentPreviewModal
+            open={Boolean(selectedDoc)}
+            onClose={() => setSelectedDoc(null)}
+            documentName={selectedDoc.doc.name}
+            documentType={selectedDoc.doc.type}
+            url={selectedDoc.doc.url}
+            urls={selectedDoc.doc.urls}
+            currentStatus={currentStatus}
+            onApproveDocument={!isVerified ? () => handleApproveDocument(selectedDoc.index) : undefined}
+            onRequestResubmit={!isVerified ? () => handleStartResubmitForDoc(liveDoc) : undefined}
+          />
+        );
+      })()}
+
+      {/* Pop-up Dialog: No documents selected for resubmission */}
+      <Dialog
+        open={noDocForReturnDialogOpen}
+        onClose={() => setNoDocForReturnDialogOpen(false)}
+        slotProps={{
+          backdrop: { sx: { backgroundColor: 'rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(8px)' } },
+          paper: {
+            sx: {
+              borderRadius: 'var(--mac-radius-lg)',
+              maxWidth: 440,
+              width: '100%',
+              backgroundColor: '#FFFFFF',
+              boxShadow: 'var(--mac-shadow-popover)',
+              overflow: 'hidden',
+              p: 0,
+            },
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            padding: '18px 24px 14px',
+            borderBottom: '1px solid var(--mac-border-color)',
+            fontSize: '15px',
+            fontWeight: 700,
+            color: 'var(--mac-text-primary)',
+            backgroundColor: '#FAFAFC',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.2,
+          }}
+        >
+          <InfoOutlinedIcon sx={{ color: 'var(--sakay-orange)', fontSize: 22 }} />
+          No Documents Selected for Resubmission
+        </DialogTitle>
+        <DialogContent sx={{ p: '20px 24px !important' }}>
+          <Typography sx={{ fontSize: '13px', color: 'var(--mac-text-secondary)', lineHeight: 1.5 }}>
+            There are currently no documents requested for resubmission. Please inspect a file from the <strong>Verification Documents</strong> list above and select <strong>Request Resubmission</strong> if corrections are required.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ padding: '12px 24px 18px', borderTop: '1px solid var(--mac-border-color)', backgroundColor: '#FAFAFC' }}>
+          <Button
+            variant="contained"
+            onClick={() => setNoDocForReturnDialogOpen(false)}
+            sx={{
+              height: 36,
+              padding: '0 20px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 600,
+              textTransform: 'none',
+              backgroundColor: 'var(--sakay-orange)',
+              '&:hover': { backgroundColor: 'var(--sakay-orange-hover)' },
+            }}
+          >
+            Understood
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Pop-up Dialog: Unsubmitted Resubmissions Exit Confirmation */}
+      <Dialog
+        open={unsubmittedExitDialogOpen}
+        onClose={() => setUnsubmittedExitDialogOpen(false)}
+        slotProps={{
+          backdrop: { sx: { backgroundColor: 'rgba(0, 0, 0, 0.45)', backdropFilter: 'blur(8px)' } },
+          paper: {
+            sx: {
+              borderRadius: 'var(--mac-radius-lg)',
+              maxWidth: 480,
+              width: '100%',
+              backgroundColor: '#FFFFFF',
+              boxShadow: 'var(--mac-shadow-popover)',
+              overflow: 'hidden',
+              p: 0,
+            },
+          },
+        }}
+      >
+        <DialogTitle
+          sx={{
+            padding: '18px 24px 14px',
+            borderBottom: '1px solid var(--mac-border-color)',
+            fontSize: '15px',
+            fontWeight: 700,
+            color: '#92400E',
+            backgroundColor: '#FFFBEB',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.2,
+          }}
+        >
+          <WarningAmberIcon sx={{ color: '#D97706', fontSize: 22 }} />
+          Unsubmitted Resubmission Requests
+        </DialogTitle>
+        <DialogContent sx={{ p: '20px 24px !important' }}>
+          <Typography sx={{ fontSize: '13.5px', color: 'var(--mac-text-primary)', lineHeight: 1.5, mb: 1 }}>
+            You have marked <strong>{pendingReturnCount} document{pendingReturnCount === 1 ? '' : 's'}</strong> for resubmission.
+          </Typography>
+          <Typography sx={{ fontSize: '12.5px', color: 'var(--mac-text-secondary)', lineHeight: 1.5 }}>
+            Do you want to check and proceed with returning this application to the driver, or exit without returning?
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ padding: '14px 24px 18px', borderTop: '1px solid var(--mac-border-color)', backgroundColor: '#FAFAFC', gap: 1.5 }}>
+          <Button
+            variant="outlined"
+            onClick={() => {
+              setUnsubmittedExitDialogOpen(false);
+              onClose();
+            }}
+            sx={{
+              height: 38,
+              padding: '0 16px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 600,
+              textTransform: 'none',
+              borderColor: '#94A3B8',
+              color: '#334155',
+              '&:hover': { backgroundColor: '#F1F5F9' },
+            }}
+          >
+            Exit
+          </Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setUnsubmittedExitDialogOpen(false);
+              setReturnSummaryDialogOpen(true);
+            }}
+            sx={{
+              height: 38,
+              padding: '0 20px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: 700,
+              textTransform: 'none',
+              backgroundColor: '#D97706',
+              color: '#FFFFFF',
+              '&:hover': { backgroundColor: '#B45309' },
+            }}
+          >
+            Proceed with Return for Resubmission
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar Alert */}
       <Snackbar

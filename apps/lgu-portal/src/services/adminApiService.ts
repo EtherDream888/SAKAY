@@ -815,7 +815,7 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
     }
 
     // STRICT LGU FILTERING: Only show drivers that have TODA endorsement or are in final stages
-    const allowedStatuses = ['TODA Approved', 'TODA Endorsed', 'Endorsed to LGU', 'LGU Approved', 'Active', 'Verified', 'Rejected', 'Suspended', 'Resubmission Required'];
+    const allowedStatuses = ['TODA Approved', 'TODA Endorsed', 'Endorsed to LGU', 'LGU Approved', 'Active', 'Verified', 'Rejected', 'Suspended', 'Resubmission Required', 'Pending Verification', 'Pending'];
 
     // Fetch drivers in two queries: by account_status AND by TODA-endorsed IDs, merge results
     const [mainRes, endorsedRes] = await Promise.all([
@@ -845,14 +845,25 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
     // Apply status filter
     if (filters?.status && filters.status !== 'All') {
       const endorsedSet = new Set(todaEndorsedDriverIds);
-      if (filters.status === 'Endorsed to LGU' || filters.status === 'Pending' || filters.status === 'Pending Verification') {
+      if (filters.status === 'Resubmitted' || filters.status === 'Resubmitted (Awaiting Review)') {
         data = data.filter((d: any) => {
           const verif = Array.isArray(d.driver_verification) ? d.driver_verification[0] : d.driver_verification;
-          const isResub = d.account_status === 'Resubmission Required' || verif?.verification_status === 'Resubmission Required';
+          return (
+            verif?.remarks?.toLowerCase().includes('resubmitted') ||
+            (verif?.submitted_at && verif?.rejected_at && new Date(verif.submitted_at) > new Date(verif.rejected_at))
+          );
+        });
+      } else if (filters.status === 'Endorsed to LGU' || filters.status === 'Pending' || filters.status === 'Pending Verification') {
+        data = data.filter((d: any) => {
+          const verif = Array.isArray(d.driver_verification) ? d.driver_verification[0] : d.driver_verification;
+          const isResub =
+            verif?.remarks?.toLowerCase().includes('resubmitted') ||
+            (verif?.submitted_at && verif?.rejected_at && new Date(verif.submitted_at) > new Date(verif.rejected_at));
+          const isResubReq = !isResub && (d.account_status === 'Resubmission Required' || verif?.verification_status === 'Resubmission Required');
           return (
             (endorsedSet.has(d.driver_id) || ['TODA Approved', 'TODA Endorsed', 'Endorsed to LGU'].includes(d.account_status)) &&
             !['Verified', 'Active', 'LGU Approved'].includes(d.account_status) &&
-            !isResub
+            !isResubReq
           );
         });
       } else if (filters.status === 'Verified' || filters.status === 'Active') {
@@ -860,7 +871,10 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
       } else if (filters.status === 'Resubmission Required') {
         data = data.filter((d: any) => {
           const verif = Array.isArray(d.driver_verification) ? d.driver_verification[0] : d.driver_verification;
-          return d.account_status === 'Resubmission Required' || verif?.verification_status === 'Resubmission Required';
+          const isResub =
+            verif?.remarks?.toLowerCase().includes('resubmitted') ||
+            (verif?.submitted_at && verif?.rejected_at && new Date(verif.submitted_at) > new Date(verif.rejected_at));
+          return !isResub && (d.account_status === 'Resubmission Required' || verif?.verification_status === 'Resubmission Required');
         });
       } else {
         data = data.filter((d: any) => d.account_status === filters.status);
@@ -876,13 +890,23 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
       const todaInfo = d.toda || todaMap.get(d.toda_id);
       const verif = Array.isArray(d.driver_verification) ? d.driver_verification[0] : d.driver_verification;
 
+      const isStatusResubmissionRequired =
+        d.account_status === 'Resubmission Required' ||
+        verif?.verification_status === 'Resubmission Required';
+
+      const isResubmitted = !isStatusResubmissionRequired && Boolean(
+        verif?.remarks?.toLowerCase().includes('resubmitted') ||
+        (verif?.submitted_at && verif?.rejected_at && new Date(verif.submitted_at) > new Date(verif.rejected_at))
+      );
+
       // Stage 2 LGU final approval: ONLY driver.account_status === 'Verified'
       const isFullyApproved = d.account_status === 'Verified';
       const isRejected = d.account_status === 'Rejected' || verif?.verification_status === 'Rejected';
       const isSuspended = d.account_status === 'Suspended';
-      const isResubmission = d.account_status === 'Resubmission Required' || verif?.verification_status === 'Resubmission Required';
+      // If applicant already resubmitted, they are no longer in "Resubmission Required" - they are awaiting review!
+      const isResubmission = !isResubmitted && isStatusResubmissionRequired;
       // Stage 1 TODA endorsement: driver is in driver_verification with 'Approved' but NOT yet LGU-approved
-      const isTodaEndorsed = (todaEndorsedSet.has(d.driver_id) || ['TODA Approved', 'TODA Endorsed', 'Endorsed to LGU'].includes(d.account_status)) && !isFullyApproved && !isResubmission && !isRejected;
+      const isTodaEndorsed = (todaEndorsedSet.has(d.driver_id) || ['TODA Approved', 'TODA Endorsed', 'Endorsed to LGU'].includes(d.account_status) || verif?.verification_status === 'Approved' || Boolean(verif?.endorsed_at)) && !isFullyApproved && !isResubmission && !isRejected;
 
       let verificationStatus: DriverRecord['verificationStatus'];
       let lguVerificationStatus: DriverRecord['lguVerificationStatus'];
@@ -895,6 +919,10 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
       } else if (isSuspended) {
         verificationStatus = 'Suspended';
         lguVerificationStatus = 'Suspended';
+        accountStatus = 'Inactive';
+      } else if (isResubmitted) {
+        verificationStatus = 'Resubmitted (Awaiting Review)';
+        lguVerificationStatus = 'Resubmitted (Awaiting Review)';
         accountStatus = 'Inactive';
       } else if (isResubmission) {
         verificationStatus = 'Resubmission Required';
@@ -930,24 +958,43 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
         resolveStorageDocUrl('driver-selfies', selfiePath, 'driver-licenses'),
       ]);
 
-        // Parse faulty list if driver has rejection_comment with JSON
+        // Parse faulty and verified lists if driver has rejection_comment with JSON
         let faultyList: string[] = [];
-        if (verif?.rejection_comment && verif.rejection_comment.startsWith('{')) {
+        let verifiedList: string[] = [];
+        const rawComment = verif?.rejection_comment || d.rejection_comment;
+        if (rawComment && rawComment.startsWith('{')) {
           try {
-            const parsed = JSON.parse(verif.rejection_comment);
+            const parsed = JSON.parse(rawComment);
             if (Array.isArray(parsed.faultyDocuments)) {
               faultyList = parsed.faultyDocuments;
+            } else if (Array.isArray(parsed.issues)) {
+              faultyList = parsed.issues.map((i: any) => i.documentType);
+            }
+            if (Array.isArray(parsed.verifiedDocuments)) {
+              verifiedList = parsed.verifiedDocuments;
             }
           } catch {}
         }
 
-        const isResubmitted = Boolean(
-          verif?.remarks?.toLowerCase().includes('resubmitted') ||
-          (verif?.submitted_at && verif?.rejected_at && new Date(verif.submitted_at) > new Date(verif.rejected_at))
-        );
+        // Merge verified documents from client cache if running in browser
+        if (typeof window !== 'undefined') {
+          try {
+            const localSaved = localStorage.getItem(`sakay_lgu_verified_docs_${d.driver_id}`);
+            if (localSaved) {
+              const parsedLocal = JSON.parse(localSaved);
+              if (Array.isArray(parsedLocal)) {
+                parsedLocal.forEach((docKey: string) => {
+                  if (!verifiedList.includes(docKey)) verifiedList.push(docKey);
+                });
+              }
+            }
+          } catch {}
+        }
 
-        const getDocStatus = (docType: string): 'Verified' | 'Pending Inspection' | 'Resubmission Required' => {
+        const getDocStatus = (docType: string): 'Verified' | 'Pending Inspection' | 'Resubmission Required' | 'Resubmitted (Awaiting Review)' => {
           if (isFullyApproved) return 'Verified';
+          if (verifiedList.includes(docType)) return 'Verified';
+          if (isResubmitted && faultyList.includes(docType)) return 'Resubmitted (Awaiting Review)';
           if (faultyList.includes(docType) && !isResubmitted) return 'Resubmission Required';
           return 'Pending Inspection';
         };
@@ -1187,9 +1234,10 @@ export async function returnDriverForCorrection(
   driverId: string,
   reason: string,
   notes?: string,
-  issues?: ReturnIssuePayload[]
+  issues?: ReturnIssuePayload[],
+  verifiedDocuments?: ('license' | 'mtop' | 'tricycle' | 'selfie')[]
 ) {
-  console.log('[adminApiService] Returning driver application for correction:', driverId, { reason, notes, issues });
+  console.log('[adminApiService] Returning driver application for correction:', driverId, { reason, notes, issues, verifiedDocuments });
   try {
     const now = new Date().toISOString();
 
@@ -1200,6 +1248,7 @@ export async function returnDriverForCorrection(
 
     const structuredPayload = {
       faultyDocuments,
+      verifiedDocuments: verifiedDocuments || [],
       issues: issues || [{ documentType: 'license', grounds: reason, notes: notes || reason }],
       displayReason: reason,
       displayNotes: notes || reason,
@@ -1234,6 +1283,14 @@ export async function returnDriverForCorrection(
         })
         .eq('driver_id', driverId);
     } catch {}
+
+    if (typeof window !== 'undefined') {
+      try {
+        if (Array.isArray(verifiedDocuments)) {
+          localStorage.setItem(`sakay_lgu_verified_docs_${driverId}`, JSON.stringify(verifiedDocuments));
+        }
+      } catch {}
+    }
 
     // Dispatch return for correction SMS
     try {
@@ -1271,6 +1328,63 @@ export async function returnDriverForCorrection(
   } catch (err: any) {
     console.error('[adminApiService] returnDriverForCorrection exception:', err);
     throw err;
+  }
+}
+
+export async function updateDriverDocumentReview(
+  driverId: string,
+  verifiedDocuments: ('license' | 'mtop' | 'tricycle' | 'selfie')[]
+) {
+  try {
+    const { data: verif } = await supabase
+      .from('driver_verification')
+      .select('rejection_comment')
+      .or(`driver_id.eq.${driverId},verification_id.eq.${driverId}`)
+      .maybeSingle();
+
+    let payload: any = {};
+    if (verif?.rejection_comment && verif.rejection_comment.startsWith('{')) {
+      try {
+        payload = JSON.parse(verif.rejection_comment);
+      } catch {}
+    }
+
+    payload.verifiedDocuments = verifiedDocuments;
+
+    if (Array.isArray(payload.faultyDocuments)) {
+      payload.faultyDocuments = payload.faultyDocuments.filter((d: string) => !verifiedDocuments.includes(d as any));
+    }
+    if (Array.isArray(payload.issues)) {
+      payload.issues = payload.issues.filter((i: any) => !verifiedDocuments.includes(i.documentType));
+    }
+
+    const updatedComment = JSON.stringify(payload);
+
+    await Promise.all([
+      supabase
+        .from('driver_verification')
+        .update({
+          rejection_comment: updatedComment,
+        })
+        .or(`driver_id.eq.${driverId},verification_id.eq.${driverId}`),
+      supabase
+        .from('driver')
+        .update({
+          rejection_comment: updatedComment,
+        })
+        .eq('driver_id', driverId),
+    ]);
+
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`sakay_lgu_verified_docs_${driverId}`, JSON.stringify(verifiedDocuments));
+      } catch {}
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.warn('[adminApiService] updateDriverDocumentReview warning:', err);
+    return { success: false, error: err };
   }
 }
 

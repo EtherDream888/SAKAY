@@ -14,6 +14,8 @@ export type StatusType =
   | 'Expiring Soon'
   | 'Expired'
   | 'Resubmission Required'
+  | 'Resubmitted (Awaiting Review)'
+  | 'Resubmitted'
   | 'Pending Review'
   | 'Under Investigation'
   | 'Dismissed'
@@ -170,6 +172,9 @@ export interface NotificationItem {
   unread?: boolean;
   type?: string;
   description?: string;
+  link?: string;
+  rawTimestamp?: string;
+  category?: 'resubmission' | 'endorsement' | 'toda' | 'incident' | 'system' | 'general' | string;
 }
 
 export interface ActiveTripMarker {
