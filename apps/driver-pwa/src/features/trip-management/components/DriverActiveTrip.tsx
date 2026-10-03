@@ -205,24 +205,8 @@ export const DriverActiveTrip: React.FC = () => {
       }
     }, 2000);
 
-    const dbInterval = setInterval(() => {
-      const activeDriverId = profile.id || booking?.driver_id || localStorage.getItem('sakay_driver_id');
-      if (activeDriverId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeDriverId) && profile.currentLat && profile.currentLng) {
-        supabase
-          .from('driver')
-          .update({
-            current_latitude: profile.currentLat,
-            current_longitude: profile.currentLng,
-            last_location_update: new Date().toISOString(),
-          })
-          .eq('driver_id', activeDriverId)
-          .then(() => {});
-      }
-    }, 5000);
-
     return () => {
       clearInterval(broadcastInterval);
-      clearInterval(dbInterval);
       if (channel) {
         supabase.removeChannel(channel);
       }

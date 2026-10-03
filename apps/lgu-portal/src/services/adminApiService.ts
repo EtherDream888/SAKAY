@@ -908,6 +908,39 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
       // Stage 1 TODA endorsement: driver is in driver_verification with 'Approved' but NOT yet LGU-approved
       const isTodaEndorsed = (todaEndorsedSet.has(d.driver_id) || ['TODA Approved', 'TODA Endorsed', 'Endorsed to LGU'].includes(d.account_status) || verif?.verification_status === 'Approved' || Boolean(verif?.endorsed_at)) && !isFullyApproved && !isResubmission && !isRejected;
 
+      // Parse faulty and verified lists if driver has rejection_comment with JSON
+      let faultyList: string[] = [];
+      let verifiedList: string[] = [];
+      const rawComment = verif?.rejection_comment || d.rejection_comment;
+      if (rawComment && rawComment.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(rawComment);
+          if (Array.isArray(parsed.faultyDocuments)) {
+            faultyList = parsed.faultyDocuments;
+          } else if (Array.isArray(parsed.issues)) {
+            faultyList = parsed.issues.map((i: any) => i.documentType);
+          }
+          if (Array.isArray(parsed.verifiedDocuments)) {
+            verifiedList = parsed.verifiedDocuments;
+          }
+        } catch {}
+      }
+
+      const getDocStatus = (docType: string): 'Verified' | 'Pending Inspection' | 'Resubmission Required' | 'Resubmitted (Awaiting Review)' => {
+        if (isFullyApproved) return 'Verified';
+        if (verifiedList.includes(docType)) return 'Verified';
+        if (isResubmitted && faultyList.includes(docType)) return 'Resubmitted (Awaiting Review)';
+        if (faultyList.includes(docType) && !isResubmitted) return 'Resubmission Required';
+        return 'Pending Inspection';
+      };
+
+      const docStatuses = [
+        getDocStatus('license'),
+        getDocStatus('mtop'),
+        getDocStatus('tricycle'),
+        getDocStatus('selfie')
+      ];
+
       let verificationStatus: DriverRecord['verificationStatus'];
       let lguVerificationStatus: DriverRecord['lguVerificationStatus'];
       let accountStatus: DriverRecord['accountStatus'];
@@ -920,27 +953,28 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
         verificationStatus = 'Suspended';
         lguVerificationStatus = 'Suspended';
         accountStatus = 'Inactive';
-      } else if (isResubmitted) {
-        verificationStatus = 'Resubmitted (Awaiting Review)';
-        lguVerificationStatus = 'Resubmitted (Awaiting Review)';
-        accountStatus = 'Inactive';
-      } else if (isResubmission) {
-        verificationStatus = 'Resubmission Required';
-        lguVerificationStatus = 'Resubmission Required';
-        accountStatus = 'Inactive';
       } else if (isRejected) {
         verificationStatus = 'Rejected';
         lguVerificationStatus = 'Rejected';
         accountStatus = 'Inactive';
-      } else if (isTodaEndorsed) {
-        // Intermediate: awaiting LGU final review/approval
-        verificationStatus = 'Endorsed to LGU';
-        lguVerificationStatus = 'Endorsed to LGU';
-        accountStatus = 'Inactive';
       } else {
-        verificationStatus = 'Pending';
-        lguVerificationStatus = 'Pending';
-        accountStatus = 'Inactive';
+        if (docStatuses.includes('Resubmission Required')) {
+          verificationStatus = 'Resubmission Required';
+          lguVerificationStatus = 'Resubmission Required';
+          accountStatus = 'Inactive';
+        } else if (docStatuses.includes('Resubmitted (Awaiting Review)')) {
+          verificationStatus = 'Resubmitted (Awaiting Review)';
+          lguVerificationStatus = 'Resubmitted (Awaiting Review)';
+          accountStatus = 'Inactive';
+        } else if (docStatuses.includes('Pending Inspection')) {
+          verificationStatus = isTodaEndorsed ? 'Endorsed to LGU' : 'Pending';
+          lguVerificationStatus = isTodaEndorsed ? 'Endorsed to LGU' : 'Pending';
+          accountStatus = 'Inactive';
+        } else {
+          verificationStatus = isTodaEndorsed ? 'Endorsed to LGU' : 'Pending';
+          lguVerificationStatus = isTodaEndorsed ? 'Endorsed to LGU' : 'Pending';
+          accountStatus = 'Inactive';
+        }
       }
 
       const authId = d.auth_user_id;
@@ -957,47 +991,6 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
         resolveStorageDocUrl('mtop-permits', tricyclePath, 'driver-licenses'),
         resolveStorageDocUrl('driver-selfies', selfiePath, 'driver-licenses'),
       ]);
-
-        // Parse faulty and verified lists if driver has rejection_comment with JSON
-        let faultyList: string[] = [];
-        let verifiedList: string[] = [];
-        const rawComment = verif?.rejection_comment || d.rejection_comment;
-        if (rawComment && rawComment.startsWith('{')) {
-          try {
-            const parsed = JSON.parse(rawComment);
-            if (Array.isArray(parsed.faultyDocuments)) {
-              faultyList = parsed.faultyDocuments;
-            } else if (Array.isArray(parsed.issues)) {
-              faultyList = parsed.issues.map((i: any) => i.documentType);
-            }
-            if (Array.isArray(parsed.verifiedDocuments)) {
-              verifiedList = parsed.verifiedDocuments;
-            }
-          } catch {}
-        }
-
-        // Merge verified documents from client cache if running in browser
-        if (typeof window !== 'undefined') {
-          try {
-            const localSaved = localStorage.getItem(`sakay_lgu_verified_docs_${d.driver_id}`);
-            if (localSaved) {
-              const parsedLocal = JSON.parse(localSaved);
-              if (Array.isArray(parsedLocal)) {
-                parsedLocal.forEach((docKey: string) => {
-                  if (!verifiedList.includes(docKey)) verifiedList.push(docKey);
-                });
-              }
-            }
-          } catch {}
-        }
-
-        const getDocStatus = (docType: string): 'Verified' | 'Pending Inspection' | 'Resubmission Required' | 'Resubmitted (Awaiting Review)' => {
-          if (isFullyApproved) return 'Verified';
-          if (verifiedList.includes(docType)) return 'Verified';
-          if (isResubmitted && faultyList.includes(docType)) return 'Resubmitted (Awaiting Review)';
-          if (faultyList.includes(docType) && !isResubmitted) return 'Resubmission Required';
-          return 'Pending Inspection';
-        };
 
         const documents = [
           {
@@ -1284,13 +1277,6 @@ export async function returnDriverForCorrection(
         .eq('driver_id', driverId);
     } catch {}
 
-    if (typeof window !== 'undefined') {
-      try {
-        if (Array.isArray(verifiedDocuments)) {
-          localStorage.setItem(`sakay_lgu_verified_docs_${driverId}`, JSON.stringify(verifiedDocuments));
-        }
-      } catch {}
-    }
 
     // Dispatch return for correction SMS
     try {
@@ -1375,11 +1361,6 @@ export async function updateDriverDocumentReview(
         .eq('driver_id', driverId),
     ]);
 
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(`sakay_lgu_verified_docs_${driverId}`, JSON.stringify(verifiedDocuments));
-      } catch {}
-    }
 
     return { success: true };
   } catch (err) {

@@ -23,7 +23,7 @@ import { DriverCommunicationModal } from '../../communication/components/DriverC
 import { supabase } from '../../../services/supabaseClient';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { useDriverSession } from '../../../contexts/DriverSessionContext';
-import { calculateDistanceKm, formatDistance, getCurrentDevicePosition, watchDevicePosition } from '@sakay/shared';
+import { calculateDistanceKm, formatDistance } from '@sakay/shared';
 
 export const DriverNavigation: React.FC = () => {
   const { language } = useLanguage();
@@ -96,30 +96,20 @@ export const DriverNavigation: React.FC = () => {
     // Watch real-time GPS position and broadcast to passenger
     const channel = bookingId ? supabase.channel(`passenger_trip_${bookingId}`) : null;
 
-    const broadcastCoords = (lat: number, lng: number) => {
-      setProfile((prev) => ({ ...prev, currentLat: lat, currentLng: lng }));
-      if (channel) {
-        channel.send({
-          type: 'broadcast',
-          event: 'driver_location',
-          payload: { lat, lng },
-        });
-      }
-    };
-
     if (channel) {
       channel.subscribe((status: string) => {
         if (status === 'SUBSCRIBED') {
-          getCurrentDevicePosition()
-            .then((coords) => broadcastCoords(coords.latitude, coords.longitude))
-            .catch(() => {});
+          const cur = profileRef.current;
+          if (cur.currentLat && cur.currentLng) {
+            channel.send({
+              type: 'broadcast',
+              event: 'driver_location',
+              payload: { lat: cur.currentLat, lng: cur.currentLng },
+            });
+          }
         }
       });
     }
-
-    const watchId = watchDevicePosition((coords) => {
-      broadcastCoords(coords.latitude, coords.longitude);
-    });
 
     // Broadcast Driver Location whenever it changes from the central context
     const broadcastInterval = setInterval(() => {
@@ -133,29 +123,8 @@ export const DriverNavigation: React.FC = () => {
        }
     }, 2000);
 
-    // Sync to Supabase periodically
-    const dbInterval = setInterval(() => {
-      const cur = profileRef.current;
-      const activeDriverId = cur.id || booking?.driver_id || localStorage.getItem('sakay_driver_id');
-      if (activeDriverId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeDriverId) && cur.currentLat && cur.currentLng) {
-        supabase
-          .from('driver')
-          .update({
-            current_latitude: cur.currentLat,
-            current_longitude: cur.currentLng,
-            last_location_update: new Date().toISOString(),
-          })
-          .eq('driver_id', activeDriverId)
-          .then(() => {});
-      }
-    }, 5000);
-
     return () => {
       clearInterval(broadcastInterval);
-      clearInterval(dbInterval);
-      if (watchId !== null && navigator.geolocation) {
-        navigator.geolocation.clearWatch(watchId);
-      }
       if (channel) {
         supabase.removeChannel(channel);
       }

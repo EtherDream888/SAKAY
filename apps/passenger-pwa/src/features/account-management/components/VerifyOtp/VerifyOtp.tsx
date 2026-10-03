@@ -61,11 +61,23 @@ export const VerifyOtp: React.FC = () => {
   const [toastInfo, setToastInfo] = useState<string | null>(null);
   const [resendTimer, setResendTimer] = useState(60);
   const [resendKey, setResendKey] = useState(0);
+  const [isLockedOut, setIsLockedOut] = useState(false);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const hasAutoApprovedRef = useRef(false);
   const hasDispatchedInitialOtpRef = useRef(false);
   const isComplete = otp.every((digit) => digit !== '');
+
+  const checkLockout = useCallback((errMsg?: string) => {
+    if (!errMsg) return;
+    const lower = errMsg.toLowerCase();
+    if (lower.includes('lock') || lower.includes('too many') || lower.includes('limit')) {
+      setIsLockedOut(true);
+      const match = errMsg.match(/(\d+)\s*minuto|(\d+)\s*minute/i);
+      const mins = match ? parseInt(match[1] || match[2], 10) : 15;
+      setResendTimer(mins * 60);
+    }
+  }, []);
 
   // Automatically initiate sending OTP SMS as soon as the user lands on this screen
   useEffect(() => {
@@ -84,6 +96,7 @@ export const VerifyOtp: React.FC = () => {
         if (result.success) {
           setResendTimer(60);
         } else {
+          checkLockout(result.error);
           setToastError(
             result.error ||
               (language === 'tl'
@@ -102,16 +115,19 @@ export const VerifyOtp: React.FC = () => {
     };
 
     dispatchInitialOtp();
-  }, [resolvedPhone, language]);
+  }, [resolvedPhone, language, checkLockout]);
 
   // Countdown timer for resend (continues running every second until timer reaches 0)
   useEffect(() => {
-    if (resendTimer <= 0) return;
+    if (resendTimer <= 0) {
+      if (isLockedOut) setIsLockedOut(false);
+      return;
+    }
     const timer = setInterval(() => {
       setResendTimer((prev) => prev - 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [resendTimer]);
+  }, [resendTimer, isLockedOut]);
 
   const [isResending, setIsResending] = useState(false);
 
@@ -129,6 +145,7 @@ export const VerifyOtp: React.FC = () => {
         if (!result.success) {
           hasAutoApprovedRef.current = false;
           setLoading(false);
+          checkLockout(result.error);
           setToastError(result.error || (language === 'tl' ? 'Maling OTP code. Pakisubukang muli.' : 'Incorrect OTP code. Please try again.'));
           return;
         }
@@ -257,7 +274,7 @@ export const VerifyOtp: React.FC = () => {
         setToastError(language === 'tl' ? 'Hindi makumpleto ang pagpapatunay. Pakisubukang muli.' : 'Verification could not be completed. Please try again.');
       }
     },
-    [loading, resolvedPhone, state, language, resolvedName, navigate]
+    [loading, resolvedPhone, state, language, resolvedName, navigate, checkLockout]
   );
 
   const handleIncomingSmsOtp = useCallback(
@@ -368,6 +385,7 @@ export const VerifyOtp: React.FC = () => {
         setResendKey((prev) => prev + 1);
         setToastInfo(language === 'tl' ? 'Matagumpay na naipadala ang bagong OTP code sa iyong numero.' : 'New OTP sent to your number.');
       } else {
+        checkLockout(result.error);
         setToastError(result.error || (language === 'tl' ? 'Hindi maipadala ang OTP code. Pakisubukang muli.' : 'Failed to resend OTP. Please try again.'));
       }
     } catch {
@@ -499,6 +517,7 @@ export const VerifyOtp: React.FC = () => {
               onChange={(e) => handleOtpChange(index, e.target.value)}
               onKeyDown={(e: any) => handleKeyDown(index, e)}
               type="tel"
+              disabled={isLockedOut || loading}
               slotProps={{
                 htmlInput: {
                   maxLength: 6,
@@ -539,31 +558,31 @@ export const VerifyOtp: React.FC = () => {
           component="button"
           type="button"
           onClick={handleResendOtp}
-          disabled={resendTimer > 0 || isResending || loading}
+          disabled={resendTimer > 0 || isResending || loading || isLockedOut}
           sx={{
             width: '100%',
             height: '48px',
             borderRadius: '14px',
-            backgroundColor: (resendTimer > 0 || isResending || loading) ? '#F8FAFC' : '#FFFFFF',
-            border: (resendTimer > 0 || isResending || loading) ? '1.5px solid #E2E8F0' : '1.5px solid #FF6B00',
-            color: (resendTimer > 0 || isResending || loading) ? '#94A3B8' : '#FF6B00',
+            backgroundColor: (resendTimer > 0 || isResending || loading || isLockedOut) ? '#F8FAFC' : '#FFFFFF',
+            border: (resendTimer > 0 || isResending || loading || isLockedOut) ? '1.5px solid #E2E8F0' : '1.5px solid #FF6B00',
+            color: (resendTimer > 0 || isResending || loading || isLockedOut) ? '#94A3B8' : '#FF6B00',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             gap: 1,
-            cursor: (resendTimer > 0 || isResending || loading) ? 'not-allowed' : 'pointer',
+            cursor: (resendTimer > 0 || isResending || loading || isLockedOut) ? 'not-allowed' : 'pointer',
             outline: 'none',
             fontSize: '14.5px',
             fontWeight: 700,
             fontFamily: 'inherit',
             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-            '&:hover': (resendTimer > 0 || isResending || loading) ? {} : {
+            '&:hover': (resendTimer > 0 || isResending || loading || isLockedOut) ? {} : {
               backgroundColor: 'rgba(255, 107, 0, 0.06)',
               borderColor: '#E66000',
               color: '#E66000',
               transform: 'translateY(-1px)',
             },
-            '&:active': (resendTimer > 0 || isResending || loading) ? {} : {
+            '&:active': (resendTimer > 0 || isResending || loading || isLockedOut) ? {} : {
               backgroundColor: 'rgba(255, 107, 0, 0.12)',
               transform: 'translateY(0)',
             },
@@ -598,7 +617,7 @@ export const VerifyOtp: React.FC = () => {
           onClick={() => executeVerification(otp.join(''))}
           fullWidth
           loading={loading}
-          disabled={!isComplete || loading}
+          disabled={!isComplete || loading || isLockedOut}
           sx={{
             height: '56px',
             borderRadius: '16px',

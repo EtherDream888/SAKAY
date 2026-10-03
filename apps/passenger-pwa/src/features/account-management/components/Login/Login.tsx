@@ -15,7 +15,7 @@ import SakayToast from "../../../../common/components/SakayToast";
 import { SakayPhoneInput } from "../../../../common/components/SakayPhoneInput";
 import { RegisterInput } from "../../../../common/components/RegisterInput";
 import { supabase } from "../../../../services/supabaseClient";
-import { getPhoneLookupCandidates } from "../../../../services/passengerApiService";
+import { getPhoneLookupCandidates, rotatePassengerSession } from "../../../../services/passengerApiService";
 
 const Login: React.FC = () => {
   const { language, t } = useLanguage();
@@ -40,13 +40,14 @@ const Login: React.FC = () => {
   // Disabled if mobile number or password is empty or loading
   const isLoginDisabled = !phone.trim() || !password.trim() || loading;
 
-  const handleBack = () => {
-    navigate("/get-started");
-  };
-
   const triggerErrorToast = (msg: string) => {
     setToastMessage(msg);
     setToastOpen(true);
+  };
+
+
+  const handleBack = () => {
+    navigate("/get-started");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -160,10 +161,19 @@ const Login: React.FC = () => {
         if (role === "passenger") {
           let { data: profile } = await supabase
             .from("passenger")
-            .select("passenger_id, account_status, full_name, auth_user_id")
+            .select("passenger_id, account_status, full_name, auth_user_id, session_id")
             .or(`auth_user_id.eq.${user.id},contact_number.eq.${candidates.phone63WithPlus},contact_number.eq.${candidates.phone09},contact_number.eq.${candidates.phone63NoPlus},contact_number.eq.${candidates.phoneRaw}`)
             .limit(1)
             .maybeSingle();
+
+          // BATCH 2 FIX: Update single-session token upon new login
+          if (profile?.passenger_id) {
+            try {
+              await rotatePassengerSession(profile.passenger_id);
+            } catch (err) {
+              console.warn("Failed to rotate session:", err);
+            }
+          }
 
           if (profile && !profile.auth_user_id) {
             await supabase
@@ -175,17 +185,15 @@ const Login: React.FC = () => {
 
           if (profile) {
             if (profile.account_status === "Pending OTP Verification") {
-              // Auto-heal status in database & Auth
-              await supabase
-                .from("passenger")
-                .update({ account_status: "Active" })
-                .eq("passenger_id", profile.passenger_id);
-              profile.account_status = "Active";
-              try {
-                await supabase.rpc("activate_passenger_otp", {
-                  p_contact_number: user.phone || user.user_metadata?.contact_number || candidates.e164,
-                });
-              } catch {}
+              // Block login and inform user
+              triggerErrorToast(
+                language === "tl"
+                  ? "Ang inyong account ay naghihintay ng OTP verification."
+                  : "Your account is pending OTP verification."
+              );
+              setLoading(false);
+              await supabase.auth.signOut();
+              return;
             }
 
             if (profile.account_status === "Suspended" || profile.account_status === "Deactivated") {
@@ -219,6 +227,15 @@ const Login: React.FC = () => {
             }
           }
         }
+
+      } else {
+        triggerErrorToast(
+          language === "tl"
+            ? "Hindi matagumpay ang pag-login. Pakisubukang muli."
+            : "Login failed. Please try again."
+        );
+        setLoading(false);
+        return;
       }
 
       setLoading(false);

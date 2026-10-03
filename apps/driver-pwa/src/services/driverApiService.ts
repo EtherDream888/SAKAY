@@ -16,6 +16,18 @@ import type { LicenseExtractedData, MtopExtractedData } from './driverOnboarding
 
 export const DEFAULT_DRIVER_ID = 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b22';
 
+export async function rotateDriverSession(driverId: string): Promise<string> {
+  const newSessionId = crypto.randomUUID();
+  await supabase
+    .from('driver')
+    .update({ session_id: newSessionId })
+    .eq('driver_id', driverId);
+  try {
+    localStorage.setItem('sakay_driver_session_token', newSessionId);
+  } catch {}
+  return newSessionId;
+}
+
 /**
  * Helper to get localized error message respecting current selected language
  */

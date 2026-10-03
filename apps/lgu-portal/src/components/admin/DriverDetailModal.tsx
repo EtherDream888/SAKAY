@@ -212,20 +212,6 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
         } catch {}
       }
 
-      // Check client storage cache as well
-      if (typeof window !== 'undefined') {
-        try {
-          const cached = localStorage.getItem(`sakay_lgu_verified_docs_${driver.id}`);
-          if (cached) {
-            const parsedCache = JSON.parse(cached);
-            if (Array.isArray(parsedCache)) {
-              parsedCache.forEach((k: FaultyDocumentType) => {
-                if (!verifiedList.includes(k)) verifiedList.push(k);
-              });
-            }
-          }
-        } catch {}
-      }
 
       const rawDocs = driver.documents || [];
       const isResub = Boolean(driver.isResubmitted);
@@ -282,11 +268,6 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
       .filter((d) => d.status === 'Verified')
       .map((d) => getDocumentType(d));
 
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(`sakay_lgu_verified_docs_${driver.id}`, JSON.stringify(currentVerified));
-      } catch {}
-    }
 
     const updatedDriver: DriverRecord = {
       ...driver,
@@ -339,11 +320,6 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
       .filter((d) => d.status === 'Verified')
       .map((d) => getDocumentType(d));
 
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem(`sakay_lgu_verified_docs_${driver.id}`, JSON.stringify(currentVerified));
-      } catch {}
-    }
 
     const updatedDriver: DriverRecord = {
       ...driver,
@@ -387,11 +363,6 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
   const handleVerifyConfirm = async () => {
     try {
       await verifyDriver(driver.id);
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.removeItem(`sakay_lgu_verified_docs_${driver.id}`);
-        } catch {}
-      }
       setSnackbarMsg(`Driver ${driver.name} successfully verified and accredited.`);
       const updated: DriverRecord = {
         ...driver,
@@ -503,11 +474,6 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
         rejectionComment: finalCommentJson,
         isResubmitted: false,
       };
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem(`sakay_lgu_verified_docs_${driver.id}`, JSON.stringify(currentVerified));
-        } catch {}
-      }
       if (onDriverUpdated) onDriverUpdated(updated);
       if (onStatusChange) onStatusChange(driver.id, 'Inactive');
     } catch (err) {

@@ -70,6 +70,7 @@ export const Register: React.FC = () => {
   const [lastName, setLastName] = useState('');
   const [suffix, setSuffix] = useState('');
   const [phone, setPhone] = useState('');
+  const [dob, setDob] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -175,6 +176,7 @@ export const Register: React.FC = () => {
     firstName.trim() &&
     lastName.trim() &&
     phone.trim() &&
+    dob.trim() &&
     password.trim() &&
     confirmPassword.trim()
   );
@@ -184,6 +186,7 @@ export const Register: React.FC = () => {
     lastName.trim() &&
     isValidPhone &&
     !phoneRegisteredError &&
+    dob.trim() &&
     isPasswordValid &&
     password === confirmPassword
   );
@@ -192,7 +195,24 @@ export const Register: React.FC = () => {
     e.preventDefault();
     setHasAttemptedSubmit(true);
     setAccountError(null);
+
     if (!isFormValid) {
+      setShakeTrigger((prev) => prev + 1);
+      return;
+    }
+
+    // --- CLIENT-SIDE AGE GATE (Under 12 years old block) ---
+    const dobDate = new Date(dob);
+    const today = new Date();
+    let age = today.getFullYear() - dobDate.getFullYear();
+    const m = today.getMonth() - dobDate.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dobDate.getDate())) {
+      age--;
+    }
+
+    if (age < 12) {
+      setAccountError(t.under12Block);
+      setToastMessage(t.under12Block);
       setShakeTrigger((prev) => prev + 1);
       return;
     }
@@ -201,8 +221,8 @@ export const Register: React.FC = () => {
     const existing = await lookupPassengerByPhone(cleanPhoneDigits);
     if (existing && (existing.account_status === 'Active' || existing.account_status === 'Verified')) {
       const msg = language === 'tl'
-        ? 'Ang mobile number na ito ay nakarehistro na. Mangyaring gumamit ng ibang numero o mag-log in.'
-        : 'This mobile number is already registered. Please use another number or log in.';
+        ? 'Ang mobile number na ito ay nakarehistro na. Mag-log in o i-recover ang password.'
+        : 'This mobile number is already registered. Please log in or recover your password.';
       setPhoneRegisteredError(msg);
       setAccountError(msg);
       setToastMessage(msg);
@@ -239,6 +259,7 @@ export const Register: React.FC = () => {
         passengerName: fullName,
         fullName: fullName,
         role: 'passenger',
+        date_of_birth: dob,
         isRecovery: false,
       },
     });
@@ -394,6 +415,25 @@ export const Register: React.FC = () => {
                     : '')
             }
             shake={shakeTrigger > 0 && ((hasAttemptedSubmit && !isValidPhone) || Boolean(phoneRegisteredError))}
+          />
+          {phoneRegisteredError && (
+            <Typography sx={{ fontSize: '12px', color: '#FF6B00', fontWeight: 600, px: 0.5, mt: -0.5, cursor: 'pointer' }}
+              onClick={() => navigate('/forgot-password')}>
+              {language === 'tl' ? '→ I-recover ang Password' : '→ Recover Password'}
+            </Typography>
+          )}
+
+          {/* Date of Birth Input */}
+          <RegisterInput
+            label={language === 'tl' ? "PETSA NG KAPANGANAKAN" : "DATE OF BIRTH"}
+            type="date"
+            value={dob}
+            onChange={setDob}
+            required
+            error={hasAttemptedSubmit && !dob.trim()}
+            helperText={hasAttemptedSubmit && !dob.trim() ? (language === 'tl' ? 'Kailangan ang petsa ng kapanganakan.' : 'Date of birth is required.') : ''}
+            shake={shakeTrigger > 0 && hasAttemptedSubmit && !dob.trim()}
+            max={new Date().toISOString().split('T')[0]} // Max date is today
           />
 
           {/* Password Input */}

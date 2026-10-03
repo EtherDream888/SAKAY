@@ -104,7 +104,6 @@ export async function lookupPassengerByPhone(rawPhone: string) {
 // OTP SMS DISPATCH & VERIFICATION
 // ============================================================================
 
-
 export function normalizePhoneE164(raw: string): string {
   const digits = raw.replace(/\D/g, '');
   if (digits.startsWith('63') && digits.length === 12) return `+${digits}`;
@@ -114,9 +113,32 @@ export function normalizePhoneE164(raw: string): string {
   return `+${digits}`;
 }
 
+/**
+ * Sends an OTP SMS to the given phone number.
+ * Checks server-side OTP lockout (via the fixed check_otp_lockout RPC) before dispatching.
+ */
 export async function sendPassengerOtp(phone: string): Promise<{ success: boolean; message?: string; error?: string; debugOtp?: string }> {
   const e164Phone = normalizePhoneE164(phone);
   try {
+    // ── OTP lockout check (Rule 4.7) ──────────────────────────────────────────
+    // The RPC now accepts TEXT (phone number), not UUID.
+    const { data: lockoutData, error: lockoutErr } = await supabase.rpc('check_otp_lockout', {
+      p_contact_number: e164Phone,
+    });
+    if (lockoutErr) {
+      console.warn('[passengerApiService] OTP lockout RPC error:', lockoutErr.message);
+    }
+    if (lockoutData?.is_locked) {
+      const mins = lockoutData.minutes_remaining ?? 15;
+      return {
+        success: false,
+        error: getLocalizedError(
+          `Ang inyong OTP ay naka-lock. Subukan muli pagkatapos ng ${mins} minuto.`,
+          `Too many failed OTP attempts. Please try again in ${mins} minute(s).`
+        ),
+      };
+    }
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 20000);
 
@@ -196,9 +218,29 @@ export async function verifyPassengerOtp(
 
     const data = await response.json().catch(() => ({}));
     if (response.ok && data.success) {
+      // Successful OTP verification – reset DB attempt counters and rotate session_id
+      const passenger = await lookupPassengerByPhone(phone);
+      if (passenger?.passenger_id) {
+        await supabase.rpc('reset_failed_otp', { p_passenger_id: passenger.passenger_id });
+        // Write a new session token that the Login page will persist locally for comparison
+        const newSessionId = crypto.randomUUID();
+        await supabase
+          .from('passenger')
+          .update({ session_id: newSessionId })
+          .eq('passenger_id', passenger.passenger_id);
+        // Persist locally so Login.tsx comparison works immediately after registration
+        try {
+          localStorage.setItem('sakay_session_token', newSessionId);
+        } catch {}
+      }
       return { success: true };
     }
 
+    // OTP verification failed – increment DB attempt counter
+    const passenger = await lookupPassengerByPhone(phone);
+    if (passenger?.passenger_id) {
+      await supabase.rpc('increment_failed_otp', { p_passenger_id: passenger.passenger_id });
+    }
     return {
       success: false,
       error: data.error || getLocalizedError('Maling OTP code o nag-expire na ito.', 'Incorrect or expired OTP code.'),
@@ -217,8 +259,28 @@ export async function verifyPassengerOtp(
 // ============================================================================
 
 /**
+ * Writes a fresh session_id to public.passenger and persists the token in
+ * localStorage so Login.tsx can compare it on the next login attempt.
+ * Call this at login time (not only at OTP time) to enforce single-session.
+ */
+export async function rotatePassengerSession(passengerId: string): Promise<string> {
+  const newSessionId = crypto.randomUUID();
+  await supabase
+    .from('passenger')
+    .update({ session_id: newSessionId })
+    .eq('passenger_id', passengerId);
+  try {
+    localStorage.setItem('sakay_session_token', newSessionId);
+  } catch {}
+  return newSessionId;
+}
+
+/**
  * Creates (or recovers) the passenger's Supabase Auth account and ensures an
  * authenticated session is active in this browser.
+ *
+ * BATCH 2 FIX: blocks re-registration when account_status is 'Pending OTP Verification'
+ * (previously only blocked 'Active' / 'Verified').
  */
 export async function ensurePassengerAuthSession(
   phone: string,
@@ -230,22 +292,37 @@ export async function ensurePassengerAuthSession(
   const passengerEmail = `passenger_${candidates.phone63NoPlus}@sakay.ph`;
 
   console.log('[PASSENGER REGISTRATION AUTH] ========================================');
-  console.log('[PASSENGER REGISTRATION AUTH] Starting fresh passenger registration auth');
+  console.log('[PASSENGER REGISTRATION AUTH] Starting passenger registration auth');
   console.log('[PASSENGER REGISTRATION AUTH] Phone (E.164):', e164Phone);
   console.log('[PASSENGER REGISTRATION AUTH] Identifier Email:', passengerEmail);
 
   try {
-    // 1. Strict Duplicate Check: Look up existing passenger record by phone in Supabase (block only if Active)
+    // 1. Strict Duplicate Check — block ALL existing accounts regardless of status.
+    //    Previously only blocked Active/Verified; now also blocks Pending OTP Verification
+    //    so a user cannot start a second registration while one is in flight (Rule 4.2).
     const existingPassenger = await lookupPassengerByPhone(phone);
-    if (existingPassenger && (existingPassenger.account_status === 'Active' || existingPassenger.account_status === 'Verified')) {
-      console.warn('[PASSENGER REGISTRATION AUTH] Phone number already registered and Active in passenger table:', e164Phone);
-      return {
-        success: false,
-        error: getLocalizedError(
-          'Ang numerong ito ay nakarehistro na. Mangyaring mag-log in na lamang.',
-          'This mobile number is already registered. Please log in instead.'
-        ),
-      };
+    if (existingPassenger) {
+      const status: string = existingPassenger.account_status || '';
+      if (status === 'Active' || status === 'Verified') {
+        console.warn('[PASSENGER REGISTRATION AUTH] Phone already Active:', e164Phone);
+        return {
+          success: false,
+          error: getLocalizedError(
+            'Ang numerong ito ay nakarehistro na. Mangyaring mag-log in na lamang o gamitin ang "Nakalimutan ang Password".',
+            'This mobile number is already registered. Please log in or use "Forgot Password".'
+          ),
+        };
+      }
+      if (status === 'Pending OTP Verification') {
+        console.warn('[PASSENGER REGISTRATION AUTH] Phone already pending OTP:', e164Phone);
+        return {
+          success: false,
+          error: getLocalizedError(
+            'May naghihintay na OTP verification para sa numerong ito. Suriin ang inyong SMS o humingi ng bagong code.',
+            'A registration is already pending OTP verification for this number. Check your SMS or request a new code.'
+          ),
+        };
+      }
     }
 
     // 2. Sign out any existing session to ensure a clean registration flow
@@ -346,12 +423,10 @@ export async function ensurePassengerAuthSession(
       authUser = signInImmediate.data.user;
     }
 
-    // 4. If Supabase Auth already has an account for this email (e.g. table was cleared during testing),
-    // reclaim/synchronize it with the new password since public.passenger has no record of this passenger
+    // 4. If Supabase Auth already has an account for this email, reclaim/synchronize it
     if (!authUser && signUpError && (signUpError.message?.toLowerCase().includes('already registered') || (signUpError as any)?.code === 'user_already_exists')) {
-      console.log('[PASSENGER REGISTRATION AUTH] Auth account exists in Supabase Auth but not in passenger table. Reclaiming...');
+      console.log('[PASSENGER REGISTRATION AUTH] Auth account exists but not in passenger table. Reclaiming...');
 
-      // Try direct sign in with the new password
       const signInDirect = await supabase.auth.signInWithPassword({
         email: passengerEmail,
         password: password,
@@ -360,7 +435,6 @@ export async function ensurePassengerAuthSession(
       if (!signInDirect.error && signInDirect.data?.user) {
         authUser = signInDirect.data.user;
       } else {
-        // Try candidate fallback test passwords
         const fallbackPasswords = [
           'Password123!',
           'MyNewPassword#2026',
@@ -382,7 +456,6 @@ export async function ensurePassengerAuthSession(
           });
           if (!fpRes.error && fpRes.data?.user) {
             authUser = fpRes.data.user;
-            // Update password to the new password entered by user
             await supabase.auth.updateUser({ password }).catch(() => {});
             break;
           }

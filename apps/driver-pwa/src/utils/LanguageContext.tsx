@@ -6,6 +6,7 @@ export type Language = 'tl' | 'en';
 
 const translations = {
   tl: {
+    sessionInvalidated: "Natapos ang inyong session dahil nag-login ang account sa ibang device. Mag-login muli.",
     start: "Magsimula na",
     hasAccount: "May account na?",
     loginLink: " Mag-login",
@@ -163,6 +164,7 @@ const translations = {
     tapToEnter: "Pindutin upang ilagay...",
   },
   en: {
+    sessionInvalidated: "Your session was invalidated because the account logged in on another device. Please log in again.",
     start: "Get Started",
     hasAccount: "Already have an account?",
     loginLink: "Login",

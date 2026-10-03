@@ -92,7 +92,7 @@ export const DriverSessionProvider: React.FC<{ children: ReactNode }> = ({ child
         currentLng: longitude,
       }));
 
-      const activeDriverId = localStorage.getItem('sakay_driver_id');
+      const activeDriverId = localStorage.getItem('sakay_driver_id') || '11111111-1111-1111-1111-111111111111';
       if (activeDriverId) {
         supabase
           .from('driver')

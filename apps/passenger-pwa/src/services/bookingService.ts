@@ -182,9 +182,24 @@ export const createBooking = async (payload: CreateBookingPayload): Promise<Book
   if (error || !dbData) {
     console.error('[bookingService] Supabase insert error:', error?.message);
     const msg = error?.message || '';
-    if (msg.includes('ERR_OUT_OF_SERVICE_AREA')) {
-      throw new Error('Nasa labas ng opisyal na service area ng Calapan City ang napiling pickup location. Mangyaring pumili ng lokasyon sa loob ng lungsod.');
+
+    // One-open-booking policy: passenger already has an active booking
+    if (
+      msg.includes('idx_one_open_booking') ||
+      msg.includes('duplicate key value violates unique constraint')
+    ) {
+      throw new Error(
+        'Mayroon ka nang aktibong booking. Kanselahin muna ang iyong kasalukuyang booking bago gumawa ng bago.\n\n' +
+        '(You already have an active booking. Please cancel it before creating a new one.)'
+      );
     }
+
+    if (msg.includes('ERR_OUT_OF_SERVICE_AREA')) {
+      throw new Error(
+        'Nasa labas ng opisyal na service area ng Calapan City ang napiling pickup location. Mangyaring pumili ng lokasyon sa loob ng lungsod.'
+      );
+    }
+
     throw new Error(error?.message || 'Failed to create booking');
   }
 

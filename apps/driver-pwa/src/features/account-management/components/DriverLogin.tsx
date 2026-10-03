@@ -17,7 +17,7 @@ import { RegisterInput } from '../../../common/components/RegisterInput';
 import SakayPhoneInput from '../../../common/components/SakayPhoneInput';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { supabase } from '../../../services/supabaseClient';
-import { getPhoneLookupCandidates, lookupDriverByPhoneSecure } from '../../../services/driverApiService';
+import { getPhoneLookupCandidates, lookupDriverByPhoneSecure, rotateDriverSession } from '../../../services/driverApiService';
 
 export const formatMobileNumber = (value: string): string => {
   const digits = value.replace(/\D/g, '');
@@ -59,6 +59,8 @@ export const DriverLogin: React.FC = () => {
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+
 
   const cleanPhoneDigits = phone.replace(/\D/g, '');
   const isValidPhone = cleanPhoneDigits.length === 11 && cleanPhoneDigits.startsWith('09');
@@ -292,6 +294,15 @@ export const DriverLogin: React.FC = () => {
           verificationStage: driverData.account_status === 'Verified' ? 'Stage 2 Approved' : 'Stage 1 TODA Review',
         })
       );
+
+      // BATCH 2 FIX: Update single-session token upon new login
+      if (driverData?.driver_id) {
+        try {
+          await rotateDriverSession(driverData.driver_id);
+        } catch (err) {
+          console.warn("Failed to rotate session:", err);
+        }
+      }
 
       setLoading(false);
       setSuccess(true);

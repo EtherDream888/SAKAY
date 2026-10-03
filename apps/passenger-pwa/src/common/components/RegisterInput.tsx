@@ -19,6 +19,7 @@ export interface RegisterInputProps {
   shake?: boolean;
   multiline?: boolean;
   rows?: number;
+  max?: string;
 }
 
 export const RegisterInput: React.FC<RegisterInputProps> = ({
@@ -38,9 +39,10 @@ export const RegisterInput: React.FC<RegisterInputProps> = ({
   shake = false,
   multiline = false,
   rows = 3,
+  max,
 }) => {
   const [focused, setFocused] = useState(false);
-  const isFloating = focused || Boolean(value && value.length > 0);
+  const isFloating = focused || Boolean(value && value.length > 0) || type === 'date';
 
   return (
     <Box sx={{ width: '100%' }}>
@@ -152,6 +154,7 @@ export const RegisterInput: React.FC<RegisterInputProps> = ({
               onKeyDown={onKeyDown}
               readOnly={readOnly}
               placeholder={isFloating ? placeholder : ''}
+              max={max}
               style={{
                 width: '100%',
                 border: 'none',

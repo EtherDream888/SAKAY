@@ -68,6 +68,12 @@ const translations = {
     useCurrentLocation: "Gamitin ang Kasalukuyang Lokasyon",
     cancel: "Kanselahin",
     searchLocation: "Maghanap ng lugar...",
+    otpLocked: "Naka-lock ang OTP dahil sa maraming maling pagsubok. Subukang muli mamaya.",
+    under12Block: "Ang mga pasaherong wala pang 12 taong gulang ay hindi maaaring magkaroon ng verified account.",
+    sessionInvalidated: "Natapos na ang iyong session dahil may nag-login sa ibang device.",
+    alreadyPendingRegistration: "May naghihintay na rehistrasyon para sa numerong ito.",
+    otpResendCooldown: "Maghintay bago humingi muli ng OTP.",
+    otpDailyCapReached: "Naabot na ang limitasyon ng OTP ngayong araw. Subukan bukas.",
   },
   en: {
     start: "Get Started",
@@ -132,6 +138,12 @@ const translations = {
     useCurrentLocation: "Use Current Location",
     cancel: "Cancel",
     searchLocation: "Search location...",
+    otpLocked: "OTP is locked due to too many failed attempts. Please try again later.",
+    under12Block: "Passengers under 12 years old cannot hold a verified account.",
+    sessionInvalidated: "Your session has expired because you logged in from another device.",
+    alreadyPendingRegistration: "A registration is already pending for this number.",
+    otpResendCooldown: "Please wait before requesting another OTP.",
+    otpDailyCapReached: "Daily OTP limit reached. Please try again tomorrow.",
   }
 };
 

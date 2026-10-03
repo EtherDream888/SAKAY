@@ -75,7 +75,7 @@ export const DriverAvailabilityHome: React.FC = () => {
   const [renewalMsg, setRenewalMsg] = useState('');
 
   const handleRenewalSubmit = async () => {
-    const activeDriverId = profile.id || localStorage.getItem('sakay_driver_id');
+    const activeDriverId = profile.id || localStorage.getItem('sakay_driver_id') || '11111111-1111-1111-1111-111111111111';
     if (!activeDriverId) return;
     setRenewalSubmitting(true);
     setRenewalMsg('');
@@ -146,7 +146,7 @@ export const DriverAvailabilityHome: React.FC = () => {
         }));
         setRecenterTrigger((prev) => prev + 1);
 
-        const activeDriverId = localStorage.getItem('sakay_driver_id');
+        const activeDriverId = profile.id || localStorage.getItem('sakay_driver_id') || '11111111-1111-1111-1111-111111111111';
         if (activeDriverId) {
           supabase
             .from('driver')
@@ -334,7 +334,7 @@ export const DriverAvailabilityHome: React.FC = () => {
     setProfile((prev) => ({ ...prev, isOnline: nextState }));
     
     // Update Supabase
-    const activeDriverId = profile.id || localStorage.getItem('sakay_driver_id');
+    const activeDriverId = profile.id || localStorage.getItem('sakay_driver_id') || '11111111-1111-1111-1111-111111111111';
     if (activeDriverId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(activeDriverId)) {
       try {
         const { error } = await supabase
@@ -361,7 +361,7 @@ export const DriverAvailabilityHome: React.FC = () => {
       }));
       setRecenterTrigger((prev) => prev + 1);
 
-      const activeDriverId = localStorage.getItem('sakay_driver_id');
+      const activeDriverId = profile.id || localStorage.getItem('sakay_driver_id') || '11111111-1111-1111-1111-111111111111';
       if (activeDriverId) {
         supabase
           .from('driver')
@@ -393,7 +393,7 @@ export const DriverAvailabilityHome: React.FC = () => {
       }));
       setRecenterTrigger((prev) => prev + 1);
 
-      const activeDriverId = localStorage.getItem('sakay_driver_id');
+      const activeDriverId = profile.id || localStorage.getItem('sakay_driver_id') || '11111111-1111-1111-1111-111111111111';
       if (activeDriverId) {
         supabase
           .from('driver')

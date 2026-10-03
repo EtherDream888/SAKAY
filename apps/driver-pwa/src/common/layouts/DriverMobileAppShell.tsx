@@ -14,8 +14,10 @@ import HistoryIcon from '@mui/icons-material/History';
 import SettingsIcon from '@mui/icons-material/Settings';
 
 import { useLanguage } from '../../utils/LanguageContext';
+import { supabase } from '../../services/supabaseClient';
 import { DriverSessionProvider } from '../../contexts/DriverSessionContext';
 import { DriverIncomingRequestModal } from '../components/DriverIncomingRequestModal';
+import SakayToast from '../components/SakayToast';
 
 interface NavTabItem {
   key: string;
@@ -29,6 +31,54 @@ export const DriverMobileAppShell: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname;
+
+  // ── Global single-device session guard (Batch 2) ─────────────────────────
+  const [sessionToastOpen, setSessionToastOpen] = React.useState(false);
+  const [sessionToastMsg, setSessionToastMsg] = React.useState('');
+
+  // AUTHENTICATED_PATHS: only guard routes where a driver should be logged in.
+  const GUARDED_PATHS = [
+    '/driver/home', '/driver/earnings', '/driver/notifications',
+    '/driver/history', '/driver/profile', '/driver/settings',
+    '/driver/navigation', '/driver/active-trip', '/driver/status',
+    '/settings', '/profile', '/trip-history', '/trip-detail',
+  ];
+
+  React.useEffect(() => {
+    const isGuarded = GUARDED_PATHS.some((p) => currentPath.startsWith(p));
+    if (!isGuarded) return;
+
+    const checkSessionMismatch = async () => {
+      const { data: sess } = await supabase.auth.getSession();
+      if (!sess?.session?.user) return;
+
+      const localToken = localStorage.getItem('sakay_driver_session_token');
+      const { data: dbProfile } = await supabase
+        .from('driver')
+        .select('session_id')
+        .eq('auth_user_id', sess.session.user.id)
+        .maybeSingle();
+
+      // If DB has a session_id and it doesn't match the local one → another device logged in
+      if (dbProfile?.session_id && dbProfile.session_id !== localToken) {
+        await supabase.auth.signOut();
+        localStorage.removeItem('sakay_driver_session_token');
+        localStorage.removeItem('sakay_driver_id');
+        localStorage.removeItem('sakay_driver_profile');
+        localStorage.removeItem('sakay_driver_phone');
+        const msg = language === 'tl'
+          ? 'Natapos ang inyong session dahil nag-login ang account sa ibang device. Mag-login muli.'
+          : 'Your session was invalidated because the account logged in on another device. Please log in again.';
+        setSessionToastMsg(msg);
+        setSessionToastOpen(true);
+        navigate('/driver/login', { replace: true });
+      }
+    };
+
+    checkSessionMismatch();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPath]);
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Routes where the bottom tab navigation should be permanently visible
   const showBottomNav = [
@@ -113,6 +163,13 @@ export const DriverMobileAppShell: React.FC = () => {
 
   const content = (
     <Box className="app-container">
+      {/* Global Session-Invalidation Toast */}
+      <SakayToast
+        open={sessionToastOpen}
+        message={sessionToastMsg}
+        severity="error"
+        onClose={() => setSessionToastOpen(false)}
+      />
       <Box
         component="main"
         className="phone-simulator hide-scrollbar"

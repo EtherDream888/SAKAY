@@ -18,8 +18,12 @@
     "dev:driver": "npm run dev --workspace=apps/driver-pwa",
     "build:driver": "npm run build --workspace=apps/driver-pwa",
     "dev:server": "npm run dev --workspace=server",
+    "supabase:db-push": "npx supabase db push",
     "build:server": "npm run build --workspace=server",
     "build": "npm run build:all",
     "build:all": "npm run build:passenger && npm run build:driver && npm run build:toda && npm run build:lgu && npm run build:server"
+  },
+  "devDependencies": {
+    "pg": "^8.23.1"
   }
 }
