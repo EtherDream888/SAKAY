@@ -53,18 +53,8 @@ function listMigrations() {
   return fs.readdirSync(MIG_DIR).filter((f) => f.endsWith('.sql')).sort();
 }
 
-// HARNESS-ONLY patch: 20260927000000 creates policies on public.toda using the column
-// account_status, which 20260828000003 already renamed to toda_status (pre-existing repo defect).
-const PATCHES = {
-  '20260927000000_fix_database_advisor_and_rls.sql': (sql) =>
-    sql
-      .replace(/account_status = 'Active'\s+OR toda_status = 'Active'/, "toda_status = 'Active'")
-      .replace(/account_status = 'Pending Verification'\s+OR public\.is_lgu_admin\(\)/, "toda_status = 'Pending Verification' OR public.is_lgu_admin()"),
-};
-
 async function applyFile(db, file) {
-  let sql = fs.readFileSync(path.join(MIG_DIR, file), 'utf8');
-  if (PATCHES[file]) sql = PATCHES[file](sql);
+  const sql = fs.readFileSync(path.join(MIG_DIR, file), 'utf8');
   await db.exec('BEGIN');
   try {
     await db.exec(sql);

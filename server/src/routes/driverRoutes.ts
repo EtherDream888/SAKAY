@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/supabase';
-import { sendRawSms } from '../services/smsService';
 import { forbidDirectAccountAction } from './disabledEndpoints';
 
 const router = Router();
@@ -89,68 +88,13 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // ============================================================================
-// 2. POST /api/admin/drivers/:id/verify - Stage 2 LGU Credential Approval
+// 2-5. verify / suspend / reactivate / strike
+// Driver approval is the LGU's Stage 2 decision (verify_driver_affiliation RPC) and
+// strikes/suspensions are enforced by the database policy engine (Batch 3). These
+// Express routes were unauthenticated, trusted `actor_name` from the request body and
+// wrote with the service-role key. Nothing calls them, so they are disabled.
 // ============================================================================
-router.post('/:id/verify', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { franchise_number, actor_name = 'LGU Transport Administrator' } = req.body;
-
-    if (supabase) {
-      const updatePayload: any = { account_status: 'Verified' };
-      if (franchise_number) {
-        updatePayload.franchise_number = franchise_number;
-      }
-
-      const { data, error } = await supabase
-        .from('driver')
-        .update(updatePayload)
-        .eq('driver_id', id)
-        .select('*, toda:toda_id ( toda_name, toda_acronym )')
-        .single();
-
-      if (error) throw error;
-
-      await supabase.from('audit_log').insert([
-        {
-          action_type: 'DRIVER_STAGE2_VERIFIED',
-          target_id: id,
-          details: `[Driver Verification] ${actor_name}: Approved Stage 2 LGU verification and accredited driver '${data?.full_name || id}'. Franchise: ${data?.franchise_number || 'Existing'}`,
-          performed_at: new Date().toISOString(),
-        },
-      ]);
-
-      // Dispatch official Tagalog approval SMS
-      if (data?.contact_number) {
-        try {
-          const firstName = data.full_name?.split(' ')[0] || data.full_name || 'Drayber';
-          const todaName = data.toda?.toda_name || 'TODA';
-          const smsMsg = `SAKAY Alert: Magandang araw, ${firstName}! Ang iyong aplikasyon bilang drayber ay opisyal nang inaprubahan ng City LGU Franchising Office at ${todaName}. Beripikado na ang iyong account! Maaari ka nang mag-log in sa SAKAY Driver app upang magsimulang pumasada. Ingat sa biyahe!`;
-          await sendRawSms(data.contact_number, smsMsg);
-        } catch (smsErr) {
-          console.warn('[driverRoutes] LGU verification SMS dispatch error:', smsErr);
-        }
-      }
-
-      return res.json({
-        success: true,
-        message: `Driver ${data?.full_name || id} verified and accredited.`,
-        data,
-      });
-    }
-
-    return res.status(500).json({ success: false, error: 'Database service unavailable' });
-  } catch (err) {
-    console.error('[driverRoutes] /:id/verify error:', err);
-    return res.status(500).json({ success: false, error: (err as Error).message });
-  }
-});
-
-// ============================================================================
-// 3-5. suspend / reactivate / strike
-// Enforced by the database policy engine (Batch 3). These routes were
-// unauthenticated and wrote with the service-role key, so they are disabled.
-// ============================================================================
+router.post('/:id/verify', forbidDirectAccountAction);
 router.post('/:id/suspend', forbidDirectAccountAction);
 router.post('/:id/reactivate', forbidDirectAccountAction);
 router.post('/:id/strike', forbidDirectAccountAction);

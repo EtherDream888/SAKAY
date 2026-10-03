@@ -33,7 +33,6 @@ node scripts/db-tests/run-all.js engine     # suites whose path contains "engine
 - A passing "can do X" check that updated 0 rows proves nothing; assert `rowCount` for writes.
 - Updating a column to the value it already has is not a change, so protection triggers will not fire.
 
-## Known workaround
-`lib.js` patches one statement of `20260927000000_fix_database_advisor_and_rls.sql` in memory (its `toda`
-policies use `account_status`, which `20260828000003` renamed to `toda_status`). Remove the `PATCHES`
-entry once that migration is fixed.
+## Note
+The migrations are applied exactly as they are in the repo (no patching), so these suites also prove that
+a fresh database can be built from `supabase/migrations`.

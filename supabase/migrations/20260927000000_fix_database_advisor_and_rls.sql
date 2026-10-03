@@ -150,7 +150,7 @@ BEGIN
     IF target_toda_id IS NULL THEN
         RETURN FALSE;
     END IF;
-    SELECT account_status INTO v_status FROM public.toda WHERE toda_id = target_toda_id;
+    SELECT toda_status INTO v_status FROM public.toda WHERE toda_id = target_toda_id;
     RETURN (v_status = 'Active');
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
@@ -829,9 +829,8 @@ DROP POLICY IF EXISTS "toda_select_policy" ON public.toda;
 CREATE POLICY "toda_select_policy"
     ON public.toda FOR SELECT TO anon, authenticated
     USING (
-        account_status = 'Active' 
-        OR toda_status = 'Active' 
-        OR public.is_lgu_admin() 
+        toda_status = 'Active'
+        OR public.is_lgu_admin()
         OR toda_id = public.get_current_toda_admin_toda_id()
     );
 
@@ -839,7 +838,7 @@ DROP POLICY IF EXISTS "toda_insert_policy" ON public.toda;
 CREATE POLICY "toda_insert_policy"
     ON public.toda FOR INSERT TO anon, authenticated
     WITH CHECK (
-        account_status = 'Pending Verification' 
+        toda_status = 'Pending Verification'
         OR public.is_lgu_admin()
     );
 

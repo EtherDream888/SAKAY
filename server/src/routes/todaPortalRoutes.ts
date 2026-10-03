@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/supabase';
+import { forbidDirectAccountAction } from './disabledEndpoints';
 
 const router = Router();
 
@@ -237,48 +238,10 @@ router.get('/drivers', async (_req: Request, res: Response) => {
   }
 });
 
-// POST /api/toda/drivers/:id/suspend - Apply TODA-level suspension
-router.post('/drivers/:id/suspend', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { reason, durationDays = 7 } = req.body;
-
-    const driver = memberDrivers.find((d) => d.id === id);
-    if (!driver) {
-      return res.status(404).json({ success: false, error: 'Driver not found' });
-    }
-
-    driver.isSuspended = true;
-    driver.standing = 'Suspended (TODA Level)';
-    return res.json({
-      success: true,
-      message: `Driver ${driver.name} placed under TODA-level suspension.`,
-      data: { driver, reason, durationDays },
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: (err as Error).message });
-  }
-});
-
-// POST /api/toda/drivers/:id/reactivate - Reactivate suspended member
-router.post('/drivers/:id/reactivate', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const driver = memberDrivers.find((d) => d.id === id);
-    if (!driver) {
-      return res.status(404).json({ success: false, error: 'Driver not found' });
-    }
-
-    driver.isSuspended = false;
-    driver.standing = 'Good Standing';
-    return res.json({
-      success: true,
-      message: `Driver ${driver.name} reactivated into active terminal rotation.`,
-      data: driver,
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: (err as Error).message });
-  }
-});
+// Suspension and reactivation are decided by the database policy engine (Batch 3). A TODA
+// administrator recommends through a review flag (todaApiService.suspendTodaDriver). These
+// routes only changed an in-memory mock list and nothing calls them, so they are disabled.
+router.post('/drivers/:id/suspend', forbidDirectAccountAction);
+router.post('/drivers/:id/reactivate', forbidDirectAccountAction);
 
 export default router;
