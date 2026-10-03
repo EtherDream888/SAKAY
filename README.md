@@ -1,75 +1,61 @@
-# React + TypeScript + Vite
+# SAKAY
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+SAKAY is a ride-hailing and logistics platform for localized transport, focused on tricycles. This repository is an npm workspaces monorepo containing the passenger and driver apps, the TODA and LGU portals, the backend API, and shared code.
 
-Currently, two official plugins are available:
+## Repository layout
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+| Path | What it is |
+|---|---|
+| `apps/passenger-pwa/` | Passenger PWA (React + Vite + MUI) |
+| `apps/driver-pwa/` | Driver PWA (React + Vite + MUI) |
+| `apps/toda-portal/` | TODA administration portal |
+| `apps/lgu-portal/` | Local Government Unit portal |
+| `packages/shared/` | Shared types and helper utilities (`@sakay/shared`) |
+| `server/` | Express API backend (Node.js + TypeScript) |
+| `supabase/` | Supabase config, migrations, and seed data |
+| `docs/` | Policy decisions and compliance matrix |
 
-## React Compiler
+## Getting started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Install dependencies for every workspace from the repository root:
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Each app and the server ships a `.env.example`. Copy it to `.env` in the same folder and fill in the values before starting that workspace:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+cp apps/passenger-pwa/.env.example apps/passenger-pwa/.env
+cp server/.env.example server/.env
 ```
+
+## Running locally
+
+All commands run from the repository root.
+
+| Command | Starts |
+|---|---|
+| `npm run dev` | Passenger PWA (alias for `dev:passenger`) |
+| `npm run dev:passenger` | Passenger PWA |
+| `npm run dev:driver` | Driver PWA |
+| `npm run dev:toda` | TODA portal |
+| `npm run dev:lgu` | LGU portal |
+| `npm run dev:server` | Backend API |
+
+## Building
+
+| Command | Builds |
+|---|---|
+| `npm run build` | Everything (alias for `build:all`) |
+| `npm run build:passenger` | Passenger PWA |
+| `npm run build:driver` | Driver PWA |
+| `npm run build:toda` | TODA portal |
+| `npm run build:lgu` | LGU portal |
+| `npm run build:server` | Backend API |
+
+## Further reading
+
+- [AGENTS.md](AGENTS.md) — coding standards, styling conventions, and contribution rules
+- [ARCHITECTURE.md](ARCHITECTURE.md) — workspace layout and passenger feature mapping
+- [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) — detailed directory reference
