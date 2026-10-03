@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Box, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Avatar, Rating, Chip } from '@mui/material';
 import PersonIcon from '@mui/icons-material/Person';
 import StarIcon from '@mui/icons-material/Star';
-import ReportProblemIcon from '@mui/icons-material/ReportProblem';
 import FlashOnIcon from '@mui/icons-material/FlashOn';
 import ShieldIcon from '@mui/icons-material/Shield';
 
@@ -12,13 +11,16 @@ import { StatusBadge } from '../components/common/StatusBadge';
 import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
+import { RestrictionBanner } from '../components/admin/RestrictionBanner';
+import { SakayToast } from '../components/common/SakayToast';
 import { TableEmptyState } from '../components/common/TableEmptyState';
+import { useStrikeData } from '../hooks/useStrikeData';
+import { getStrikeLevel } from '../utils/strikeLevel';
 import {
   fetchPassengers,
   suspendPassenger,
   reactivatePassenger,
   issuePassengerStrike,
-  recordAdminAuditAction,
 } from '../services/adminApiService';
 
 /**
@@ -41,9 +43,16 @@ export const PassengerManagementPage: React.FC = () => {
   const [selectedPassenger, setSelectedPassenger] = useState<PassengerRecord | null>(null);
   const [strikeIssued, setStrikeIssued] = useState(false);
 
-  // Suspension & Reactivation Dialog States
+  // Suspension, Reactivation & Strike Dialog States
   const [suspendDialogOpen, setSuspendDialogOpen] = useState(false);
   const [reactivateDialogOpen, setReactivateDialogOpen] = useState(false);
+  const [strikeDialogOpen, setStrikeDialogOpen] = useState(false);
+  const [toast, setToast] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
+
+  // Authoritative strike ledger + violation catalog for the open passenger
+  const strikeData = useStrikeData('passenger', selectedPassenger?.id);
+  const activeStrikes = strikeData.activeStrikes ?? selectedPassenger?.strikesCount ?? 0;
+  const strikeItems = strikeData.history.length > 0 ? strikeData.history : selectedPassenger?.strikeHistory ?? [];
 
   /**
    * Effect: Fetch live passenger records on initial mount.
@@ -85,6 +94,7 @@ export const PassengerManagementPage: React.FC = () => {
     { label: 'All Account Statuses', value: 'All' },
     { label: 'Active', value: 'Active' },
     { label: 'Suspended', value: 'Suspended' },
+    { label: 'Deactivated', value: 'Deactivated' },
   ];
 
   const verificationOptions: FilterOption[] = [
@@ -100,101 +110,69 @@ export const PassengerManagementPage: React.FC = () => {
     if (!selectedPassenger) return;
     const finalReason = reason || 'Violation of Platform Policies';
 
-    // Backend API Call
+    // The database engine applies and audits the suspension; failures must be visible.
     try {
       await suspendPassenger(selectedPassenger.id, finalReason, 7);
+      await refreshSelectedPassenger(selectedPassenger.id);
+      setToast({ message: `${selectedPassenger.name} has been suspended for 7 days.`, severity: 'success' });
     } catch (err) {
-      console.warn('[PassengerManagement] Backend error during suspend:', err);
+      setToast({ message: `Suspension failed: ${(err as Error).message}`, severity: 'error' });
     }
-
-    setPassengers((prev) =>
-      prev.map((p) =>
-        p.id === selectedPassenger.id
-          ? { ...p, accountStatus: 'Suspended', suspensionReason: finalReason }
-          : p
-      )
-    );
-    setSelectedPassenger((prev) =>
-      prev ? { ...prev, accountStatus: 'Suspended', suspensionReason: finalReason } : null
-    );
-
-    // Record Action in Audit Trail
-    recordAdminAuditAction({
-      actionType: 'PASSENGER_ACCOUNT_SUSPENDED',
-      targetId: selectedPassenger.id,
-      targetName: selectedPassenger.name,
-      details: `Suspended passenger access. Reason: ${finalReason}. Registered phone: ${selectedPassenger.phone}.`,
-      category: 'User Oversight',
-    });
 
     setSuspendDialogOpen(false);
   };
 
   /**
-   * Action Handler: Reactivates a suspended passenger account.
+   * Action Handler: Reactivates a suspended or deactivated passenger account.
+   * Strike counts are kept and age out normally (Rule 22.4).
    */
   const handleReactivateConfirm = async () => {
     if (!selectedPassenger) return;
+    const wasDeactivated = selectedPassenger.accountStatus === 'Deactivated';
 
-    // Backend API Call
     try {
-      await reactivatePassenger(selectedPassenger.id);
+      await reactivatePassenger(
+        selectedPassenger.id,
+        wasDeactivated ? 'Reactivated after manual review of the full violation history' : 'Suspension lifted by LGU Administrator',
+        wasDeactivated
+      );
+      await refreshSelectedPassenger(selectedPassenger.id);
+      setToast({ message: `${selectedPassenger.name} has been reactivated.`, severity: 'success' });
     } catch (err) {
-      console.warn('[PassengerManagement] Backend error during reactivate:', err);
+      setToast({ message: `Reactivation failed: ${(err as Error).message}`, severity: 'error' });
     }
-
-    setPassengers((prev) =>
-      prev.map((p) => (p.id === selectedPassenger.id ? { ...p, accountStatus: 'Active', suspensionReason: undefined } : p))
-    );
-    setSelectedPassenger((prev) => (prev ? { ...prev, accountStatus: 'Active', suspensionReason: undefined } : null));
-
-    // Record Action in Audit Trail
-    recordAdminAuditAction({
-      actionType: 'PASSENGER_ACCOUNT_REACTIVATED',
-      targetId: selectedPassenger.id,
-      targetName: selectedPassenger.name,
-      details: `Reactivated passenger account access for mobile bookings.`,
-      category: 'User Oversight',
-    });
 
     setReactivateDialogOpen(false);
   };
 
   /**
-   * Action Handler: Issues an administrative policy strike (+1) to a passenger.
+   * Action Handler: Records a catalog violation against a passenger. The engine decides the
+   * points, the ladder consequence and the audit entry (nothing is computed here).
    */
-  const handleIssueStrike = async () => {
-    if (!selectedPassenger) return;
-    setStrikeIssued(true);
+  const handleIssueStrike = async (reason?: string, violationCode?: string) => {
+    if (!selectedPassenger || !violationCode) return;
+    setStrikeDialogOpen(false);
 
-    // Backend API Call
     try {
-      await issuePassengerStrike(selectedPassenger.id, 'Repeated booking cancellation misconduct.');
+      const result = await issuePassengerStrike(selectedPassenger.id, violationCode, reason || 'Administrator confirmed');
+      await refreshSelectedPassenger(selectedPassenger.id);
+      setStrikeIssued(true);
+      setTimeout(() => setStrikeIssued(false), 3000);
+      const consequence = result.consequence ? ` Consequence: ${result.consequence.replace(/_/g, ' ').toLowerCase()}.` : '';
+      setToast({ message: `Recorded for ${selectedPassenger.name}. Active strikes: ${result.active_after ?? '-'}.${consequence}`, severity: 'success' });
     } catch (err) {
-      console.warn('[PassengerManagement] Backend error during strike issue:', err);
+      setToast({ message: `Could not record the violation: ${(err as Error).message}`, severity: 'error' });
     }
-
-    // Record Action in Audit Trail
-    recordAdminAuditAction({
-      actionType: 'MANUAL_STRIKE_ISSUED',
-      targetId: selectedPassenger.id,
-      targetName: selectedPassenger.name,
-      details: `Issued +1 Administrative Policy Strike to passenger for repeated booking misconduct. Current strikes: ${selectedPassenger.strikesCount + 1}.`,
-      category: 'User Oversight',
-    });
-
-    setTimeout(() => setStrikeIssued(false), 3000);
   };
 
-  // Helper for Strike Consequence Level (Rolling 90-Day Window)
-  const getStrikeLevel = (count: number) => {
-    if (count === 0) return { label: 'Compliant (0 / 10)', color: '#1E8E3E', bg: '#E6F4EA', border: '#A8DADC' };
-    if (count < 3) return { label: `Level 1: Warning Issued (${count} / 10)`, color: '#B06000', bg: '#FEF7E0', border: '#FCE8E6' };
-    if (count < 5) return { label: `Level 2: Administrative Review (${count} / 10)`, color: '#C2410C', bg: '#FFF7ED', border: '#FDBA74' };
-    if (count < 8) return { label: `Level 3: 7-Day Suspension (${count} / 10)`, color: '#DC2626', bg: '#FEE2E2', border: '#FCA5A5' };
-    if (count < 10) return { label: `Level 4: 30-Day Suspension (${count} / 10)`, color: '#B91C1C', bg: '#FEE2E2', border: '#F87171' };
-    return { label: `Level 5: Permanent Deactivation (${count} / 10)`, color: '#7F1D1D', bg: '#FEF2F2', border: '#EF4444' };
+  /** Re-reads the passenger list and the open ledger so every number comes from the database. */
+  const refreshSelectedPassenger = async (passengerId: string) => {
+    const fresh = await fetchPassengers();
+    setPassengers(fresh);
+    setSelectedPassenger(fresh.find((p) => p.id === passengerId) ?? null);
+    await strikeData.reload();
   };
+
 
   return (
     <Box sx={{ maxWidth: 1600, margin: '0 auto', pb: 6 }}>
@@ -383,16 +361,16 @@ export const PassengerManagementPage: React.FC = () => {
                 </Typography>
               </Box>
               <Chip
-                icon={<ShieldIcon style={{ fontSize: '11.3', color: getStrikeLevel(selectedPassenger.strikesCount).color }} />}
-                label={getStrikeLevel(selectedPassenger.strikesCount).label}
+                icon={<ShieldIcon style={{ fontSize: '11.3', color: getStrikeLevel(activeStrikes).color }} />}
+                label={getStrikeLevel(activeStrikes).label}
                 size="small"
                 sx={{
-                  backgroundColor: getStrikeLevel(selectedPassenger.strikesCount).bg,
-                  color: getStrikeLevel(selectedPassenger.strikesCount).color,
+                  backgroundColor: getStrikeLevel(activeStrikes).bg,
+                  color: getStrikeLevel(activeStrikes).color,
                   fontWeight: 700,
                   fontSize: '11.2px',
                   height: 26,
-                  border: `1px solid ${getStrikeLevel(selectedPassenger.strikesCount).border}`,
+                  border: `1px solid ${getStrikeLevel(activeStrikes).border}`,
                 }}
               />
             </Box>
@@ -400,19 +378,19 @@ export const PassengerManagementPage: React.FC = () => {
             <Box sx={{ backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px', mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                 <Typography sx={{ fontSize: '13px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                  Active Strike Count: <span style={{ color: selectedPassenger.strikesCount > 0 ? '#DC2626' : '#1E8E3E', fontWeight: 700 }}>{selectedPassenger.strikesCount} Strike(s)</span>
+                  Active Strike Count: <span style={{ color: activeStrikes > 0 ? '#DC2626' : '#1E8E3E', fontWeight: 700 }}>{activeStrikes} Strike(s)</span>
                 </Typography>
                 <ActionButton
-                  label={strikeIssued ? 'Administrative Strike Issued ✓' : '+ Issue Manual Strike'}
+                  label={strikeIssued ? 'Violation Recorded ✓' : '+ Record Violation / Strike'}
                   showArrow={false}
-                  onClick={handleIssueStrike}
+                  onClick={() => setStrikeDialogOpen(true)}
                   sx={{ height: 32, fontSize: '11.2px' }}
                 />
               </Box>
 
-              {selectedPassenger.strikeHistory && selectedPassenger.strikeHistory.length > 0 ? (
+              {strikeItems.length > 0 ? (
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                  {selectedPassenger.strikeHistory.map((item) => (
+                  {strikeItems.map((item) => (
                     <Box
                       key={item.id}
                       sx={{
@@ -458,20 +436,12 @@ export const PassengerManagementPage: React.FC = () => {
             </Box>
           </Box>
 
-          {/* Policy Violation Suspension Reason if Suspended */}
-          {selectedPassenger.accountStatus === 'Suspended' && selectedPassenger.suspensionReason && (
-            <Box sx={{ mb: 4, backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', padding: '16px 20px', borderRadius: '12px' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
-                <ReportProblemIcon sx={{ color: '#DC2626', fontSize: '17.6' }} />
-                <Typography sx={{ fontSize: '13px', fontWeight: 600, color: '#991B1B' }}>
-                  Account Suspended — Policy Violation
-                </Typography>
-              </Box>
-              <Typography sx={{ fontSize: '11.2px', color: '#B91C1C', mt: '4px' }}>
-                {selectedPassenger.suspensionReason}
-              </Typography>
-            </Box>
-          )}
+          {/* Suspension / deactivation state, as decided by the database */}
+          <RestrictionBanner
+            kind={selectedPassenger.restrictionKind}
+            suspendedUntil={selectedPassenger.suspendedUntil}
+            reason={selectedPassenger.suspensionReason}
+          />
 
           {/* Account Details */}
           <Box sx={{ mb: 4 }}>
@@ -569,12 +539,40 @@ export const PassengerManagementPage: React.FC = () => {
           open={reactivateDialogOpen}
           onClose={() => setReactivateDialogOpen(false)}
           title="Reactivate Passenger Account?"
-          message={`Reactivate account access for "${selectedPassenger.name}"? They will regain ability to book rides through the SAKAY Passenger PWA.`}
-          confirmLabel="Reactivate Account"
+          message={
+            selectedPassenger.accountStatus === 'Deactivated'
+              ? `"${selectedPassenger.name}" is deactivated. Confirm that you reviewed the full violation history above. Strike counts are not reset; they age out of the 90-day window.`
+              : `Reactivate account access for "${selectedPassenger.name}"? They will regain ability to book rides through the SAKAY Passenger PWA.`
+          }
+          confirmLabel={selectedPassenger.accountStatus === 'Deactivated' ? 'I Reviewed the History — Reactivate' : 'Reactivate Account'}
           confirmVariant="orange"
           onConfirm={handleReactivateConfirm}
         />
       )}
+
+      {/* 6. Record Violation / Strike Dialog (catalog-driven; the engine applies the ladder) */}
+      {selectedPassenger && (
+        <MacConfirmDialog
+          open={strikeDialogOpen}
+          onClose={() => setStrikeDialogOpen(false)}
+          title="Record a Policy Violation?"
+          message={`Record a confirmed violation against "${selectedPassenger.name}". The platform applies the strike count and any consequence automatically (warning at 1, review at 3, suspension at 5 and 8, deactivation at 10).`}
+          confirmLabel="Record Violation"
+          confirmVariant="danger"
+          options={strikeData.violationOptions}
+          optionLabel="Violation"
+          requireReason
+          reasonPlaceholder="Describe the evidence that confirms this violation..."
+          onConfirm={handleIssueStrike}
+        />
+      )}
+
+      <SakayToast
+        open={Boolean(toast)}
+        message={toast?.message ?? null}
+        severity={toast?.severity ?? 'info'}
+        onClose={() => setToast(null)}
+      />
     </Box>
   );
 };

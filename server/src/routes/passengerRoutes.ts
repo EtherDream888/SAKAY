@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/supabase';
+import { forbidDirectAccountAction } from './disabledEndpoints';
 
 const router = Router();
 
@@ -63,74 +64,10 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/admin/passengers/:id/suspend - Suspend passenger account
-router.post('/:id/suspend', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { reason, duration_days = 7 } = req.body;
-
-    const passenger = passengers.find((p) => p.passenger_id === id);
-    if (!passenger) {
-      return res.status(404).json({ success: false, error: 'Passenger not found' });
-    }
-
-    passenger.account_status = 'Suspended';
-    return res.json({
-      success: true,
-      message: `Passenger ${passenger.full_name} suspended for ${duration_days} days.`,
-      data: { passenger, reason, duration_days },
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: (err as Error).message });
-  }
-});
-
-// POST /api/admin/passengers/:id/reactivate - Reactivate passenger account
-router.post('/:id/reactivate', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const passenger = passengers.find((p) => p.passenger_id === id);
-    if (!passenger) {
-      return res.status(404).json({ success: false, error: 'Passenger not found' });
-    }
-
-    passenger.account_status = 'Active';
-    return res.json({
-      success: true,
-      message: `Passenger ${passenger.full_name} reactivated.`,
-      data: passenger,
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: (err as Error).message });
-  }
-});
-
-// POST /api/admin/passengers/:id/strike - Issue strike to passenger
-router.post('/:id/strike', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { reason, violation_type } = req.body;
-
-    const passenger = passengers.find((p) => p.passenger_id === id);
-    if (!passenger) {
-      return res.status(404).json({ success: false, error: 'Passenger not found' });
-    }
-
-    passenger.strikes_count = (passenger.strikes_count || 0) + 1;
-    let autoSuspended = false;
-    if (passenger.strikes_count >= 3) {
-      passenger.account_status = 'Suspended';
-      autoSuspended = true;
-    }
-
-    return res.json({
-      success: true,
-      message: `Strike issued to ${passenger.full_name}. Total strikes: ${passenger.strikes_count}`,
-      data: { passenger, reason, violation_type, autoSuspended },
-    });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: (err as Error).message });
-  }
-});
+// Suspend / reactivate / strike are enforced by the database policy engine and are
+// disabled here (the routes were unauthenticated). See disabledEndpoints.ts.
+router.post('/:id/suspend', forbidDirectAccountAction);
+router.post('/:id/reactivate', forbidDirectAccountAction);
+router.post('/:id/strike', forbidDirectAccountAction);
 
 export default router;

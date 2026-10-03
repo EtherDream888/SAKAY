@@ -1,5 +1,10 @@
 import React, { useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, Button, TextField, Box } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, Button, TextField, Box, MenuItem } from '@mui/material';
+
+export interface MacConfirmDialogOption {
+  value: string;
+  label: string;
+}
 
 interface MacConfirmDialogProps {
   open: boolean;
@@ -10,7 +15,10 @@ interface MacConfirmDialogProps {
   confirmVariant?: 'orange' | 'danger';
   requireReason?: boolean;
   reasonPlaceholder?: string;
-  onConfirm: (reason?: string) => void;
+  /** Optional required choice shown above the reason (e.g. the violation being recorded). */
+  options?: MacConfirmDialogOption[];
+  optionLabel?: string;
+  onConfirm: (reason?: string, option?: string) => void;
 }
 
 export const MacConfirmDialog: React.FC<MacConfirmDialogProps> = ({
@@ -22,13 +30,17 @@ export const MacConfirmDialog: React.FC<MacConfirmDialogProps> = ({
   confirmVariant = 'orange',
   requireReason = false,
   reasonPlaceholder = 'Enter reason...',
+  options,
+  optionLabel = 'Select an option',
   onConfirm,
 }) => {
   const [reason, setReason] = useState('');
+  const [option, setOption] = useState('');
 
   const handleConfirm = () => {
-    onConfirm(requireReason ? reason : undefined);
+    onConfirm(requireReason ? reason : undefined, options ? option : undefined);
     setReason('');
+    setOption('');
   };
 
   return (
@@ -72,6 +84,28 @@ export const MacConfirmDialog: React.FC<MacConfirmDialogProps> = ({
         <Typography sx={{ fontSize: '11.3px', color: 'var(--mac-text-secondary)', lineHeight: 1.5, mb: requireReason ? 2 : 0 }}>
           {message}
         </Typography>
+
+        {options && (
+          <Box sx={{ mt: 2 }}>
+            <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: 'var(--mac-text-primary)', mb: 1 }}>
+              {optionLabel} (Required)
+            </Typography>
+            <TextField
+              select
+              fullWidth
+              size="small"
+              value={option}
+              onChange={(e) => setOption(e.target.value)}
+              sx={{ '& .MuiOutlinedInput-root': { borderRadius: '9px', fontSize: '11.3px', backgroundColor: '#FAFAFC' } }}
+            >
+              {options.map((o) => (
+                <MenuItem key={o.value} value={o.value} sx={{ fontSize: '11.3px', whiteSpace: 'normal' }}>
+                  {o.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Box>
+        )}
 
         {requireReason && (
           <Box sx={{ mt: 2 }}>
@@ -125,7 +159,7 @@ export const MacConfirmDialog: React.FC<MacConfirmDialogProps> = ({
 
         <Button
           onClick={handleConfirm}
-          disabled={requireReason && !reason.trim()}
+          disabled={(requireReason && !reason.trim()) || (Boolean(options) && !option)}
           variant="contained"
           sx={{
             height: 38,

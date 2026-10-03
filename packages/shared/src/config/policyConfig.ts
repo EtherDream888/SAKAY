@@ -90,7 +90,38 @@ export const TODA_INCIDENT_REPORT_WINDOW_DAYS = 60;
 export const DOCUMENT_EXPIRY_REMINDER_DAYS = [30, 14, 3] as const;
 
 // ============================================================================
-// 6. UNIFIED POLICY CONSTANTS OBJECT
+// 6. STRIKES, SUSPENSION & EXEMPTION (Batch 3 - Sections 20, 21, 22, 25)
+// ============================================================================
+// The database is authoritative: these values are code constants inside
+// public.strike_policy_constant() (supabase/migrations/20261004000001_*). They are
+// mirrored here ONLY for display (notices, FAQs, admin screens). Change both together.
+
+/** Rolling window for counting active strikes, in days (Sections 20/21) */
+export const STRIKE_WINDOW_DAYS = 90;
+
+/** Active-strike ladder (Sections 20/21). Suspension lengths follow decision F3.3. */
+export const STRIKE_LADDER = {
+  WARNING_AT: 1,
+  ADMIN_REVIEW_AT: 3,
+  SUSPENSION_1_AT: 5,
+  SUSPENSION_1_DAYS: 3,
+  SUSPENSION_2_AT: 8,
+  SUSPENSION_2_DAYS: 7,
+  DEACTIVATION_AT: 10,
+} as const;
+
+/** Time an account holder has to request an exemption for a strike (decision D1; policy text: 48 h) */
+export const EXEMPTION_REQUEST_WINDOW_HOURS = 72;
+
+/** Business days (Mon-Fri, Asia/Manila) to decide an exemption request (Rule 25.6) */
+export const EXEMPTION_DECISION_BUSINESS_DAYS = 3;
+
+/** Same-cause requests reviewed within the window; the next one is denied (Rule 25.7, PI-B2) */
+export const EXEMPTION_REPEAT_LIMIT = 3;
+export const EXEMPTION_REPEAT_WINDOW_DAYS = 30;
+
+// ============================================================================
+// 7. UNIFIED POLICY CONSTANTS OBJECT
 // ============================================================================
 
 export const POLICY_CONSTANTS = {
@@ -113,6 +144,14 @@ export const POLICY_CONSTANTS = {
     TODA_INCIDENT_REPORT_FLAG_THRESHOLD,
     TODA_INCIDENT_REPORT_WINDOW_DAYS,
     DOCUMENT_EXPIRY_REMINDER_DAYS,
+  },
+  STRIKES: {
+    STRIKE_WINDOW_DAYS,
+    STRIKE_LADDER,
+    EXEMPTION_REQUEST_WINDOW_HOURS,
+    EXEMPTION_DECISION_BUSINESS_DAYS,
+    EXEMPTION_REPEAT_LIMIT,
+    EXEMPTION_REPEAT_WINDOW_DAYS,
   },
 } as const;
 

@@ -126,9 +126,12 @@ export function getDocumentType(doc: {
 import { DriverRecord } from '../../mockData/adminData';
 import { MacCenterModal } from './MacCenterModal';
 import { MacConfirmDialog } from './MacConfirmDialog';
+import { RestrictionBanner } from './RestrictionBanner';
 import { StatusBadge } from '../common/StatusBadge';
 import { ActionButton } from './ActionButton';
 import { DocumentPreviewModal } from './DocumentPreviewModal';
+import { useStrikeData } from '../../hooks/useStrikeData';
+import { getStrikeLevel } from '../../utils/strikeLevel';
 import {
   verifyDriver,
   rejectDriver,
@@ -175,6 +178,9 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
   const [noDocForReturnDialogOpen, setNoDocForReturnDialogOpen] = useState<boolean>(false);
   const [unsubmittedExitDialogOpen, setUnsubmittedExitDialogOpen] = useState<boolean>(false);
   const prevModalDriverIdRef = React.useRef<string | null>(null);
+
+  // Authoritative strike ledger + violation catalog (read from the policy engine)
+  const strikeData = useStrikeData('driver', open ? driver?.id : null);
 
   React.useEffect(() => {
     if (driver && open) {
@@ -490,12 +496,15 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
   const handleSuspendConfirm = async (reason?: string) => {
     const finalReason = reason || 'Administrative policy suspension';
     try {
-      await suspendDriver(driver.id, finalReason, 7);
-      setSnackbarMsg(`Driver ${driver.name} has been suspended.`);
+      const res = await suspendDriver(driver.id, finalReason, 7);
+      setSnackbarMsg(`Driver ${driver.name} has been suspended for 7 days.`);
       const updated: DriverRecord = {
         ...driver,
         accountStatus: 'Inactive',
         verificationStatus: 'Suspended',
+        restrictionKind: 'SUSPENDED',
+        suspendedUntil: res.data.suspended_until ?? undefined,
+        suspensionReason: finalReason,
       };
       if (onDriverUpdated) onDriverUpdated(updated);
       if (onStatusChange) onStatusChange(driver.id, 'Inactive');
@@ -510,14 +519,23 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
    * Action Handler: Reactivate Driver Account
    */
   const handleReactivateConfirm = async () => {
+    const wasDeactivated = driver.restrictionKind === 'DEACTIVATED';
     try {
-      await reactivateDriver(driver.id);
+      await reactivateDriver(
+        driver.id,
+        wasDeactivated ? 'Reactivated after manual review of the full violation history' : 'Suspension lifted by LGU Administrator',
+        wasDeactivated
+      );
       setSnackbarMsg(`Driver ${driver.name} account has been reactivated.`);
       const updated: DriverRecord = {
         ...driver,
         accountStatus: 'Active',
         verificationStatus: 'Verified',
+        restrictionKind: undefined,
+        suspendedUntil: undefined,
+        suspensionReason: undefined,
       };
+      void strikeData.reload();
       if (onDriverUpdated) onDriverUpdated(updated);
       if (onStatusChange) onStatusChange(driver.id, 'Active');
     } catch (err) {
@@ -530,18 +548,26 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
   /**
    * Action Handler: Issue Policy Strike
    */
-  const handleStrikeConfirm = async (reason?: string) => {
-    const finalReason = reason || 'Operational non-compliance violation';
+  const handleStrikeConfirm = async (reason?: string, violationCode?: string) => {
+    if (!violationCode) return;
+    const finalReason = reason || 'Administrator confirmed';
     try {
-      await issueDriverStrike(driver.id, finalReason, 'Operational');
-      setSnackbarMsg(`Administrative policy strike issued to ${driver.name}.`);
-      const newStrikesCount = driver.strikesCount + 1;
+      // The database engine decides the points and the ladder consequence (nothing is computed here).
+      const result = await issueDriverStrike(driver.id, violationCode, finalReason);
+      const consequence = result.consequence ? ` Consequence: ${result.consequence.replace(/_/g, ' ').toLowerCase()}.` : '';
+      setSnackbarMsg(`Recorded for ${driver.name}. Active strikes: ${result.active_after ?? driver.strikesCount}.${consequence}`);
+      const restricted = result.consequence === 'SUSPENSION' || result.consequence === 'INVESTIGATION_SUSPENSION' || result.consequence === 'DEACTIVATION';
       const updated: DriverRecord = {
         ...driver,
-        strikesCount: newStrikesCount,
-        accountStatus: newStrikesCount >= 3 ? 'Inactive' : driver.accountStatus,
-        verificationStatus: newStrikesCount >= 3 ? 'Suspended' : driver.verificationStatus,
+        strikesCount: result.active_after ?? driver.strikesCount,
+        accountStatus: restricted ? 'Inactive' : driver.accountStatus,
+        verificationStatus: restricted ? 'Suspended' : driver.verificationStatus,
+        restrictionKind: result.consequence === 'DEACTIVATION' ? 'DEACTIVATED'
+          : result.consequence === 'INVESTIGATION_SUSPENSION' ? 'INVESTIGATION'
+          : result.consequence === 'SUSPENSION' ? 'SUSPENDED' : driver.restrictionKind,
+        suspendedUntil: result.suspended_until ?? driver.suspendedUntil,
       };
+      void strikeData.reload();
       if (onDriverUpdated) onDriverUpdated(updated);
     } catch (err) {
       console.error('[DriverDetailModal] Strike error:', err);
@@ -612,14 +638,9 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
   };
 
   // Strike level calculation
-  const getStrikeLevel = (count: number) => {
-    if (count === 0) return { label: 'Compliant (0 Strikes)', color: '#1E8E3E', bg: '#E6F4EA', border: '#A8DADC' };
-    if (count === 1) return { label: 'Level 1 Warning (1 Strike)', color: '#B06000', bg: '#FEF7E0', border: '#FCE8E6' };
-    if (count === 2) return { label: 'Level 2 Warning (2 Strikes)', color: '#C2410C', bg: '#FFF7ED', border: '#FDBA74' };
-    return { label: `Suspended (${count} Strikes)`, color: '#DC2626', bg: '#FEE2E2', border: '#FCA5A5' };
-  };
-
-  const strikeLevel = getStrikeLevel(driver.strikesCount);
+  // Ladder label from policyConfig; the count comes from the ledger.
+  const activeStrikes = strikeData.activeStrikes ?? driver.strikesCount;
+  const strikeLevel = getStrikeLevel(activeStrikes);
 
   const pendingReturnCount = returnIssues.length;
   const hasResubmissionIssues = pendingReturnCount > 0 || docList.some((d) => d.status === 'Resubmission Required');
@@ -973,16 +994,39 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
           <Box sx={{ backgroundColor: '#F5F5F7', padding: '20px', borderRadius: '12px', mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography sx={{ fontSize: '11.3px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
-                Active Strikes: <span style={{ color: driver.strikesCount > 0 ? '#DC2626' : '#1E8E3E', fontWeight: 700 }}>{driver.strikesCount} Strike(s)</span>
+                Active Strikes: <span style={{ color: activeStrikes > 0 ? '#DC2626' : '#1E8E3E', fontWeight: 700 }}>{activeStrikes} Strike(s)</span>
               </Typography>
               <ActionButton
-                label="+ Issue Administrative Strike"
+                label="+ Record Violation / Strike"
                 showArrow={false}
                 onClick={() => setStrikeDialogOpen(true)}
                 sx={{ height: 32, fontSize: '12px' }}
               />
             </Box>
+
+            {strikeData.history.length > 0 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 2 }}>
+                {strikeData.history.slice(0, 8).map((item) => (
+                  <Box
+                    key={item.id}
+                    sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, backgroundColor: '#FFFFFF', padding: '10px 14px', borderRadius: '9px', border: '1px solid var(--mac-border-color)' }}
+                  >
+                    <Box>
+                      <Typography sx={{ fontSize: '11.3px', fontWeight: 600, color: 'var(--mac-text-primary)' }}>
+                        +{item.strikesApplied} • {item.reason}
+                      </Typography>
+                      <Typography sx={{ fontSize: '10.4px', color: 'var(--mac-text-muted)' }}>
+                        {item.date} • {item.issuedBy}
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontSize: '10.4px', fontWeight: 600, color: '#C25E00', flexShrink: 0 }}>{item.status}</Typography>
+                  </Box>
+                ))}
+              </Box>
+            )}
           </Box>
+
+          <RestrictionBanner kind={driver.restrictionKind} suspendedUntil={driver.suspendedUntil} reason={driver.suspensionReason} />
         </Box>
 
         {/* Section 2: Personal Information */}
@@ -1605,8 +1649,12 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
         open={reactivateDialogOpen}
         onClose={() => setReactivateDialogOpen(false)}
         title="Reactivate Driver Account?"
-        message={`Reactivate "${driver.name}" to active status. The driver will immediately become eligible to receive ride bookings.`}
-        confirmLabel="Reactivate Account"
+        message={
+          driver.restrictionKind === 'DEACTIVATED'
+            ? `"${driver.name}" is deactivated. Confirm that you reviewed the full violation history. Strike counts are not reset; they age out of the 90-day window.`
+            : `Reactivate "${driver.name}" to active status. The driver will immediately become eligible to receive ride bookings.`
+        }
+        confirmLabel={driver.restrictionKind === 'DEACTIVATED' ? 'I Reviewed the History — Reactivate' : 'Reactivate Account'}
         confirmVariant="orange"
         onConfirm={handleReactivateConfirm}
       />
@@ -1614,12 +1662,14 @@ export const DriverDetailModal: React.FC<DriverDetailModalProps> = ({
       <MacConfirmDialog
         open={strikeDialogOpen}
         onClose={() => setStrikeDialogOpen(false)}
-        title="Issue Administrative Policy Strike?"
-        message={`Issue +1 policy violation strike to "${driver.name}". Note: 3 strikes trigger automated platform suspension.`}
-        confirmLabel="Issue Strike"
+        title="Record a Policy Violation?"
+        message={`Record a confirmed violation against "${driver.name}". The platform applies the strike count and any consequence automatically (warning at 1, review at 3, suspension at 5 and 8, deactivation at 10).`}
+        confirmLabel="Record Violation"
         confirmVariant="danger"
+        options={strikeData.violationOptions}
+        optionLabel="Violation"
         requireReason
-        reasonPlaceholder="Specify violation details (e.g. Overcharging, Route Deviation)..."
+        reasonPlaceholder="Describe the evidence that confirms this violation..."
         onConfirm={handleStrikeConfirm}
       />
 

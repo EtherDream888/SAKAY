@@ -1,5 +1,7 @@
 // Realistic sample records for Calapan City LGU Admin Portal aligned with SAKAY.docx specifications
 
+import type { RestrictionKind } from '@sakay/shared/utils/restrictionUtils';
+
 export interface TodaApplicationRecord {
   id: string;
   name: string;
@@ -90,9 +92,17 @@ export interface StrikeItem {
   date: string;
   reason: string;
   strikesApplied: number;
-  status: 'Active (Rolling 90d)' | 'Expired' | 'Waived on Appeal';
+  status:
+    | 'Active (Rolling 90d)'
+    | 'Provisional (Exemption Window Open)'
+    | 'Expired'
+    | 'Waived on Appeal'
+    | 'Not Counted (Waived / Exempt)';
   issuedBy: string;
 }
+
+/** Restriction state decided by the database (public.account_restriction_state). */
+export type AccountRestrictionKind = RestrictionKind;
 
 export interface DriverRecord {
   id: string;
@@ -128,6 +138,9 @@ export interface DriverRecord {
   rejectionComment?: string;
   strikesCount: number;
   strikeHistory: StrikeItem[];
+  restrictionKind?: AccountRestrictionKind;
+  suspendedUntil?: string;
+  suspensionReason?: string;
   isResubmitted?: boolean;
   resubmittedAt?: string;
   documents: {
@@ -147,8 +160,10 @@ export interface PassengerRecord {
   phone: string;
   email: string;
   verificationStatus: 'Verified' | 'Unverified';
-  accountStatus: 'Active' | 'Suspended';
+  accountStatus: 'Active' | 'Suspended' | 'Deactivated';
   suspensionReason?: string;
+  restrictionKind?: AccountRestrictionKind;
+  suspendedUntil?: string;
   activeSession: boolean;
   totalBookings: number;
   registeredDate: string;

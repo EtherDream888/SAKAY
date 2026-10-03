@@ -17,6 +17,7 @@ import { RegisterInput } from '../../../common/components/RegisterInput';
 import SakayPhoneInput from '../../../common/components/SakayPhoneInput';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { supabase } from '../../../services/supabaseClient';
+import { describeRestriction, fetchOwnAccountRestriction } from '@sakay/shared';
 import { getPhoneLookupCandidates, lookupDriverByPhoneSecure, rotateDriverSession } from '../../../services/driverApiService';
 
 export const formatMobileNumber = (value: string): string => {
@@ -259,6 +260,16 @@ export const DriverLogin: React.FC = () => {
           .update({ contact_number: phone63 })
           .eq('driver_id', driverData.driver_id)
           .then(() => {});
+      }
+
+      // A suspended or deactivated driver cannot log in (Section 1). The database decides, and
+      // lifts a suspension whose period has ended, so the message always carries the real end date.
+      const restriction = await fetchOwnAccountRestriction(supabase, 'driver');
+      if (restriction?.restricted) {
+        setLoading(false);
+        triggerErrorToast(describeRestriction(restriction, language === 'tl' ? 'tl' : 'en'));
+        await supabase.auth.signOut();
+        return;
       }
 
       localStorage.setItem('sakay_driver_phone', phone63);

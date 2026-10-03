@@ -268,3 +268,40 @@ This document records the architectural and regulatory decisions for SAKAY polic
   - In Batch 1, re-application after rejection requires an audited administrative action (`allow_driver_reapplication(p_affiliation_id, p_reason)`) by the TODA or LGU administrator.
   - Permanently disqualified drivers (`is_permanently_disqualified = TRUE`, Rule 3.9) are globally disqualified from all TODAs and can never be cleared by `allow_driver_reapplication`.
 
+
+---
+
+## 5. Batch 3 Decisions (Strikes, Suspension, Deactivation, Exemption, Review Flags)
+
+Approved by the project owner when Phase B was started.
+
+| Ref | Decision |
+|---|---|
+| **D1 / F3.4 / F3.7** | Exemption request window and provisional-strike waiver window are **72 hours** (policy text: 48). One constant for both (`strike_policy_constant('exemption_window_hours')`). |
+| **D2 / F3.8** | Previously undefined counts: booking abuse (12.9) **2**, vehicle damage (29.15) **3**, contamination (29.16) **1**, availability violation (5.7) **1**, intentional pickup deviation (8.7) **1** (issued on the 2nd occurrence within 30 days, PI-B3). |
+| **D3** | Existing strike counts reset to 0; old test data is not migrated. Suspensions created by the old 3-strike logic ("Automated platform suspension: …") are lifted with the counts; manual suspensions are kept as open-ended and must be reinstated by an administrator. |
+| **D5** | The unauthenticated Express strike / suspend / reactivate routes (`server/src/routes/passengerRoutes.ts`, `driverRoutes.ts`) return **403**. |
+| **D6** | Ladder thresholds, window and deadlines are code constants in the database (`strike_policy_constant`) mirrored in `packages/shared/src/config/policyConfig.ts` for display. The pause switch is database state in `system_policy_config.strike_accrual_paused`. |
+| **F3.3 override** | Suspension lengths: **3 days at 5 strikes, 7 days at 8 strikes** (policy text: 7 and 30). Ladder otherwise as written: 1 warning, 3 administrative review, 10 deactivation. |
+| **PI-09** | Option A: errata (a)–(f) applied by intent; counts for (g)–(h) per D2. The Batch 2 `issue_booking_abuse_strike` function, its trigger and the `strike_count` / `last_strike_at` / `is_suspended` passenger columns are removed. |
+| **PI-B1** | A consequence fires on each *upward* crossing of a threshold; one strike that crosses several applies the highest and still raises the 3-strike review. A reinstated account still at/over 10 is deactivated again on its next strike. |
+| **PI-B2** | Repeated exemption cause (25.7): the 3rd request on the same cause within 30 days is **reviewed**; the 4th and later are denied automatically. |
+| **PI-B3** | "Repeated" = the 2nd confirmed occurrence of the same violation within 30 days; the strike is issued on the 2nd and each later one. |
+| **PI-B4** | A 10-strike deactivation is reviewed by the **LGU** Administrator; the TODA Administrator can recommend through a review flag. |
+| **PI-B5** | The driver's active TODA is snapshotted on each strike and exemption request; that TODA's administrator reviews it. |
+| **PI-B6** | Immediate-escalation violations suspend the account **with no end date** ("pending investigation") until an administrator decides. |
+| **PI-B7** | The emergency pause carries a scope (`ALL` or `CANCEL_STALL_NOSHOW`); serious and safety violations are never pausable. |
+| **PI-B8** | A waiver or void that removes the basis for an *active ladder suspension* lifts it, and dismisses the open 3-strike review. Deactivation is never lifted automatically. |
+| **PI-B9** | A driver can state that the TODA is a party to the dispute; the TODA administrator can also escalate with a reason. |
+
+### Assumptions to confirm
+- `DRV_FABRICATED_REPORT` (a driver's fabricated report against a passenger) is seeded at **2 strikes**, mirroring the passenger rule 19.5. The Batch 3 policy text only states the passenger count.
+- Business days are Monday–Friday in Asia/Manila with **no holiday calendar** in this version.
+- Suspension of a driver does not interrupt an active trip; the driver is forced offline when it ends.
+
+### Findings routed to other batches
+- **Batch 8:** the PI-09 cancellation trigger tests the booking statuses `Assigned` / `Ongoing`, which no app code writes (apps write `Accepted`, `In Transit`, `Trip Ongoing` …). It does not fire today; Batch 8 owns the definition of a "late" cancellation (12.2) and must align the statuses. The Batch 2 one-open-booking guard (`check_one_open_booking`) tests the same two names and therefore also misses accepted / in-transit bookings.
+- **Batch 2:** `apps/passenger-pwa/src/services/bookingService.ts` (~lines 132-147) falls back to "the first passenger in the table" when no valid passenger id is available, so a booking (and any strike it later causes) can be attributed to the wrong person. Hard-coded test logins in `Login.tsx` and `DriverLogin.tsx` bypass the suspension checks and should be removed or gated.
+- **Batch 0/1:** migration `20260927000000_fix_database_advisor_and_rls.sql` creates `toda` policies that use `account_status`, a column `20260828000003` renamed to `toda_status`, so the migration chain fails on a fresh database at that file.
+- **Batch 1:** `server/src/routes/driverRoutes.ts` `POST /:id/verify` still has no authentication and writes `account_status = 'Verified'` with the service-role key.
+- **Open for a later batch:** no LGU screen for the emergency pause or the exemption queue; no driver/passenger exemption request forms; TODA review-flag list.

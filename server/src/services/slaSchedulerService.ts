@@ -15,6 +15,7 @@ export async function executeSlaCascadeRun(): Promise<{
   success: boolean;
   skipped?: boolean;
   data?: any;
+  strikeSweep?: unknown;
   error?: string;
 }> {
   if (isExecuting) {
@@ -39,9 +40,17 @@ export async function executeSlaCascadeRun(): Promise<{
       return { success: false, error: error.message };
     }
 
+    // Batch 3: lift expired suspensions, confirm provisional strikes, refresh cached strike
+    // counts and escalate overdue exemption requests. Enforcement guards in the database
+    // never depend on this sweep (they evaluate suspended_until live); it keeps state tidy.
+    const { data: sweepData, error: sweepError } = await supabase.rpc('sweep_strike_state');
+    if (sweepError) {
+      console.error('[SLA Scheduler Error] strike sweep failed:', sweepError.message);
+    }
+
     const elapsed = Date.now() - startTime;
-    console.log(`[SLA Scheduler] Execution finished in ${elapsed}ms:`, data);
-    return { success: true, data };
+    console.log(`[SLA Scheduler] Execution finished in ${elapsed}ms:`, data, 'strike sweep:', sweepData);
+    return { success: true, data, strikeSweep: sweepData ?? null };
   } catch (err: any) {
     console.error('[SLA Scheduler Fatal Error]:', err);
     return { success: false, error: err.message || 'Unknown scheduler error' };

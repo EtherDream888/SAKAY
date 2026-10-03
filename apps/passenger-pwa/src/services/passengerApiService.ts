@@ -8,6 +8,7 @@
  * ============================================================================
  */
 
+import { fetchOwnAccountRestriction, type AccountRestriction } from '@sakay/shared';
 import { supabase } from './supabaseClient';
 
 /**
@@ -252,6 +253,15 @@ export async function verifyPassengerOtp(
       error: getLocalizedError('Hindi makakonekta sa server. Pakisubukang muli.', 'Unable to connect to server. Please try again.'),
     };
   }
+}
+
+// ============================================================================
+// ACCOUNT RESTRICTION (Batch 3 - suspension / deactivation)
+// ============================================================================
+
+/** Whether the signed-in passenger is suspended or deactivated, as decided by the database. */
+export function getOwnAccountRestriction(role: 'passenger' | 'driver' = 'passenger'): Promise<AccountRestriction | null> {
+  return fetchOwnAccountRestriction(supabase, role);
 }
 
 // ============================================================================

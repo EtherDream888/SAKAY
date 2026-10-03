@@ -32,7 +32,9 @@ import AddIcon from '@mui/icons-material/Add';
 
 import { TodaDriverMember, DriverExemptionRequest, EvidenceFileItem } from '../types/toda';
 import { FilterToolbar, FilterOption } from '../components/admin/FilterToolbar';
+import { STRIKE_LADDER } from '@sakay/shared/config/policyConfig';
 import { StatusBadge } from '../components/common/StatusBadge';
+import { SakayToast } from '../components/common/SakayToast';
 import { ActionButton } from '../components/admin/ActionButton';
 import { MacCenterModal } from '../components/admin/MacCenterModal';
 import { MacConfirmDialog } from '../components/admin/MacConfirmDialog';
@@ -58,6 +60,7 @@ export const TodaDriverMembershipPage: React.FC = () => {
   const [drivers, setDrivers] = useState<TodaDriverMember[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [exemptions, setExemptions] = useState<DriverExemptionRequest[]>([]);
+  const [toast, setToast] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
 
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -178,7 +181,9 @@ export const TodaDriverMembershipPage: React.FC = () => {
     try {
       await suspendTodaDriver(selectedDriver.id, suspendReasonInput);
     } catch (err) {
-      console.warn('[TodaMembership] Error submitting suspension endorsement:', err);
+      // Do not show a review that was never raised.
+      setToast({ message: `Could not submit the recommendation: ${(err as Error).message}`, severity: 'error' });
+      return;
     }
 
     setDrivers((prev) =>
@@ -213,7 +218,8 @@ export const TodaDriverMembershipPage: React.FC = () => {
     try {
       await reactivateTodaDriver(selectedDriver.id);
     } catch (err) {
-      console.warn('[TodaMembership] Error submitting reactivation endorsement:', err);
+      setToast({ message: `Could not submit the recommendation: ${(err as Error).message}`, severity: 'error' });
+      return;
     }
 
     setDrivers((prev) =>
@@ -452,13 +458,13 @@ export const TodaDriverMembershipPage: React.FC = () => {
                       <TableCell sx={{ py: 2, px: 3 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
                           <Chip
-                            label={`${drv.strikesCount} / 5 Strikes`}
+                            label={`${drv.strikesCount} / ${STRIKE_LADDER.DEACTIVATION_AT} Strikes`}
                             size="small"
                             sx={{
                               fontSize: '13px',
                               fontWeight: 600,
-                              backgroundColor: drv.strikesCount >= 3 ? '#FEF2F2' : '#F1F3F4',
-                              color: drv.strikesCount >= 3 ? '#DC2626' : 'var(--mac-text-secondary)',
+                              backgroundColor: drv.strikesCount >= STRIKE_LADDER.ADMIN_REVIEW_AT ? '#FEF2F2' : '#F1F3F4',
+                              color: drv.strikesCount >= STRIKE_LADDER.ADMIN_REVIEW_AT ? '#DC2626' : 'var(--mac-text-secondary)',
                             }}
                           />
                         </Box>
@@ -885,6 +891,13 @@ export const TodaDriverMembershipPage: React.FC = () => {
       </Dialog>
       </>
       )}
+
+      <SakayToast
+        open={Boolean(toast)}
+        message={toast?.message ?? null}
+        severity={toast?.severity ?? 'info'}
+        onClose={() => setToast(null)}
+      />
     </Box>
   );
 };

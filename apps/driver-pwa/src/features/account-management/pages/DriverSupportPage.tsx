@@ -14,6 +14,8 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PhoneIcon from '@mui/icons-material/Phone';
 import HelpOutlinedIcon from '@mui/icons-material/HelpOutlined';
 import ReportProblemOutlinedIcon from '@mui/icons-material/ReportProblemOutlined';
+
+import { EXEMPTION_REQUEST_WINDOW_HOURS, STRIKE_LADDER, STRIKE_WINDOW_DAYS } from '@sakay/shared';
 import TrackChangesOutlinedIcon from '@mui/icons-material/TrackChangesOutlined';
 
 import PageHeader from '../../../common/components/PageHeader';
@@ -30,7 +32,7 @@ const FAQS_TL = [
   },
   {
     q: 'Paano gumagana ang Strike system para sa mga drayber?',
-    a: 'Ang mga strike ay naiipon kapag may napatunayang paglabag sa taripa o alituntunin. Sa 5 strike, may 7-day suspension; sa 10 strike, isasailalim sa permanent deactivation review ng LGU.',
+    a: `Ang mga strike ay naiipon sa loob ng ${STRIKE_WINDOW_DAYS} araw kapag may napatunayang paglabag sa taripa o alituntunin. Sa ${STRIKE_LADDER.ADMIN_REVIEW_AT} strike, may administrative review; sa ${STRIKE_LADDER.SUSPENSION_1_AT} strike, ${STRIKE_LADDER.SUSPENSION_1_DAYS}-araw na suspensyon; sa ${STRIKE_LADDER.SUSPENSION_2_AT} strike, ${STRIKE_LADDER.SUSPENSION_2_DAYS}-araw na suspensyon; sa ${STRIKE_LADDER.DEACTIVATION_AT} strike, isasailalim sa permanent deactivation review ng LGU. May ${EXEMPTION_REQUEST_WINDOW_HOURS} oras kayo para humiling ng exemption.`,
   },
   {
     q: 'Ano ang kailangan kapag magpapalit ng nakarehistrong traysikel o lisensya?',
@@ -49,7 +51,7 @@ const FAQS_EN = [
   },
   {
     q: 'How does the Strike system work for drivers?',
-    a: 'Strikes accumulate on verified tariff violations. 5 strikes trigger a 7-day suspension; 10 strikes lead to permanent LGU deactivation review.',
+    a: `Strikes accumulate over a rolling ${STRIKE_WINDOW_DAYS} days on verified violations. ${STRIKE_LADDER.ADMIN_REVIEW_AT} strikes trigger an administrative review; ${STRIKE_LADDER.SUSPENSION_1_AT} strikes a ${STRIKE_LADDER.SUSPENSION_1_DAYS}-day suspension; ${STRIKE_LADDER.SUSPENSION_2_AT} strikes a ${STRIKE_LADDER.SUSPENSION_2_DAYS}-day suspension; ${STRIKE_LADDER.DEACTIVATION_AT} strikes lead to permanent LGU deactivation review. You have ${EXEMPTION_REQUEST_WINDOW_HOURS} hours to request an exemption.`,
   },
   {
     q: 'How do I update my vehicle or driver license details?',

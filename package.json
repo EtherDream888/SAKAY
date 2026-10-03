@@ -24,6 +24,7 @@
     "build:all": "npm run build:passenger && npm run build:driver && npm run build:toda && npm run build:lgu && npm run build:server"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "pg": "^8.23.1"
   }
 }

@@ -1150,51 +1150,34 @@ export async function requestDriverResubmission(
   return { success: true };
 }
 
-export async function updateDriverMembershipStatus(
+// A TODA administrator does not suspend or reactivate drivers directly: suspensions
+// come from the strike ladder and administrative decisions, and reinstatement is a
+// manual LGU decision (Sections 21, 22). The TODA's part is to RECOMMEND, which raises a
+// review flag for the LGU Administrator through the shared flag mechanism (the database
+// verifies the driver belongs to this TODA and audits the flag).
+async function recommendToLgu(
+  flagType: 'TODA_SUSPENSION_RECOMMENDATION' | 'TODA_REACTIVATION_RECOMMENDATION',
   driverId: string,
-  newStatus: 'Active' | 'Suspended' | 'Inactive',
   reason?: string
 ) {
-  const updatePayload: any = {
-    account_status: newStatus === 'Active' ? 'Verified' : 'Suspended',
-    suspension_reason: newStatus === 'Suspended' ? (reason || 'TODA Association Policy Suspension') : null,
-    suspended_at: newStatus === 'Suspended' ? new Date().toISOString() : null,
-  };
-
-  let { data, error } = await supabase
-    .from('driver')
-    .update(updatePayload)
-    .eq('driver_id', driverId)
-    .select()
-    .maybeSingle();
-
-  if (error) {
-    const fallback = await supabase
-      .from('driver')
-      .update({ account_status: newStatus === 'Active' ? 'Verified' : 'Suspended' })
-      .eq('driver_id', driverId)
-      .select()
-      .maybeSingle();
-    data = fallback.data;
-  }
-
-  await recordTodaAuditAction({
-    actionType: newStatus === 'Suspended' ? 'DRIVER_MEMBERSHIP_SUSPENDED' : 'DRIVER_MEMBERSHIP_REACTIVATED',
-    targetId: driverId,
-    targetName: data?.full_name || driverId,
-    details: `Updated driver membership status to '${newStatus}'. ${reason ? 'Reason: ' + reason : ''}`,
-    category: 'Membership',
+  const { data, error } = await supabase.rpc('create_admin_review_flag', {
+    p_flag_type: flagType,
+    p_subject_type: 'driver',
+    p_subject_id: driverId,
+    p_source_rule: 'Section 22',
+    p_assigned_role: 'lgu_admin',
+    p_details: { reason: reason || null },
   });
-
-  return { success: true, data };
+  if (error) throw new Error(error.message);
+  return { success: true, flagId: data as string };
 }
 
 export async function suspendTodaDriver(driverId: string, reason: string) {
-  return updateDriverMembershipStatus(driverId, 'Suspended', reason);
+  return recommendToLgu('TODA_SUSPENSION_RECOMMENDATION', driverId, reason);
 }
 
-export async function reactivateTodaDriver(driverId: string) {
-  return updateDriverMembershipStatus(driverId, 'Active');
+export async function reactivateTodaDriver(driverId: string, reason?: string) {
+  return recommendToLgu('TODA_REACTIVATION_RECOMMENDATION', driverId, reason);
 }
 
 // ============================================================================

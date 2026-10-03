@@ -29,7 +29,14 @@ import MapView from '../../../common/components/MapView';
 import SakayToast from '../../../common/components/SakayToast';
 import { supabase } from '../../../services/supabaseClient';
 import { fetchAccreditedTodas, checkDriverDocumentaryRestriction, submitDriverRenewal } from '../../../services/driverApiService';
-import { getCurrentDevicePosition, getCachedDevicePosition } from '@sakay/shared';
+import {
+  getCurrentDevicePosition,
+  getCachedDevicePosition,
+  describeRestriction,
+  fetchOwnAccountRestriction,
+  parseRestrictionError,
+  type AccountRestriction,
+} from '@sakay/shared';
 import { useLanguage } from '../../../utils/LanguageContext';
 import { useDriverSession } from '../../../contexts/DriverSessionContext';
 
@@ -57,6 +64,9 @@ export const DriverAvailabilityHome: React.FC = () => {
       setSearchingPillVisible(true);
     }, 150);
   };
+
+  // Suspension / deactivation decided by the database (Sections 20-22)
+  const [accountRestriction, setAccountRestriction] = useState<AccountRestriction | null>(null);
 
   // Documentary Restriction & Renewal State (Rule 24.1 - 24.3)
   const [restrictionInfo, setRestrictionInfo] = useState<{
@@ -179,6 +189,11 @@ export const DriverAvailabilityHome: React.FC = () => {
 
         const { data: { user } } = await supabase.auth.getUser();
 
+        // Ask the database before reading the profile: it decides suspension / deactivation and
+        // lifts a suspension whose period has ended, so the status read below is current.
+        const ownRestriction = user?.id ? await fetchOwnAccountRestriction(supabase, 'driver') : null;
+        setAccountRestriction(ownRestriction?.restricted ? ownRestriction : null);
+
         let query = supabase
           .from('driver')
           .select(`
@@ -215,7 +230,9 @@ export const DriverAvailabilityHome: React.FC = () => {
         const { data: driverData } = await query.maybeSingle();
 
         if (driverData) {
-          if (driverData.account_status !== 'Verified') {
+          // A suspended / deactivated driver stays on the home screen with the reason and end date;
+          // only applicants who are not yet verified are sent to the application status page.
+          if (driverData.account_status !== 'Verified' && !ownRestriction?.restricted) {
             navigate('/driver/status', { replace: true });
             return;
           }
@@ -326,7 +343,7 @@ export const DriverAvailabilityHome: React.FC = () => {
   };
 
   const isDriverVerifiedInDb = profile.accountStatus === 'Verified';
-  const canGoOnline = isDriverVerifiedInDb && !restrictionInfo?.is_restricted;
+  const canGoOnline = isDriverVerifiedInDb && !restrictionInfo?.is_restricted && !accountRestriction?.restricted;
 
   const handleToggleOnline = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!canGoOnline) return;
@@ -344,6 +361,9 @@ export const DriverAvailabilityHome: React.FC = () => {
         if (error) {
           console.warn('[DriverAvailabilityHome] Failed to sync availability_status:', error);
           setProfile((prev) => ({ ...prev, isOnline: false }));
+          // The database refuses going online while suspended / deactivated: show why.
+          const refused = parseRestrictionError(error.message);
+          if (refused) setAccountRestriction(refused);
         }
       } catch (err) {
         console.warn('[DriverAvailabilityHome] Failed to sync availability_status:', err);
@@ -547,8 +567,48 @@ export const DriverAvailabilityHome: React.FC = () => {
         </Box>
       </Paper>
 
+      {/* Suspension / Deactivation Banner (Sections 20-22): shows the reason and end date */}
+      {accountRestriction?.restricted && (
+        <Paper
+          elevation={3}
+          sx={{
+            position: 'absolute',
+            top: 'calc(var(--safe-area-top) + 84px)',
+            left: '16px',
+            right: '16px',
+            backgroundColor: '#FEF2F2',
+            border: '1.5px solid #FCA5A5',
+            borderRadius: '16px',
+            p: 2,
+            zIndex: 25,
+            boxShadow: '0 8px 24px rgba(220, 38, 38, 0.15)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+            <WarningAmberIcon sx={{ color: '#DC2626', fontSize: 26, mt: 0.2, flexShrink: 0 }} />
+            <Box sx={{ flex: 1 }}>
+              <Typography sx={{ color: '#991B1B', fontWeight: 800, fontSize: '13px', lineHeight: 1.2 }}>
+                {accountRestriction.kind === 'DEACTIVATED' || accountRestriction.kind === 'CLOSED'
+                  ? (language === 'tl' ? 'Na-deactivate ang Account' : 'Account Deactivated')
+                  : (language === 'tl' ? 'Suspendido ang Account' : 'Account Suspended')}
+              </Typography>
+              <Typography sx={{ color: '#7F1D1D', fontSize: '11.5px', mt: 0.5, lineHeight: 1.4 }}>
+                {describeRestriction(accountRestriction, language === 'tl' ? 'tl' : 'en')}
+              </Typography>
+              {accountRestriction.kind === 'SUSPENDED' && (
+                <Typography sx={{ color: '#991B1B', fontSize: '10.5px', fontStyle: 'italic', mt: 0.5 }}>
+                  {language === 'tl'
+                    ? 'Kusang mawawala ang suspensyon kapag natapos ang panahon nito.'
+                    : 'The suspension lifts automatically when this period ends.'}
+                </Typography>
+              )}
+            </Box>
+          </Box>
+        </Paper>
+      )}
+
       {/* Documentary Restriction Warning Banner (Rule 24.2, 24.3) */}
-      {restrictionInfo?.is_restricted && (
+      {restrictionInfo?.is_restricted && !accountRestriction?.restricted && (
         <Paper
           elevation={3}
           sx={{

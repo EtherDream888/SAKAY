@@ -20,6 +20,7 @@ import {
   AccreditedTodaRecord,
   DriverRecord,
   PassengerRecord,
+  StrikeItem,
   IncidentReportRecord,
   AnnouncementRecord,
   AuditLogRecord,
@@ -902,7 +903,7 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
       // Stage 2 LGU final approval: ONLY driver.account_status === 'Verified'
       const isFullyApproved = d.account_status === 'Verified';
       const isRejected = d.account_status === 'Rejected' || verif?.verification_status === 'Rejected';
-      const isSuspended = d.account_status === 'Suspended';
+      const isSuspended = d.account_status === 'Suspended' || d.account_status === 'Deactivated';
       // If applicant already resubmitted, they are no longer in "Resubmission Required" - they are awaiting review!
       const isResubmission = !isResubmitted && isStatusResubmissionRequired;
       // Stage 1 TODA endorsement: driver is in driver_verification with 'Approved' but NOT yet LGU-approved
@@ -1057,8 +1058,11 @@ export async function fetchDrivers(filters?: { status?: string; toda?: string })
           barangay: d.barangay_service_area || todaInfo?.barangay || 'Calapan City',
           rejectionReason: verif?.rejection_reason || d.rejection_reason || undefined,
           rejectionComment: verif?.rejection_comment || d.rejection_comment || undefined,
-          strikesCount: 0,
+          strikesCount: d.strikes_count ?? 0,
           strikeHistory: [],
+          restrictionKind: deriveRestrictionKind(d),
+          suspendedUntil: d.suspended_until || undefined,
+          suspensionReason: d.suspension_reason || undefined,
           isResubmitted,
           resubmittedAt: verif?.submitted_at || undefined,
           documents,
@@ -1415,14 +1419,17 @@ export async function fetchTodaDrivers(todaId: string): Promise<DriverRecord[]> 
         todaVerificationStatus: 'Verified',
         lguVerificationStatus: d.account_status === 'Verified' ? 'Verified' : 'Pending',
         verificationStatus: d.account_status === 'Verified' ? 'Verified' : 'Pending',
-        accountStatus: d.account_status === 'Suspended' ? 'Inactive' : 'Active',
+        accountStatus: d.account_status === 'Suspended' || d.account_status === 'Deactivated' ? 'Inactive' : 'Active',
         onlineStatus: d.availability_status === 'Available' || d.availability_status === 'Busy' ? 'Online' : 'Offline',
         rating: Number(d.weighted_average_rating) || 5.0,
         ratingCount: 0,
         phone: d.contact_number,
         barangay: d.barangay_service_area || d.toda?.barangay || 'Calapan City',
-        strikesCount: 0,
+        strikesCount: d.strikes_count ?? 0,
         strikeHistory: [],
+        restrictionKind: deriveRestrictionKind(d),
+        suspendedUntil: d.suspended_until || undefined,
+        suspensionReason: d.suspension_reason || undefined,
         documents: [
           { name: "Driver's License (Front)", type: 'Identification Proof', status: 'Verified', url: licFrontUrl },
           { name: "Driver's License (Back)", type: 'Identification Proof', status: 'Verified', url: licBackUrl },
@@ -1438,102 +1445,121 @@ export async function fetchTodaDrivers(todaId: string): Promise<DriverRecord[]> 
   }
 }
 
-export async function suspendDriver(driverId: string, reason: string, durationDays?: number) {
-  const updatePayload: any = {
-    account_status: 'Suspended',
-    suspension_reason: reason,
-    suspended_at: new Date().toISOString(),
-  };
+// ----------------------------------------------------------------------------
+// STRIKES, SUSPENSIONS & REINSTATEMENT (Batch 3)
+// All decisions are made by the database policy engine (RPCs) and audited there
+// (actor, before/after state, reason). The client never writes strike or
+// suspension columns directly: the database rejects such writes.
+// ----------------------------------------------------------------------------
 
-  let { data, error } = await supabase
-    .from('driver')
-    .update(updatePayload)
-    .eq('driver_id', driverId)
-    .select();
+export type StrikeSubjectType = 'passenger' | 'driver';
 
-  if (error) {
-    const fallback = await supabase
-      .from('driver')
-      .update({ account_status: 'Suspended' })
-      .eq('driver_id', driverId)
-      .select();
-    data = fallback.data;
-  }
-
-  await recordAdminAuditAction({
-    actionType: 'DRIVER_ACCOUNT_SUSPENDED',
-    targetId: driverId,
-    details: `Suspended driver account for ${durationDays || 7} days. Reason: ${reason}`,
-    category: 'User Oversight',
-  });
-  return { success: true, data };
+export interface StrikeEngineResult {
+  success: boolean;
+  strike_id?: string;
+  points?: number;
+  active_before?: number;
+  active_after?: number;
+  consequence?: 'WARNING' | 'ADMIN_REVIEW' | 'SUSPENSION' | 'DEACTIVATION' | 'INVESTIGATION_SUSPENSION' | null;
+  suspended_until?: string | null;
+  paused?: boolean;
+  observed?: boolean;
+  exempt?: boolean;
+  idempotent?: boolean;
 }
 
-
-export async function reactivateDriver(driverId: string) {
-  const updatePayload: any = {
-    account_status: 'Verified',
-    suspension_reason: null,
-    suspended_at: null,
-  };
-
-  let { data, error } = await supabase
-    .from('driver')
-    .update(updatePayload)
-    .eq('driver_id', driverId)
-    .select();
-
-  if (error) {
-    const fallback = await supabase
-      .from('driver')
-      .update({ account_status: 'Verified' })
-      .eq('driver_id', driverId)
-      .select();
-    data = fallback.data;
-  }
-
-  await recordAdminAuditAction({
-    actionType: 'DRIVER_ACCOUNT_REACTIVATED',
-    targetId: driverId,
-    details: `Reactivated driver account.`,
-    category: 'User Oversight',
-  });
-  return { success: true, data };
+export interface ViolationCatalogItem {
+  violation_code: string;
+  description: string;
+  source_rule: string;
+  default_points: number;
+  min_points: number;
+  max_points: number;
+  confirmation_mode: 'AUTOMATIC' | 'UPHELD_REPORT' | 'ADMIN_CONFIRMATION';
+  ladder_bypass: string;
 }
 
-export async function issueDriverStrike(driverId: string, reason: string, strikesOrCategory?: string | number) {
-  try {
-    const { data: driverRow } = await supabase
-      .from('driver')
-      .select('strikes_count')
-      .eq('driver_id', driverId)
-      .maybeSingle();
+async function callPolicyRpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) throw new Error(error.message);
+  return data as T;
+}
 
-    const currentStrikes = (driverRow?.strikes_count || 0) + 1;
-    const updatePayload: any = {
-      strikes_count: currentStrikes,
+function deriveRestrictionKind(row: any): DriverRecord['restrictionKind'] {
+  if (row.closed_at) return 'CLOSED';
+  if (row.deactivated_at || row.account_status === 'Deactivated') return 'DEACTIVATED';
+  if (row.suspension_kind === 'INVESTIGATION') return 'INVESTIGATION';
+  if (row.account_status === 'Suspended') return 'SUSPENDED';
+  return undefined;
+}
+
+/** Violations an administrator may record by hand (system-detected ones are issued by the platform). */
+export async function fetchViolationCatalog(appliesTo: StrikeSubjectType): Promise<ViolationCatalogItem[]> {
+  const { data, error } = await supabase
+    .from('violation_catalog')
+    .select('violation_code, description, source_rule, default_points, min_points, max_points, confirmation_mode, ladder_bypass')
+    .eq('applies_to', appliesTo)
+    .eq('is_active', true)
+    .neq('confirmation_mode', 'AUTOMATIC')
+    .order('source_rule');
+  if (error) throw new Error(error.message);
+  return (data || []) as ViolationCatalogItem[];
+}
+
+/** Strike ledger for one account, mapped for the existing strike-history lists. */
+export async function fetchStrikeHistory(
+  subjectType: StrikeSubjectType,
+  subjectId: string
+): Promise<{ activeStrikes: number; history: StrikeItem[] }> {
+  const res = await callPolicyRpc<any>('get_strike_history', { p_subject_type: subjectType, p_subject_id: subjectId });
+  const roleLabels: Record<string, string> = {
+    lgu_admin: 'LGU Administrator',
+    toda_admin: 'TODA Administrator',
+    system: 'SAKAY System',
+  };
+  const history: StrikeItem[] = (res.strikes || []).map((s: any) => {
+    const counted = ['ACTIVE', 'PROVISIONAL', 'PARTIALLY_WAIVED'].includes(s.status) && s.points_active > 0;
+    let status: StrikeItem['status'];
+    if (s.status === 'PROVISIONAL') status = 'Provisional (Exemption Window Open)';
+    else if (s.status === 'WAIVED' || s.status === 'PARTIALLY_WAIVED' || s.status === 'VOIDED') status = 'Waived on Appeal';
+    else if (s.status === 'AUTO_WAIVED' || s.status === 'OBSERVED') status = 'Not Counted (Waived / Exempt)';
+    else status = counted && s.in_window ? 'Active (Rolling 90d)' : 'Expired';
+    return {
+      id: s.strike_id,
+      date: new Date(s.issued_at).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: '2-digit', year: 'numeric' }),
+      reason: `${s.description} (${s.source_rule})`,
+      strikesApplied: s.points_active > 0 ? s.points_active : s.points_issued,
+      status,
+      issuedBy: roleLabels[s.issued_by_role] || 'SAKAY System',
     };
-    if (currentStrikes >= 3) {
-      updatePayload.account_status = 'Suspended';
-      updatePayload.suspension_reason = `Automated platform suspension: ${currentStrikes} policy strikes accumulated. Last violation: ${reason}`;
-      updatePayload.suspended_at = new Date().toISOString();
-    }
-
-    await supabase
-      .from('driver')
-      .update(updatePayload)
-      .eq('driver_id', driverId);
-  } catch (err) {
-    console.warn('[adminApiService] Error updating driver strikes:', err);
-  }
-
-  await recordAdminAuditAction({
-    actionType: 'DRIVER_POLICY_STRIKE_ISSUED',
-    targetId: driverId,
-    details: `Issued administrative strike to driver (${strikesOrCategory || 'Policy'}). Reason: ${reason}`,
-    category: 'User Oversight',
   });
-  return { success: true };
+  return { activeStrikes: res.active_strikes ?? 0, history };
+}
+
+export async function suspendDriver(driverId: string, reason: string, durationDays: number | null = 7) {
+  const data = await callPolicyRpc<{ success: boolean; suspended_until: string | null }>('admin_suspend_account', {
+    p_subject_type: 'driver', p_subject_id: driverId, p_days: durationDays, p_reason: reason,
+  });
+  return { success: true, data };
+}
+
+/** Lifts a suspension or reactivates a deactivated account. A deactivated account requires the
+ *  administrator to confirm the full violation history was reviewed (Rule 22.2). Strikes are kept (22.4). */
+export async function reactivateDriver(
+  driverId: string,
+  reason: string = 'Reinstated by LGU Administrator',
+  historyReviewed: boolean = false
+) {
+  const data = await callPolicyRpc<{ success: boolean }>('admin_reinstate_account', {
+    p_subject_type: 'driver', p_subject_id: driverId, p_reason: reason, p_history_reviewed: historyReviewed,
+  });
+  return { success: true, data };
+}
+
+export async function issueDriverStrike(driverId: string, violationCode: string, reason: string): Promise<StrikeEngineResult> {
+  return callPolicyRpc<StrikeEngineResult>('issue_strike', {
+    p_subject_type: 'driver', p_subject_id: driverId, p_violation_code: violationCode, p_reason: reason,
+  });
 }
 
 
@@ -1552,7 +1578,11 @@ export async function fetchPassengers(filters?: { status?: string }): Promise<Pa
       phone: p.contact_number,
       email: p.email || '',
       verificationStatus: 'Verified',
-      accountStatus: p.account_status === 'Suspended' ? 'Suspended' : 'Active',
+      accountStatus: deriveRestrictionKind(p) === 'DEACTIVATED' || deriveRestrictionKind(p) === 'CLOSED'
+        ? 'Deactivated'
+        : p.account_status === 'Suspended' ? 'Suspended' : 'Active',
+      restrictionKind: deriveRestrictionKind(p),
+      suspendedUntil: p.suspended_until || undefined,
       suspensionReason: p.suspension_reason || undefined,
       activeSession: false,
       totalBookings: 0,
@@ -1568,85 +1598,29 @@ export async function fetchPassengers(filters?: { status?: string }): Promise<Pa
   }
 }
 
-export async function suspendPassenger(passengerId: string, reason: string, durationDays?: number) {
-  const updatePayload: any = {
-    account_status: 'Suspended',
-    suspension_reason: reason,
-    suspended_at: new Date().toISOString(),
-  };
-
-  const { data, error } = await supabase
-    .from('passenger')
-    .update(updatePayload)
-    .eq('passenger_id', passengerId)
-    .select();
-  if (error) throw error;
-
-  await recordAdminAuditAction({
-    actionType: 'PASSENGER_ACCOUNT_SUSPENDED',
-    targetId: passengerId,
-    details: `Suspended passenger account for ${durationDays || 7} days. Reason: ${reason}`,
-    category: 'User Oversight',
+export async function suspendPassenger(passengerId: string, reason: string, durationDays: number | null = 7) {
+  const data = await callPolicyRpc<{ success: boolean; suspended_until: string | null }>('admin_suspend_account', {
+    p_subject_type: 'passenger', p_subject_id: passengerId, p_days: durationDays, p_reason: reason,
   });
   return { success: true, data };
 }
 
-export async function reactivatePassenger(passengerId: string) {
-  const updatePayload: any = {
-    account_status: 'Active',
-    suspension_reason: null,
-    suspended_at: null,
-  };
-
-  const { data, error } = await supabase
-    .from('passenger')
-    .update(updatePayload)
-    .eq('passenger_id', passengerId)
-    .select();
-  if (error) throw error;
-
-  await recordAdminAuditAction({
-    actionType: 'PASSENGER_ACCOUNT_REACTIVATED',
-    targetId: passengerId,
-    details: `Reactivated passenger account.`,
-    category: 'User Oversight',
+/** See reactivateDriver: deactivated accounts need the history-reviewed confirmation. */
+export async function reactivatePassenger(
+  passengerId: string,
+  reason: string = 'Reinstated by LGU Administrator',
+  historyReviewed: boolean = false
+) {
+  const data = await callPolicyRpc<{ success: boolean }>('admin_reinstate_account', {
+    p_subject_type: 'passenger', p_subject_id: passengerId, p_reason: reason, p_history_reviewed: historyReviewed,
   });
   return { success: true, data };
 }
 
-export async function issuePassengerStrike(passengerId: string, reason: string) {
-  try {
-    const { data: passRow } = await supabase
-      .from('passenger')
-      .select('strikes_count')
-      .eq('passenger_id', passengerId)
-      .maybeSingle();
-
-    const currentStrikes = (passRow?.strikes_count || 0) + 1;
-    const updatePayload: any = {
-      strikes_count: currentStrikes,
-    };
-    if (currentStrikes >= 3) {
-      updatePayload.account_status = 'Suspended';
-      updatePayload.suspension_reason = `Automated platform suspension: ${currentStrikes} policy strikes accumulated. Last violation: ${reason}`;
-      updatePayload.suspended_at = new Date().toISOString();
-    }
-
-    await supabase
-      .from('passenger')
-      .update(updatePayload)
-      .eq('passenger_id', passengerId);
-  } catch (err) {
-    console.warn('[adminApiService] Error updating passenger strikes:', err);
-  }
-
-  await recordAdminAuditAction({
-    actionType: 'PASSENGER_POLICY_STRIKE_ISSUED',
-    targetId: passengerId,
-    details: `Issued strike to passenger. Reason: ${reason}`,
-    category: 'User Oversight',
+export async function issuePassengerStrike(passengerId: string, violationCode: string, reason: string): Promise<StrikeEngineResult> {
+  return callPolicyRpc<StrikeEngineResult>('issue_strike', {
+    p_subject_type: 'passenger', p_subject_id: passengerId, p_violation_code: violationCode, p_reason: reason,
   });
-  return { success: true };
 }
 
 // ============================================================================
@@ -2365,19 +2339,10 @@ export async function fetchAdminReviewFlags() {
  * Resolves an administrative review flag
  */
 export async function resolveAdminReviewFlag(flagId: string, resolution: string) {
-  const { data, error } = await supabase
-    .from('admin_review_flag')
-    .update({
-      status: 'Resolved',
-      resolution: resolution,
-      resolved_at: new Date().toISOString(),
-    })
-    .eq('flag_id', flagId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+  // The RPC records the reviewer (resolved_by) and writes the audit_log entry.
+  return callPolicyRpc<{ success: boolean; flag_id: string; status: string }>('resolve_admin_review_flag', {
+    p_flag_id: flagId, p_status: 'Resolved', p_resolution: resolution,
+  });
 }
 
 

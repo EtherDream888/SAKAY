@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import { sendRawSms } from '../services/smsService';
+import { forbidDirectAccountAction } from './disabledEndpoints';
 
 const router = Router();
 
@@ -52,7 +53,7 @@ router.get('/', async (req: Request, res: Response) => {
           account_status: d.account_status || 'Pending Verification',
           availability_status: d.availability_status || 'Offline',
           weighted_average_rating: Number(d.weighted_average_rating) || 5.0,
-          strikes_count: 0,
+          strikes_count: d.strikes_count ?? 0,
           created_at: d.created_at,
         }));
 
@@ -146,137 +147,12 @@ router.post('/:id/verify', async (req: Request, res: Response) => {
 });
 
 // ============================================================================
-// 3. POST /api/admin/drivers/:id/suspend - Administrative Driver Suspension
+// 3-5. suspend / reactivate / strike
+// Enforced by the database policy engine (Batch 3). These routes were
+// unauthenticated and wrote with the service-role key, so they are disabled.
 // ============================================================================
-router.post('/:id/suspend', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { reason, duration_days = 7, actor_name = 'LGU Transport Administrator' } = req.body;
-
-    if (!reason) {
-      return res.status(400).json({
-        success: false,
-        error: 'A mandatory suspension reason must be specified.',
-      });
-    }
-
-    if (supabase) {
-      const { data, error } = await supabase
-        .from('driver')
-        .update({ account_status: 'Suspended' })
-        .eq('driver_id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      await supabase.from('audit_log').insert([
-        {
-          action_type: 'DRIVER_ACCOUNT_SUSPENDED',
-          target_id: id,
-          details: `[User Oversight] ${actor_name}: Enacted administrative suspension on driver '${data?.full_name || id}' for ${duration_days} days. Reason: ${reason}`,
-          performed_at: new Date().toISOString(),
-        },
-      ]);
-
-      return res.json({
-        success: true,
-        message: `Driver ${data?.full_name || id} suspended for ${duration_days} days.`,
-        data,
-      });
-    }
-
-    return res.status(500).json({ success: false, error: 'Database service unavailable' });
-  } catch (err) {
-    console.error('[driverRoutes] /:id/suspend error:', err);
-    return res.status(500).json({ success: false, error: (err as Error).message });
-  }
-});
-
-// ============================================================================
-// 4. POST /api/admin/drivers/:id/reactivate - Reactivate Suspended Driver
-// ============================================================================
-router.post('/:id/reactivate', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { actor_name = 'LGU Transport Administrator' } = req.body;
-
-    if (supabase) {
-      const { data, error } = await supabase
-        .from('driver')
-        .update({ account_status: 'Verified' })
-        .eq('driver_id', id)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      await supabase.from('audit_log').insert([
-        {
-          action_type: 'DRIVER_ACCOUNT_REACTIVATED',
-          target_id: id,
-          details: `[User Oversight] ${actor_name}: Reactivated driver '${data?.full_name || id}' to active verified standing.`,
-          performed_at: new Date().toISOString(),
-        },
-      ]);
-
-      return res.json({
-        success: true,
-        message: `Driver ${data?.full_name || id} reactivated.`,
-        data,
-      });
-    }
-
-    return res.status(500).json({ success: false, error: 'Database service unavailable' });
-  } catch (err) {
-    console.error('[driverRoutes] /:id/reactivate error:', err);
-    return res.status(500).json({ success: false, error: (err as Error).message });
-  }
-});
-
-// ============================================================================
-// 5. POST /api/admin/drivers/:id/strike - Issue Administrative Policy Strike
-// ============================================================================
-router.post('/:id/strike', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { reason, violation_type = 'Operational Violation', actor_name = 'LGU Transport Administrator' } = req.body;
-
-    if (!reason) {
-      return res.status(400).json({
-        success: false,
-        error: 'A mandatory reason for the strike must be provided.',
-      });
-    }
-
-    if (supabase) {
-      const { data: driver } = await supabase
-        .from('driver')
-        .select('full_name')
-        .eq('driver_id', id)
-        .maybeSingle();
-
-      await supabase.from('audit_log').insert([
-        {
-          action_type: 'DRIVER_POLICY_STRIKE_ISSUED',
-          target_id: id,
-          details: `[User Oversight] ${actor_name}: Issued administrative policy strike to driver '${driver?.full_name || id}'. Category: ${violation_type}. Reason: ${reason}`,
-          performed_at: new Date().toISOString(),
-        },
-      ]);
-
-      return res.json({
-        success: true,
-        message: `Administrative policy strike issued to driver ${driver?.full_name || id}.`,
-        data: { id, reason, violation_type },
-      });
-    }
-
-    return res.status(500).json({ success: false, error: 'Database service unavailable' });
-  } catch (err) {
-    console.error('[driverRoutes] /:id/strike error:', err);
-    return res.status(500).json({ success: false, error: (err as Error).message });
-  }
-});
+router.post('/:id/suspend', forbidDirectAccountAction);
+router.post('/:id/reactivate', forbidDirectAccountAction);
+router.post('/:id/strike', forbidDirectAccountAction);
 
 export default router;

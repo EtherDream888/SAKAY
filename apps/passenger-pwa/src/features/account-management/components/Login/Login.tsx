@@ -15,7 +15,8 @@ import SakayToast from "../../../../common/components/SakayToast";
 import { SakayPhoneInput } from "../../../../common/components/SakayPhoneInput";
 import { RegisterInput } from "../../../../common/components/RegisterInput";
 import { supabase } from "../../../../services/supabaseClient";
-import { getPhoneLookupCandidates, rotatePassengerSession } from "../../../../services/passengerApiService";
+import { describeRestriction } from "@sakay/shared";
+import { getOwnAccountRestriction, getPhoneLookupCandidates, rotatePassengerSession } from "../../../../services/passengerApiService";
 
 const Login: React.FC = () => {
   const { language, t } = useLanguage();
@@ -196,11 +197,19 @@ const Login: React.FC = () => {
               return;
             }
 
-            if (profile.account_status === "Suspended" || profile.account_status === "Deactivated") {
+            // The database decides suspension / deactivation (and lifts a suspension whose
+            // period has ended). Falls back to the status column if the check is unavailable.
+            const restriction = await getOwnAccountRestriction("passenger");
+            const isRestricted = restriction
+              ? restriction.restricted
+              : profile.account_status === "Suspended" || profile.account_status === "Deactivated";
+            if (isRestricted) {
               triggerErrorToast(
-                language === "tl"
-                  ? "Ang inyong account ay suspendido o na-deactivate."
-                  : "Your account has been suspended or deactivated."
+                restriction
+                  ? describeRestriction(restriction, language === "tl" ? "tl" : "en")
+                  : language === "tl"
+                    ? "Ang inyong account ay suspendido o na-deactivate."
+                    : "Your account has been suspended or deactivated."
               );
               setLoading(false);
               await supabase.auth.signOut();

@@ -5,6 +5,7 @@
 
 import { supabase } from './supabaseClient';
 import type { BookingRecord } from '@sakay/shared';
+import { describeRestriction, parseRestrictionError } from '@sakay/shared';
 import { saveTripToHistory } from './tripService';
 
 export type { BookingRecord };
@@ -192,6 +193,12 @@ export const createBooking = async (payload: CreateBookingPayload): Promise<Book
         'Mayroon ka nang aktibong booking. Kanselahin muna ang iyong kasalukuyang booking bago gumawa ng bago.\n\n' +
         '(You already have an active booking. Please cancel it before creating a new one.)'
       );
+    }
+
+    // Suspended / deactivated account: the database guard refuses new bookings (Batch 3)
+    const restriction = parseRestrictionError(msg);
+    if (restriction) {
+      throw new Error(`${describeRestriction(restriction, 'tl')}\n\n(${describeRestriction(restriction, 'en')})`);
     }
 
     if (msg.includes('ERR_OUT_OF_SERVICE_AREA')) {
